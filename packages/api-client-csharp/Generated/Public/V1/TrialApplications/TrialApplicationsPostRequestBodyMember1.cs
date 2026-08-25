@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Public.V1.TrialApplications
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The attribution property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Public.V1.TrialApplications.TrialApplicationsPostRequestBodyMember1_attribution? Attribution { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Public.V1.TrialApplications.TrialApplicationsPostRequestBodyMember1_attribution Attribution { get; set; }
+#endif
         /// <summary>The businessName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -83,6 +91,7 @@ namespace GiroMesa.ApiClient.Public.V1.TrialApplications
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "attribution", n => { Attribution = n.GetObjectValue<global::GiroMesa.ApiClient.Public.V1.TrialApplications.TrialApplicationsPostRequestBodyMember1_attribution>(global::GiroMesa.ApiClient.Public.V1.TrialApplications.TrialApplicationsPostRequestBodyMember1_attribution.CreateFromDiscriminatorValue); } },
                 { "businessName", n => { BusinessName = n.GetStringValue(); } },
                 { "consent", n => { Consent = n.GetBoolValue(); } },
                 { "email", n => { Email = n.GetStringValue(); } },
@@ -99,6 +108,7 @@ namespace GiroMesa.ApiClient.Public.V1.TrialApplications
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Public.V1.TrialApplications.TrialApplicationsPostRequestBodyMember1_attribution>("attribution", Attribution);
             writer.WriteStringValue("businessName", BusinessName);
             writer.WriteBoolValue("consent", Consent);
             writer.WriteStringValue("email", Email);

@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   identities,
+  managementInventoryItems,
+  managementReturnableCustodyHandoffs,
+  managementReturnableCustodyMovements,
+  managementReturnablePolicies,
   memberships,
   organizations,
   outboxEvents,
@@ -21,9 +25,11 @@ import {
   posProductPrices,
   posProductStations,
   posProducts,
+  posTabs,
   roleBindings,
   units,
 } from "@giromesa/db";
+import { ConflictException } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -113,6 +119,35 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       unitId: unitA.id,
       role: "waiter",
     });
+    const createScopedActor = async (
+      emailPrefix: string,
+      displayName: string,
+      role: "cashier" | "receptionist" | "busser",
+    ) => {
+      const [actor] = await database.db
+        .insert(identities)
+        .values({ email: `${emailPrefix}+${runId}@example.test`, displayName })
+        .returning();
+      assert.ok(actor);
+      const [actorMembership] = await database.db
+        .insert(memberships)
+        .values({ identityId: actor.id, organizationId: organizationA.id, status: "active" })
+        .returning();
+      assert.ok(actorMembership);
+      await database.db.insert(roleBindings).values({
+        membershipId: actorMembership.id,
+        unitId: unitA.id,
+        role,
+      });
+      return actor;
+    };
+    const cashierIdentity = await createScopedActor("pilot-cashier", "Pilot Cashier", "cashier");
+    const receptionistIdentity = await createScopedActor(
+      "pilot-receptionist",
+      "Pilot Receptionist",
+      "receptionist",
+    );
+    const busserIdentity = await createScopedActor("pilot-busser", "Pilot Busser", "busser");
     const [kdsIdentity] = await database.db
       .insert(identities)
       .values({ email: `pilot-kds+${runId}@example.test`, displayName: "Pilot KDS" })
@@ -194,7 +229,21 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     await assert.rejects(() => pos.listFloor(identity.id, organizationA.id, unitB.id));
 
     await pos.updateFloorLayout(identity.id, organizationA.id, unitA.id, {
-      tables: [{ tableId: table.id, x: 240, y: 180 }],
+      expectedRevision: 1,
+      tables: [
+        {
+          tableId: table.id,
+          roomId: room.id,
+          label: table.label,
+          seats: table.seats,
+          x: 240,
+          y: 180,
+          width: 122,
+          height: 76,
+          rotation: 0,
+          shape: "rectangle",
+        },
+      ],
       rooms: [
         {
           roomId: room.id,
@@ -220,6 +269,17 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         { x: 20, y: 300 },
       ],
     );
+    await assert.rejects(
+      () =>
+        pos.createRoom(identity.id, organizationA.id, unitA.id, {
+          name: "Ambiente obsoleto",
+          sortOrder: 2,
+          expectedRevision: 1,
+        }),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "FLOOR_LAYOUT_VERSION_CONFLICT",
+    );
 
     const opened = await pos.openTab(identity.id, organizationA.id, unitA.id, "open-tab-0001", {
       tableId: table.id,
@@ -238,6 +298,39 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       }),
     );
     const tabId = (opened.tab as { id: string }).id;
+    const cashierFloor = await pos.listFloor(cashierIdentity.id, organizationA.id, unitA.id);
+    assert.equal(cashierFloor.openTabs[0]?.id, tabId);
+    assert.equal(
+      cashierFloor.tables.find((candidate) => candidate.id === table.id)?.accessLevel,
+      "financial",
+    );
+    assert.equal(cashierFloor.capabilities.canAccessAllTabs, true);
+    assert.equal(cashierFloor.capabilities.canManageFloor, false);
+
+    const waiterFloor = await pos.listFloor(supportIdentity.id, organizationA.id, unitA.id);
+    assert.equal(waiterFloor.openTabs.length, 0);
+    assert.equal(
+      waiterFloor.tables.find((candidate) => candidate.id === table.id)?.accessLevel,
+      "overview",
+    );
+    assert.equal(waiterFloor.capabilities.canAccessAllTabs, false);
+    assert.equal(waiterFloor.capabilities.canReorganizeTables, true);
+
+    for (const restrictedIdentity of [receptionistIdentity, busserIdentity]) {
+      const restrictedFloor = await pos.listFloor(
+        restrictedIdentity.id,
+        organizationA.id,
+        unitA.id,
+      );
+      assert.equal(restrictedFloor.openTabs.length, 0);
+      assert.equal(
+        restrictedFloor.tables.find((candidate) => candidate.id === table.id)?.accessLevel,
+        "overview",
+      );
+      assert.equal(restrictedFloor.capabilities.canAccessAllTabs, false);
+      assert.equal(restrictedFloor.capabilities.canManageFloor, false);
+      assert.equal(restrictedFloor.capabilities.canManageShift, false);
+    }
 
     const orderResult = await pos.createOrder(
       identity.id,
@@ -250,6 +343,105 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     const order = orderResult.order as { id: string };
     const item = (orderResult.items as { id: string }[])[0];
     assert.ok(item);
+    const [stockBeforeQrDraft] = await database.db
+      .select({ soldToday: posProductAvailability.soldToday })
+      .from(posProductAvailability)
+      .where(
+        and(
+          eq(posProductAvailability.organizationId, organizationA.id),
+          eq(posProductAvailability.unitId, unitA.id),
+          eq(posProductAvailability.productId, product.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(stockBeforeQrDraft);
+    const [tabBeforeQrDraft] = await database.db
+      .select({ totalCents: posTabs.totalCents })
+      .from(posTabs)
+      .where(eq(posTabs.id, tabId))
+      .limit(1);
+    assert.ok(tabBeforeQrDraft);
+    const qrDraft = await pos.createPublicTableOrder(
+      organizationA.id,
+      unitA.id,
+      table.id,
+      tabId,
+      "qr-table-order-0001",
+      { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
+    );
+    assert.equal(qrDraft.order.source, "qr_table");
+    assert.equal(qrDraft.order.status, "draft");
+    const [[stockWithQrDraft], [tabWithQrDraft]] = await Promise.all([
+      database.db
+        .select({ soldToday: posProductAvailability.soldToday })
+        .from(posProductAvailability)
+        .where(
+          and(
+            eq(posProductAvailability.organizationId, organizationA.id),
+            eq(posProductAvailability.unitId, unitA.id),
+            eq(posProductAvailability.productId, product.id),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ totalCents: posTabs.totalCents })
+        .from(posTabs)
+        .where(eq(posTabs.id, tabId))
+        .limit(1),
+    ]);
+    assert.equal(stockWithQrDraft?.soldToday, stockBeforeQrDraft.soldToday);
+    assert.equal(tabWithQrDraft?.totalCents, tabBeforeQrDraft.totalCents);
+    const rejectedQrDraft = await pos.rejectPublicTableOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      qrDraft.order.id,
+      "reject-qr-table-order-0001",
+      { reason: "Cliente solicitou ajuste" },
+    );
+    assert.equal(rejectedQrDraft.status, "canceled");
+    const replayedQrRejection = await pos.rejectPublicTableOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      qrDraft.order.id,
+      "reject-qr-table-order-0001",
+      { reason: "Cliente solicitou ajuste" },
+    );
+    assert.equal(replayedQrRejection.idempotentReplay, true);
+    await assert.rejects(() =>
+      pos.rejectPublicTableOrder(
+        identity.id,
+        organizationB.id,
+        unitB.id,
+        qrDraft.order.id,
+        "reject-qr-cross-tenant-0001",
+        { reason: "Tentativa inválida" },
+      ),
+    );
+    const [stockAfterQrRejection] = await database.db
+      .select({ soldToday: posProductAvailability.soldToday })
+      .from(posProductAvailability)
+      .where(
+        and(
+          eq(posProductAvailability.organizationId, organizationA.id),
+          eq(posProductAvailability.unitId, unitA.id),
+          eq(posProductAvailability.productId, product.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(stockAfterQrRejection?.soldToday, stockBeforeQrDraft.soldToday);
+    const [rejectionEvent] = await database.db
+      .select({ id: outboxEvents.id })
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.topic, "pos.public_table_order.rejected"),
+          eq(outboxEvents.aggregateId, qrDraft.order.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(rejectionEvent);
     await pos.setServiceCharge(
       identity.id,
       organizationA.id,
@@ -293,15 +485,101 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       anchorTableId: groupCloseTableA.id,
       mode: "single_tab",
       targetTabId: groupCloseTabId,
+      reasonCode: "operational_reorganization",
     });
-    await pos.closeTab(
+    const [returnableContainer] = await database.db
+      .insert(managementInventoryItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        kind: "returnable_container",
+        name: "Caixa retornável 600 ml",
+        unit: "un",
+      })
+      .returning();
+    assert.ok(returnableContainer);
+    const [returnableOrder] = await database.db
+      .insert(posOrders)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tabId: groupCloseTabId,
+        createdByIdentityId: identity.id,
+        status: "sent",
+        sentAt: new Date(),
+      })
+      .returning();
+    assert.ok(returnableOrder);
+    const [returnableIssue] = await database.db
+      .insert(managementReturnableCustodyMovements)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        containerInventoryItemId: returnableContainer.id,
+        type: "issue",
+        quantityDelta: "2.000",
+        orderId: returnableOrder.id,
+        responsibleIdentityId: identity.id,
+        sourceType: "test_returnable_issue",
+        sourceId: randomUUID(),
+        idempotencyKey: `test-returnable-issue:${runId}`,
+        actorIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(returnableIssue);
+    await database.db.insert(managementReturnableCustodyMovements).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      containerInventoryItemId: returnableContainer.id,
+      type: "return",
+      quantityDelta: "-0.750",
+      orderId: returnableOrder.id,
+      parentMovementId: returnableIssue.id,
+      responsibleIdentityId: identity.id,
+      sourceType: "test_returnable_partial_return",
+      sourceId: randomUUID(),
+      idempotencyKey: `test-returnable-partial-return:${runId}`,
+      actorIdentityId: identity.id,
+    });
+    await database.db.insert(managementReturnablePolicies).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      returnableClosePolicy: "warn",
+      updatedByIdentityId: identity.id,
+    });
+    await assert.rejects(
+      () =>
+        pos.closeTab(
+          identity.id,
+          organizationA.id,
+          unitA.id,
+          groupCloseTabId,
+          "close-group-returnable-warn-0001",
+          { printRequested: false },
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConflictException);
+        const response = error.getResponse() as {
+          code: string;
+          policy: string;
+          pending: { issueCount: number; openQuantity: string };
+        };
+        assert.equal(response.code, "TAB_HAS_OPEN_RETURNABLE_CUSTODY");
+        assert.equal(response.policy, "warn");
+        assert.equal(response.pending.issueCount, 1);
+        assert.equal(response.pending.openQuantity, "1.250");
+        return true;
+      },
+    );
+    const acknowledgedClose = await pos.closeTab(
       identity.id,
       organizationA.id,
       unitA.id,
       groupCloseTabId,
       "close-group-0001",
-      { printRequested: false },
+      { printRequested: false, returnableDecision: "acknowledge" },
     );
+    assert.equal(acknowledgedClose.returnables.openQuantity, "1.250");
     let groupCloseFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.equal(
       groupCloseFloor.tables
@@ -324,7 +602,48 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         .every((candidate) => candidate.status === "occupied"),
       true,
     );
-    await pos.closeTab(
+    await database.db
+      .update(managementReturnablePolicies)
+      .set({ returnableClosePolicy: "block", updatedAt: new Date() })
+      .where(
+        and(
+          eq(managementReturnablePolicies.organizationId, organizationA.id),
+          eq(managementReturnablePolicies.unitId, unitA.id),
+        ),
+      );
+    await assert.rejects(
+      () =>
+        pos.closeTab(
+          identity.id,
+          organizationA.id,
+          unitA.id,
+          groupCloseTabId,
+          "close-group-returnable-block-0001",
+          { printRequested: false, returnableDecision: "acknowledge" },
+        ),
+      (error: unknown) => {
+        assert.ok(error instanceof ConflictException);
+        const response = error.getResponse() as { code: string; policy: string };
+        assert.equal(response.code, "TAB_HAS_OPEN_RETURNABLE_CUSTODY");
+        assert.equal(response.policy, "block");
+        return true;
+      },
+    );
+    await database.db.insert(managementReturnableCustodyMovements).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      containerInventoryItemId: returnableContainer.id,
+      type: "return",
+      quantityDelta: "-1.250",
+      orderId: returnableOrder.id,
+      parentMovementId: returnableIssue.id,
+      responsibleIdentityId: identity.id,
+      sourceType: "test_returnable_final_return",
+      sourceId: randomUUID(),
+      idempotencyKey: `test-returnable-final-return:${runId}`,
+      actorIdentityId: identity.id,
+    });
+    const closedWithoutPendingReturnables = await pos.closeTab(
       identity.id,
       organizationA.id,
       unitA.id,
@@ -332,6 +651,24 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       "close-group-0002",
       { printRequested: false },
     );
+    assert.equal(closedWithoutPendingReturnables.returnables.openQuantity, "0.000");
+    const [closedTabReturnableIssue] = await database.db
+      .insert(managementReturnableCustodyMovements)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        containerInventoryItemId: returnableContainer.id,
+        type: "issue",
+        quantityDelta: "1.000",
+        orderId: returnableOrder.id,
+        responsibleIdentityId: identity.id,
+        sourceType: "test_closed_tab_returnable_issue",
+        sourceId: randomUUID(),
+        idempotencyKey: `test-closed-tab-returnable-issue:${runId}`,
+        actorIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(closedTabReturnableIssue);
     await assert.rejects(
       () =>
         pos.discountItem(
@@ -634,6 +971,9 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       },
     );
     const splitTargetTabId = split.targetTabId as string;
+    assert.deepEqual(split.printableTabIds, [tabId, splitTargetTabId]);
+    assert.equal(split.printJobs.length, 2);
+    assert.ok(split.printJobs.every((job) => job.documentType === "partial_statement"));
     const movedSplitItemId = (split.movedItemIds as string[])[0];
     assert.ok(movedSplitItemId);
     const splitTargetTab = await pos.getTab(
@@ -1497,7 +1837,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         unitA.id,
         table.id,
         "service-call-mismatch-0001",
-        { kind: "assistance", tabId: occupiedTabId, slaMinutes: 3 },
+        { kind: "assistance", tabId: occupiedTabId, slaMinutes: 3, copies: 1 },
       ),
     );
     await pos.createOrder(
@@ -1520,6 +1860,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         mode: "single_tab",
         targetTabId: tabId,
         responsibleIdentityId: supportIdentity.id,
+        reasonCode: "large_party",
       },
     );
     assert.equal((occupiedAndFree.group as { primaryTabId: string }).primaryTabId, tabId);
@@ -1539,6 +1880,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       tableIds: [table.id, freeTable.id, occupiedTable.id],
       anchorTableId: table.id,
       mode: "physical_only",
+      reasonCode: "sit_together",
     });
     groupedFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.equal(
@@ -1559,6 +1901,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         mode: "single_tab",
         targetTabId: tabId,
         responsibleIdentityId: supportIdentity.id,
+        reasonCode: "large_party",
       },
     );
     const unifiedGroupId = (unified.group as { id: string }).id;
@@ -1620,13 +1963,49 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       tableIds: [table.id, freeTable.id, occupiedTable.id],
       defaultResponsibleIdentityId: identity.id,
     });
-    await pos.createServiceSection(identity.id, organizationA.id, unitA.id, {
-      name: "Praça varanda",
-      color: "#245D8C",
-      serviceMode: "full_service",
-      tableIds: [varandaTable.id],
-      defaultResponsibleIdentityId: supportIdentity.id,
-    });
+    const archivedTemplate = await pos.createServiceSection(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      {
+        name: "Praça temporária",
+        color: "#8B5A2B",
+        serviceMode: "full_service",
+        tableIds: [varandaTable.id],
+        defaultResponsibleIdentityId: null,
+      },
+    );
+    await pos.archiveServiceSection(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      (archivedTemplate.section as { id: string }).id,
+    );
+    const varandaTemplate = await pos.createServiceSection(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      {
+        name: "Praça varanda",
+        color: "#245D8C",
+        serviceMode: "full_service",
+        tableIds: [varandaTable.id],
+        defaultResponsibleIdentityId: supportIdentity.id,
+      },
+    );
+    await pos.updateServiceSection(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      (varandaTemplate.section as { id: string }).id,
+      {
+        name: "Praça varanda atualizada",
+        color: "#E0A100",
+        serviceMode: "full_service",
+        tableIds: [varandaTable.id],
+        defaultResponsibleIdentityId: supportIdentity.id,
+      },
+    );
     const openedShift = await pos.openOperationalShift(identity.id, organizationA.id, unitA.id, {
       label: "Jantar",
       serviceMode: "full_service",
@@ -1635,7 +2014,9 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     const shift = openedShift.shift as { id: string };
     const shiftSections = openedShift.sections as { id: string; name: string }[];
     const shiftSection = shiftSections.find((section) => section.name === "Praça principal");
-    const targetShiftSection = shiftSections.find((section) => section.name === "Praça varanda");
+    const targetShiftSection = shiftSections.find(
+      (section) => section.name === "Praça varanda atualizada",
+    );
     assert.ok(shiftSection && targetShiftSection);
     await pos.updateShiftSectionAssignment(
       identity.id,
@@ -1644,6 +2025,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       shift.id,
       shiftSection.id,
       {
+        expectedRevision: 1,
         tableIds: [table.id, freeTable.id, occupiedTable.id],
         primaryIdentityId: identity.id,
         supportIdentityIds: [],
@@ -1694,7 +2076,8 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       targetShiftSectionId: targetShiftSection.id,
       durationMinutes: 30,
       transferOpenTab: true,
-      reason: "Grupo cobrindo a varanda",
+      reasonCode: "staff_coverage",
+      reasonNote: "Grupo cobrindo a varanda",
     });
     const transferredGroupFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.deepEqual(
@@ -1729,7 +2112,8 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       targetShiftSectionId: targetShiftSection.id,
       durationMinutes: 60,
       transferOpenTab: true,
-      reason: "Cobertura temporária da varanda",
+      reasonCode: "staff_coverage",
+      reasonNote: "Cobertura temporária da varanda",
     });
     const transferredFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.equal(transferredFloor.shiftTableTransfers[0]?.tableId, freeTable.id);
@@ -1751,7 +2135,8 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       0,
     );
     await pos.updateShiftLayout(identity.id, organizationA.id, unitA.id, shift.id, {
-      tables: [{ tableId: table.id, roomId: room.id, x: 320, y: 220 }],
+      expectedRevision: 2,
+      tables: [{ tableId: table.id, roomId: room.id, x: 320, y: 220, rotation: 0 }],
     });
     const shiftedFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
     assert.deepEqual(
@@ -1762,6 +2147,27 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         y,
       })),
       [{ tableId: table.id, roomId: room.id, x: 320, y: 220 }],
+    );
+    await assert.rejects(
+      () =>
+        pos.updateShiftLayout(identity.id, organizationA.id, unitA.id, shift.id, {
+          expectedRevision: 2,
+          tables: [{ tableId: table.id, roomId: room.id, x: 320, y: 220, rotation: 0 }],
+        }),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "SHIFT_LAYOUT_VERSION_CONFLICT",
+    );
+    await assert.rejects(
+      () =>
+        pos.openTab(identity.id, organizationA.id, unitA.id, "counter-open-past-0001", {
+          fulfillmentType: "pickup",
+          promisedAt: new Date(Date.now() - 120_000).toISOString(),
+          guestCount: 1,
+        }),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "PROMISED_AT_IN_PAST",
     );
     const counterOpened = await pos.openTab(
       identity.id,
@@ -1784,8 +2190,19 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       counterTab.id,
       {
         expectedVersion: counterTab.version,
-        promisedAt: "2026-08-15T22:00:00.000Z",
+        promisedAt: new Date(Date.now() + 3_600_000).toISOString(),
       },
+    );
+    const currentCounterVersion = (updatedCounter.tab as { version: number }).version;
+    await assert.rejects(
+      () =>
+        pos.updateTab(identity.id, organizationA.id, unitA.id, counterTab.id, {
+          expectedVersion: currentCounterVersion,
+          promisedAt: new Date(Date.now() - 120_000).toISOString(),
+        }),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "PROMISED_AT_IN_PAST",
     );
     await assert.rejects(() =>
       pos.updateTab(identity.id, organizationA.id, unitA.id, counterTab.id, {
@@ -1818,7 +2235,215 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       targetTabId: tabId,
       items: [{ orderItemId: counterItem.id, quantity: 1 }],
     });
-    await pos.recordPayment(supportIdentity.id, organizationA.id, unitA.id, tabId, "payment-0001", {
+    const queueOpened = await pos.openTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      "counter-queue-open-0001",
+      {
+        fulfillmentType: "pickup",
+        label: "Queue stage test",
+        guestCount: 1,
+      },
+    );
+    const queueTabId = (queueOpened.tab as { id: string }).id;
+    const queueQuery = {
+      stage: "all" as const,
+      channel: "pickup" as const,
+      query: "Queue stage test",
+      page: 1,
+      limit: 1,
+    };
+    const newQueue = await pos.listCounterQueue(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueQuery,
+    );
+    assert.equal(newQueue.items[0]?.queueStage, "new");
+    assert.equal(newQueue.counts.all, 1);
+    assert.deepEqual(newQueue.pagination, { page: 1, limit: 1, total: 1, totalPages: 1 });
+
+    const queueOrder = await pos.createOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTabId,
+      "counter-queue-order-0001",
+      {
+        items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }],
+      },
+    );
+    const queueOrderId = (queueOrder.order as { id: string }).id;
+    const queueItemId = (queueOrder.items as { id: string }[])[0]?.id;
+    assert.ok(queueItemId);
+    const queueSent = await pos.sendOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueOrderId,
+      "counter-queue-send-0001",
+    );
+    const queueTicketId = (queueSent.ticketIds as string[])[0];
+    assert.ok(queueTicketId);
+    const productionQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      stage: "production",
+    });
+    assert.equal(productionQueue.items[0]?.id, queueTabId);
+    assert.equal(productionQueue.items[0]?.queueStage, "production");
+
+    await pos.transitionKds(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      "counter-queue-preparing-0001",
+      { state: "preparing" },
+    );
+    await pos.transitionKdsItem(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      queueItemId,
+      "counter-queue-ready-0001",
+      { state: "ready", quantity: 1 },
+    );
+    await pos.handoffKdsOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueOrderId,
+      "counter-queue-handoff-0001",
+      { target: "expedition" },
+    );
+    await database.db
+      .update(posTabs)
+      .set({ readyNotifiedAt: null })
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationA.id),
+          eq(posTabs.unitId, unitA.id),
+          eq(posTabs.id, queueTabId),
+        ),
+      );
+    const readyQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      stage: "ready",
+    });
+    assert.equal(readyQueue.items[0]?.queueStage, "ready");
+
+    await pos.notifyReady(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTabId,
+      "counter-queue-notify-0001",
+    );
+    const waitingQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      stage: "waiting",
+    });
+    assert.equal(waitingQueue.items[0]?.queueStage, "waiting");
+
+    const secondQueueOrder = await pos.createOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTabId,
+      "counter-queue-order-0002",
+      {
+        items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }],
+      },
+    );
+    await pos.sendOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      (secondQueueOrder.order as { id: string }).id,
+      "counter-queue-send-0002",
+    );
+    const resumedProductionQueue = await pos.listCounterQueue(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      { ...queueQuery, stage: "production" },
+    );
+    assert.equal(resumedProductionQueue.items[0]?.queueStage, "production");
+    const wrongChannelQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      channel: "delivery",
+    });
+    assert.equal(wrongChannelQueue.items.length, 0);
+    assert.equal(wrongChannelQueue.pagination.total, 0);
+    const [[stockBeforeQrApproval], [tabBeforeQrApproval]] = await Promise.all([
+      database.db
+        .select({ soldToday: posProductAvailability.soldToday })
+        .from(posProductAvailability)
+        .where(
+          and(
+            eq(posProductAvailability.organizationId, organizationA.id),
+            eq(posProductAvailability.unitId, unitA.id),
+            eq(posProductAvailability.productId, product.id),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ totalCents: posTabs.totalCents })
+        .from(posTabs)
+        .where(eq(posTabs.id, tabId))
+        .limit(1),
+    ]);
+    assert.ok(stockBeforeQrApproval && tabBeforeQrApproval);
+    const qrApproval = await pos.createPublicTableOrder(
+      organizationA.id,
+      unitA.id,
+      table.id,
+      tabId,
+      "qr-table-order-approval-0001",
+      { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
+    );
+    const [stockWhileQrPending] = await database.db
+      .select({ soldToday: posProductAvailability.soldToday })
+      .from(posProductAvailability)
+      .where(
+        and(
+          eq(posProductAvailability.organizationId, organizationA.id),
+          eq(posProductAvailability.unitId, unitA.id),
+          eq(posProductAvailability.productId, product.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(stockWhileQrPending?.soldToday, stockBeforeQrApproval.soldToday);
+    await pos.sendOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      qrApproval.order.id,
+      "qr-table-order-approve-0001",
+    );
+    const [[stockAfterQrApproval], [tabAfterQrApproval]] = await Promise.all([
+      database.db
+        .select({ soldToday: posProductAvailability.soldToday })
+        .from(posProductAvailability)
+        .where(
+          and(
+            eq(posProductAvailability.organizationId, organizationA.id),
+            eq(posProductAvailability.unitId, unitA.id),
+            eq(posProductAvailability.productId, product.id),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ totalCents: posTabs.totalCents })
+        .from(posTabs)
+        .where(eq(posTabs.id, tabId))
+        .limit(1),
+    ]);
+    assert.equal(stockAfterQrApproval?.soldToday, stockBeforeQrApproval.soldToday + 1);
+    assert.ok((tabAfterQrApproval?.totalCents ?? 0) > tabBeforeQrApproval.totalCents);
+    await pos.recordPayment(identity.id, organizationA.id, unitA.id, tabId, "payment-0001", {
       method: "pix",
       amountCents: 100,
       reference: "e2e",
@@ -1836,10 +2461,12 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       },
     );
     const printJobId = (queuedPrint.printJob as { id: string }).id;
-    assert.equal(
-      (queuedPrint.printJob as { payload: Record<string, unknown> }).payload.establishmentName,
-      "Restaurante Pilot A",
-    );
+    const printPayload = queuedPrint.printJob.payload as unknown as {
+      schemaVersion: number;
+      establishment: { displayName: string };
+    };
+    assert.equal(printPayload.establishment.displayName, "Restaurante Pilot A");
+    assert.equal(printPayload.schemaVersion, 2);
     const replayedPrint = await pos.createPrintJob(
       identity.id,
       organizationA.id,
@@ -1939,7 +2566,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       unitA.id,
       table.id,
       "service-call-0001",
-      { kind: "bill", tabId, slaMinutes: 2 },
+      { kind: "bill", tabId, slaMinutes: 2, copies: 1 },
     );
     const callId = (createdCall.call as { id: string }).id;
     await pos.transitionServiceCall(
@@ -1963,10 +2590,64 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       finalFloor.serviceCalls.some((call) => call.id === callId),
       false,
     );
+    const returnableHandoffTab = finalFloor.openTabs.find(
+      (openTab) => openTab.responsibleIdentityId === identity.id,
+    );
+    assert.ok(returnableHandoffTab);
+    const [returnableHandoffOrder] = await database.db
+      .insert(posOrders)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tabId: returnableHandoffTab.id,
+        createdByIdentityId: identity.id,
+        status: "sent",
+        sentAt: new Date(),
+      })
+      .returning();
+    assert.ok(returnableHandoffOrder);
+    const [returnableHandoffIssue] = await database.db
+      .insert(managementReturnableCustodyMovements)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        containerInventoryItemId: returnableContainer.id,
+        type: "issue",
+        quantityDelta: "1.000",
+        orderId: returnableHandoffOrder.id,
+        responsibleIdentityId: identity.id,
+        sourceType: "test_returnable_shift_handoff",
+        sourceId: randomUUID(),
+        idempotencyKey: `test-returnable-shift-handoff:${runId}`,
+        actorIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(returnableHandoffIssue);
     await assert.rejects(() =>
       pos.closeOperationalShift(identity.id, organizationA.id, unitA.id, shift.id, {
         acknowledgeOpenTabs: false,
       }),
+    );
+    await assert.rejects(
+      () =>
+        pos.closeOperationalShift(identity.id, organizationA.id, unitA.id, shift.id, {
+          acknowledgeOpenTabs: true,
+          returnableDecision: "acknowledge",
+          reason: "Tentativa sem destinatário da custódia",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConflictException);
+        const response = error.getResponse() as {
+          code: string;
+          policy: string;
+          pending: { issueCount: number; openQuantity: string };
+        };
+        assert.equal(response.code, "SHIFT_HAS_OPEN_RETURNABLE_CUSTODY");
+        assert.equal(response.policy, "block");
+        assert.equal(response.pending.issueCount, 2);
+        assert.equal(response.pending.openQuantity, "2.000");
+        return true;
+      },
     );
     const closedShift = await pos.closeOperationalShift(
       identity.id,
@@ -1985,11 +2666,68 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       },
     );
     assert.ok(closedShift.handover.openTabs > 0);
+    assert.equal(closedShift.handover.returnableCustodyHandoffs, 2);
+    assert.equal(closedShift.handover.pendingReturnableCustodies, 0);
+    const [returnableCustodyHandoff] = await database.db
+      .select()
+      .from(managementReturnableCustodyHandoffs)
+      .where(
+        and(
+          eq(managementReturnableCustodyHandoffs.organizationId, organizationA.id),
+          eq(managementReturnableCustodyHandoffs.unitId, unitA.id),
+          eq(managementReturnableCustodyHandoffs.issueMovementId, returnableHandoffIssue.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(returnableCustodyHandoff?.fromIdentityId, identity.id);
+    assert.equal(returnableCustodyHandoff?.toIdentityId, supportIdentity.id);
+    assert.equal(returnableCustodyHandoff?.fromShiftReference, shift.id);
+    const [closedTabCustodyHandoff] = await database.db
+      .select()
+      .from(managementReturnableCustodyHandoffs)
+      .where(
+        and(
+          eq(managementReturnableCustodyHandoffs.organizationId, organizationA.id),
+          eq(managementReturnableCustodyHandoffs.unitId, unitA.id),
+          eq(managementReturnableCustodyHandoffs.issueMovementId, closedTabReturnableIssue.id),
+        ),
+      )
+      .limit(1);
+    assert.equal(closedTabCustodyHandoff?.fromIdentityId, identity.id);
+    assert.equal(closedTabCustodyHandoff?.toIdentityId, supportIdentity.id);
     assert.equal(
       (await pos.listFloor(identity.id, organizationA.id, unitA.id)).openTabs.every(
         (open) => open.responsibleIdentityId === supportIdentity.id,
       ),
       true,
+    );
+    const [raceTable] = await database.db
+      .insert(posDiningTables)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        roomId: room.id,
+        label: "Concorrência",
+      })
+      .returning();
+    assert.ok(raceTable);
+    const concurrentOpens = await Promise.allSettled([
+      pos.openTab(identity.id, organizationA.id, unitA.id, "open-race-owner-0001", {
+        tableId: raceTable.id,
+        guestCount: 2,
+      }),
+      pos.openTab(cashierIdentity.id, organizationA.id, unitA.id, "open-race-cashier-0001", {
+        tableId: raceTable.id,
+        guestCount: 2,
+      }),
+    ]);
+    assert.equal(concurrentOpens.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(concurrentOpens.filter((result) => result.status === "rejected").length, 1);
+    assert.equal(
+      (await pos.listFloor(identity.id, organizationA.id, unitA.id)).openTabs.filter(
+        (open) => open.tableId === raceTable.id,
+      ).length,
+      1,
     );
   } finally {
     await database.onModuleDestroy();

@@ -10,6 +10,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Pa
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Presence;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintSplits;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Reopen;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.ServiceCharge;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Split;
@@ -80,6 +81,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs.PrintJobsRequestBuilder PrintJobs
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs.PrintJobsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The printSplits property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintSplits.PrintSplitsRequestBuilder PrintSplits
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintSplits.PrintSplitsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The reopen property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Reopen.ReopenRequestBuilder Reopen

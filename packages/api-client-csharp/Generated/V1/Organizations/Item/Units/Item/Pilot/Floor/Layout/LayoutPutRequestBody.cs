@@ -12,6 +12,16 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout
     public partial class LayoutPutRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
+        /// <summary>The layoutElements property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_layoutElements>? LayoutElements { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_layoutElements> LayoutElements { get; set; }
+#endif
         /// <summary>The rooms property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -46,6 +56,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
+                { "layoutElements", n => { LayoutElements = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_layoutElements>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_layoutElements.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "rooms", n => { Rooms = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_rooms>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_rooms.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "tables", n => { Tables = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables.CreateFromDiscriminatorValue)?.AsList(); } },
             };
@@ -57,6 +69,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_layoutElements>("layoutElements", LayoutElements);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_rooms>("rooms", Rooms);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables>("tables", Tables);
         }

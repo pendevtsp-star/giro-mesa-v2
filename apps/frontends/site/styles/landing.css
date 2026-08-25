@@ -72,6 +72,11 @@
   height: auto;
   display: block;
 }
+.hero-product-frame.media-frame {
+  position: relative;
+  min-height: 320px;
+  padding: 0;
+}
 .hero-product figcaption {
   margin: 18px 8px 0;
   display: flex;
@@ -94,6 +99,19 @@
 .segment-strip span {
   text-transform: uppercase;
   letter-spacing: 1px;
+}
+.social-proof-item {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  text-align: center;
+}
+.social-proof-item strong {
+  color: var(--ink);
+  font-size: 20px;
+}
+.social-proof-item small {
+  color: var(--legacy-muted);
 }
 .segment-name {
   color: var(--ink);
@@ -291,6 +309,10 @@
 .price strong {
   font-size: 38px;
 }
+.price s {
+  margin-right: 8px;
+  color: var(--legacy-muted);
+}
 .price span {
   color: var(--legacy-muted);
   font-size: 12px;
@@ -298,6 +320,15 @@
 .plan .annual {
   min-height: auto;
   margin: 0;
+  font-size: 12px;
+}
+.promotion-note {
+  display: flex;
+  min-height: auto;
+  align-items: baseline;
+  gap: 7px;
+  margin: 8px 0;
+  color: var(--forest);
   font-size: 12px;
 }
 .plan ul {
@@ -319,6 +350,32 @@
 }
 .trust-section {
   background: var(--gm-surface-soft);
+}
+.testimonial-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+.testimonial-card {
+  margin: 0;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+.testimonial-card blockquote {
+  margin: 0 0 28px;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  line-height: 1.35;
+}
+.testimonial-card figcaption {
+  display: grid;
+  color: var(--legacy-muted);
+  font-size: 13px;
+}
+.testimonial-card figcaption strong {
+  color: var(--ink);
 }
 .trust-grid {
   display: grid;
@@ -379,6 +436,16 @@
   text-align: center;
   background: var(--orange);
   color: var(--gm-on-action);
+}
+.catalog-unavailable {
+  min-height: 62vh;
+  padding: 120px 0;
+  background: var(--cream);
+}
+.catalog-unavailable h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(40px, 6vw, 64px);
+  line-height: 1.05;
 }
 .final-cta h2 {
   margin: 15px 0 35px;

@@ -1,0 +1,2 @@
+DROP INDEX "growth_customers_org_email_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "growth_customers_org_email_unique" ON "growth_customers" USING btree ("organization_id","email") WHERE "growth_customers"."email" is not null and "growth_customers"."archived_at" is null;

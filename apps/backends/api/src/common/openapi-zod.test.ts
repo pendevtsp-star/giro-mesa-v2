@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { z } from "zod";
+import { commercialPublishSchema } from "../platform/platform.schemas.js";
 import { matchesOperationId, toOpenApiSchema } from "./openapi-zod.js";
 
 describe("Zod OpenAPI bridge", () => {
@@ -51,5 +52,13 @@ describe("Zod OpenAPI bridge", () => {
       ),
       true,
     );
+  });
+
+  it("documents transformed commercial dates as ISO request strings", () => {
+    const schema = toOpenApiSchema(commercialPublishSchema);
+    const publishAt = (schema.properties as Record<string, Record<string, unknown>>).publishAt;
+
+    assert.equal(publishAt?.type, "string");
+    assert.equal(publishAt?.format, "date-time");
   });
 });

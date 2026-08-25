@@ -11,6 +11,7 @@ public sealed class CloudSyncWorker(
     HttpClient httpClient,
     HubStore store,
     FocusCredentialStore fiscalCredentials,
+    CloudPrinterCommandProcessor printerCommands,
     IOptions<HubOptions> options,
     ILogger<CloudSyncWorker> logger) : BackgroundService
 {
@@ -27,6 +28,14 @@ public sealed class CloudSyncWorker(
     {
         if (!CanSynchronize())
         {
+            try
+            {
+                await ProcessDurableCommandsAsync(stoppingToken);
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                logger.LogError(exception, "Persisted cloud commands could not be processed at startup");
+            }
             logger.LogWarning("Cloud synchronization is disabled until CloudApiBaseUrl and CloudSyncKey are configured");
             return;
         }
@@ -47,15 +56,18 @@ public sealed class CloudSyncWorker(
     {
         if (!CanSynchronize())
         {
+            await ProcessDurableCommandsAsync(cancellationToken);
             Status = "not-configured";
             return;
         }
         ConfigureClient();
         try
         {
+            await ProcessDurableCommandsAsync(cancellationToken);
             Status = "syncing";
             var pending = await store.GetPendingAsync(100, includeSecrets: true);
             var acknowledgements = await store.GetPendingCloudAcknowledgementsAsync(100);
+            var commandResults = await store.GetPendingCloudCommandResultsAsync(100);
             var now = DateTimeOffset.UtcNow;
             var emptyInterval = TimeSpan.FromSeconds(Math.Clamp(_options.EmptySyncIntervalSeconds, 1, 60));
             if (_consecutiveFailures == 0 && pending.Count == 0 && acknowledgements.Count == 0 &&
@@ -65,20 +77,27 @@ public sealed class CloudSyncWorker(
                 return;
             }
             var revision = await store.GetSnapshotRevisionAsync();
-            var response = await PostBatchAsync(pending, acknowledgements, revision, cancellationToken);
+            var response = await PostBatchAsync(
+                pending,
+                acknowledgements,
+                commandResults,
+                revision,
+                cancellationToken);
 
-            await ApplyResponseAsync(response);
+            await ApplyResponseAsync(response, cancellationToken);
             await store.MarkCloudAcknowledgementsAsync(acknowledgements);
 
             var processedCommandIds = await store.GetPendingCloudAcknowledgementsAsync(100);
             if (processedCommandIds.Count > 0)
             {
+                var processedCommandResults = await store.GetPendingCloudCommandResultsAsync(100);
                 var acknowledgementResponse = await PostBatchAsync(
                     [],
                     processedCommandIds,
+                    processedCommandResults,
                     response.SnapshotRevision ?? revision,
                     cancellationToken);
-                await ApplyResponseAsync(acknowledgementResponse);
+                await ApplyResponseAsync(acknowledgementResponse, cancellationToken);
                 await store.MarkCloudAcknowledgementsAsync(processedCommandIds);
             }
             await store.MarkSyncSuccessfulAsync(DateTimeOffset.UtcNow);
@@ -103,7 +122,9 @@ public sealed class CloudSyncWorker(
         }
     }
 
-    private async Task ApplyResponseAsync(SyncResponse response)
+    private async Task ApplyResponseAsync(
+        SyncResponse response,
+        CancellationToken cancellationToken)
     {
         fiscalCredentials.Apply(response.FiscalConfiguration);
         await store.SaveCloudCommandsAsync(response.Commands);
@@ -123,12 +144,19 @@ public sealed class CloudSyncWorker(
             }
             await store.SaveOperationalSnapshotAsync(response.Snapshot, response.SnapshotRevision);
         }
+        await ProcessDurableCommandsAsync(cancellationToken);
+    }
+
+    private async Task ProcessDurableCommandsAsync(CancellationToken cancellationToken = default)
+    {
         await store.ProcessPendingCloudCommandsAsync();
+        await printerCommands.ProcessPendingAsync(cancellationToken);
     }
 
     private async Task<SyncResponse> PostBatchAsync(
         IReadOnlyList<PendingEvent> events,
         IReadOnlyList<string> acknowledgedCommandIds,
+        IReadOnlyList<JsonElement> commandResults,
         string? snapshotRevision,
         CancellationToken cancellationToken)
     {
@@ -150,6 +178,7 @@ public sealed class CloudSyncWorker(
                     ? new Dictionary<string, object>()
                     : new Dictionary<string, object> { ["snapshotRevision"] = snapshotRevision },
                 acknowledgedCommandIds,
+                commandResults,
                 outboundEvents),
             cancellationToken);
         response.EnsureSuccessStatusCode();
@@ -205,6 +234,7 @@ public sealed record SyncBatch(
     string HubVersion,
     IReadOnlyDictionary<string, object> Metadata,
     IReadOnlyList<string> AcknowledgedCommandIds,
+    IReadOnlyList<JsonElement> CommandResults,
     IReadOnlyList<SyncEvent> Events);
 
 public sealed record SyncEvent(

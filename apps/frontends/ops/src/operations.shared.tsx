@@ -221,6 +221,13 @@ export interface FloorTable {
   status: "available" | "occupied" | "reserved" | "needs_cleaning" | "cleaning";
   layoutX: number | null;
   layoutY: number | null;
+  width: number | null;
+  height: number | null;
+  rotation: number | null;
+  shape: "round" | "square" | "rectangle" | null;
+  accessLevel: "summary" | "full" | "overview" | "operate" | "financial" | "manage" | null;
+  openedAt: string | null;
+  responsibleDisplayName: string | null;
   active: boolean;
 }
 
@@ -230,6 +237,32 @@ export interface FloorPoint {
 }
 
 export type ServiceMode = "full_service" | "quick_service" | "bar" | "hybrid";
+
+export const SERVICE_MODE_PRESENTATION: Record<
+  ServiceMode,
+  { label: string; description: string }
+> = {
+  full_service: {
+    label: "Atendimento à mesa",
+    description: "Informa pessoas e assentos e permite liberar pratos por etapa.",
+  },
+  quick_service: {
+    label: "Atendimento rápido",
+    description: "Um toque abre a mesa para 1 pessoa e envia os itens sem etapas.",
+  },
+  bar: {
+    label: "Bar por comanda",
+    description: "Fluxo direto para consumo contínuo; abre para 1 pessoa e sem etapas.",
+  },
+  hybrid: {
+    label: "Misto por praça",
+    description: "Use quando as praças trabalham de formas diferentes; o padrão é mesa completa.",
+  },
+};
+
+export function serviceModeLabel(mode: ServiceMode) {
+  return SERVICE_MODE_PRESENTATION[mode].label;
+}
 
 export function usesQuickServiceMode(mode: ServiceMode) {
   return mode === "quick_service" || mode === "bar";
@@ -253,6 +286,8 @@ export interface PosTab {
   promisedAt: string | null;
   readyNotifiedAt: string | null;
   responsibleIdentityId: string | null;
+  structuralMergeAllowed: boolean | null;
+  structuralMergeReason: string | null;
   guestCount: number;
   version: number;
   status: string;
@@ -265,6 +300,9 @@ export interface PosTab {
 }
 
 export interface PilotFloor {
+  accessLevel: "summary" | "full" | "overview" | "operate" | "financial" | "manage" | null;
+  floorRevision: number | null;
+  shiftRevision: number | null;
   rooms: Array<{
     id: string;
     name: string;
@@ -272,6 +310,25 @@ export interface PilotFloor {
     layoutPolygon: FloorPoint[] | null;
   }>;
   tables: FloorTable[];
+  layoutElements: Array<{
+    id: string;
+    roomId: string;
+    kind: "label" | "barrier";
+    label: string | null;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+  }>;
+  capabilities: {
+    canManageFloor: boolean;
+    canManageShift: boolean;
+    canReorganizeTables: boolean;
+    canRequestPrint: boolean;
+    canManagePrint: boolean;
+    canAccessAllTabs: boolean;
+  } | null;
   openTabs: PosTab[];
   tableGroups: Array<{
     id: string;
@@ -288,13 +345,16 @@ export interface PilotFloor {
     kind: "assistance" | "bill" | "water" | "other";
     status: "open" | "acknowledged";
     slaMinutes: number;
+    printStatus: "queued" | "printing" | "confirmation_required" | "printed" | "failed" | null;
+    printJobId: string | null;
+    printLastErrorCode: string | null;
     acknowledgedByIdentityId: string | null;
     acknowledgedAt: string | null;
     createdAt: string;
   }>;
   tablePhases: Array<{
     tableId: string;
-    tabId: string;
+    tabId: string | null;
     phase: "awaiting_order" | "production" | "ready" | "served";
     since: string;
   }>;
@@ -335,11 +395,13 @@ export interface PilotFloor {
     roomId: string;
     x: number;
     y: number;
+    rotation: number | null;
   }>;
   shiftTableTransfers: Array<{
     id: string;
     shiftId: string;
     tableId: string;
+    tabId: string | null;
     sourceShiftSectionId: string;
     targetShiftSectionId: string;
     expiresAt: string;
@@ -868,6 +930,13 @@ export function parseTab(row: Row): PosTab {
     promisedAt: optionalText(row.promisedAt),
     readyNotifiedAt: optionalText(row.readyNotifiedAt),
     responsibleIdentityId: optionalText(row.responsibleIdentityId),
+    structuralMergeAllowed:
+      row.structuralMergeAllowed === null || row.structuralMergeAllowed === undefined
+        ? null
+        : bool(row.structuralMergeAllowed),
+    structuralMergeReason: optionalText(
+      row.structuralMergeReason ?? row.structuralMergeBlockedReason,
+    ),
     guestCount: number(row.guestCount),
     version: number(row.version ?? 1),
     status: text(row.status),
@@ -1187,7 +1256,17 @@ function values(value: unknown): unknown[] {
 export function parsePilotFloor(value: unknown): PilotFloor {
   const payload = record(value);
   const activeShift = payload.activeShift == null ? null : record(payload.activeShift);
+  const accessLevel = optionalText(payload.accessLevel);
+  if (
+    accessLevel !== null &&
+    !["summary", "full", "overview", "operate", "financial", "manage"].includes(accessLevel)
+  ) {
+    throw new InvalidPilotPayloadError();
+  }
   return {
+    accessLevel: accessLevel as PilotFloor["accessLevel"],
+    floorRevision: optionalNumber(payload.floorRevision ?? payload.revision),
+    shiftRevision: optionalNumber(payload.shiftRevision),
     rooms: records(payload.rooms).map((row) => ({
       id: text(row.id),
       name: text(row.name),
@@ -1207,9 +1286,60 @@ export function parsePilotFloor(value: unknown): PilotFloor {
         status: status as FloorTable["status"],
         layoutX: optionalNumber(row.layoutX),
         layoutY: optionalNumber(row.layoutY),
+        width: optionalNumber(row.width ?? row.layoutWidth),
+        height: optionalNumber(row.height ?? row.layoutHeight),
+        rotation: optionalNumber(row.rotation ?? row.layoutRotation),
+        shape: (() => {
+          const shape = optionalText(row.shape ?? row.layoutShape);
+          if (shape !== null && !["round", "square", "rectangle"].includes(shape)) {
+            throw new InvalidPilotPayloadError();
+          }
+          return shape as FloorTable["shape"];
+        })(),
+        accessLevel: (() => {
+          const level = optionalText(row.accessLevel);
+          if (
+            level !== null &&
+            !["summary", "full", "overview", "operate", "financial", "manage"].includes(level)
+          ) {
+            throw new InvalidPilotPayloadError();
+          }
+          return level as FloorTable["accessLevel"];
+        })(),
+        openedAt: optionalText(row.openedAt),
+        responsibleDisplayName: optionalText(row.responsibleDisplayName),
         active: bool(row.active),
       };
     }),
+    layoutElements: records(payload.floorElements ?? payload.layoutElements ?? []).map((row) => {
+      const kind = text(row.kind);
+      if (kind !== "label" && kind !== "barrier") throw new InvalidPilotPayloadError();
+      return {
+        id: text(row.id),
+        roomId: text(row.roomId),
+        kind,
+        label: optionalText(row.label),
+        x: number(row.x),
+        y: number(row.y),
+        width: number(row.width),
+        height: number(row.height),
+        rotation: number(row.rotation),
+      };
+    }),
+    capabilities:
+      payload.capabilities == null
+        ? null
+        : (() => {
+            const capabilities = record(payload.capabilities);
+            return {
+              canManageFloor: bool(capabilities.canManageFloor),
+              canManageShift: bool(capabilities.canManageShift),
+              canReorganizeTables: bool(capabilities.canReorganizeTables),
+              canRequestPrint: bool(capabilities.canRequestPrint),
+              canManagePrint: bool(capabilities.canManagePrint),
+              canAccessAllTabs: bool(capabilities.canAccessAllTabs),
+            };
+          })(),
     openTabs: records(payload.openTabs).map(parseTab),
     tableGroups: records(payload.tableGroups ?? []).map((row) => {
       const mode = text(row.mode);
@@ -1231,9 +1361,14 @@ export function parsePilotFloor(value: unknown): PilotFloor {
     serviceCalls: records(payload.serviceCalls ?? []).map((row) => {
       const kind = text(row.kind);
       const status = text(row.status);
+      const rawPrintStatus = row.printStatus == null ? null : text(row.printStatus);
       if (
         !["assistance", "bill", "water", "other"].includes(kind) ||
-        !["open", "acknowledged"].includes(status)
+        !["open", "acknowledged"].includes(status) ||
+        (rawPrintStatus !== null &&
+          !["queued", "printing", "confirmation_required", "printed", "failed"].includes(
+            rawPrintStatus,
+          ))
       ) {
         throw new InvalidPilotPayloadError();
       }
@@ -1244,6 +1379,9 @@ export function parsePilotFloor(value: unknown): PilotFloor {
         kind: kind as PilotFloor["serviceCalls"][number]["kind"],
         status: status as PilotFloor["serviceCalls"][number]["status"],
         slaMinutes: number(row.slaMinutes),
+        printStatus: rawPrintStatus as PilotFloor["serviceCalls"][number]["printStatus"],
+        printJobId: optionalText(row.printJobId),
+        printLastErrorCode: optionalText(row.printLastErrorCode),
         acknowledgedByIdentityId: optionalText(row.acknowledgedByIdentityId),
         acknowledgedAt: optionalText(row.acknowledgedAt),
         createdAt: text(row.createdAt),
@@ -1256,7 +1394,7 @@ export function parsePilotFloor(value: unknown): PilotFloor {
       }
       return {
         tableId: text(row.tableId),
-        tabId: text(row.tabId),
+        tabId: optionalText(row.tabId),
         phase: phase as PilotFloor["tablePhases"][number]["phase"],
         since: text(row.since),
       };
@@ -1314,11 +1452,13 @@ export function parsePilotFloor(value: unknown): PilotFloor {
       roomId: text(row.roomId),
       x: number(row.x),
       y: number(row.y),
+      rotation: optionalNumber(row.rotation),
     })),
     shiftTableTransfers: records(payload.shiftTableTransfers ?? []).map((row) => ({
       id: text(row.id),
       shiftId: text(row.shiftId),
       tableId: text(row.tableId),
+      tabId: optionalText(row.tabId),
       sourceShiftSectionId: text(row.sourceShiftSectionId),
       targetShiftSectionId: text(row.targetShiftSectionId),
       expiresAt: text(row.expiresAt),
@@ -2108,6 +2248,7 @@ export function useRemote<T>(
   scope: PilotScope,
   loader: () => Promise<unknown>,
   parser: (value: unknown) => T,
+  requestKey = "",
 ) {
   const [retryToken, setRetryToken] = useState(0);
   const [state, setState] = useState<RemoteState<T>>({ status: "loading" });
@@ -2119,6 +2260,7 @@ export function useRemote<T>(
   const readyRef = useRef(false);
   const mountedRef = useRef(true);
   const requestIdRef = useRef(0);
+  const committedRequestIdRef = useRef(0);
   const scopeKeyRef = useRef(`${scope.organizationId}:${scope.unitId}`);
   loaderRef.current = loader;
   parserRef.current = parser;
@@ -2130,11 +2272,10 @@ export function useRemote<T>(
   }, []);
   useEffect(() => {
     void retryToken;
-    void scope.load;
     void scope.organizationId;
     void scope.refreshToken;
     void scope.unitId;
-    let active = true;
+    void requestKey;
     const requestId = ++requestIdRef.current;
     const scopeKey = `${scope.organizationId}:${scope.unitId}`;
     if (scopeKeyRef.current !== scopeKey) {
@@ -2152,24 +2293,35 @@ export function useRemote<T>(
       .current()
       .then(parserRef.current)
       .then((data) => {
-        if (!active || requestIdRef.current !== requestId) return;
+        if (
+          !mountedRef.current ||
+          scopeKeyRef.current !== scopeKey ||
+          requestId < committedRequestIdRef.current
+        ) {
+          return;
+        }
+        committedRequestIdRef.current = requestId;
         readyRef.current = true;
         setState({ status: "ready", data });
         setLastSuccessfulAt(new Date().toISOString());
         setRefreshing(false);
       })
       .catch((error: unknown) => {
-        if (!active || requestIdRef.current !== requestId) return;
+        if (
+          !mountedRef.current ||
+          scopeKeyRef.current !== scopeKey ||
+          requestId < committedRequestIdRef.current
+        ) {
+          return;
+        }
+        committedRequestIdRef.current = requestId;
         const message =
           error instanceof Error ? error.message : "Não foi possível carregar a operação.";
         if (readyRef.current) setRefreshError(message);
         setState((previous) => remoteStateAfterFailure(previous, message));
         setRefreshing(false);
       });
-    return () => {
-      active = false;
-    };
-  }, [retryToken, scope.load, scope.organizationId, scope.refreshToken, scope.unitId]);
+  }, [requestKey, retryToken, scope.organizationId, scope.refreshToken, scope.unitId]);
   const retry = useCallback(() => setRetryToken((value) => value + 1), []);
   const refresh = useCallback(async (): Promise<boolean> => {
     const expectedScopeKey = scopeKeyRef.current;
@@ -2182,10 +2334,11 @@ export function useRemote<T>(
       if (
         !mountedRef.current ||
         scopeKeyRef.current !== expectedScopeKey ||
-        requestIdRef.current !== requestId
+        requestId < committedRequestIdRef.current
       ) {
         return false;
       }
+      committedRequestIdRef.current = requestId;
       readyRef.current = true;
       setState({ status: "ready", data });
       setLastSuccessfulAt(new Date().toISOString());
@@ -2195,10 +2348,11 @@ export function useRemote<T>(
       if (
         !mountedRef.current ||
         scopeKeyRef.current !== expectedScopeKey ||
-        requestIdRef.current !== requestId
+        requestId < committedRequestIdRef.current
       ) {
         return false;
       }
+      committedRequestIdRef.current = requestId;
       const message =
         error instanceof Error ? error.message : "Não foi possível carregar a operação.";
       if (readyRef.current) setRefreshError(message);

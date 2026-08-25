@@ -36,10 +36,11 @@ export function summarizeCashEntries(entries: CashEntry[]) {
       if (entry.direction === "in") summary.drawerInCents += entry.amountCents;
       else summary.drawerOutCents += entry.amountCents;
     }
-    if (entry.direction === "in" && entry.paymentMethod) {
+    if (entry.paymentMethod) {
       summary.byMethod.set(
         entry.paymentMethod,
-        (summary.byMethod.get(entry.paymentMethod) ?? 0) + entry.amountCents,
+        (summary.byMethod.get(entry.paymentMethod) ?? 0) +
+          (entry.direction === "in" ? entry.amountCents : -entry.amountCents),
       );
     }
   }

@@ -112,6 +112,22 @@ export function validateFiscalEnvironment(environment, manifest) {
   if (!hasText(environment.MEDIA_ROOT) || !isAbsolute(environment.MEDIA_ROOT)) {
     errors.push("MEDIA_ROOT must be an absolute persistent path for fiscal production.");
   }
+  if (environment.ACCOUNTANT_ATTACHMENT_SCAN_MODE !== "clamd") {
+    errors.push("ACCOUNTANT_ATTACHMENT_SCAN_MODE=clamd is required for fiscal production.");
+  }
+  if (!hasText(environment.ACCOUNTANT_ATTACHMENT_CLAMD_HOST)) {
+    errors.push("ACCOUNTANT_ATTACHMENT_CLAMD_HOST is required for fiscal production.");
+  }
+  const clamdPort = Number(environment.ACCOUNTANT_ATTACHMENT_CLAMD_PORT ?? 3310);
+  if (!Number.isSafeInteger(clamdPort) || clamdPort <= 0 || clamdPort > 65_535) {
+    errors.push("ACCOUNTANT_ATTACHMENT_CLAMD_PORT must be a valid TCP port.");
+  }
+  const retentionDays = Number(environment.ACCOUNTANT_ATTACHMENT_RETENTION_DAYS);
+  if (!Number.isSafeInteger(retentionDays) || retentionDays < 1827) {
+    errors.push(
+      "ACCOUNTANT_ATTACHMENT_RETENTION_DAYS must preserve fiscal attachments for at least five years.",
+    );
+  }
   return errors;
 }
 
@@ -123,25 +139,39 @@ async function nonEmpty(path) {
   }
 }
 
+export function validateRecoveryCoverage(recovery, journal, manifest) {
+  if (manifest.status !== "homologated") return [];
+  const latestMigration = journal.entries?.at(-1)?.tag;
+  return latestMigration && recovery.targetMigration === latestMigration
+    ? []
+    : ["Recovery compatibility evidence must cover the latest database migration."];
+}
+
 export async function checkFiscalRelease(options = {}) {
   const repositoryRoot =
     options.repositoryRoot ?? dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
   const environment = options.environment ?? process.env;
   const read = (path) => readFile(join(repositoryRoot, path), "utf8");
-  const [rootPackage, manifest, compose, worker, migration] = await Promise.all([
+  const [rootPackage, manifest, compose, worker, migration, journal, recovery] = await Promise.all([
     read("package.json").then(JSON.parse),
     read("config/fiscal-release.json").then(JSON.parse),
     read("deploy/vps/compose.pilot.yaml"),
     read("apps/backends/worker/src/fiscal.ts"),
-    nonEmpty(join(repositoryRoot, "packages/db/drizzle/0050_fiscal-production.sql")),
+    nonEmpty(join(repositoryRoot, "packages/db/drizzle/0061_accountant_portal_security.sql")),
+    read("packages/db/drizzle/meta/_journal.json").then(JSON.parse),
+    read("deploy/vps/recovery-compatibility.json").then(JSON.parse),
   ]);
   const errors = [
     ...validateFiscalReleaseManifest(manifest, rootPackage.version),
     ...validateFiscalEnvironment(environment, manifest),
   ];
-  if (!migration) errors.push("Fiscal production migration 0050 is missing.");
+  if (!migration) errors.push("Fiscal/accountant security migration 0061 is missing.");
+  errors.push(...validateRecoveryCoverage(recovery, journal, manifest));
   if ((compose.match(/media_data:\/app\/data\/media/g) ?? []).length < 2) {
     errors.push("API and worker must share the persistent fiscal media volume.");
+  }
+  for (const marker of ["clamav_data:/var/lib/clamav", "condition: service_healthy"]) {
+    if (!compose.includes(marker)) errors.push(`Fiscal deploy is missing ClamAV marker ${marker}.`);
   }
   for (const marker of [
     '"pos.tab.closed"',

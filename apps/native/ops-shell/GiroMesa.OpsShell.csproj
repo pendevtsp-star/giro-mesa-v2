@@ -11,7 +11,7 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>GiroMesa Operação</ApplicationTitle>
     <ApplicationId>br.com.giromesa.operacao</ApplicationId>
-    <ApplicationDisplayVersion>0.2.3</ApplicationDisplayVersion>
+    <ApplicationDisplayVersion>0.2.4</ApplicationDisplayVersion>
     <ApplicationVersion>2</ApplicationVersion>
     <WindowsPackageType>None</WindowsPackageType>
     <MauiXamlInflator>SourceGen</MauiXamlInflator>

@@ -13,6 +13,7 @@ export function Modal({
   children,
   size = "md",
   className = "",
+  contentClassName = "",
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -21,6 +22,7 @@ export function Modal({
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
+  contentClassName?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -57,7 +59,10 @@ export function Modal({
       onClick={(event) => event.target === event.currentTarget && requestClose()}
       ref={dialogRef}
     >
-      <div className={`gm-modal gm-modal--${size}`} data-slot="dialog-content">
+      <div
+        className={cn(`gm-modal gm-modal--${size}`, contentClassName)}
+        data-slot="dialog-content"
+      >
         <div className="gm-modal__header" data-slot="dialog-header">
           <strong data-slot="dialog-title" id={titleId}>
             {title}

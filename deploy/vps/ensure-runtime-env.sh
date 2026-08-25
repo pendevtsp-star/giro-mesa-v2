@@ -150,6 +150,84 @@ elif not timeout.isascii() or not timeout.isdigit() or not 1000 <= int(timeout) 
     print("FOCUS_NFE_TIMEOUT_MS_INVALID", file=sys.stderr)
     raise SystemExit(1)
 
+scanner_defaults = {
+    "ACCOUNTANT_ATTACHMENT_SCAN_MODE": "clamd",
+    "ACCOUNTANT_ATTACHMENT_CLAMD_HOST": "clamav",
+    "ACCOUNTANT_ATTACHMENT_CLAMD_PORT": "3310",
+    "ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS": "10000",
+    "ACCOUNTANT_ATTACHMENT_RETENTION_DAYS": "1827",
+}
+
+evolution_defaults = {
+    "WHATSAPP_PROVIDER_ENABLED": "false",
+    "WHATSAPP_PROVIDER_CREDENTIAL_REFERENCE": "evolution-go",
+    "WHATSAPP_EVOLUTION_API_URL": "http://evolution-go:4000",
+    "WHATSAPP_EVOLUTION_WEBHOOK_URL": "http://api:3200/v1/growth/evolution-go/webhook",
+    "EVOLUTION_POSTGRES_USER": "evolution",
+    "EVOLUTION_OPERATOR_EMAIL": "",
+}
+for name, default in evolution_defaults.items():
+    if name not in values:
+        additions[name] = default
+for name in ("WHATSAPP_EVOLUTION_GLOBAL_API_KEY", "WHATSAPP_EVOLUTION_TOKEN_SECRET"):
+    value = values.get(name)
+    if value is None:
+        additions[name] = secrets.token_hex(32)
+    elif len(value.strip()) < 32:
+        print(f"{name}_INVALID", file=sys.stderr)
+        raise SystemExit(1)
+if "EVOLUTION_POSTGRES_PASSWORD" not in values:
+    additions["EVOLUTION_POSTGRES_PASSWORD"] = secrets.token_hex(24)
+elif len(values["EVOLUTION_POSTGRES_PASSWORD"].strip()) < 24:
+    print("EVOLUTION_POSTGRES_PASSWORD_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("WHATSAPP_PROVIDER_ENABLED", "false") not in {"true", "false"}:
+    print("WHATSAPP_PROVIDER_ENABLED_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("WHATSAPP_PROVIDER_CREDENTIAL_REFERENCE", "evolution-go") != "evolution-go":
+    print("WHATSAPP_PROVIDER_CREDENTIAL_REFERENCE_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+
+doseclub_defaults = {
+    "DOSECLUB_PROVIDER_ENABLED": "false",
+    "DOSECLUB_API_BASE_URL": "https://doseclube.giromesa.com.br",
+    "DOSECLUB_PROVISIONING_KEY": "",
+    "GIROMESA_API_BASE_URL": "https://api.giromesa.com.br",
+}
+for name, default in doseclub_defaults.items():
+    if name not in values:
+        additions[name] = default
+if "DOSECLUB_CREDENTIAL_SECRET" not in values:
+    additions["DOSECLUB_CREDENTIAL_SECRET"] = secrets.token_hex(32)
+elif len(values["DOSECLUB_CREDENTIAL_SECRET"].strip()) < 32:
+    print("DOSECLUB_CREDENTIAL_SECRET_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("DOSECLUB_PROVIDER_ENABLED", "false") not in {"true", "false"}:
+    print("DOSECLUB_PROVIDER_ENABLED_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+provisioning_key = values.get("DOSECLUB_PROVISIONING_KEY", "").strip()
+if values.get("DOSECLUB_PROVIDER_ENABLED") == "true" and len(provisioning_key) < 32:
+    print("DOSECLUB_PROVISIONING_KEY_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+for name, default in scanner_defaults.items():
+    if name not in values:
+        additions[name] = default
+if values.get("ACCOUNTANT_ATTACHMENT_SCAN_MODE", "clamd") != "clamd":
+    print("ACCOUNTANT_ATTACHMENT_SCAN_MODE_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if not values.get("ACCOUNTANT_ATTACHMENT_CLAMD_HOST", "clamav").strip():
+    print("ACCOUNTANT_ATTACHMENT_CLAMD_HOST_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+for name, minimum, maximum in (
+    ("ACCOUNTANT_ATTACHMENT_CLAMD_PORT", 1, 65535),
+    ("ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS", 1000, 30000),
+    ("ACCOUNTANT_ATTACHMENT_RETENTION_DAYS", 1827, 36500),
+):
+    value = values.get(name, scanner_defaults[name])
+    if not value.isascii() or not value.isdigit() or not minimum <= int(value) <= maximum:
+        print(f"{name}_INVALID", file=sys.stderr)
+        raise SystemExit(1)
+
 if not additions:
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)
     print("Runtime env validado; nenhum segredo foi alterado ou exibido.")

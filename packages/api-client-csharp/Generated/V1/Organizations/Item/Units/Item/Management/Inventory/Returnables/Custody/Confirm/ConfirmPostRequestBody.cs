@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The containerInventoryItemId property</summary>
         public Guid? ContainerInventoryItemId { get; set; }
+        /// <summary>The issueMovementId property</summary>
+        public Guid? IssueMovementId { get; set; }
         /// <summary>The locationId property</summary>
         public Guid? LocationId { get; set; }
         /// <summary>The note property</summary>
@@ -26,8 +28,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
 #else
         public string Note { get; set; }
 #endif
-        /// <summary>The orderId property</summary>
-        public Guid? OrderId { get; set; }
         /// <summary>The quantity property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -62,9 +62,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "containerInventoryItemId", n => { ContainerInventoryItemId = n.GetGuidValue(); } },
+                { "issueMovementId", n => { IssueMovementId = n.GetGuidValue(); } },
                 { "locationId", n => { LocationId = n.GetGuidValue(); } },
                 { "note", n => { Note = n.GetStringValue(); } },
-                { "orderId", n => { OrderId = n.GetGuidValue(); } },
                 { "quantity", n => { Quantity = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Custody.Confirm.ConfirmPostRequestBody.ConfirmPostRequestBody_quantity>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Custody.Confirm.ConfirmPostRequestBody.ConfirmPostRequestBody_quantity.CreateFromDiscriminatorValue); } },
             };
         }
@@ -76,9 +76,9 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteGuidValue("containerInventoryItemId", ContainerInventoryItemId);
+            writer.WriteGuidValue("issueMovementId", IssueMovementId);
             writer.WriteGuidValue("locationId", LocationId);
             writer.WriteStringValue("note", Note);
-            writer.WriteGuidValue("orderId", OrderId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Custody.Confirm.ConfirmPostRequestBody.ConfirmPostRequestBody_quantity>("quantity", Quantity);
             writer.WriteAdditionalData(AdditionalData);
         }

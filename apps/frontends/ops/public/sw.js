@@ -1,4 +1,4 @@
-const CACHE_NAME = "giromesa-ops-shell-v0.2.3-r2";
+const CACHE_NAME = "giromesa-ops-shell-v0.2.4-r1";
 const SCOPE_URL = new URL(self.registration.scope);
 const CORE_ASSETS = [
   "./",
@@ -47,6 +47,58 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data?.url;
+  if (typeof target !== "string") return;
+  const targetUrl = new URL(target, SCOPE_URL);
+  if (targetUrl.origin !== SCOPE_URL.origin || !targetUrl.pathname.startsWith(SCOPE_URL.pathname)) {
+    return;
+  }
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
+      const existing = clients.find((client) => new URL(client.url).origin === SCOPE_URL.origin);
+      if (existing) {
+        await existing.focus();
+        return existing.navigate(targetUrl.toString());
+      }
+      return self.clients.openWindow(targetUrl.toString());
+    }),
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let payload;
+  try {
+    payload = event.data?.json();
+  } catch {
+    payload = null;
+  }
+  const route = payload?.route === "#/counter" ? "#/counter" : "#/salon";
+  const title =
+    typeof payload?.title === "string" && payload.title.length <= 80
+      ? payload.title
+      : "Nova atenção operacional";
+  const body =
+    typeof payload?.body === "string" && payload.body.length <= 180
+      ? payload.body
+      : "Abra o GiroMesa para verificar a fila.";
+  const tag =
+    typeof payload?.tag === "string" && /^[A-Za-z0-9:_-]{1,80}$/.test(payload.tag)
+      ? payload.tag
+      : "operational-attention";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      badge: new URL("icons/giromesa-192.png", SCOPE_URL).toString(),
+      icon: new URL("icons/giromesa-192.png", SCOPE_URL).toString(),
+      tag,
+      renotify: true,
+      data: { url: new URL(route, SCOPE_URL).toString() },
+    }),
+  );
 });
 
 self.addEventListener("fetch", (event) => {

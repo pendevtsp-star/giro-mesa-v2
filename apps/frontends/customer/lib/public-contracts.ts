@@ -7,9 +7,10 @@ export function isCommandAccepted(payload: unknown): boolean {
   );
 }
 
-export function readTableAccessToken(search: string): string | null {
+export function readTableAccessToken(search: string, hash = ""): string | null {
+  const fragment = new URLSearchParams(hash.replace(/^#/, ""));
   const parameters = new URLSearchParams(search);
-  const token = (parameters.get("mesa") ?? parameters.get("token"))?.trim();
+  const token = (fragment.get("mesa") ?? parameters.get("mesa") ?? parameters.get("token"))?.trim();
   return token && token.length <= 1_024 && /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)
     ? token
     : null;

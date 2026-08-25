@@ -30,6 +30,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
 #else
         public string LegalName { get; set; }
 #endif
+        /// <summary>The revision property</summary>
+        public DateTimeOffset? Revision { get; set; }
         /// <summary>The tradeName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -59,6 +61,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
                 { "document", n => { Document = n.GetStringValue(); } },
                 { "id", n => { Id = n.GetGuidValue(); } },
                 { "legalName", n => { LegalName = n.GetStringValue(); } },
+                { "revision", n => { Revision = n.GetDateTimeOffsetValue(); } },
                 { "tradeName", n => { TradeName = n.GetStringValue(); } },
             };
         }
@@ -72,6 +75,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
             writer.WriteStringValue("document", Document);
             writer.WriteGuidValue("id", Id);
             writer.WriteStringValue("legalName", LegalName);
+            writer.WriteDateTimeOffsetValue("revision", Revision);
             writer.WriteStringValue("tradeName", TradeName);
         }
     }

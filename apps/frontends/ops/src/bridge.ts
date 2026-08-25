@@ -183,6 +183,42 @@ export async function loadShellPrinters(): Promise<ShellOperationalStateResult |
   }
 }
 
+export async function loadShellPrinterDiagnostics(): Promise<ShellOperationalStateResult | null> {
+  const invoke = window.HybridWebView?.InvokeDotNet;
+  if (!invoke) return null;
+  try {
+    const result = await invoke<Record<string, unknown>>("GetPrinterDiagnosticsAsync");
+    return {
+      success: readBoolean(result, "Success", "success"),
+      payload: readUnknown(result, "Payload", "payload"),
+      errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
+    };
+  } catch {
+    return loadShellPrinters();
+  }
+}
+
+export async function loadShellLocalPrintQueue(
+  status?: string,
+  limit = 100,
+): Promise<ShellOperationalStateResult | null> {
+  const invoke = window.HybridWebView?.InvokeDotNet;
+  if (!invoke) return null;
+  try {
+    const result = await invoke<Record<string, unknown>>("GetLocalPrintQueueAsync", [
+      status ?? null,
+      Math.min(200, Math.max(1, Math.trunc(limit))),
+    ]);
+    return {
+      success: readBoolean(result, "Success", "success"),
+      payload: readUnknown(result, "Payload", "payload"),
+      errorCode: readString(result, "ErrorCode", "errorCode") ?? undefined,
+    };
+  } catch {
+    return { success: false, errorCode: "SHELL_BRIDGE_UNAVAILABLE" };
+  }
+}
+
 export async function testShellPrinter(printerId: string): Promise<ShellPrintResult | null> {
   const invoke = window.HybridWebView?.InvokeDotNet;
   if (!invoke) return null;

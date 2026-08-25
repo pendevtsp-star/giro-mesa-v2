@@ -15,6 +15,7 @@ import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from
 import { addZodRequestBodies } from "./common/openapi-zod.js";
 import { requestRateLimit, requestRateLimitKey } from "./common/rate-limit.js";
 import { DatabaseReadinessService, MetricsService } from "./health/health.module.js";
+import { TABLE_SESSION_COOKIE_NAME } from "./public-menu/table-session-token.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
 export async function createApplication(options: { checkDatabaseReadiness?: boolean } = {}) {
@@ -39,7 +40,9 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
       return requestRateLimitKey(
         bucket,
         request.ip,
-        request.cookies[SESSION_COOKIE_NAME] ?? request.headers.authorization,
+        bucket.startsWith("public-table-")
+          ? request.cookies[TABLE_SESSION_COOKIE_NAME]
+          : (request.cookies[SESSION_COOKIE_NAME] ?? request.headers.authorization),
       );
     },
     timeWindow: "1 minute",

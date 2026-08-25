@@ -9,11 +9,13 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class SplitPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class SplitPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The copies property</summary>
+        public int? Copies { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -30,15 +32,24 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The printerId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? PrinterId { get; set; }
+#nullable restore
+#else
+        public string PrinterId { get; set; }
+#endif
         /// <summary>The tableId property</summary>
         public Guid? TableId { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Split.SplitPostRequestBody"/> and sets the default values.
-        /// </summary>
-        public SplitPostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
+        /// <summary>The terminalId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? TerminalId { get; set; }
+#nullable restore
+#else
+        public string TerminalId { get; set; }
+#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -57,9 +68,13 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "copies", n => { Copies = n.GetIntValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Split.SplitPostRequestBody_items>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Split.SplitPostRequestBody_items.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "tableId", n => { TableId = n.GetGuidValue(); } },
+                { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -69,10 +84,13 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("copies", Copies);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Split.SplitPostRequestBody_items>("items", Items);
             writer.WriteStringValue("label", Label);
+            writer.WriteStringValue("printerId", PrinterId);
             writer.WriteGuidValue("tableId", TableId);
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteStringValue("terminalId", TerminalId);
         }
     }
 }

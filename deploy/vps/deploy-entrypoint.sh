@@ -193,19 +193,27 @@ target_manifest, target_root, recovery_manifest, recovery_root, evidence_path, e
 evidence_file = pathlib.Path(evidence_path)
 evidence = json.loads(evidence_file.read_text(encoding="utf-8"))
 recovery_sha = pathlib.Path(recovery_root).name
+def journal_identity(root):
+    entries=json.loads((pathlib.Path(root)/"packages/db/drizzle/meta/_journal.json").read_text(encoding="utf-8")).get("entries",[])
+    if not entries: return None
+    tag=entries[-1].get("tag",""); match=re.fullmatch(r"([0-9]{4})_[A-Za-z0-9_.-]+",tag)
+    return (tag,int(match.group(1))) if match else None
+target_identity=journal_identity(target_root)
+recovery_identity=journal_identity(recovery_root)
+expected_levels=[recovery_identity[1],target_identity[1]] if target_identity and recovery_identity else None
 evidence_valid = (
     evidence_hash == "sha256:" + hashlib.sha256(evidence_file.read_bytes()).hexdigest()
     and evidence.get("schemaVersion") == 1
     and evidence.get("role") == "recovery"
     and evidence.get("recoveryArtifact") == "git:" + recovery_sha
     and evidence.get("postgresMajors") == [16, 17]
-    and evidence.get("schemaLevels") == [45, 53]
-    and evidence.get("targetMigration") == "0053_petite_trauma"
+    and evidence.get("schemaLevels") == expected_levels
+    and evidence.get("targetMigration") == target_identity[0]
     and evidence.get("testedUpgrade") is True
     and evidence.get("doseClubReconciliation") == "legacy-source-upgraded"
     and evidence.get("legacyUpgrade") == {"sourceArtifact":"git:4d408037c3fbcb67e2ad57f8ad47b6300a10ec77","sourceMigration":"0026_doseclub_integration","sourceAppliedAt":"1786493658116","postgresMajors":[16,17],"result":"passed"}
     and evidence.get("result") == "passed"
-    and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":53,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
+    and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":target_identity[1],"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
 )
 if not (validate_files(target_manifest, target_root, "target") and validate_files(recovery_manifest, recovery_root, "recovery") and evidence_valid):
     raise SystemExit("TRUST_RELEASE_FILES_INVALID")

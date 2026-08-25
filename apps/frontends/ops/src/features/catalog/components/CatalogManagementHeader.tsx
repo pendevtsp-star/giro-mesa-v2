@@ -21,9 +21,9 @@ type CatalogManagementHeaderProps = {
   onOpenModifiers: () => void;
   onOpenPdf: () => void;
   onOpenPromotions: () => void;
-  onOpenQrGenerator: () => void;
   onOpenReorder: () => void;
   onOpenSpreadsheet: () => void;
+  tableQrHref: string;
 };
 
 type HeaderAction = {
@@ -75,9 +75,9 @@ export function CatalogManagementHeader({
   onOpenModifiers,
   onOpenPdf,
   onOpenPromotions,
-  onOpenQrGenerator,
   onOpenReorder,
   onOpenSpreadsheet,
+  tableQrHref,
 }: CatalogManagementHeaderProps) {
   const headerActions: HeaderAction[] = [
     {
@@ -202,16 +202,14 @@ export function CatalogManagementHeader({
               ))}
             </fieldset>
 
-            <Button
-              className="catalog-management-header__action catalog-management-header__action--accent"
-              onClick={onOpenQrGenerator}
-              size="sm"
+            <a
+              className="gm-button gm-button--secondary gm-button--sm catalog-management-header__action catalog-management-header__action--accent"
+              href={tableQrHref}
               title="Gerar e imprimir placas de QR Code numeradas para mesas e balcões"
-              variant="secondary"
             >
               <Icon name="catalog" size={14} />
-              <span>Placas QR de Mesas</span>
-            </Button>
+              <span>Abrir QR das mesas</span>
+            </a>
 
             {secondaryActions.map((action) =>
               "href" in action ? (

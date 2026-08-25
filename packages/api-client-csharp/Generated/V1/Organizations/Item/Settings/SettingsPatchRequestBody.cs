@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
     public partial class SettingsPatchRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedRevision property</summary>
+        public DateTimeOffset? ExpectedRevision { get; set; }
         /// <summary>The tradeName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -38,6 +40,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetDateTimeOffsetValue(); } },
                 { "tradeName", n => { TradeName = n.GetStringValue(); } },
             };
         }
@@ -48,6 +51,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Settings
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteDateTimeOffsetValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("tradeName", TradeName);
         }
     }

@@ -10,8 +10,16 @@ import {
   Textarea,
   Toast,
 } from "@giromesa/ui";
-import { useEffect, useRef, useState } from "react";
-import { api, type PosPrintJob, type PrintDocumentType, type PrintJobStatus } from "../../api";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import {
+  ApiClientError,
+  api,
+  type DoseClubEligibleMembership,
+  type PosPrintJob,
+  type PrintDocumentType,
+  type PrintJobStatus,
+} from "../../api";
 import { sendShellPrintJob, shellPrintingAvailable } from "../../bridge";
 import { pilotMutation } from "../../operational-dispatch";
 import {
@@ -23,6 +31,7 @@ import {
   parseTabs,
   RemoteGate,
   record,
+  serviceModeLabel,
   statusTone,
   summarizeTabPayments,
   useRemote,
@@ -30,12 +39,22 @@ import {
 import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
 import { currentTerminalPrinterId, readActiveTerminalProfile } from "../shell/terminal-profile";
+import { BrowserReceipt } from "./BrowserReceipt";
 import type { PaymentAttempt } from "./pos-payments";
 import { promisedAtToIso, splitPromisedAt } from "./promisedAt";
 import { SmartPosPaymentModal } from "./SmartPosPaymentModal";
 import "./counter.css";
 
-type DraftCartItem = {
+type DoseClubDraftSnapshot = {
+  externalOfferId: string;
+  offerName: string;
+  offerType: "individual" | "combo_pool";
+  externalProductId: string;
+  availableDoses: number;
+  doseMl: number;
+};
+
+export type DraftCartItem = {
   id: string;
   productId: string;
   name: string;
@@ -45,7 +64,14 @@ type DraftCartItem = {
   seatNumber?: number;
   course?: "anytime" | "starter" | "main" | "dessert";
   allergyNote?: string;
+  doseClub?: { externalClubId: string };
+  doseClubSnapshot?: DoseClubDraftSnapshot;
 };
+
+type DoseClubLoadState =
+  | { status: "idle" | "loading" }
+  | { status: "error"; message: string }
+  | { status: "ready"; memberships: DoseClubEligibleMembership[] };
 
 type PrintJob = {
   id: string;
@@ -53,12 +79,13 @@ type PrintJob = {
   server?: PosPrintJob;
   mode: PrintMode;
   label: string;
-  status: PrintJobStatus | "preparing" | "confirming" | "fallback";
+  status: PrintJobStatus | "preparing" | "fallback";
   lastError?: string;
 };
 
 export type WorkspaceView = "order" | "account" | "table" | "activity";
 type PrintMode = "account" | "payments" | "final";
+type CloseTabBody = Parameters<typeof api.pilot.closeTab>[3];
 
 const printDocuments: Record<PrintMode, { documentType: PrintDocumentType; label: string }> = {
   account: { documentType: "partial_statement", label: "Extrato parcial" },
@@ -91,16 +118,16 @@ function printStatusLabel(job: PrintJob) {
   if (job.status === "preparing") return "Preparando documento";
   if (job.status === "queued") return "Aguardando este terminal";
   if (job.status === "printing") return "Envio iniciado; confirme antes de repetir";
+  if (job.status === "confirmation_required") return "Saída enviada; confirme o papel";
   if (job.status === "printed") return "Entregue à impressora";
-  if (job.status === "confirming") return "Entregue; confirmação pendente";
   if (job.status === "fallback") return "Diálogo do sistema, sem confirmação";
   return job.lastError ? `Falhou: ${job.lastError}` : "Falhou";
 }
 
 function printActionLabel(status: PrintJob["status"]) {
   if (status === "queued") return "Imprimir agora";
-  if (status === "printing") return "Não imprimiu";
-  if (status === "confirming") return "Sincronizar";
+  if (status === "printing") return "Marcar não impresso";
+  if (status === "confirmation_required") return "Confirmar saída física";
   if (status === "failed") return "Tentar novamente";
   return "Reimprimir";
 }
@@ -131,12 +158,122 @@ export function groupDraftItemsByCourse(items: DraftCartItem[]): DraftCartItem[]
   return [...groups.values()];
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function doseClubText(value: unknown, maximum = 300): string {
+  if (typeof value !== "string" || !value.trim() || value.length > maximum) {
+    throw new Error("O Dose Club retornou dados em formato inesperado.");
+  }
+  return value.trim();
+}
+
+function doseClubCount(value: unknown): number {
+  if (!Number.isSafeInteger(value) || Number(value) < 0) {
+    throw new Error("O Dose Club retornou dados em formato inesperado.");
+  }
+  return Number(value);
+}
+
+export function parseDoseClubMemberships(value: unknown): DoseClubEligibleMembership[] {
+  if (!isPlainRecord(value) || !Array.isArray(value.memberships)) {
+    throw new Error("O Dose Club retornou dados em formato inesperado.");
+  }
+  return value.memberships.map((candidate) => {
+    if (
+      !isPlainRecord(candidate) ||
+      candidate.status !== "active" ||
+      !isPlainRecord(candidate.offer)
+    ) {
+      throw new Error("O Dose Club retornou dados em formato inesperado.");
+    }
+    const offerType = candidate.offer.type;
+    if (offerType !== "individual" && offerType !== "combo_pool") {
+      throw new Error("O Dose Club retornou dados em formato inesperado.");
+    }
+    if (!Array.isArray(candidate.eligibleProducts)) {
+      throw new Error("O Dose Club retornou dados em formato inesperado.");
+    }
+    const doseMl = candidate.doseMl;
+    if (typeof doseMl !== "number" || !Number.isFinite(doseMl) || doseMl <= 0) {
+      throw new Error("O Dose Club retornou dados em formato inesperado.");
+    }
+    return {
+      externalClubId: doseClubText(candidate.externalClubId, 200),
+      status: "active" as const,
+      offer: {
+        externalOfferId: doseClubText(candidate.offer.externalOfferId, 200),
+        name: doseClubText(candidate.offer.name),
+        type: offerType,
+      },
+      remainingDoses: doseClubCount(candidate.remainingDoses),
+      reservedDoses: doseClubCount(candidate.reservedDoses),
+      availableDoses: doseClubCount(candidate.availableDoses),
+      doseMl,
+      eligibleProducts: candidate.eligibleProducts.map((eligibleProduct) => {
+        if (
+          !isPlainRecord(eligibleProduct) ||
+          (eligibleProduct.brand !== null && typeof eligibleProduct.brand !== "string")
+        ) {
+          throw new Error("O Dose Club retornou dados em formato inesperado.");
+        }
+        return {
+          externalProductId: doseClubText(eligibleProduct.externalProductId, 200),
+          name: doseClubText(eligibleProduct.name),
+          brand:
+            eligibleProduct.brand === null || !eligibleProduct.brand.trim()
+              ? null
+              : doseClubText(eligibleProduct.brand),
+        };
+      }),
+    };
+  });
+}
+
+export function doseClubDraftQuantity(items: DraftCartItem[], externalClubId: string): number {
+  return items.reduce(
+    (total, item) =>
+      item.doseClub?.externalClubId === externalClubId ? total + item.quantity : total,
+    0,
+  );
+}
+
+export function incrementDraftItem(items: DraftCartItem[], itemId: string): DraftCartItem[] {
+  const target = items.find((item) => item.id === itemId);
+  if (!target) return items;
+  if (
+    target.doseClub &&
+    target.doseClubSnapshot &&
+    doseClubDraftQuantity(items, target.doseClub.externalClubId) >=
+      target.doseClubSnapshot.availableDoses
+  ) {
+    return items;
+  }
+  return items.map((item) =>
+    item.id === itemId ? { ...item, quantity: item.quantity + 1 } : item,
+  );
+}
+
+export function draftItemsToOrderItems(items: DraftCartItem[]) {
+  return items.map((item) => ({
+    productId: item.productId,
+    quantity: item.quantity,
+    modifierOptionIds: item.modifierOptionIds,
+    ...(item.notes !== undefined ? { notes: item.notes } : {}),
+    ...(item.seatNumber !== undefined ? { seatNumber: item.seatNumber } : {}),
+    ...(item.course !== undefined ? { course: item.course } : {}),
+    ...(item.allergyNote !== undefined ? { allergyNote: item.allergyNote } : {}),
+    ...(item.doseClub ? { doseClub: { externalClubId: item.doseClub.externalClubId } } : {}),
+  }));
+}
+
 export function parseStoredCart(value: string | null): DraftCartItem[] {
   if (!value) return [];
   try {
     const parsed: unknown = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];
-    return parsed.slice(0, 100).flatMap((candidate) => {
+    const restored = parsed.slice(0, 100).flatMap((candidate) => {
       if (!candidate || typeof candidate !== "object") return [];
       const item = candidate as Record<string, unknown>;
       const course = item.course ?? "anytime";
@@ -153,6 +290,41 @@ export function parseStoredCart(value: string | null): DraftCartItem[] {
       ) {
         return [];
       }
+      const hasDoseClub = item.doseClub !== undefined || item.doseClubSnapshot !== undefined;
+      let doseClubFields: Pick<DraftCartItem, "doseClub" | "doseClubSnapshot"> = {};
+      if (hasDoseClub) {
+        if (!isPlainRecord(item.doseClub) || !isPlainRecord(item.doseClubSnapshot)) return [];
+        const snapshot = item.doseClubSnapshot;
+        if (
+          typeof item.doseClub.externalClubId !== "string" ||
+          !item.doseClub.externalClubId.trim() ||
+          item.doseClub.externalClubId.length > 200 ||
+          typeof snapshot.externalOfferId !== "string" ||
+          !snapshot.externalOfferId.trim() ||
+          typeof snapshot.offerName !== "string" ||
+          !snapshot.offerName.trim() ||
+          !["individual", "combo_pool"].includes(String(snapshot.offerType)) ||
+          snapshot.externalProductId !== item.productId ||
+          !Number.isSafeInteger(snapshot.availableDoses) ||
+          Number(snapshot.availableDoses) < Number(item.quantity) ||
+          typeof snapshot.doseMl !== "number" ||
+          !Number.isFinite(snapshot.doseMl) ||
+          snapshot.doseMl <= 0
+        ) {
+          return [];
+        }
+        doseClubFields = {
+          doseClub: { externalClubId: item.doseClub.externalClubId.trim() },
+          doseClubSnapshot: {
+            externalOfferId: snapshot.externalOfferId.trim(),
+            offerName: snapshot.offerName.trim(),
+            offerType: snapshot.offerType as DoseClubDraftSnapshot["offerType"],
+            externalProductId: snapshot.externalProductId,
+            availableDoses: Number(snapshot.availableDoses),
+            doseMl: snapshot.doseMl,
+          },
+        };
+      }
       return [
         {
           id: item.id,
@@ -166,8 +338,18 @@ export function parseStoredCart(value: string | null): DraftCartItem[] {
             : {}),
           course: course as DraftCartItem["course"],
           ...(typeof item.allergyNote === "string" ? { allergyNote: item.allergyNote } : {}),
+          ...doseClubFields,
         },
       ];
+    });
+    const doseUsage = new Map<string, number>();
+    return restored.filter((item) => {
+      if (!item.doseClub || !item.doseClubSnapshot) return true;
+      const current = doseUsage.get(item.doseClub.externalClubId) ?? 0;
+      const next = current + item.quantity;
+      if (next > item.doseClubSnapshot.availableDoses) return false;
+      doseUsage.set(item.doseClub.externalClubId, next);
+      return true;
     });
   } catch {
     return [];
@@ -282,17 +464,28 @@ export function TabWorkspace({
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
+  const [browserPrintJob, setBrowserPrintJob] = useState<PosPrintJob | null>(null);
+  const [reprintReasons, setReprintReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [billRequestPending, setBillRequestPending] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [draftExpanded, setDraftExpanded] = useState(false);
-  const [printMode, setPrintMode] = useState<PrintMode>("account");
   const [itemActionId, setItemActionId] = useState("");
   const [transferTableId, setTransferTableId] = useState("");
   const [mergeTabId, setMergeTabId] = useState("");
+  const [mergeReasonCode, setMergeReasonCode] = useState<
+    "large_party" | "sit_together" | "accessibility" | "operational_reorganization" | "other"
+  >("sit_together");
+  const [mergeReasonNote, setMergeReasonNote] = useState("");
   const [splitItemId, setSplitItemId] = useState("");
   const [splitQuantity, setSplitQuantity] = useState(1);
+  const [splitLabel, setSplitLabel] = useState("Conta separada");
+  const [printSplitMethod, setPrintSplitMethod] = useState<"equal_people" | "fixed_amount">(
+    "equal_people",
+  );
+  const [printSplitPartCount, setPrintSplitPartCount] = useState(2);
+  const [printSplitFixedReais, setPrintSplitFixedReais] = useState(0);
   const [servicePercent, setServicePercent] = useState(10);
   const [tipReais, setTipReais] = useState(0);
   const [approvalItemId, setApprovalItemId] = useState("");
@@ -320,15 +513,65 @@ export function TabWorkspace({
   const [reopenPin, setReopenPin] = useState("");
   const [smartPosOpen, setSmartPosOpen] = useState(false);
   const [integratedAttempt, setIntegratedAttempt] = useState<PaymentAttempt | null>(null);
+  const [doseClubOpen, setDoseClubOpen] = useState(false);
+  const [doseClubState, setDoseClubState] = useState<DoseClubLoadState>({ status: "idle" });
+  const [doseClubRetryKey, setDoseClubRetryKey] = useState(0);
+  const [doseClubNotice, setDoseClubNotice] = useState("");
   const [undoResponsibility, setUndoResponsibility] = useState<{
     identityId: string | null;
     version: number;
   } | null>(null);
   const metadataVersionRef = useRef(0);
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const terminalProfile = readActiveTerminalProfile(scope.unitId);
+  const terminalPaymentMode =
+    terminalProfile?.paymentMode ??
+    (terminalProfile?.mode === "waiter_mobile" ? "disabled" : "cashier");
+  const localPrintingEnabled = terminalPaymentMode !== "disabled";
+  const cashierPaymentEnabled = terminalPaymentMode === "cashier";
+  const integratedPaymentEnabled = terminalPaymentMode === "homologated_pos";
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new tab must reset navigation even when the requested view is unchanged.
   useEffect(() => setView(initialView), [initialView, tabId]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: trocar a comanda deve fechar e limpar a consulta, mesmo sem ler o identificador no corpo.
+  useEffect(() => {
+    setDoseClubOpen(false);
+    setDoseClubState({ status: "idle" });
+    setDoseClubNotice("");
+  }, [tabId]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: o nonce de retry existe somente para repetir esta consulta remota.
+  useEffect(() => {
+    if (!doseClubOpen) return;
+    let cancelled = false;
+    setDoseClubState({ status: "loading" });
+    setDoseClubNotice("");
+    api.integrations
+      .doseClubMemberships(scope.organizationId, scope.unitId, tabId)
+      .then((response) => {
+        if (!cancelled) {
+          setDoseClubState({
+            status: "ready",
+            memberships: parseDoseClubMemberships(response),
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setDoseClubState({
+            status: "error",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Não foi possível consultar os clubes deste cliente.",
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [doseClubOpen, doseClubRetryKey, scope.organizationId, scope.unitId, tabId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -364,7 +607,11 @@ export function TabWorkspace({
       printing.printJob,
       `${printing.printJob.id}:${printing.printJob.attempts}`,
     );
-    if (!result?.success) {
+    const confirmationRequired =
+      result?.success === true ||
+      result?.status === "confirmation_required" ||
+      result?.errorCode === "PRINTER_RESULT_UNKNOWN";
+    if (!confirmationRequired) {
       const error = result?.errorCode ?? "HUB_PRINT_UNAVAILABLE";
       try {
         const failed = await api.pilot.updatePrintJobStatus(
@@ -385,26 +632,66 @@ export function TabWorkspace({
       setFeedback(`A impressora não recebeu o documento (${error}).`);
       return false;
     }
-    updateLocalPrint(localId, { status: "confirming" });
     try {
-      const printed = await api.pilot.updatePrintJobStatus(
+      const pendingConfirmation = await api.pilot.updatePrintJobStatus(
         scope.organizationId,
         scope.unitId,
         printJob.id,
-        { status: "printed", printerId: result.printerId },
+        {
+          status: "confirmation_required",
+          error: "PRINTER_RESULT_UNKNOWN",
+          printerId: result?.printerId,
+        },
         crypto.randomUUID(),
       );
-      updateLocalPrint(localId, { server: printed.printJob, status: "printed" });
+      updateLocalPrint(localId, {
+        server: pendingConfirmation.printJob,
+        status: "confirmation_required",
+      });
       setFeedback(
-        `${printDocuments[printModeFor(printJob.documentType)].label} entregue à impressora${result.printerId ? ` ${result.printerId}` : ""}.`,
+        `${printDocuments[printModeFor(printJob.documentType)].label} enviada${result?.printerId ? ` para ${result.printerId}` : ""}. Confirme a saída física antes de repetir.`,
       );
     } catch {
-      setFeedback("A impressora recebeu o documento; falta sincronizar a confirmação.");
+      updateLocalPrint(localId, { status: "confirmation_required" });
+      setFeedback("A saída pode ter ocorrido; confirme o papel antes de tentar novamente.");
     }
     return true;
   }
 
+  async function deliverBrowserJob(printJob: PosPrintJob, localId: string) {
+    flushSync(() => setBrowserPrintJob(printJob));
+    window.print();
+    try {
+      const pendingConfirmation = await api.pilot.updatePrintJobStatus(
+        scope.organizationId,
+        scope.unitId,
+        printJob.id,
+        { status: "confirmation_required", error: "PRINTER_RESULT_UNKNOWN" },
+        crypto.randomUUID(),
+      );
+      updateLocalPrint(localId, {
+        serverId: printJob.id,
+        server: pendingConfirmation.printJob,
+        status: "confirmation_required",
+      });
+      setFeedback(
+        "Diálogo do sistema aberto com o documento oficial. Confirme a saída física na fila antes de repetir.",
+      );
+    } catch {
+      updateLocalPrint(localId, {
+        serverId: printJob.id,
+        server: printJob,
+        status: "confirmation_required",
+      });
+      setFeedback("A saída pode ter ocorrido; confirme o papel antes de tentar novamente.");
+    }
+  }
+
   async function printDocument(mode: PrintMode) {
+    if (!localPrintingEnabled) {
+      setFeedback("Este terminal encaminha pedidos de conta ao caixa e não imprime localmente.");
+      return;
+    }
     const id = crypto.randomUUID();
     setPrintJobs((current) =>
       [
@@ -412,13 +699,6 @@ export function TabWorkspace({
         ...current,
       ].slice(0, 4),
     );
-    setPrintMode(mode);
-    if (!shellPrintingAvailable()) {
-      window.print();
-      updateLocalPrint(id, { status: "fallback" });
-      setFeedback("Impressão do sistema aberta; o navegador não confirma a saída no papel.");
-      return;
-    }
     try {
       const created = await api.pilot.createPrintJob(
         scope.organizationId,
@@ -432,6 +712,10 @@ export function TabWorkspace({
         id,
       );
       updateLocalPrint(id, { serverId: created.printJob.id, server: created.printJob });
+      if (!shellPrintingAvailable()) {
+        await deliverBrowserJob(created.printJob, id);
+        return;
+      }
       await deliverThermalJob(created.printJob, id);
     } catch (error) {
       updateLocalPrint(id, {
@@ -443,11 +727,16 @@ export function TabWorkspace({
   }
 
   async function reprintDocument(job: PrintJob) {
+    const reason = reprintReasons[job.id]?.trim() ?? "";
+    if ((job.status === "printed" || job.status === "fallback") && reason.length < 3) {
+      setFeedback("Informe o motivo da reimpressão com pelo menos 3 caracteres.");
+      return;
+    }
     if (!job.serverId) {
       await printDocument(job.mode);
       return;
     }
-    if (job.status === "confirming") {
+    if (job.status === "confirmation_required") {
       try {
         const confirmed = await api.pilot.updatePrintJobStatus(
           scope.organizationId,
@@ -464,23 +753,7 @@ export function TabWorkspace({
       return;
     }
     if (job.status === "printing") {
-      if (
-        !window.confirm("Confirme somente se nenhum papel saiu. Marcar esta tentativa como falha?")
-      )
-        return;
-      try {
-        const failed = await api.pilot.updatePrintJobStatus(
-          scope.organizationId,
-          scope.unitId,
-          job.serverId,
-          { status: "failed", error: "Falha confirmada pelo operador" },
-          crypto.randomUUID(),
-        );
-        updateLocalPrint(job.id, { server: failed.printJob, status: "failed" });
-        setFeedback("Tentativa marcada como falha; agora é seguro tentar novamente.");
-      } catch (error) {
-        setFeedback(error instanceof Error ? error.message : "Não foi possível corrigir o estado.");
-      }
+      await markPrintNotDelivered(job);
       return;
     }
     updateLocalPrint(job.id, { status: "preparing" });
@@ -500,14 +773,39 @@ export function TabWorkspace({
                 scope.organizationId,
                 scope.unitId,
                 job.serverId,
-                { reason: "Reimpressão solicitada no atendimento", copies: 1 },
+                { reason, copies: 1 },
                 crypto.randomUUID(),
               );
       updateLocalPrint(job.id, { serverId: queued.printJob.id, server: queued.printJob });
-      await deliverThermalJob(queued.printJob, job.id);
+      if (shellPrintingAvailable()) await deliverThermalJob(queued.printJob, job.id);
+      else await deliverBrowserJob(queued.printJob, job.id);
     } catch (error) {
       updateLocalPrint(job.id, { status: "failed" });
       setFeedback(error instanceof Error ? error.message : "Não foi possível imprimir.");
+    }
+  }
+
+  async function markPrintNotDelivered(job: PrintJob) {
+    if (!job.serverId) return;
+    if (
+      !window.confirm(
+        "Confirme somente se nenhum papel útil saiu. Marcar esta tentativa como não impressa?",
+      )
+    ) {
+      return;
+    }
+    try {
+      const failed = await api.pilot.updatePrintJobStatus(
+        scope.organizationId,
+        scope.unitId,
+        job.serverId,
+        { status: "failed", error: "Saída física não confirmada pelo operador" },
+        crypto.randomUUID(),
+      );
+      updateLocalPrint(job.id, { server: failed.printJob, status: "failed" });
+      setFeedback("Tentativa marcada como não impressa; agora é seguro tentar novamente.");
+    } catch (error) {
+      setFeedback(error instanceof Error ? error.message : "Não foi possível corrigir o estado.");
     }
   }
 
@@ -574,12 +872,17 @@ export function TabWorkspace({
     return () => window.clearInterval(interval);
   }, [scope.organizationId, scope.unitId, tabId]);
 
-  async function mutate(action: () => Promise<unknown>, success: string) {
+  async function mutate<T>(
+    action: () => Promise<T>,
+    success: string | ((result: T) => string),
+    onSuccess?: (result: T) => void,
+  ) {
     setBusy(true);
     setFeedback("");
     try {
-      await action();
-      setFeedback(success);
+      const result = await action();
+      onSuccess?.(result);
+      setFeedback(typeof success === "function" ? success(result) : success);
       detail.retry();
       tabs.retry();
       onChanged();
@@ -594,28 +897,72 @@ export function TabWorkspace({
     }
   }
 
+  async function closeTabWithReturnableCheck(body: CloseTabBody) {
+    try {
+      return await api.pilot.closeTab(
+        scope.organizationId,
+        scope.unitId,
+        tabId,
+        body,
+        crypto.randomUUID(),
+      );
+    } catch (error) {
+      if (!(error instanceof ApiClientError) || error.code !== "TAB_HAS_OPEN_RETURNABLE_CUSTODY") {
+        throw error;
+      }
+      if (error.details?.policy === "block") {
+        throw new Error(
+          "Confirme a devolução em Estoque > Vasilhames antes de encerrar o atendimento.",
+        );
+      }
+      if (
+        !window.confirm(
+          "Há vasilhames pendentes nesta comanda. Deseja encerrar mesmo assim e manter a pendência em Estoque > Vasilhames?",
+        )
+      ) {
+        throw new Error("Fechamento cancelado. A custódia dos vasilhames continua pendente.");
+      }
+      return api.pilot.closeTab(
+        scope.organizationId,
+        scope.unitId,
+        tabId,
+        { ...body, returnableDecision: "acknowledge" },
+        crypto.randomUUID(),
+      );
+    }
+  }
+
   async function closeAndPrint() {
     setBusy(true);
     setFeedback("");
     const thermal = shellPrintingAvailable();
     try {
-      const closed = await api.pilot.closeTab(
-        scope.organizationId,
-        scope.unitId,
-        tabId,
-        { printRequested: thermal, ...(thermal ? { printOptions: { copies: 1 } } : {}) },
-        crypto.randomUUID(),
-      );
+      const closed = await closeTabWithReturnableCheck({
+        printRequested: true,
+        printOptions: {
+          copies: 1,
+          ...((terminalProfile?.installationId ?? scope.installationId)
+            ? {
+                terminalId: terminalProfile?.installationId ?? scope.installationId,
+              }
+            : {}),
+          ...((terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId))
+            ? {
+                printerId: terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId),
+              }
+            : {}),
+        },
+      });
       detail.retry();
       tabs.retry();
       onChanged();
-      if (thermal && closed.printJob) {
+      if (closed.printJob) {
         const local = printJobFromServer(closed.printJob);
         setPrintJobs((current) => [local, ...current].slice(0, 4));
-        await deliverThermalJob(closed.printJob, local.id);
+        if (thermal) await deliverThermalJob(closed.printJob, local.id);
+        else await deliverBrowserJob(closed.printJob, local.id);
       } else {
-        window.print();
-        setFeedback("Atendimento encerrado; impressão do sistema aberta sem confirmação do papel.");
+        setFeedback("Atendimento encerrado, mas o servidor não gerou o documento de impressão.");
       }
     } catch (error) {
       setFeedback(
@@ -703,6 +1050,7 @@ export function TabWorkspace({
                 ? tabs.state.data.filter((tab) => tab.status === "open" && tab.id !== tabId)
                 : [];
             const draftItemTotal = (item: DraftCartItem) => {
+              if (item.doseClub) return 0;
               const selected = menu.products.find((candidate) => candidate.id === item.productId);
               const optionTotal = item.modifierOptionIds.reduce(
                 (sum, optionId) =>
@@ -742,6 +1090,89 @@ export function TabWorkspace({
                 [id, ...current.filter((item) => item !== id)].slice(0, 12),
               );
             }
+            function addDoseClubItem(
+              membership: DoseClubEligibleMembership,
+              externalProductId: string,
+            ) {
+              const selectedProduct = menu.products.find(
+                (item) =>
+                  item.id === externalProductId &&
+                  item.active &&
+                  item.available &&
+                  item.priceCents !== null,
+              );
+              if (!selectedProduct) {
+                setDoseClubNotice("Este produto não está disponível no cardápio atual.");
+                return;
+              }
+              if (
+                doseClubDraftQuantity(cart, membership.externalClubId) >= membership.availableDoses
+              ) {
+                setDoseClubNotice("O saldo disponível desta oferta já está no rascunho.");
+                return;
+              }
+              const snapshot: DoseClubDraftSnapshot = {
+                externalOfferId: membership.offer.externalOfferId,
+                offerName: membership.offer.name,
+                offerType: membership.offer.type,
+                externalProductId,
+                availableDoses: membership.availableDoses,
+                doseMl: membership.doseMl,
+              };
+              setCart((current) => {
+                if (
+                  doseClubDraftQuantity(current, membership.externalClubId) >=
+                  membership.availableDoses
+                ) {
+                  return current;
+                }
+                const refreshed = current.map((item) =>
+                  item.doseClub?.externalClubId === membership.externalClubId &&
+                  item.doseClubSnapshot
+                    ? {
+                        ...item,
+                        doseClubSnapshot: {
+                          ...item.doseClubSnapshot,
+                          externalOfferId: membership.offer.externalOfferId,
+                          offerName: membership.offer.name,
+                          offerType: membership.offer.type,
+                          availableDoses: membership.availableDoses,
+                          doseMl: membership.doseMl,
+                        },
+                      }
+                    : item,
+                );
+                const duplicate = refreshed.find(
+                  (item) =>
+                    item.productId === selectedProduct.id &&
+                    item.doseClub?.externalClubId === membership.externalClubId,
+                );
+                return duplicate
+                  ? refreshed.map((item) =>
+                      item.id === duplicate.id
+                        ? { ...item, quantity: item.quantity + 1, doseClubSnapshot: snapshot }
+                        : item,
+                    )
+                  : [
+                      ...refreshed,
+                      {
+                        id: crypto.randomUUID(),
+                        productId: selectedProduct.id,
+                        name: selectedProduct.name,
+                        quantity: 1,
+                        modifierOptionIds: [],
+                        doseClub: { externalClubId: membership.externalClubId },
+                        doseClubSnapshot: snapshot,
+                      },
+                    ];
+              });
+              rememberProduct(selectedProduct.id);
+              setLastRemovedItem(null);
+              setDoseClubNotice(
+                `1 dose de ${selectedProduct.name} adicionada como pré-paga por ${membership.offer.name}.`,
+              );
+              if (!window.matchMedia("(max-width: 640px)").matches) setDraftExpanded(true);
+            }
             function addItem(selectedProduct = product) {
               if (
                 !selectedProduct ||
@@ -762,6 +1193,7 @@ export function TabWorkspace({
               setCart((value) => {
                 const duplicate = value.find(
                   (item) =>
+                    !item.doseClub &&
                     item.productId === next.productId &&
                     JSON.stringify(item.modifierOptionIds) ===
                       JSON.stringify(next.modifierOptionIds) &&
@@ -807,6 +1239,7 @@ export function TabWorkspace({
 
             function repeatLastOrder() {
               const repeatable = lastOrder.filter((item) => {
+                if (item.doseClub) return false;
                 const selected = menu.products.find((product) => product.id === item.productId);
                 return selected?.active && selected.available && selected.priceCents !== null;
               });
@@ -829,37 +1262,130 @@ export function TabWorkspace({
             async function requestBillAndPrint() {
               const tableId = data.tab.tableId;
               if (billRequestPending) return;
-              if (!tableId || billCall) {
-                printDocument("account");
+              if (!tableId) {
+                if (localPrintingEnabled) void printDocument("account");
                 setFeedback(
-                  tableId
-                    ? "Nova via da pré-conta enviada para impressão."
+                  !localPrintingEnabled
+                    ? "Este terminal não imprime localmente."
                     : "Pré-conta enviada para impressão.",
+                );
+                return;
+              }
+              if (billCall) {
+                setView("account");
+                setFeedback(
+                  localPrintingEnabled
+                    ? "A conta já foi solicitada. Para outra via, informe o motivo na fila de impressão."
+                    : "A conta já está na fila do caixa.",
                 );
                 return;
               }
               setBillRequestPending(true);
               try {
-                const requested = await mutate(
-                  () =>
-                    api.pilot.createServiceCall(
-                      scope.organizationId,
-                      scope.unitId,
-                      tableId,
-                      { kind: "bill", tabId, slaMinutes: 2 },
-                      crypto.randomUUID(),
-                    ),
-                  "Pedido de conta registrado.",
+                const installationId = terminalProfile?.installationId ?? scope.installationId;
+                const printerId =
+                  terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId);
+                const requested = await api.pilot.createServiceCall(
+                  scope.organizationId,
+                  scope.unitId,
+                  tableId,
+                  {
+                    kind: "bill",
+                    tabId,
+                    slaMinutes: 2,
+                    copies: 1,
+                    ...(installationId ? { installationId, terminalId: installationId } : {}),
+                    ...(printerId ? { printerId } : {}),
+                  },
+                  crypto.randomUUID(),
                 );
-                if (requested) printDocument("account");
+                detail.retry();
+                tabs.retry();
+                onChanged();
+                if (requested.printJob && requested.deliveryRoute === "local") {
+                  const local = printJobFromServer(requested.printJob);
+                  setPrintJobs((current) => [local, ...current].slice(0, 12));
+                  if (requested.printJob.status !== "queued") {
+                    setView("account");
+                    setFeedback(
+                      "A conta já tinha uma tentativa de impressão. Confira o estado na fila antes de repetir.",
+                    );
+                  } else if (shellPrintingAvailable()) {
+                    await deliverThermalJob(requested.printJob, local.id);
+                  } else {
+                    await deliverBrowserJob(requested.printJob, local.id);
+                  }
+                } else {
+                  setFeedback("Conta solicitada ao caixa.");
+                }
+              } catch (error) {
+                setFeedback(
+                  error instanceof Error ? error.message : "Não foi possível solicitar a conta.",
+                );
               } finally {
                 setBillRequestPending(false);
               }
             }
 
+            async function submitPrintSplit(event: FormEvent<HTMLFormElement>) {
+              event.preventDefault();
+              if (!localPrintingEnabled || printSplitPartCount < 2) return;
+              if (printSplitMethod === "fixed_amount" && printSplitFixedReais <= 0) return;
+              setBusy(true);
+              setFeedback("");
+              try {
+                const created = await api.pilot.createPrintSplit(
+                  scope.organizationId,
+                  scope.unitId,
+                  tabId,
+                  {
+                    method: printSplitMethod,
+                    partCount: printSplitPartCount,
+                    ...(printSplitMethod === "fixed_amount"
+                      ? { fixedAmountCents: Math.round(printSplitFixedReais * 100) }
+                      : {}),
+                    documentType: "partial_statement",
+                    copies: 1,
+                    ...((terminalProfile?.installationId ?? scope.installationId)
+                      ? {
+                          installationId: terminalProfile?.installationId ?? scope.installationId,
+                          terminalId: terminalProfile?.installationId ?? scope.installationId,
+                        }
+                      : {}),
+                    ...((terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId))
+                      ? {
+                          printerId:
+                            terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId),
+                        }
+                      : {}),
+                    ...(billCall ? { serviceCallId: billCall.id } : {}),
+                  },
+                  crypto.randomUUID(),
+                );
+                const localJobs = created.printJobs.map(printJobFromServer);
+                setPrintJobs((current) => [...localJobs, ...current].slice(0, 12));
+                if (shellPrintingAvailable()) {
+                  for (const job of created.printJobs) {
+                    await deliverThermalJob(job, job.id);
+                  }
+                }
+                setFeedback(
+                  `${created.parts.length} via(s) de divisão criadas sobre o saldo atual. A divisão não registrou pagamento.`,
+                );
+              } catch (error) {
+                setFeedback(
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível criar as vias da divisão.",
+                );
+              } finally {
+                setBusy(false);
+              }
+            }
+
             function openReceive() {
               setView("account");
-              setSmartPosOpen(true);
+              if (integratedPaymentEnabled) setSmartPosOpen(true);
             }
 
             async function submitCart(sendToProduction: boolean) {
@@ -872,7 +1398,7 @@ export function TabWorkspace({
                 const submittedCart = cart;
                 for (const group of groupDraftItemsByCourse(submittedCart)) {
                   const body = {
-                    items: group.map(({ id: _id, name: _name, ...item }) => item),
+                    items: draftItemsToOrderItems(group),
                   };
                   const value = record(
                     await scope.dispatch(
@@ -936,7 +1462,12 @@ export function TabWorkspace({
                     event.preventDefault();
                     productSearchRef.current?.focus();
                   }
-                  if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && cart.length) {
+                  if (
+                    (event.ctrlKey || event.metaKey) &&
+                    event.key === "Enter" &&
+                    cart.length &&
+                    !doseClubOpen
+                  ) {
                     event.preventDefault();
                     void submitCart(true);
                   }
@@ -949,13 +1480,7 @@ export function TabWorkspace({
                       <p className="eyebrow">
                         {currentRoom?.name ?? "Atendimento"}
                         <span aria-hidden="true"> · </span>
-                        {serviceMode === "full_service"
-                          ? "Serviço completo"
-                          : serviceMode === "quick_service"
-                            ? "Giro rápido"
-                            : serviceMode === "bar"
-                              ? "Bar e comandas"
-                              : "Operação híbrida"}
+                        {serviceModeLabel(serviceMode)}
                       </p>
                       <div className="workspace-heading__title-row">
                         <h2>{displayLabel}</h2>
@@ -1313,8 +1838,185 @@ export function TabWorkspace({
                         <p className="eyebrow">Novo pedido</p>
                         <h3>Adicionar itens</h3>
                       </div>
-                      <small>{visibleProducts.length} produto(s)</small>
+                      <div className="order-composer__heading-actions">
+                        <small>{visibleProducts.length} produto(s)</small>
+                        <Button
+                          disabled={busy}
+                          onClick={() => {
+                            setDoseClubState({ status: "loading" });
+                            setDoseClubOpen(true);
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="secondary"
+                        >
+                          Dose Club
+                        </Button>
+                      </div>
                     </div>
+                    <Modal
+                      className="dose-club-modal"
+                      description="Consulte o saldo pré-pago do cliente vinculado a esta comanda."
+                      isOpen={doseClubOpen}
+                      onClose={() => setDoseClubOpen(false)}
+                      size="lg"
+                      title="Dose Club"
+                    >
+                      <div className="dose-club-modal__content">
+                        {doseClubState.status === "loading" && (
+                          <div className="dose-club-state" role="status">
+                            <strong>Consultando clubes do cliente…</strong>
+                            <span>O saldo será confirmado pelo Dose Club.</span>
+                          </div>
+                        )}
+                        {doseClubState.status === "error" && (
+                          <div role="alert">
+                            <Callout tone="danger">
+                              <strong>Não foi possível consultar o Dose Club</strong>
+                              <p>{doseClubState.message}</p>
+                              <Button
+                                onClick={() => {
+                                  setDoseClubState({ status: "loading" });
+                                  setDoseClubRetryKey((current) => current + 1);
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="secondary"
+                              >
+                                Tentar novamente
+                              </Button>
+                            </Callout>
+                          </div>
+                        )}
+                        {doseClubState.status === "ready" &&
+                          doseClubState.memberships.length === 0 && (
+                            <div className="dose-club-state" role="status">
+                              <strong>Nenhum clube ativo encontrado</strong>
+                              <span>
+                                Vincule o cliente à comanda ou siga com a venda comum do cardápio.
+                              </span>
+                            </div>
+                          )}
+                        {doseClubState.status === "ready" &&
+                          doseClubState.memberships.length > 0 && (
+                            <div className="dose-club-memberships">
+                              {doseClubState.memberships.map((membership) => {
+                                const draftedDoses = doseClubDraftQuantity(
+                                  cart,
+                                  membership.externalClubId,
+                                );
+                                const availableForDraft = Math.max(
+                                  0,
+                                  membership.availableDoses - draftedDoses,
+                                );
+                                const eligibleProducts = membership.eligibleProducts.flatMap(
+                                  (eligibleProduct) => {
+                                    const localProduct = menu.products.find(
+                                      (item) =>
+                                        item.id === eligibleProduct.externalProductId &&
+                                        item.active &&
+                                        item.available &&
+                                        item.priceCents !== null,
+                                    );
+                                    return localProduct ? [{ eligibleProduct, localProduct }] : [];
+                                  },
+                                );
+                                return (
+                                  <article
+                                    className="dose-club-membership"
+                                    key={membership.externalClubId}
+                                  >
+                                    <header className="dose-club-membership__heading">
+                                      <div>
+                                        <strong>{membership.offer.name}</strong>
+                                        <small>
+                                          {membership.offer.type === "combo_pool"
+                                            ? "Combo compartilhado"
+                                            : "Clube individual"}
+                                        </small>
+                                      </div>
+                                      <Badge
+                                        tone={membership.availableDoses > 0 ? "success" : "warning"}
+                                      >
+                                        {membership.availableDoses > 0 ? "Ativo" : "Sem saldo"}
+                                      </Badge>
+                                    </header>
+                                    <dl className="dose-club-balance" aria-label="Saldo de doses">
+                                      <div>
+                                        <dt>Saldo</dt>
+                                        <dd>{membership.remainingDoses}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Reservadas</dt>
+                                        <dd>{membership.reservedDoses}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Disponíveis</dt>
+                                        <dd>{membership.availableDoses}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>No rascunho</dt>
+                                        <dd>{draftedDoses}</dd>
+                                      </div>
+                                      <div>
+                                        <dt>Por dose</dt>
+                                        <dd>{membership.doseMl} ml</dd>
+                                      </div>
+                                    </dl>
+                                    <div className="dose-club-products">
+                                      <strong>Produtos elegíveis</strong>
+                                      {eligibleProducts.length === 0 ? (
+                                        <p>
+                                          Nenhum produto elegível está disponível no cardápio atual.
+                                        </p>
+                                      ) : (
+                                        eligibleProducts.map(
+                                          ({ eligibleProduct, localProduct }) => (
+                                            <div
+                                              className="dose-club-product"
+                                              key={eligibleProduct.externalProductId}
+                                            >
+                                              <span>
+                                                <strong>{localProduct.name}</strong>
+                                                <small>
+                                                  {eligibleProduct.brand
+                                                    ? `${eligibleProduct.brand} · `
+                                                    : ""}
+                                                  {membership.doseMl} ml · pré-pago
+                                                </small>
+                                              </span>
+                                              <Button
+                                                disabled={busy || availableForDraft <= 0}
+                                                onClick={() =>
+                                                  addDoseClubItem(
+                                                    membership,
+                                                    eligibleProduct.externalProductId,
+                                                  )
+                                                }
+                                                size="sm"
+                                                type="button"
+                                              >
+                                                Usar 1 dose
+                                              </Button>
+                                            </div>
+                                          ),
+                                        )
+                                      )}
+                                    </div>
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          )}
+                        {doseClubNotice && (
+                          <Callout
+                            tone={doseClubNotice.startsWith("1 dose") ? "success" : "warning"}
+                          >
+                            <span role="status">{doseClubNotice}</span>
+                          </Callout>
+                        )}
+                      </div>
+                    </Modal>
                     {(quickProducts.length > 0 || lastOrder.length > 0) && (
                       <section className="quick-order-strip" aria-label="Atalhos de pedido">
                         <div>
@@ -1689,12 +2391,24 @@ export function TabWorkspace({
                         <div className="cart-preview__item" key={item.id}>
                           <span className="cart-preview__item-copy">
                             <strong>{item.name}</strong>
+                            {item.doseClubSnapshot && (
+                              <span className="cart-preview__dose-club">
+                                <Badge tone="info">Dose Club</Badge>
+                                <span>{item.doseClubSnapshot.offerName}</span>
+                              </span>
+                            )}
                             <small>
-                              {item.notes || "Sem observação"}
+                              {item.doseClubSnapshot
+                                ? `${item.doseClubSnapshot.doseMl} ml · pré-pago · limite ${item.doseClubSnapshot.availableDoses}`
+                                : item.notes || "Sem observação"}
                               {item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""}
                               {item.allergyNote ? ` · ⚠ ${item.allergyNote}` : ""}
                             </small>
-                            <b>{formatMoney(draftItemTotal(item))}</b>
+                            <b>
+                              {item.doseClub
+                                ? `Pré-pago · ${formatMoney(0)}`
+                                : formatMoney(draftItemTotal(item))}
+                            </b>
                           </span>
                           <span className="cart-preview__actions">
                             <span className="quantity-stepper quantity-stepper--compact">
@@ -1718,37 +2432,40 @@ export function TabWorkspace({
                               <strong>{item.quantity}</strong>
                               <Button
                                 aria-label={`Aumentar ${item.name}`}
+                                disabled={
+                                  Boolean(item.doseClub && item.doseClubSnapshot) &&
+                                  doseClubDraftQuantity(
+                                    cart,
+                                    item.doseClub?.externalClubId ?? "",
+                                  ) >= (item.doseClubSnapshot?.availableDoses ?? 0)
+                                }
                                 onClick={() =>
-                                  setCart((current) =>
-                                    current.map((candidate) =>
-                                      candidate.id === item.id
-                                        ? { ...candidate, quantity: candidate.quantity + 1 }
-                                        : candidate,
-                                    ),
-                                  )
+                                  setCart((current) => incrementDraftItem(current, item.id))
                                 }
                                 type="button"
                               >
                                 +
                               </Button>
                             </span>
-                            <Button
-                              onClick={() => {
-                                setProductId(item.productId);
-                                setQuantity(item.quantity);
-                                setNotes(item.notes ?? "");
-                                setSeatNumber(item.seatNumber ?? 0);
-                                setCourse(item.course ?? "anytime");
-                                setAllergyNote(item.allergyNote ?? "");
-                                setOptions(item.modifierOptionIds);
-                                setCart((current) =>
-                                  current.filter((candidate) => candidate.id !== item.id),
-                                );
-                              }}
-                              type="button"
-                            >
-                              Observação
-                            </Button>
+                            {!item.doseClub && (
+                              <Button
+                                onClick={() => {
+                                  setProductId(item.productId);
+                                  setQuantity(item.quantity);
+                                  setNotes(item.notes ?? "");
+                                  setSeatNumber(item.seatNumber ?? 0);
+                                  setCourse(item.course ?? "anytime");
+                                  setAllergyNote(item.allergyNote ?? "");
+                                  setOptions(item.modifierOptionIds);
+                                  setCart((current) =>
+                                    current.filter((candidate) => candidate.id !== item.id),
+                                  );
+                                }}
+                                type="button"
+                              >
+                                Observação
+                              </Button>
+                            )}
                             <Button
                               aria-label={`Remover ${item.name}`}
                               onClick={() => removeDraftItem(item)}
@@ -1879,43 +2596,52 @@ export function TabWorkspace({
                       </span>
                     </div>
                     <div className="account-overview__actions">
-                      <Button
-                        className="smart-pos-trigger"
-                        disabled={!tabOpen || remainingCents <= 0}
-                        onClick={() => setSmartPosOpen(true)}
-                        size="sm"
-                      >
-                        Cobrar {formatMoney(remainingCents)} na maquininha
-                      </Button>
+                      {integratedPaymentEnabled && (
+                        <Button
+                          className="smart-pos-trigger"
+                          disabled={!tabOpen || remainingCents <= 0}
+                          onClick={() => setSmartPosOpen(true)}
+                          size="sm"
+                        >
+                          Cobrar {formatMoney(remainingCents)} na maquininha
+                        </Button>
+                      )}
                       <Button
                         disabled={busy || billRequestPending || !tabOpen}
                         onClick={() => void requestBillAndPrint()}
                         size="sm"
                         variant="secondary"
                       >
-                        {data.tab.tableId && billCall
-                          ? "Reimprimir pré-conta"
-                          : billRequestPending
-                            ? "Solicitando conta…"
-                            : data.tab.tableId
-                              ? "Pedir conta e imprimir"
-                              : "Imprimir pré-conta"}
+                        {!localPrintingEnabled
+                          ? billCall
+                            ? "Conta já solicitada ao caixa"
+                            : "Pedir conta ao caixa"
+                          : data.tab.tableId && billCall
+                            ? "Reimprimir pré-conta"
+                            : billRequestPending
+                              ? "Solicitando conta…"
+                              : data.tab.tableId
+                                ? "Pedir conta e imprimir"
+                                : "Imprimir pré-conta"}
                       </Button>
-                      {data.tab.tableId && (
+                      {localPrintingEnabled && data.tab.tableId && (
                         <Button onClick={() => printDocument("account")} size="sm" variant="ghost">
                           Só imprimir pré-conta
                         </Button>
                       )}
-                      <Button
-                        disabled={data.payments.length === 0}
-                        onClick={() => printDocument("payments")}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Extrato de pagamentos
-                      </Button>
+                      {localPrintingEnabled && (
+                        <Button
+                          disabled={data.payments.length === 0}
+                          onClick={() => printDocument("payments")}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          Extrato de pagamentos
+                        </Button>
+                      )}
                     </div>
-                    {integratedAttempt &&
+                    {integratedPaymentEnabled &&
+                      integratedAttempt &&
                       ["created", "processing", "unknown"].includes(integratedAttempt.status) && (
                         <Callout tone={integratedAttempt.status === "unknown" ? "warning" : "info"}>
                           <strong>
@@ -1940,16 +2666,100 @@ export function TabWorkspace({
                       A pré-conta mostra itens, total, valores pagos e saldo. Não fecha a comanda e
                       não registra pagamento.
                     </small>
+                    {localPrintingEnabled && tabOpen && remainingCents > 0 && (
+                      <form className="print-split-form" onSubmit={submitPrintSplit}>
+                        <strong>Imprimir divisão sugerida</strong>
+                        <NativeSelect
+                          aria-label="Forma da divisão impressa"
+                          onChange={(event) =>
+                            setPrintSplitMethod(event.target.value as typeof printSplitMethod)
+                          }
+                          value={printSplitMethod}
+                        >
+                          <option value="equal_people">Dividir igualmente por pessoas</option>
+                          <option value="fixed_amount">Vias por valor fixo</option>
+                        </NativeSelect>
+                        <Label>
+                          Quantidade de vias
+                          <Input
+                            max={50}
+                            min={2}
+                            onChange={(event) => setPrintSplitPartCount(Number(event.target.value))}
+                            type="number"
+                            value={printSplitPartCount}
+                          />
+                        </Label>
+                        {printSplitMethod === "fixed_amount" && (
+                          <Label>
+                            Valor sugerido por via
+                            <Input
+                              min={0.01}
+                              onChange={(event) =>
+                                setPrintSplitFixedReais(Number(event.target.value))
+                              }
+                              step="0.01"
+                              type="number"
+                              value={printSplitFixedReais}
+                            />
+                          </Label>
+                        )}
+                        <Button
+                          disabled={
+                            busy ||
+                            printSplitPartCount < 2 ||
+                            (printSplitMethod === "fixed_amount" && printSplitFixedReais <= 0)
+                          }
+                          size="sm"
+                          type="submit"
+                        >
+                          Criar e imprimir vias
+                        </Button>
+                        <small>Divisão sugerida e persistida; não registra pagamento.</small>
+                      </form>
+                    )}
                     {printJobs.length > 0 && (
                       <div aria-label="Fila de impressão" className="print-queue" role="status">
                         {printJobs.map((job) => (
                           <span key={job.id}>
                             <strong>{job.label}</strong>
                             <small>{printStatusLabel(job)}</small>
+                            {(job.status === "printed" || job.status === "fallback") && (
+                              <Input
+                                aria-label={`Motivo da reimpressão de ${job.label}`}
+                                maxLength={500}
+                                minLength={3}
+                                onChange={(event) =>
+                                  setReprintReasons((current) => ({
+                                    ...current,
+                                    [job.id]: event.target.value,
+                                  }))
+                                }
+                                placeholder="Motivo obrigatório para reimprimir"
+                                value={reprintReasons[job.id] ?? ""}
+                              />
+                            )}
                             {job.status !== "preparing" && (
-                              <Button onClick={() => void reprintDocument(job)} type="button">
-                                {printActionLabel(job.status)}
-                              </Button>
+                              <div className="print-queue__actions">
+                                <Button
+                                  disabled={
+                                    (job.status === "printed" || job.status === "fallback") &&
+                                    (reprintReasons[job.id]?.trim().length ?? 0) < 3
+                                  }
+                                  onClick={() => void reprintDocument(job)}
+                                  type="button"
+                                >
+                                  {printActionLabel(job.status)}
+                                </Button>
+                                {job.status === "confirmation_required" && (
+                                  <Button
+                                    onClick={() => void markPrintNotDelivered(job)}
+                                    type="button"
+                                    variant="secondary"
+                                  >
+                                    Marcar não impresso
+                                  </Button>
+                                )}
+                              </div>
                             )}
                           </span>
                         ))}
@@ -2239,47 +3049,46 @@ export function TabWorkspace({
                         </div>
                       ))}
                     </div>
-                    {tabOpen && data.tab.totalCents > 0 && remainingCents === 0 && (
-                      <div className="account-close-actions">
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Encerrar ${displayLabel} e imprimir o comprovante final?`,
+                    {tabOpen &&
+                      data.tab.totalCents > 0 &&
+                      remainingCents === 0 &&
+                      terminalPaymentMode !== "disabled" && (
+                        <div className="account-close-actions">
+                          {localPrintingEnabled && (
+                            <Button
+                              disabled={busy}
+                              onClick={() => {
+                                if (
+                                  !window.confirm(
+                                    `Encerrar ${displayLabel} e imprimir o comprovante final?`,
+                                  )
+                                )
+                                  return;
+                                void closeAndPrint();
+                              }}
+                              size="sm"
+                            >
+                              Encerrar e imprimir
+                            </Button>
+                          )}
+                          <Button
+                            disabled={busy}
+                            onClick={() =>
+                              window.confirm(
+                                `Encerrar ${displayLabel} sem imprimir comprovante?`,
+                              ) &&
+                              void mutate(
+                                () => closeTabWithReturnableCheck({ printRequested: false }),
+                                "Atendimento encerrado.",
                               )
-                            )
-                              return;
-                            setPrintMode("final");
-                            void closeAndPrint();
-                          }}
-                          size="sm"
-                        >
-                          Encerrar e imprimir
-                        </Button>
-                        <Button
-                          disabled={busy}
-                          onClick={() =>
-                            window.confirm(`Encerrar ${displayLabel} sem imprimir comprovante?`) &&
-                            void mutate(
-                              () =>
-                                api.pilot.closeTab(
-                                  scope.organizationId,
-                                  scope.unitId,
-                                  tabId,
-                                  { printRequested: false },
-                                  crypto.randomUUID(),
-                                ),
-                              "Atendimento encerrado.",
-                            )
-                          }
-                          size="sm"
-                          variant="secondary"
-                        >
-                          Encerrar sem imprimir
-                        </Button>
-                      </div>
-                    )}
+                            }
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Encerrar sem imprimir
+                          </Button>
+                        </div>
+                      )}
                   </section>
                 )}
                 {tabOpen && view !== "order" && view !== "activity" && (
@@ -2415,7 +3224,7 @@ export function TabWorkspace({
                           </Button>
                         </form>
                         <form
-                          hidden={view !== "account"}
+                          hidden={view !== "account" || !cashierPaymentEnabled}
                           onSubmit={(event) => {
                             event.preventDefault();
                             if (paymentReais <= 0) return;
@@ -2577,13 +3386,27 @@ export function TabWorkspace({
                                   scope.dispatch(
                                     "pos.tabs.merge_requested",
                                     pilotMutation("merge-tabs", {
-                                      body: { targetTabId: tabId, sourceTabIds: [mergeTabId] },
+                                      body: {
+                                        targetTabId: tabId,
+                                        sourceTabIds: [mergeTabId],
+                                        reasonCode: mergeReasonCode,
+                                        ...(mergeReasonNote.trim()
+                                          ? { reasonNote: mergeReasonNote.trim() }
+                                          : {}),
+                                      },
                                     }),
                                     (key) =>
                                       api.pilot.mergeTabs(
                                         scope.organizationId,
                                         scope.unitId,
-                                        { targetTabId: tabId, sourceTabIds: [mergeTabId] },
+                                        {
+                                          targetTabId: tabId,
+                                          sourceTabIds: [mergeTabId],
+                                          reasonCode: mergeReasonCode,
+                                          ...(mergeReasonNote.trim()
+                                            ? { reasonNote: mergeReasonNote.trim() }
+                                            : {}),
+                                        },
                                         key,
                                       ),
                                   ),
@@ -2603,7 +3426,39 @@ export function TabWorkspace({
                               </option>
                             ))}
                           </NativeSelect>
-                          <Button disabled={busy || !mergeTabId} size="sm" type="submit">
+                          <NativeSelect
+                            aria-label="Motivo para unificar comandas"
+                            onChange={(event) =>
+                              setMergeReasonCode(event.target.value as typeof mergeReasonCode)
+                            }
+                            value={mergeReasonCode}
+                          >
+                            <option value="sit_together">Clientes querem sentar juntos</option>
+                            <option value="large_party">Grupo ou família grande</option>
+                            <option value="accessibility">Necessidade de acessibilidade</option>
+                            <option value="operational_reorganization">
+                              Reorganização operacional
+                            </option>
+                            <option value="other">Outro</option>
+                          </NativeSelect>
+                          {(mergeReasonCode === "other" || mergeReasonNote) && (
+                            <Input
+                              aria-label="Detalhe do motivo da unificação"
+                              maxLength={500}
+                              onChange={(event) => setMergeReasonNote(event.target.value)}
+                              placeholder="Detalhe o motivo"
+                              value={mergeReasonNote}
+                            />
+                          )}
+                          <Button
+                            disabled={
+                              busy ||
+                              !mergeTabId ||
+                              (mergeReasonCode === "other" && mergeReasonNote.trim().length < 3)
+                            }
+                            size="sm"
+                            type="submit"
+                          >
                             Unificar aqui
                           </Button>
                         </form>
@@ -2619,7 +3474,7 @@ export function TabWorkspace({
                                     pilotMutation("split-tab", {
                                       tabId,
                                       body: {
-                                        label: "Conta separada",
+                                        label: splitLabel.trim() || "Conta separada",
                                         items: [
                                           { orderItemId: splitItemId, quantity: splitQuantity },
                                         ],
@@ -2631,7 +3486,7 @@ export function TabWorkspace({
                                         scope.unitId,
                                         tabId,
                                         {
-                                          label: "Conta separada",
+                                          label: splitLabel.trim() || "Conta separada",
                                           items: [
                                             { orderItemId: splitItemId, quantity: splitQuantity },
                                           ],
@@ -2639,11 +3494,25 @@ export function TabWorkspace({
                                         key,
                                       ),
                                   ),
-                                "Item separado em nova comanda.",
+                                (result) =>
+                                  `Item separado em nova comanda. ${result.printJobs.length} via(s) foram criadas na fila de impressão.`,
+                                (result) => {
+                                  const localJobs = result.printJobs.map(printJobFromServer);
+                                  setPrintJobs((current) =>
+                                    [...localJobs, ...current].slice(0, 12),
+                                  );
+                                },
                               );
                           }}
                         >
                           <h3>Separar item</h3>
+                          <Input
+                            aria-label="Nome da nova comanda"
+                            maxLength={120}
+                            onChange={(event) => setSplitLabel(event.target.value)}
+                            placeholder="Nome da nova comanda"
+                            value={splitLabel}
+                          />
                           <NativeSelect
                             onChange={(event) => setSplitItemId(event.target.value)}
                             value={splitItemId}
@@ -2872,23 +3741,25 @@ export function TabWorkspace({
                     </Button>
                   </form>
                 )}
-                <SmartPosPaymentModal
-                  embedded={scope.embedded === true}
-                  installationId={scope.installationId ?? ""}
-                  isOpen={smartPosOpen}
-                  onApproved={() => {
-                    detail.retry();
-                    tabs.retry();
-                    onChanged();
-                    setFeedback("Pagamento aprovado na maquininha.");
-                  }}
-                  onAttemptChange={setIntegratedAttempt}
-                  onClose={() => setSmartPosOpen(false)}
-                  organizationId={scope.organizationId}
-                  remainingCents={remainingCents}
-                  tabId={tabId}
-                  unitId={scope.unitId}
-                />
+                {integratedPaymentEnabled && (
+                  <SmartPosPaymentModal
+                    embedded={scope.embedded === true}
+                    installationId={scope.installationId ?? ""}
+                    isOpen={smartPosOpen}
+                    onApproved={() => {
+                      detail.retry();
+                      tabs.retry();
+                      onChanged();
+                      setFeedback("Pagamento aprovado na maquininha.");
+                    }}
+                    onAttemptChange={setIntegratedAttempt}
+                    onClose={() => setSmartPosOpen(false)}
+                    organizationId={scope.organizationId}
+                    remainingCents={remainingCents}
+                    tabId={tabId}
+                    unitId={scope.unitId}
+                  />
+                )}
                 {tabOpen && (
                   <footer
                     aria-label="Ações rápidas do atendimento"
@@ -2926,8 +3797,20 @@ export function TabWorkspace({
                               : "Pedir conta"}
                         </Button>
                       )}
-                      <Button onClick={openReceive} size="sm" variant="ghost">
-                        Receber
+                      <Button
+                        onClick={() =>
+                          terminalPaymentMode === "disabled"
+                            ? void requestBillAndPrint()
+                            : openReceive()
+                        }
+                        size="sm"
+                        variant="ghost"
+                      >
+                        {terminalPaymentMode === "disabled"
+                          ? "Pedir conta ao caixa"
+                          : terminalPaymentMode === "homologated_pos"
+                            ? "Cobrar na POS"
+                            : "Receber no caixa"}
                       </Button>
                       <Button onClick={() => setView("table")} size="sm" variant="ghost">
                         Dados e ações
@@ -2935,92 +3818,12 @@ export function TabWorkspace({
                     </div>
                   </footer>
                 )}
-                <article className="receipt-print-only">
-                  <header
-                    className="receipt-print-brand"
-                    style={{
-                      borderColor: /^#[0-9a-f]{6}$/i.test(menu.branding?.brandColor ?? "")
-                        ? menu.branding?.brandColor
-                        : "#111111",
-                    }}
-                  >
-                    {menu.branding?.headerBannerUrl && (
-                      <img alt="" src={menu.branding.headerBannerUrl} />
-                    )}
-                    <strong>{menu.branding?.restaurantName || "GiroMesa"}</strong>
-                  </header>
-                  <h1>{displayLabel}</h1>
-                  <p>
-                    {printMode === "payments"
-                      ? "Extrato de pagamentos parciais"
-                      : printMode === "final"
-                        ? "Comprovante de encerramento"
-                        : "Extrato parcial da conta"}
-                  </p>
-                  <p>
-                    {data.tab.fulfillmentType === "pickup"
-                      ? "Retirada"
-                      : data.tab.fulfillmentType === "delivery"
-                        ? "Entrega"
-                        : "Consumo no local"}
-                    {data.tab.customerName ? ` · ${data.tab.customerName}` : ""}
-                    {data.tab.guestCount > 0 ? ` · ${data.tab.guestCount} pessoa(s)` : ""}
-                  </p>
-                  {printMode !== "payments" &&
-                    activeItems.map((item) => (
-                      <div key={item.id}>
-                        <span>
-                          {item.quantity}× {item.productName}
-                          <small>
-                            {item.seatNumber ? `Pessoa ${item.seatNumber} · ` : ""}
-                            {courseLabels[item.course]}
-                            {item.allergyNote ? ` · Atenção: ${item.allergyNote}` : ""}
-                          </small>
-                        </span>
-                        <strong>{formatMoney(item.netCents)}</strong>
-                      </div>
-                    ))}
-                  {data.payments.map((payment) => (
-                    <div key={payment.id}>
-                      <span>
-                        {
-                          {
-                            cash: "Dinheiro",
-                            credit_card: "Crédito",
-                            debit_card: "Débito",
-                            pix: "Pix",
-                            other: "Outro",
-                          }[payment.method]
-                        }
-                        <small>{new Date(payment.createdAt).toLocaleString("pt-BR")}</small>
-                        {payment.financialStatus === "reversed" && (
-                          <small>Estornado · líquido {formatMoney(payment.netAmountCents)}</small>
-                        )}
-                      </span>
-                      <strong>{formatMoney(payment.amountCents)}</strong>
-                    </div>
-                  ))}
-                  <hr />
-                  <div>
-                    <strong>Total</strong>
-                    <strong>{formatMoney(data.tab.totalCents)}</strong>
-                  </div>
-                  <div>
-                    <span>Pago líquido</span>
-                    <strong>{formatMoney(paidCents)}</strong>
-                  </div>
-                  {paymentSummary.reversedCents > 0 && (
-                    <div>
-                      <span>Estornado</span>
-                      <strong>{formatMoney(paymentSummary.reversedCents)}</strong>
-                    </div>
-                  )}
-                  <div>
-                    <span>Saldo</span>
-                    <strong>{formatMoney(remainingCents)}</strong>
-                  </div>
-                  <small>Documento não fiscal · {new Date().toLocaleString("pt-BR")}</small>
-                </article>
+                {browserPrintJob && (
+                  <BrowserReceipt
+                    documentType={browserPrintJob.documentType}
+                    payload={browserPrintJob.payload}
+                  />
+                )}
               </section>
             );
           }}

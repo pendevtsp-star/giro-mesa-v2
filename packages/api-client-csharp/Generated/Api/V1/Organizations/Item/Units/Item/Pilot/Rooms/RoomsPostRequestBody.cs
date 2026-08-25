@@ -9,11 +9,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class RoomsPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class RoomsPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -29,7 +29,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms
         /// </summary>
         public RoomsPostRequestBody()
         {
-            AdditionalData = new Dictionary<string, object>();
             SortOrder = 0;
         }
         /// <summary>
@@ -50,6 +49,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "sortOrder", n => { SortOrder = n.GetIntValue(); } },
             };
@@ -61,9 +61,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("name", Name);
             writer.WriteIntValue("sortOrder", SortOrder);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

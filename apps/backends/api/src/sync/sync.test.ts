@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { stableOperationalId } from "./stable-operational-id.js";
 import { hubSyncKey } from "./sync.controller.js";
-import { syncBatchSchema } from "./sync.schemas.js";
+import { cloudCommandResultSchema, syncBatchSchema } from "./sync.schemas.js";
 import {
   canonicalJson,
   operationalSnapshotRevision,
@@ -60,6 +60,89 @@ describe("edge sync boundaries", () => {
         acknowledgedCommandIds: Array.from({ length: 101 }, () => crypto.randomUUID()),
       }).success,
       false,
+    );
+  });
+
+  it("accepts typed cloud command results and requires an explicit unknown code", () => {
+    const commandId = crypto.randomUUID();
+    const cloudPrintJobId = crypto.randomUUID();
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "print_job.execute",
+        cloudPrintJobId,
+        localPrintJobId: crypto.randomUUID(),
+        printerId: crypto.randomUUID(),
+        status: "printed",
+        errorCode: null,
+        duplicate: false,
+      }).success,
+      true,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "print_job.execute",
+        cloudPrintJobId: null,
+        status: "failed",
+        errorCode: "CLOUD_PRINT_JOB_INVALID",
+      }).success,
+      true,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "printer.configuration.upsert",
+        printerId: null,
+        revision: 0,
+        status: "failed",
+        errorCode: "PRINTER_CONFIGURATION_COMMAND_INVALID",
+      }).success,
+      true,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "printer.test",
+        printerId: null,
+        revision: 0,
+        status: "failed",
+        errorCode: "PRINTER_TEST_COMMAND_INVALID",
+      }).success,
+      true,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "print_job.execute",
+        cloudPrintJobId,
+        status: "confirmation_required",
+      }).success,
+      false,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "printer.test",
+        printerId: crypto.randomUUID(),
+        revision: 2,
+        status: "confirmation_required",
+        errorCode: "PRINTER_RESULT_UNKNOWN",
+        duplicate: true,
+      }).success,
+      true,
+    );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "printer.configuration.upsert",
+        printerId: crypto.randomUUID(),
+        revision: 3,
+        status: "applied",
+        errorCode: null,
+        duplicate: false,
+      }).success,
+      true,
     );
   });
 

@@ -76,7 +76,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments
             writer.WriteAdditionalData(AdditionalData);
         }
         /// <summary>
-        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember2"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember3"/>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember2"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember3"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember4"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember5"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember6"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember7"/>
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
         public partial class SegmentsPostRequestBody_filters : IComposedTypeWrapper, IParsable
@@ -104,6 +104,38 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments
 #nullable restore
 #else
             public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember3 SegmentsPostRequestBodyFiltersMember3 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember4"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember4? SegmentsPostRequestBodyFiltersMember4 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember4 SegmentsPostRequestBodyFiltersMember4 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember5"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember5? SegmentsPostRequestBodyFiltersMember5 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember5 SegmentsPostRequestBodyFiltersMember5 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember6"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember6? SegmentsPostRequestBodyFiltersMember6 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember6 SegmentsPostRequestBodyFiltersMember6 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember7"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember7? SegmentsPostRequestBodyFiltersMember7 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember7 SegmentsPostRequestBodyFiltersMember7 { get; set; }
 #endif
             /// <summary>
             /// Creates a new instance of the appropriate class based on discriminator value
@@ -135,6 +167,22 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments
                 {
                     return SegmentsPostRequestBodyFiltersMember3.GetFieldDeserializers();
                 }
+                else if(SegmentsPostRequestBodyFiltersMember4 != null)
+                {
+                    return SegmentsPostRequestBodyFiltersMember4.GetFieldDeserializers();
+                }
+                else if(SegmentsPostRequestBodyFiltersMember5 != null)
+                {
+                    return SegmentsPostRequestBodyFiltersMember5.GetFieldDeserializers();
+                }
+                else if(SegmentsPostRequestBodyFiltersMember6 != null)
+                {
+                    return SegmentsPostRequestBodyFiltersMember6.GetFieldDeserializers();
+                }
+                else if(SegmentsPostRequestBodyFiltersMember7 != null)
+                {
+                    return SegmentsPostRequestBodyFiltersMember7.GetFieldDeserializers();
+                }
                 return new Dictionary<string, Action<IParseNode>>();
             }
             /// <summary>
@@ -155,6 +203,22 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments
                 else if(SegmentsPostRequestBodyFiltersMember3 != null)
                 {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember3>(null, SegmentsPostRequestBodyFiltersMember3);
+                }
+                else if(SegmentsPostRequestBodyFiltersMember4 != null)
+                {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember4>(null, SegmentsPostRequestBodyFiltersMember4);
+                }
+                else if(SegmentsPostRequestBodyFiltersMember5 != null)
+                {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember5>(null, SegmentsPostRequestBodyFiltersMember5);
+                }
+                else if(SegmentsPostRequestBodyFiltersMember6 != null)
+                {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember6>(null, SegmentsPostRequestBodyFiltersMember6);
+                }
+                else if(SegmentsPostRequestBodyFiltersMember7 != null)
+                {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments.SegmentsPostRequestBody_filtersMember7>(null, SegmentsPostRequestBodyFiltersMember7);
                 }
             }
         }

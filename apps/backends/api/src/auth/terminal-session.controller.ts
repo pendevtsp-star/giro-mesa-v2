@@ -33,6 +33,10 @@ const createTerminalSchema = z
   .strict();
 const unlockSchema = z.object({ membershipId: id, pin }).strict();
 const activitySchema = z.object({ actorEpoch: z.number().int().nonnegative() }).strict();
+const lockSchema = z
+  .object({ reason: z.enum(["manual", "idle", "switch"]).default("manual") })
+  .strict()
+  .default({ reason: "manual" });
 
 function terminalToken(request: FastifyRequest) {
   const token = request.cookies[SESSION_COOKIE_NAME];
@@ -106,8 +110,11 @@ export class TerminalSessionController {
 
   @HttpCode(200)
   @Post("terminal-session/lock")
-  lock(@Req() request: FastifyRequest) {
-    return this.terminals.lock(terminalToken(request));
+  lock(
+    @Req() request: FastifyRequest,
+    @Body(new ZodPipe(lockSchema)) body: z.infer<typeof lockSchema>,
+  ) {
+    return this.terminals.lock(terminalToken(request), body.reason);
   }
 
   @HttpCode(204)

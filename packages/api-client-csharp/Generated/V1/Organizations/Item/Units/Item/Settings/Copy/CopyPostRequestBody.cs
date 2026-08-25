@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Copy
     public partial class CopyPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The targetUnitIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -38,6 +40,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Copy
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "targetUnitIds", n => { TargetUnitIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
             };
         }
@@ -48,6 +51,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Copy
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("targetUnitIds", TargetUnitIds);
         }
     }

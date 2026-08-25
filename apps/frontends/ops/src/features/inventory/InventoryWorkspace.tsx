@@ -32,6 +32,7 @@ export type InventoryView =
   | "transfers"
   | "returnables"
   | "assets"
+  | "controls"
   | "recipes"
   | "settings";
 
@@ -76,6 +77,8 @@ interface ItemSummary {
   item: InventoryItem;
   quantity: number;
   reservedQuantity: number;
+  blockedQuantity: number;
+  inTransitQuantity: number;
   availableQuantity: number;
   valueCents: number;
   averageCostCents: number | null;
@@ -124,9 +127,6 @@ export function InventoryWorkspace({
   onEditLocation,
   onArchiveItem,
   onArchiveLocation,
-  canConfirmReturnables,
-  canRecordReturnableIncident,
-  canApproveReturnableIncident,
   canApproveInventoryRisk,
   canResolveTransfers,
   canManageAssets,
@@ -142,6 +142,8 @@ export function InventoryWorkspace({
   onCancelInterunitTransfer,
   onGenerateCyclePlan,
   scannedCode,
+  controls,
+  returnablesPanel,
   recipes,
   realtimeStatus,
 }: {
@@ -154,9 +156,6 @@ export function InventoryWorkspace({
   onEditLocation: (location: StockLocation) => void;
   onArchiveItem: (item: InventoryItem) => void;
   onArchiveLocation: (location: StockLocation) => void;
-  canConfirmReturnables: boolean;
-  canRecordReturnableIncident: boolean;
-  canApproveReturnableIncident: boolean;
   canApproveInventoryRisk: boolean;
   canResolveTransfers: boolean;
   canManageAssets: boolean;
@@ -172,6 +171,8 @@ export function InventoryWorkspace({
   onCancelInterunitTransfer: (transferId: string) => void;
   onGenerateCyclePlan: () => void;
   scannedCode?: string;
+  controls: ReactNode;
+  returnablesPanel: ReactNode;
   recipes: ReactNode;
   realtimeStatus: "connecting" | "live" | "polling";
 }) {
@@ -184,7 +185,6 @@ export function InventoryWorkspace({
     setQuery(scannedCode);
     onViewChange("balances");
   }, [onViewChange, scannedCode]);
-  const returnables = data.returnables ?? [];
   const returnableIncidents = data.returnableIncidents ?? [];
   const itemById = useMemo(() => new Map(data.items.map((item) => [item.id, item])), [data.items]);
   const locationById = useMemo(
@@ -212,6 +212,14 @@ export function InventoryWorkspace({
           (sum, balance) => sum + balance.reservedQuantity,
           0,
         );
+        const blockedQuantity = balances.reduce((sum, balance) => sum + balance.blockedQuantity, 0);
+        const availableQuantity = balances.reduce(
+          (sum, balance) => sum + balance.availableQuantity,
+          0,
+        );
+        const inTransitQuantity = data.inTransitBalances
+          .filter((balance) => balance.inventoryItemId === item.id)
+          .reduce((sum, balance) => sum + balance.quantity, 0);
         const valueCents = balances.reduce(
           (sum, balance) => sum + balance.quantity * (balance.averageCostCents ?? 0),
           0,
@@ -220,17 +228,16 @@ export function InventoryWorkspace({
           item,
           quantity,
           reservedQuantity,
-          availableQuantity: quantity - reservedQuantity,
+          blockedQuantity,
+          inTransitQuantity,
+          availableQuantity,
           valueCents,
           averageCostCents: quantity > 0 ? Math.round(valueCents / quantity) : null,
-          low:
-            item.active &&
-            quantity - reservedQuantity > 0 &&
-            quantity - reservedQuantity <= item.minimumQuantity,
-          zero: item.active && quantity - reservedQuantity <= 0,
+          low: item.active && availableQuantity > 0 && availableQuantity <= item.minimumQuantity,
+          zero: item.active && availableQuantity <= 0,
         };
       }),
-    [data.balances, data.items],
+    [data.balances, data.inTransitBalances, data.items],
   );
   const lowCount = summaries.filter((summary) => summary.low).length;
   const zeroCount = summaries.filter((summary) => summary.zero).length;
@@ -327,9 +334,12 @@ export function InventoryWorkspace({
             {
               id: "returnables",
               label: "Vasilhames",
-              count: returnables.filter((position) => position.divergenceQuantity !== 0).length,
+              count:
+                (data.openCustodies?.length ?? 0) +
+                returnableIncidents.filter((incident) => incident.status === "pending").length,
             },
             { id: "assets", label: "Ativos", count: data.assets.length },
+            { id: "controls", label: "Controles", count: data.pendingActions.length },
             { id: "recipes", label: "Fichas técnicas" },
             { id: "settings", label: "Configurações" },
           ]}
@@ -980,7 +990,12 @@ export function InventoryWorkspace({
                       {closing.lineCount} posição(ões) · {dateLabel(closing.closedAt)}
                     </small>
                   </span>
-                  <strong>{formatMoney(closing.totalValueCents)}</strong>
+                  <span>
+                    <strong>{formatMoney(closing.totalValueCents)}</strong>
+                    {closing.totalInTransitValueCents > 0 && (
+                      <small>{formatMoney(closing.totalInTransitValueCents)} em trânsito</small>
+                    )}
+                  </span>
                 </article>
               ))}
               {!data.closings.length && <p className="inventory-copy">Nenhum período fechado.</p>}
@@ -1059,9 +1074,11 @@ export function InventoryWorkspace({
                     </strong>
                   </div>
                   <div>
-                    <small>Reservado / disponível</small>
+                    <small>Reservado / quarentena / em trânsito / disponível</small>
                     <strong>
                       {summary.reservedQuantity.toLocaleString("pt-BR")} /{" "}
+                      {summary.blockedQuantity.toLocaleString("pt-BR")} /{" "}
+                      {summary.inTransitQuantity.toLocaleString("pt-BR")} /{" "}
                       {summary.availableQuantity.toLocaleString("pt-BR")} {summary.item.unit}
                     </strong>
                   </div>
@@ -1259,6 +1276,14 @@ export function InventoryWorkspace({
                       Enviada por {transfer.sentByName ?? "usuário"} · prazo{" "}
                       {dateLabel(transfer.deadlineAt)}
                     </small>
+                    {transfer.receipts.map((receipt) => (
+                      <small key={receipt.id}>
+                        Conferida por {receipt.receivedByName ?? "usuário"} em{" "}
+                        {dateLabel(receipt.receivedAt)} · recebida{" "}
+                        {receipt.quantityReceived.toLocaleString("pt-BR")} · divergente{" "}
+                        {receipt.quantityDivergent.toLocaleString("pt-BR")}
+                      </small>
+                    ))}
                   </span>
                   <span>
                     <strong>
@@ -1388,140 +1413,10 @@ export function InventoryWorkspace({
         </Card>
       )}
 
-      {view === "returnables" && (
-        <div className="inventory-overview-grid">
-          <Card className="inventory-priority-card">
-            <div className="inventory-section-header inventory-section-header--wrap">
-              <div>
-                <p className="eyebrow">Custódia separada do saldo</p>
-                <h2>Posição de vasilhames</h2>
-              </div>
-              <div className="inventory-command-bar__actions">
-                {canConfirmReturnables && (
-                  <Button onClick={() => onOpen("returnable-conference")} size="sm">
-                    Conferir
-                  </Button>
-                )}
-                {canRecordReturnableIncident && (
-                  <Button
-                    onClick={() => onOpen("returnable-incident")}
-                    size="sm"
-                    variant="secondary"
-                  >
-                    Registrar ocorrência
-                  </Button>
-                )}
-                {canConfirmReturnables && (
-                  <Button
-                    onClick={() => onOpen("returnable-supplier-exchange")}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Enviar ao fornecedor
-                  </Button>
-                )}
-              </div>
-            </div>
-            {returnables.length ? (
-              <div className="inventory-priority-list">
-                {returnables.map((position) => (
-                  <article key={`${position.inventoryItemId}:${position.locationId ?? "all"}`}>
-                    <span>
-                      <strong>{itemById.get(position.inventoryItemId)?.name ?? "Vasilhame"}</strong>
-                      <small>
-                        {locationById.get(position.locationId ?? "")?.name ?? "Todos os locais"}
-                      </small>
-                    </span>
-                    <span>
-                      <small>Previsto {position.expectedQuantity.toLocaleString("pt-BR")}</small>
-                      <strong>Físico {position.physicalQuantity.toLocaleString("pt-BR")}</strong>
-                      {position.expectedQuantity > 0 && (
-                        <small>
-                          {position.ageDays} dia(s) pendente(s) · caução{" "}
-                          {formatMoney(position.depositExposureCents)}
-                        </small>
-                      )}
-                    </span>
-                    <Badge tone={position.divergenceQuantity === 0 ? "success" : "warning"}>
-                      {position.divergenceQuantity === 0
-                        ? "Conferido"
-                        : `Divergência ${position.divergenceQuantity.toLocaleString("pt-BR")}`}
-                    </Badge>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="Nenhum retorno previsto"
-                description="Vincule um produto de revenda a um vasilhame para acompanhar a custódia."
-                icon="↩"
-              />
-            )}
-          </Card>
-          <Card className="inventory-recent-card">
-            <div className="inventory-section-header">
-              <div>
-                <p className="eyebrow">Aprovação</p>
-                <h2>Ocorrências recentes</h2>
-              </div>
-              <Badge
-                tone={
-                  returnableIncidents.some((incident) => incident.status === "pending")
-                    ? "warning"
-                    : "info"
-                }
-              >
-                {returnableIncidents.filter((incident) => incident.status === "pending").length}{" "}
-                pendente(s)
-              </Badge>
-            </div>
-            {returnableIncidents.length ? (
-              <div className="inventory-movement-list">
-                {returnableIncidents.map((incident) => (
-                  <article key={incident.id}>
-                    <span>
-                      <strong>{itemById.get(incident.inventoryItemId)?.name ?? "Vasilhame"}</strong>
-                      <small>{incident.reason}</small>
-                    </span>
-                    <Badge
-                      tone={
-                        incident.status === "approved"
-                          ? "danger"
-                          : incident.status === "rejected"
-                            ? "success"
-                            : "warning"
-                      }
-                    >
-                      {incident.status === "approved"
-                        ? "Aprovado"
-                        : incident.status === "rejected"
-                          ? "Rejeitado"
-                          : "Aguardando aprovação"}
-                    </Badge>
-                    {incident.status === "pending" && canApproveReturnableIncident && (
-                      <Button
-                        onClick={() => onReviewReturnableIncident(incident.id)}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Revisar
-                      </Button>
-                    )}
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState
-                title="Sem ocorrências"
-                description="Quebras, extravios e furtos ficam auditados aqui."
-                icon="✓"
-              />
-            )}
-          </Card>
-        </div>
-      )}
+      {view === "returnables" && returnablesPanel}
 
       {view === "recipes" && recipes}
+      {view === "controls" && controls}
 
       {view === "settings" && (
         <div className="inventory-settings-grid">

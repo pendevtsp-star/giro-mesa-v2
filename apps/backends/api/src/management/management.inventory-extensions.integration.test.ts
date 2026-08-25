@@ -5,8 +5,11 @@ import {
   identities,
   managementInventoryClosings,
   managementNfeImportLines,
+  managementPeople,
   managementPurchaseReceipts,
+  managementReturnableCustodyMovements,
   managementStockBalances,
+  managementSupplierInvoices,
   memberships,
   organizations,
   roleBindings,
@@ -21,8 +24,8 @@ function digits(length: number) {
   return Array.from({ length }, () => randomInt(0, 10)).join("");
 }
 
-function nfeAccessKey(issuerDocument: string) {
-  const base = `352608${issuerDocument}55001000000099112345678`;
+function nfeAccessKey(issuerDocument: string, documentNumber = 99) {
+  const base = `352608${issuerDocument}55001${String(documentNumber).padStart(9, "0")}112345678`;
   const sum = [...base]
     .reverse()
     .reduce((total, digit, index) => total + Number(digit) * ((index % 8) + 2), 0);
@@ -151,7 +154,11 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       unit.id,
       imported.importId,
       `confirm-${randomUUID()}`,
-      { locationId: location.id, acceptTotalDivergence: false },
+      {
+        locationId: location.id,
+        dueDate: "2026-08-31",
+        acceptTotalDivergence: false,
+      },
     );
     const [storedLine] = await database.db
       .select()
@@ -194,6 +201,70 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       ),
       hasCode("NFE_IMPORT_NOT_FOUND"),
     );
+
+    const order = await management.createPurchaseOrder(
+      identity.id,
+      organization.id,
+      unit.id,
+      `order-${randomUUID()}`,
+      {
+        supplierId: supplier.id,
+        items: [{ inventoryItemId: storedLine.inventoryItemId, quantity: "1", unitCostCents: 500 }],
+      },
+    );
+    await management.approvePurchaseOrder(
+      identity.id,
+      organization.id,
+      unit.id,
+      order.purchaseOrderId,
+      `approve-${randomUUID()}`,
+      { version: order.version },
+    );
+    const linkedAccessKey = nfeAccessKey(issuerDocument, 100);
+    const linkedXml = `<NFe><infNFe Id="NFe${linkedAccessKey}"><ide><mod>55</mod><serie>1</serie><nNF>100</nNF><dhEmi>2026-08-18T10:00:00-03:00</dhEmi></ide><emit><CNPJ>${issuerDocument}</CNPJ><xNome>Emitente NF-e</xNome></emit><dest><CNPJ>${recipientDocument}</CNPJ></dest><det nItem="1"><prod><cProd>NEW-1</cProd><cEAN>SEM GTIN</cEAN><xProd>Produto novo</xProd><NCM>22030000</NCM><CFOP>5102</CFOP><uCom>UN</uCom><qCom>1</qCom><vProd>5.00</vProd></prod></det><total><ICMSTot><vNF>5.00</vNF></ICMSTot></total></infNFe></NFe>`;
+    const linkedImport = await management.importNfe(
+      identity.id,
+      organization.id,
+      unit.id,
+      `linked-import-${randomUUID()}`,
+      { xml: linkedXml, supplierId: supplier.id },
+    );
+    assert.ok(linkedImport.lines[0]);
+    await management.reviewNfeImport(
+      identity.id,
+      organization.id,
+      unit.id,
+      linkedImport.importId,
+      `linked-review-${randomUUID()}`,
+      {
+        lines: [
+          {
+            lineId: linkedImport.lines[0].id,
+            status: "matched",
+            inventoryItemId: storedLine.inventoryItemId,
+          },
+        ],
+      },
+    );
+    const linked = await management.confirmNfeImport(
+      identity.id,
+      organization.id,
+      unit.id,
+      linkedImport.importId,
+      `linked-confirm-${randomUUID()}`,
+      {
+        locationId: location.id,
+        purchaseOrderId: order.purchaseOrderId,
+        dueDate: "2026-08-31",
+        acceptTotalDivergence: false,
+      },
+    );
+    assert.equal(linked.purchaseOrderId, order.purchaseOrderId);
+    const [linkedInvoice] = await database.db
+      .select()
+      .from(managementSupplierInvoices)
+      .where(eq(managementSupplierInvoices.id, linked.invoiceId));
+    assert.equal(linkedInvoice?.status, "matched");
 
     const container = await management.createInventoryItem(
       identity.id,
@@ -471,6 +542,21 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
         reason: "Reserva para evento de integração.",
       },
     );
+    await assert.rejects(
+      management.transferInventoryBatch(identity.id, organization.id, unit.id, randomUUID(), {
+        sourceLocationId: destination.id,
+        destinationLocationId: location.id,
+        reason: "Tentativa acima do saldo disponível.",
+        lines: [
+          {
+            inventoryItemId: prepared.id,
+            lotId: completed.outputLotId,
+            quantity: "0.9",
+          },
+        ],
+      }),
+      hasCode("INVENTORY_RESERVED_STOCK_BLOCKED"),
+    );
     const reservedDashboard = await management.inventoryDashboard(
       identity.id,
       organization.id,
@@ -590,6 +676,217 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
     ]);
     assert.equal(sourcePreparedBalance[0]?.quantity, "0.600");
     assert.equal(destinationPreparedBalance[0]?.quantity, "0.400");
+
+    await management.configureInventorySectorPolicy(
+      identity.id,
+      organization.id,
+      unit.id,
+      destination.id,
+      {
+        blindCountRequired: true,
+        requireDistinctCountReviewer: true,
+        scanRequired: true,
+        offlineAllowed: true,
+        temperatureMinimumCelsius: 2,
+        temperatureMaximumCelsius: 8,
+      },
+    );
+    const criticalReading = await management.recordInventoryTemperature(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      randomUUID(),
+      { locationId: destination.id, celsius: 11, source: "manual" },
+    );
+    assert.equal(criticalReading.status, "critical");
+
+    const hold = await management.holdInventoryLot(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      completed.outputLotId,
+      randomUUID(),
+      { reason: "Amostra com suspeita de contaminação.", evidence: [] },
+    );
+    await assert.rejects(
+      management.recordInventoryEvent(
+        inventoryIdentity.id,
+        organization.id,
+        unit.id,
+        randomUUID(),
+        {
+          type: "loss",
+          reason: "Tentativa de baixa durante a quarentena.",
+          lines: [
+            {
+              inventoryItemId: prepared.id,
+              locationId: destination.id,
+              lotId: completed.outputLotId,
+              quantity: "0.1",
+            },
+          ],
+        },
+      ),
+      hasCode("INVENTORY_LOT_HELD"),
+    );
+    await management.releaseInventoryLot(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+      completed.outputLotId,
+      hold.id,
+      randomUUID(),
+      { reason: "Amostra liberada apó inspeção de qualidade." },
+    );
+
+    const blindCount = await management.startBlindInventoryCount(
+      identity.id,
+      organization.id,
+      unit.id,
+      randomUUID(),
+      { locationId: destination.id, reason: "Conferência cega do fechamento." },
+    );
+    const firstBlindLine = blindCount.lines[0];
+    assert.ok(firstBlindLine);
+    assert.equal("expectedQuantity" in firstBlindLine, false);
+    await management.submitBlindInventoryCount(
+      identity.id,
+      organization.id,
+      unit.id,
+      blindCount.id,
+      randomUUID(),
+      {
+        lines: blindCount.lines.map((line) => ({ lineId: line.id, countedQuantity: "0" })),
+        offline: true,
+        capturedAt: new Date().toISOString(),
+      },
+    );
+    await assert.rejects(
+      management.reviewBlindInventoryCount(
+        identity.id,
+        organization.id,
+        unit.id,
+        blindCount.id,
+        randomUUID(),
+        { decision: "approved", note: "Tentativa de autoaprovação." },
+      ),
+      hasCode("INVENTORY_COUNT_DUAL_CONTROL_REQUIRED"),
+    );
+    const approvedCount = await management.reviewBlindInventoryCount(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+      blindCount.id,
+      randomUUID(),
+      { decision: "approved", note: "Contagem conferida por gerente distinto." },
+    );
+    assert.equal(approvedCount.status, "approved");
+    const controls = await management.inventoryControlsDashboard(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+    );
+    assert.equal(controls.temperatureReadings[0]?.status, "critical");
+    assert.ok(controls.countSessions.some((session) => session.id === blindCount.id));
+
+    const defaultReturnablePolicy = await management.returnablePolicy(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+    );
+    assert.equal(defaultReturnablePolicy.depositMode, "disabled");
+    const custodyIssueId = randomUUID();
+    await database.db.insert(managementReturnableCustodyMovements).values({
+      id: custodyIssueId,
+      organizationId: organization.id,
+      unitId: unit.id,
+      containerInventoryItemId: container.id,
+      locationId: destination.id,
+      type: "issue",
+      quantityDelta: "4",
+      sourceType: "integration_sale",
+      sourceId: randomUUID(),
+      idempotencyKey: randomUUID(),
+      actorIdentityId: inventoryIdentity.id,
+      dueAt: new Date(Date.now() + 7 * 86_400_000),
+      context: { depositCents: 500 },
+    });
+    await management.confirmReturnableCustody(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      randomUUID(),
+      {
+        issueMovementId: custodyIssueId,
+        containerInventoryItemId: container.id,
+        locationId: destination.id,
+        quantity: "1",
+      },
+    );
+    const custodyIncident = await management.createReturnableIncident(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      randomUUID(),
+      {
+        movementId: custodyIssueId,
+        containerInventoryItemId: container.id,
+        locationId: destination.id,
+        type: "breakage",
+        quantity: "1",
+        note: "Vasilhame quebrado durante a custódia.",
+        evidence: [],
+      },
+    );
+    await management.reviewReturnableIncident(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+      custodyIncident.incidentId,
+      randomUUID(),
+      { decision: "approved", reason: "Quebra conferida no setor de destino." },
+    );
+    await database.db.insert(managementPeople).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      identityId: reviewerIdentity.id,
+      name: "Responsável do turno seguinte",
+      roleLabel: "Gerente",
+    });
+    await management.handoffReturnableCustodies(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      randomUUID(),
+      {
+        issueMovementIds: [custodyIssueId],
+        toIdentityId: reviewerIdentity.id,
+        toShiftReference: "turno-noite",
+        note: "Passagem formal da custódia aberta.",
+      },
+    );
+    const returnables = await management.returnablesDashboard(
+      reviewerIdentity.id,
+      organization.id,
+      unit.id,
+    );
+    const custodyInboxRow = returnables.custodyInbox.find(
+      (row) => row.issueMovementId === custodyIssueId,
+    );
+    assert.equal(custodyInboxRow?.returnedQuantity, "1.000");
+    assert.equal(custodyInboxRow?.incidentQuantity, "1.000");
+    assert.equal(custodyInboxRow?.outstandingQuantity, "2.000");
+    assert.equal(custodyInboxRow?.depositExposureCents, 1_000);
+    assert.equal(custodyInboxRow?.handoff?.toIdentityId, reviewerIdentity.id);
+    const sectorCustody = returnables.custodyByLocation.find(
+      (row) => row.containerInventoryItemId === container.id && row.locationId === destination.id,
+    );
+    assert.equal(sectorCustody?.openCustodyQuantity, "2.000");
+    const sectorReconciliation = returnables.reconciliation.byLocation.find(
+      (row) => row.containerInventoryItemId === container.id && row.locationId === destination.id,
+    );
+    assert.equal(sectorReconciliation?.openCustodyQuantity, "2.000");
+    assert.equal(sectorReconciliation?.approvedLossQuantity, "1.000");
 
     const closing = await management.closeInventoryPeriod(
       identity.id,

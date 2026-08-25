@@ -27,7 +27,29 @@ export function requestRateLimit(method: string, url: string) {
   const path = new URL(url, "http://localhost").pathname.replace(/\/+$/, "");
   if (
     method.toUpperCase() === "POST" &&
-    (/^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:commands|orders|reservations|waitlist|coupons\/validate)$/.test(
+    /^\/(?:api\/)?v1\/growth\/evolution-go\/webhook$/.test(path)
+  )
+    return { bucket: "evolution-webhook", max: 300 } as const;
+  if (
+    method.toUpperCase() === "POST" &&
+    /^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/table-session$/.test(path)
+  )
+    return { bucket: "public-table-session", max: 10 } as const;
+  if (
+    method.toUpperCase() === "POST" &&
+    /^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:commands|table-orders)$/.test(path)
+  )
+    return { bucket: "public-table-write", max: 30 } as const;
+  if (
+    method.toUpperCase() === "GET" &&
+    /^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:consumption|table-session|table-orders\/[^/]+)$/.test(
+      path,
+    )
+  )
+    return { bucket: "public-table-read", max: 120 } as const;
+  if (
+    method.toUpperCase() === "POST" &&
+    (/^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/(?:orders|reservations|waitlist|coupons\/validate)$/.test(
       path,
     ) ||
       /^\/(?:api\/v1\/public|public\/v1)\/(?:trial-applications|contact)$/.test(path))
@@ -47,7 +69,7 @@ export function requestRateLimit(method: string, url: string) {
 
 export function requestRateLimitKey(bucket: string, ip: string, credential?: string) {
   const subject =
-    bucket === "reports-read" && credential
+    (bucket === "reports-read" || bucket.startsWith("public-table-")) && credential
       ? createHash("sha256").update(credential).digest("base64url").slice(0, 22)
       : ip;
   return `${subject}:${bucket}`;

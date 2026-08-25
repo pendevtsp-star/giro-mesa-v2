@@ -9,11 +9,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class BatchPostRequestBody_tables : IAdditionalDataHolder, IParsable
+    public partial class BatchPostRequestBody_tables : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The height property</summary>
+        public int? Height { get; set; }
         /// <summary>The label property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -22,15 +22,24 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The rotation property</summary>
+        public int? Rotation { get; set; }
         /// <summary>The seats property</summary>
         public int? Seats { get; set; }
+        /// <summary>The shape property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables_shape? Shape { get; set; }
+        /// <summary>The width property</summary>
+        public int? Width { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables"/> and sets the default values.
         /// </summary>
         public BatchPostRequestBody_tables()
         {
-            AdditionalData = new Dictionary<string, object>();
+            Height = 76;
+            Rotation = 0;
             Seats = 4;
+            Shape = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables_shape.Rectangle;
+            Width = 122;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
@@ -50,8 +59,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "height", n => { Height = n.GetIntValue(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "rotation", n => { Rotation = n.GetIntValue(); } },
                 { "seats", n => { Seats = n.GetIntValue(); } },
+                { "shape", n => { Shape = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables_shape>(); } },
+                { "width", n => { Width = n.GetIntValue(); } },
             };
         }
         /// <summary>
@@ -61,9 +74,12 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("height", Height);
             writer.WriteStringValue("label", Label);
+            writer.WriteIntValue("rotation", Rotation);
             writer.WriteIntValue("seats", Seats);
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables_shape>("shape", Shape);
+            writer.WriteIntValue("width", Width);
         }
     }
 }

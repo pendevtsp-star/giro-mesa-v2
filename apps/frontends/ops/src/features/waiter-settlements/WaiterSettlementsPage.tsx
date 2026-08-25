@@ -947,6 +947,60 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={save}>
+          <div className="grid gap-3 rounded-lg border border-border p-3">
+            <div className="flex min-h-10 items-center justify-between gap-3">
+              <span>
+                <strong className="block text-sm">Sugerir taxa de serviço</strong>
+                <small className="text-muted-foreground">
+                  Afeta somente novas comandas de mesa; retirada, balcão e delivery permanecem sem
+                  taxa.
+                </small>
+              </span>
+              <Switch
+                aria-label="Sugerir taxa de serviço"
+                checked={settings.serviceChargeEnabled}
+                onCheckedChange={(checked) => update("serviceChargeEnabled", checked)}
+              />
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <FormField htmlFor="default-service-charge" label="Percentual sugerido (%)">
+                <Input
+                  disabled={!settings.serviceChargeEnabled}
+                  id="default-service-charge"
+                  max={100}
+                  min={0.01}
+                  onChange={(event) =>
+                    update(
+                      "defaultServiceChargeBasisPoints",
+                      Math.round(Number(event.target.value) * 100),
+                    )
+                  }
+                  step="0.01"
+                  type="number"
+                  value={settings.defaultServiceChargeBasisPoints / 100}
+                />
+              </FormField>
+              <SelectSetting
+                id="service-charge-application"
+                label="Aplicação em novas comandas"
+                onChange={(value) =>
+                  update(
+                    "serviceChargeApplication",
+                    value as SettlementConfiguration["serviceChargeApplication"],
+                  )
+                }
+                value={settings.serviceChargeApplication}
+                options={[
+                  ["manual", "Somente quando aplicada manualmente"],
+                  ["suggest_dine_in", "Sugerir automaticamente nas mesas"],
+                ]}
+              />
+            </div>
+            <small className="text-muted-foreground">
+              A taxa é opcional para o cliente e pode ser retirada da comanda por usuário
+              autorizado.
+            </small>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <SelectSetting
               id="attribution-mode"
@@ -1131,7 +1185,14 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
             />
           </div>
           {data.capabilities.canConfigure ? (
-            <Button className="justify-self-start" disabled={busy} type="submit">
+            <Button
+              className="justify-self-start"
+              disabled={
+                busy ||
+                (settings.serviceChargeEnabled && settings.defaultServiceChargeBasisPoints <= 0)
+              }
+              type="submit"
+            >
               {busy ? "Salvando…" : "Salvar configurações"}
             </Button>
           ) : (

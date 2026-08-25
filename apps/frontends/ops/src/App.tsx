@@ -88,6 +88,7 @@ export function App() {
     setBooting(true);
     setBootError("");
     try {
+      await api.assertCompatibility();
       try {
         const view = await terminalApi.status();
         setTerminalView(view);
@@ -164,15 +165,12 @@ export function App() {
   }
 
   async function logout() {
-    try {
-      if (terminalView) await terminalApi.close();
-      else await api.logout();
-    } finally {
-      forgetScope();
-      setSession(null);
-      setScopeSource(null);
-      setTerminalView(null);
-    }
+    if (terminalView) await terminalApi.close();
+    else await api.logout();
+    forgetScope();
+    setSession(null);
+    setScopeSource(null);
+    setTerminalView(null);
   }
 
   async function unlockTerminal(membershipId: string, pin: string) {
@@ -183,10 +181,15 @@ export function App() {
     setSession(nextSession);
   }
 
-  const lockTerminal = useCallback(async () => {
-    setSession(null);
-    const view = await terminalApi.lock();
-    setTerminalView(view);
+  const lockTerminal = useCallback(async (reason: "idle" | "switch" = "idle") => {
+    if (reason === "idle") setSession(null);
+    try {
+      const view = await terminalApi.lock(reason);
+      setTerminalView(view);
+      setSession(null);
+    } catch (error) {
+      if (reason === "switch") throw error;
+    }
   }, []);
 
   useEffect(() => {
@@ -251,8 +254,8 @@ export function App() {
   return (
     <OperationalApp
       session={session}
-      onLogout={() => void logout()}
-      onSwitchUser={session.terminalMode ? () => void lockTerminal() : undefined}
+      onLogout={logout}
+      onSwitchUser={session.terminalMode ? () => lockTerminal("switch") : undefined}
     />
   );
 }

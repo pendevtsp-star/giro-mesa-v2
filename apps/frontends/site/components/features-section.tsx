@@ -1,66 +1,26 @@
-const capabilities = [
-  [
-    "01",
-    "Atendimento sem atrito",
-    "Mesas, comandas, balcão, divisão de conta e QR conversam com o mesmo pedido.",
-  ],
-  [
-    "02",
-    "Produção no ritmo",
-    "KDS por estação, impressão e prioridades ajudam cozinha e bar a trabalhar com contexto.",
-  ],
-  [
-    "03",
-    "Estoque conectado",
-    "Fichas técnicas transformam vendas em consumo e tornam rupturas e perdas visíveis.",
-  ],
-  [
-    "04",
-    "Caixa responsável",
-    "Turnos, aprovações, pagamentos e conciliação preservam uma trilha auditável.",
-  ],
-  [
-    "05",
-    "Gestão acionável",
-    "Indicadores começam nas exceções que pedem decisão, não em gráficos decorativos.",
-  ],
-  [
-    "06",
-    "Continuidade local",
-    "O hub planejado mantém a operação essencial da unidade durante falhas de internet.",
-  ],
-] as const;
+import type { CommercialLanding } from "../lib/commercial";
 
-const steps = [
-  ["01", "Entendemos a operação", "Unidade, canais, equipe, equipamentos e necessidades fiscais."],
-  ["02", "Configuramos a base", "Cardápio, mesas, produção, usuários, caixa e permissões."],
-  [
-    "03",
-    "Simulamos o turno",
-    "Pedido, produção, pagamento, emissão e fechamento antes da ativação.",
-  ],
-  ["04", "Ativamos os 14 dias", "O período gratuito começa após a aprovação operacional."],
-] as const;
-
-export function FeaturesSection() {
+export function FeaturesSection({
+  benefits,
+  howItWorks,
+}: {
+  benefits: CommercialLanding["benefits"];
+  howItWorks: CommercialLanding["howItWorks"];
+}) {
   return (
     <>
       <section className="section capabilities" id="solucoes">
         <div className="container">
           <div className="section-heading light">
-            <p className="eyebrow">Feito para o turno real</p>
-            <h2>
-              Menos improviso.
-              <br />
-              Mais controle.
-            </h2>
+            <p className="eyebrow">Benefícios publicados</p>
+            <h2>{benefits.title}</h2>
           </div>
           <div className="capability-grid">
-            {capabilities.map(([number, title, text]) => (
-              <article key={number}>
-                <span>{number}</span>
-                <h3>{title}</h3>
-                <p>{text}</p>
+            {benefits.items.map((item) => (
+              <article key={item.title}>
+                <span aria-hidden="true">{item.icon}</span>
+                <h3>{item.title}</h3>
+                <p>{item.description}</p>
               </article>
             ))}
           </div>
@@ -69,17 +29,16 @@ export function FeaturesSection() {
       <section className="section" id="recursos">
         <div className="container two-column">
           <div className="section-heading">
-            <p className="eyebrow">Implantação responsável</p>
-            <h2>O teste começa quando a casa está pronta.</h2>
-            <p>Em vez de entregar uma senha e contar dias, organizamos a ativação com você.</p>
+            <p className="eyebrow">Como funciona</p>
+            <h2>{howItWorks.title}</h2>
           </div>
           <ol className="steps">
-            {steps.map(([number, title, text]) => (
-              <li key={number}>
-                <span>{number}</span>
+            {howItWorks.steps.map((step, index) => (
+              <li key={step.title}>
+                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
                 <div>
-                  <h3>{title}</h3>
-                  <p>{text}</p>
+                  <h3>{step.title}</h3>
+                  <p>{step.description}</p>
                 </div>
               </li>
             ))}

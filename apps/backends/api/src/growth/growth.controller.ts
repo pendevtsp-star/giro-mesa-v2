@@ -2,6 +2,7 @@ import { idempotencyKeySchema, publicMenuSlugSchema } from "@giromesa/contracts"
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -20,16 +21,36 @@ import { ZodPipe } from "../common/zod.pipe.js";
 import {
   type ApiKeyInput,
   apiKeySchema,
+  type CampaignCancelInput,
   type CampaignInput,
   type ConsentInput,
   type CouponInput,
   type CouponRedemptionInput,
+  type CouponUpdateInput,
+  type CrmAutomationExecutionQueryInput,
+  type CrmAutomationRuleInput,
+  type CrmAutomationTestInput,
+  type CrmQuickReplyInput,
+  type CustomerArchiveInput,
   type CustomerInput,
+  type CustomerListQueryInput,
+  type CustomerMergeInput,
+  type CustomerUpdateInput,
+  campaignCancelSchema,
   campaignSchema,
   consentSchema,
   couponRedemptionSchema,
   couponSchema,
+  couponUpdateSchema,
+  crmAutomationExecutionQuerySchema,
+  crmAutomationRuleSchema,
+  crmAutomationTestSchema,
+  crmQuickReplySchema,
+  customerArchiveSchema,
+  customerListQuerySchema,
+  customerMergeSchema,
   customerSchema,
+  customerUpdateSchema,
   type DeliveryAddressValidationInput,
   type DeliveryCourierAssignmentInput,
   type DeliveryCourierCreateInput,
@@ -56,6 +77,12 @@ import {
   deliveryZoneUpdateSchema,
   dispatchSchema,
   doseClubSchema,
+  type EvolutionConfigurationInput,
+  type EvolutionUnitQueryInput,
+  type EvolutionWebhookInput,
+  evolutionConfigurationSchema,
+  evolutionUnitQuerySchema,
+  evolutionWebhookSchema,
   type LoyaltyEarnInput,
   type LoyaltyProgramInput,
   type LoyaltyRedeemInput,
@@ -91,11 +118,19 @@ import {
   type WaitlistTransitionInput,
   type WebhookEndpointInput,
   type WebhookEventInput,
+  type WhatsAppConversationUpdateInput,
+  type WhatsAppInboxQueryInput,
+  type WhatsAppMessageInput,
+  type WhatsAppMessagesQueryInput,
   waitlistListQuerySchema,
   waitlistSchema,
   waitlistTransitionSchema,
   webhookEndpointSchema,
   webhookEventSchema,
+  whatsappConversationUpdateSchema,
+  whatsappInboxQuerySchema,
+  whatsappMessageSchema,
+  whatsappMessagesQuerySchema,
 } from "./growth.schemas.js";
 import { GrowthService } from "./growth.service.js";
 
@@ -124,6 +159,54 @@ export class GrowthController {
     return this.growth.createCustomer(request.auth.identityId, organizationId, body);
   }
 
+  @Get("customers/page")
+  listCustomerPage(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(customerListQuerySchema)) query: CustomerListQueryInput,
+  ) {
+    return this.growth.listCustomerPage(request.auth.identityId, organizationId, query);
+  }
+
+  @Get("customers/:customerId")
+  customerDetail(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+  ) {
+    return this.growth.customerDetail(request.auth.identityId, organizationId, customerId);
+  }
+
+  @Patch("customers/:customerId")
+  updateCustomer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Body(new ZodPipe(customerUpdateSchema)) body: CustomerUpdateInput,
+  ) {
+    return this.growth.updateCustomer(request.auth.identityId, organizationId, customerId, body);
+  }
+
+  @Post("customers/:customerId/archive")
+  archiveCustomer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Body(new ZodPipe(customerArchiveSchema)) body: CustomerArchiveInput,
+  ) {
+    return this.growth.archiveCustomer(request.auth.identityId, organizationId, customerId, body);
+  }
+
+  @Post("customers/:customerId/merge")
+  mergeCustomer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Body(new ZodPipe(customerMergeSchema)) body: CustomerMergeInput,
+  ) {
+    return this.growth.mergeCustomer(request.auth.identityId, organizationId, customerId, body);
+  }
+
   @Post("customers/:customerId/consents")
   consent(
     @Req() request: AuthenticatedRequest,
@@ -150,6 +233,14 @@ export class GrowthController {
     @Body(new ZodPipe(loyaltyProgramSchema)) body: LoyaltyProgramInput,
   ) {
     return this.growth.configureLoyaltyProgram(request.auth.identityId, organizationId, body);
+  }
+
+  @Get("loyalty/programs/current")
+  loyaltyProgram(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+  ) {
+    return this.growth.loyaltyProgram(request.auth.identityId, organizationId);
   }
 
   @Get("loyalty/customers/:customerId/balance")
@@ -206,6 +297,16 @@ export class GrowthController {
     return this.growth.createCoupon(request.auth.identityId, organizationId, body);
   }
 
+  @Patch("coupons/:couponId")
+  updateCoupon(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("couponId", ParseUUIDPipe) couponId: string,
+    @Body(new ZodPipe(couponUpdateSchema)) body: CouponUpdateInput,
+  ) {
+    return this.growth.updateCoupon(request.auth.identityId, organizationId, couponId, body);
+  }
+
   @Post("coupons/redeem")
   redeemCoupon(
     @Req() request: AuthenticatedRequest,
@@ -256,6 +357,34 @@ export class GrowthController {
     @Param("campaignId", ParseUUIDPipe) campaignId: string,
   ) {
     return this.growth.queueCampaign(request.auth.identityId, organizationId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/preview")
+  previewCampaign(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("campaignId", ParseUUIDPipe) campaignId: string,
+  ) {
+    return this.growth.previewCampaign(request.auth.identityId, organizationId, campaignId);
+  }
+
+  @Get("campaigns/:campaignId/deliveries")
+  campaignDeliveries(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("campaignId", ParseUUIDPipe) campaignId: string,
+  ) {
+    return this.growth.campaignDeliverySummary(request.auth.identityId, organizationId, campaignId);
+  }
+
+  @Post("campaigns/:campaignId/cancel")
+  cancelCampaign(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("campaignId", ParseUUIDPipe) campaignId: string,
+    @Body(new ZodPipe(campaignCancelSchema)) body: CampaignCancelInput,
+  ) {
+    return this.growth.cancelCampaign(request.auth.identityId, organizationId, campaignId, body);
   }
 
   @Get("units/:unitId/reservations")
@@ -636,6 +765,236 @@ export class GrowthController {
   ) {
     return this.growth.configureDoseClub(request.auth.identityId, organizationId, body);
   }
+
+  @Get("integrations/evolution-go")
+  getEvolution(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.getEvolutionIntegration(
+      request.auth.identityId,
+      organizationId,
+      query.unitId,
+    );
+  }
+
+  @Post("integrations/evolution-go")
+  configureEvolution(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(evolutionConfigurationSchema)) body: EvolutionConfigurationInput,
+  ) {
+    return this.growth.configureEvolution(request.auth.identityId, organizationId, body);
+  }
+
+  @Get("integrations/evolution-go/status")
+  evolutionStatus(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.evolutionStatus(request.auth.identityId, organizationId, query.unitId);
+  }
+
+  @Get("integrations/evolution-go/qr")
+  evolutionQr(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.evolutionQr(request.auth.identityId, organizationId, query.unitId);
+  }
+
+  @Post("integrations/evolution-go/reconnect")
+  reconnectEvolution(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(evolutionUnitQuerySchema)) body: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.evolutionConnectionAction(
+      request.auth.identityId,
+      organizationId,
+      body.unitId,
+      "reconnect",
+    );
+  }
+
+  @Post("integrations/evolution-go/logout")
+  logoutEvolution(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(evolutionUnitQuerySchema)) body: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.evolutionConnectionAction(
+      request.auth.identityId,
+      organizationId,
+      body.unitId,
+      "logout",
+    );
+  }
+
+  @Get("whatsapp/conversations")
+  whatsappInbox(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(whatsappInboxQuerySchema)) query: WhatsAppInboxQueryInput,
+  ) {
+    return this.growth.listWhatsAppInbox(request.auth.identityId, organizationId, query);
+  }
+
+  @Get("whatsapp/conversations/:conversationId/messages")
+  whatsappMessages(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("conversationId", ParseUUIDPipe) conversationId: string,
+    @Query(new ZodPipe(whatsappMessagesQuerySchema)) query: WhatsAppMessagesQueryInput,
+  ) {
+    return this.growth.listWhatsAppMessages(
+      request.auth.identityId,
+      organizationId,
+      conversationId,
+      query,
+    );
+  }
+
+  @Patch("whatsapp/conversations/:conversationId")
+  updateWhatsappConversation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("conversationId", ParseUUIDPipe) conversationId: string,
+    @Body(new ZodPipe(whatsappConversationUpdateSchema)) body: WhatsAppConversationUpdateInput,
+  ) {
+    return this.growth.updateWhatsAppConversation(
+      request.auth.identityId,
+      organizationId,
+      conversationId,
+      body,
+    );
+  }
+
+  @Get("whatsapp/assignees")
+  whatsappAssignees(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.listWhatsAppAssignees(request.auth.identityId, organizationId, query.unitId);
+  }
+
+  @Get("whatsapp/conversations/:conversationId/messages/:messageId/media")
+  whatsappMessageMedia(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("conversationId", ParseUUIDPipe) conversationId: string,
+    @Param("messageId", ParseUUIDPipe) messageId: string,
+  ) {
+    return this.growth.whatsAppMessageMedia(
+      request.auth.identityId,
+      organizationId,
+      conversationId,
+      messageId,
+    );
+  }
+
+  @Post("whatsapp/conversations/:conversationId/read")
+  markWhatsappRead(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("conversationId", ParseUUIDPipe) conversationId: string,
+  ) {
+    return this.growth.markWhatsAppConversationRead(
+      request.auth.identityId,
+      organizationId,
+      conversationId,
+    );
+  }
+
+  @Post("whatsapp/messages")
+  sendWhatsappMessage(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(whatsappMessageSchema)) body: WhatsAppMessageInput,
+  ) {
+    return this.growth.sendWhatsAppMessage(request.auth.identityId, organizationId, body);
+  }
+
+  @Get("crm/automations")
+  crmAutomations(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.listCrmAutomations(request.auth.identityId, organizationId, query.unitId);
+  }
+
+  @Post("crm/automations")
+  upsertCrmAutomation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(crmAutomationRuleSchema)) body: CrmAutomationRuleInput,
+  ) {
+    return this.growth.upsertCrmAutomation(request.auth.identityId, organizationId, body);
+  }
+
+  @Get("crm/automation-executions")
+  crmAutomationExecutions(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(crmAutomationExecutionQuerySchema)) query: CrmAutomationExecutionQueryInput,
+  ) {
+    return this.growth.listCrmAutomationExecutions(request.auth.identityId, organizationId, query);
+  }
+
+  @Post("crm/automation-executions/:executionId/retry")
+  retryCrmAutomationExecution(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("executionId", ParseUUIDPipe) executionId: string,
+  ) {
+    return this.growth.retryCrmAutomationExecution(
+      request.auth.identityId,
+      organizationId,
+      executionId,
+    );
+  }
+
+  @Post("crm/automations/:ruleId/test")
+  testCrmAutomation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("ruleId", ParseUUIDPipe) ruleId: string,
+    @Body(new ZodPipe(crmAutomationTestSchema)) body: CrmAutomationTestInput,
+  ) {
+    return this.growth.testCrmAutomation(request.auth.identityId, organizationId, ruleId, body);
+  }
+
+  @Get("crm/quick-replies")
+  crmQuickReplies(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(evolutionUnitQuerySchema)) query: EvolutionUnitQueryInput,
+  ) {
+    return this.growth.listCrmQuickReplies(request.auth.identityId, organizationId, query.unitId);
+  }
+
+  @Post("crm/quick-replies")
+  upsertCrmQuickReply(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(crmQuickReplySchema)) body: CrmQuickReplyInput,
+  ) {
+    return this.growth.upsertCrmQuickReply(request.auth.identityId, organizationId, body);
+  }
+
+  @Delete("crm/quick-replies/:replyId")
+  deleteCrmQuickReply(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("replyId", ParseUUIDPipe) replyId: string,
+  ) {
+    return this.growth.deleteCrmQuickReply(request.auth.identityId, organizationId, replyId);
+  }
 }
 
 @Controller(["api/v1/growth", "v1/growth"])
@@ -645,6 +1004,11 @@ export class GrowthPublicController {
   @Post("opt-out")
   optOut(@Body(new ZodPipe(optOutSchema)) body: OptOutInput) {
     return this.growth.optOut(body.token);
+  }
+
+  @Post("evolution-go/webhook")
+  evolutionWebhook(@Body(new ZodPipe(evolutionWebhookSchema)) body: EvolutionWebhookInput) {
+    return this.growth.handleEvolutionWebhook(body);
   }
 }
 

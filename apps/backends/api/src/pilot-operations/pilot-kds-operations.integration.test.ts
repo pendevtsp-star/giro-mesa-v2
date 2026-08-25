@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   auditEvents,
+  deviceEnrollments,
+  hubCommands,
   identities,
   memberships,
   organizations,
@@ -11,6 +13,7 @@ import {
   posKdsTicketItems,
   posKdsTickets,
   posOrders,
+  posPrintJobs,
   posProductAvailability,
   posProductionStations,
   posProductPrices,
@@ -26,6 +29,8 @@ import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 import { kdsReadModelSchema } from "./pilot-schemas.js";
+import { PilotSmartPosService } from "./pilot-smartpos.service.js";
+import { ProductionPrintingService } from "./production-printing.service.js";
 
 function errorCode(error: unknown) {
   return (error as { getResponse?: () => { code?: string } }).getResponse?.().code;
@@ -43,7 +48,13 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     const runId = randomUUID();
     const documentPrefix = runId.replaceAll("-", "").slice(0, 13);
     const scope = new ScopeService(database);
-    const pos = new PilotPosService(database, scope);
+    const productionPrinting = new ProductionPrintingService(database, scope);
+    const pos = new PilotPosService(
+      database,
+      scope,
+      new PilotSmartPosService(database, scope),
+      productionPrinting,
+    );
     const [organization] = await database.db
       .insert(organizations)
       .values({
@@ -114,6 +125,55 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       ])
       .returning();
     assert.ok(hotStation && coldStation && inactiveStation);
+    const [hub] = await database.db
+      .insert(deviceEnrollments)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        label: "Edge cozinha",
+        syncKeyHash: runId.replaceAll("-", "").padEnd(64, "0").slice(0, 64),
+      })
+      .returning();
+    assert.ok(hub);
+    const createdPrinter = await productionPrinting.createPrinter(
+      owner.id,
+      organization.id,
+      unit.id,
+      `printer-create-${runId}`,
+      {
+        hubId: hub.id,
+        label: "Impressora cozinha",
+        host: "192.168.44.20",
+        port: 9100,
+        paperWidthMm: 80,
+        charactersPerLine: 48,
+        codeTable: 16,
+        cut: true,
+        supportsRasterGraphics: false,
+        isDefault: false,
+        documentTypes: ["kds_ticket"],
+        fallbackPrinterId: null,
+        active: true,
+      },
+    );
+    const printer = createdPrinter.printer as { id: string; isDefault: boolean };
+    assert.equal(printer.isDefault, true);
+    await productionPrinting.updateStationPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      hotStation.id,
+      `policy-hot-${runId}`,
+      { deliveryMode: "both", copies: 1, printerId: printer.id },
+    );
+    await productionPrinting.updateStationPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      coldStation.id,
+      `policy-cold-${runId}`,
+      { deliveryMode: "printer_only", copies: 2, printerId: printer.id },
+    );
     const [product] = await database.db
       .insert(posProducts)
       .values({
@@ -181,6 +241,202 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     const sent = await pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-${runId}`);
     const ticketIds = sent.ticketIds as string[];
     assert.equal(ticketIds.length, 2);
+    const printJobIds = sent.printJobIds as string[];
+    assert.equal(printJobIds.length, 2);
+    const [orderSentOutbox] = await database.db
+      .select({ payload: outboxEvents.payload })
+      .from(outboxEvents)
+      .where(and(eq(outboxEvents.topic, "pos.order.sent"), eq(outboxEvents.aggregateId, tab.id)))
+      .limit(1);
+    assert.deepEqual(orderSentOutbox?.payload, {
+      organizationId: organization.id,
+      unitId: unit.id,
+      tabId: tab.id,
+      orderId: order.id,
+      ticketIds,
+    });
+    const replayedSend = await pos.sendOrder(
+      owner.id,
+      organization.id,
+      unit.id,
+      order.id,
+      `send-${runId}`,
+    );
+    assert.equal(replayedSend.idempotentReplay, true);
+    assert.deepEqual([...replayedSend.printJobIds].sort(), [...printJobIds].sort());
+    const automaticJobs = await database.db
+      .select({
+        id: posPrintJobs.id,
+        stationId: posPrintJobs.stationId,
+        hubCommandId: posPrintJobs.hubCommandId,
+      })
+      .from(posPrintJobs)
+      .innerJoin(
+        posKdsTickets,
+        and(
+          eq(posKdsTickets.organizationId, posPrintJobs.organizationId),
+          eq(posKdsTickets.unitId, posPrintJobs.unitId),
+          eq(posKdsTickets.id, posPrintJobs.kdsTicketId),
+        ),
+      )
+      .where(
+        and(
+          eq(posPrintJobs.organizationId, organization.id),
+          eq(posPrintJobs.unitId, unit.id),
+          eq(posKdsTickets.orderId, order.id),
+        ),
+      );
+    assert.equal(automaticJobs.length, 2);
+    assert.deepEqual(
+      automaticJobs.map((job) => job.stationId).sort(),
+      [hotStation.id, coldStation.id].sort(),
+    );
+    const executeCommands = await database.db
+      .select({ id: hubCommands.id })
+      .from(hubCommands)
+      .where(
+        and(
+          eq(hubCommands.organizationId, organization.id),
+          eq(hubCommands.unitId, unit.id),
+          eq(hubCommands.type, "print_job.execute"),
+        ),
+      );
+    assert.equal(executeCommands.length, 2);
+    const printerOnlySnapshot = await pos.snapshotKds(organization.id, unit.id);
+    assert.equal(
+      (printerOnlySnapshot.stations as Array<{ id: string }>).some(
+        (station) => station.id === coldStation.id,
+      ),
+      false,
+    );
+    assert.equal(
+      (printerOnlySnapshot.tickets as Array<{ stationId: string }>).every(
+        (ticket) => ticket.stationId === hotStation.id,
+      ),
+      true,
+    );
+    const explicitPrinterOnlySnapshot = await pos.snapshotKds(
+      organization.id,
+      unit.id,
+      coldStation.id,
+    );
+    assert.equal((explicitPrinterOnlySnapshot.tickets as unknown[]).length, 0);
+
+    const failedJob = automaticJobs.find((job) => job.stationId === hotStation.id);
+    const unknownJob = automaticJobs.find((job) => job.stationId === coldStation.id);
+    const failedCommandId = failedJob?.hubCommandId;
+    const unknownCommandId = unknownJob?.hubCommandId;
+    if (!failedJob || !unknownJob || !failedCommandId || !unknownCommandId) {
+      assert.fail("Automatic production print jobs must have durable Hub commands");
+    }
+    await database.db.transaction((tx) =>
+      productionPrinting.applyCommandResult(
+        tx,
+        { id: hub.id, organizationId: organization.id, unitId: unit.id },
+        {
+          commandId: failedCommandId,
+          type: "print_job.execute",
+          cloudPrintJobId: failedJob.id,
+          localPrintJobId: null,
+          printerId: printer.id,
+          status: "failed",
+          errorCode: "PAPER_OUT",
+          duplicate: false,
+        },
+      ),
+    );
+    const reprinted = await pos.reprintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      failedJob.id,
+      `reprint-failed-${runId}`,
+      { reason: "Falha de papel confirmada pela cozinha" },
+    );
+    assert.equal(
+      (reprinted.printJob as { reprintOfJobId: string; status: string }).reprintOfJobId,
+      failedJob.id,
+    );
+    assert.equal((reprinted.printJob as { status: string }).status, "queued");
+
+    await database.db.transaction((tx) =>
+      productionPrinting.applyCommandResult(
+        tx,
+        { id: hub.id, organizationId: organization.id, unitId: unit.id },
+        {
+          commandId: unknownCommandId,
+          type: "print_job.execute",
+          cloudPrintJobId: unknownJob.id,
+          localPrintJobId: null,
+          printerId: printer.id,
+          status: "confirmation_required",
+          errorCode: "PRINTER_RESULT_UNKNOWN",
+          duplicate: false,
+        },
+      ),
+    );
+    await assert.rejects(
+      () =>
+        pos.reprintJob(
+          owner.id,
+          organization.id,
+          unit.id,
+          unknownJob.id,
+          `reprint-unknown-${runId}`,
+          { reason: "Tentativa indevida antes da confirmação" },
+        ),
+      (error: unknown) => errorCode(error) === "PRINT_JOB_RESULT_CONFIRMATION_REQUIRED",
+    );
+    const resolvedUnknown = await productionPrinting.resolveUnknownPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      unknownJob.id,
+      `resolve-unknown-${runId}`,
+      { outcome: "printed", reason: "Operador confirmou a impressão física" },
+    );
+    assert.equal((resolvedUnknown.printJob as { status: string }).status, "printed");
+    const replayedResolution = await productionPrinting.resolveUnknownPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      unknownJob.id,
+      `resolve-unknown-${runId}`,
+      { outcome: "printed", reason: "Operador confirmou a impressão física" },
+    );
+    assert.equal(replayedResolution.idempotentReplay, true);
+    const [resolutionAudit] = await database.db
+      .select({ id: auditEvents.id })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organization.id),
+          eq(auditEvents.unitId, unit.id),
+          eq(auditEvents.action, "pos.print_job.unknown_resolved"),
+          eq(auditEvents.entityId, unknownJob.id),
+        ),
+      )
+      .limit(1);
+    const [resolutionOutbox] = await database.db
+      .select({ id: outboxEvents.id })
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.topic, "pos.print_job.unknown_resolved"),
+          eq(outboxEvents.aggregateId, unknownJob.id),
+        ),
+      )
+      .limit(1);
+    assert.ok(resolutionAudit && resolutionOutbox);
+
+    await productionPrinting.updateStationPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      coldStation.id,
+      `policy-cold-both-${runId}`,
+      { deliveryMode: "both", copies: 2, printerId: printer.id },
+    );
 
     const stationInstallationId = randomUUID();
     const passInstallationId = randomUUID();

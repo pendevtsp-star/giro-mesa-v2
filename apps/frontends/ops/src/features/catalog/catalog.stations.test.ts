@@ -5,7 +5,7 @@ import {
   toggleCatalogStationId,
 } from "./catalog.stations";
 
-describe("praças de produção do catálogo", () => {
+describe("estações de produção do catálogo", () => {
   it("preserva múltiplas praças, remove duplicatas e permite alternar cada seleção", () => {
     expect(normalizeCatalogStationIds(["cozinha", "bar", "cozinha", ""])).toEqual([
       "cozinha",

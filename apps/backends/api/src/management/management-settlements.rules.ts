@@ -3,6 +3,9 @@ import { BadRequestException } from "@nestjs/common";
 export const SETTLEMENT_CENTS_MAX = 2_147_483_647;
 
 export type SettlementConfig = {
+  serviceChargeEnabled: boolean;
+  defaultServiceChargeBasisPoints: number;
+  serviceChargeApplication: "manual" | "suggest_dine_in";
   attributionMode: "final_responsible" | "order_creator";
   transferMode: "move_to_final" | "preserve_origin";
   serviceBase: "gross" | "net_after_discounts";
@@ -27,6 +30,9 @@ export type PartnershipTier = {
 };
 
 export const defaultSettlementConfig: SettlementConfig = {
+  serviceChargeEnabled: false,
+  defaultServiceChargeBasisPoints: 0,
+  serviceChargeApplication: "manual",
   attributionMode: "final_responsible",
   transferMode: "move_to_final",
   serviceBase: "net_after_discounts",
@@ -42,6 +48,12 @@ export const defaultSettlementConfig: SettlementConfig = {
   customPeriodStartDay: 1,
   aggregateAcrossUnits: false,
 };
+
+export function normalizeSettlementConfig(
+  configuration?: Partial<SettlementConfig> | null,
+): SettlementConfig {
+  return { ...defaultSettlementConfig, ...configuration };
+}
 
 function assertCents(value: number, field: string) {
   if (!Number.isSafeInteger(value) || value < 0 || value > SETTLEMENT_CENTS_MAX) {

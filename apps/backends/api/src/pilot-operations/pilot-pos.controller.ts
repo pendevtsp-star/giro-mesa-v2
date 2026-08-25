@@ -1,4 +1,14 @@
 import {
+  idempotencyKeySchema,
+  type OperationalPushSubscription,
+  operationalPushConfigSchema,
+  operationalPushSubscriptionSchema,
+  type RejectPublicTableOrderInput,
+  rejectPublicTableOrderResponseSchema,
+  rejectPublicTableOrderSchema,
+  tableQrPresenceSchema,
+} from "@giromesa/contracts";
+import {
   Body,
   Controller,
   Delete,
@@ -17,6 +27,7 @@ import {
 import {
   ApiBody,
   ApiConflictResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiQuery,
   ApiServiceUnavailableResponse,
@@ -34,16 +45,20 @@ import {
   type ClaimTabInput,
   type CloseOperationalShiftInput,
   type CloseTabInput,
+  type CounterQueueQueryInput,
   cancelItemSchema,
   claimTabSchema,
   closeOperationalShiftSchema,
   closeTabSchema,
+  counterQueueQuerySchema,
   type DetachTableGroupInput,
   type DiscountInput,
   detachTableGroupSchema,
   discountSchema,
   type FloorLayoutInput,
+  type FloorRevisionQueryInput,
   floorLayoutSchema,
+  floorRevisionQuerySchema,
   type KdsAnalyticsQueryInput,
   type KdsAttentionAcknowledgeInput,
   type KdsBatchCancelInput,
@@ -122,6 +137,7 @@ import {
   type PrintJobInput,
   type PrintJobQueryInput,
   type PrintJobStatusInput,
+  type PrintSplitInput,
   paymentAttemptCreateSchema,
   paymentAttemptLookupResponseSchema,
   paymentAttemptMutationResponseSchema,
@@ -141,6 +157,7 @@ import {
   printJobQuerySchema,
   printJobSchema,
   printJobStatusSchema,
+  printSplitSchema,
   type ReopenTabInput,
   type ReprintJobInput,
   type RetryPrintJobInput,
@@ -155,6 +172,7 @@ import {
   type ShiftLayoutInput,
   type ShiftSectionAssignmentInput,
   type ShiftSectionCoverageInput,
+  type ShiftSectionsBatchAssignmentInput,
   type SplitTabInput,
   serviceCallSchema,
   serviceChargeSchema,
@@ -162,8 +180,10 @@ import {
   shiftLayoutSchema,
   shiftSectionAssignmentSchema,
   shiftSectionCoverageSchema,
+  shiftSectionsBatchAssignmentSchema,
   splitTabSchema,
   type TableBatchInput,
+  type TableEditInput,
   type TableGroupInput,
   type TableInput,
   type TableTurnoverInput,
@@ -172,6 +192,7 @@ import {
   type TipInput,
   type TransferTabInput,
   tableBatchSchema,
+  tableEditSchema,
   tableGroupSchema,
   tableSchema,
   tableTurnoverSchema,
@@ -206,6 +227,69 @@ export class PilotPosController {
     return this.pos.listFloor(request.auth.identityId, organizationId, unitId);
   }
 
+  @Get("tables/qr/presence")
+  @ApiOkResponse({ schema: toOpenApiSchema(tableQrPresenceSchema) })
+  tableQrPresence(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.pos.tableQrPresence(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Get("push/subscriptions/:installationId")
+  @ApiOkResponse({ schema: toOpenApiSchema(operationalPushConfigSchema) })
+  operationalPushConfig(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+  ) {
+    return this.pos.operationalPushConfig(
+      request.auth.identityId,
+      request.auth.sessionId,
+      organizationId,
+      unitId,
+      installationId,
+    );
+  }
+
+  @Put("push/subscriptions/:installationId")
+  @ApiOkResponse({ schema: toOpenApiSchema(operationalPushConfigSchema) })
+  upsertOperationalPushSubscription(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+    @Body(new ZodPipe(operationalPushSubscriptionSchema)) body: OperationalPushSubscription,
+  ) {
+    return this.pos.upsertOperationalPushSubscription(
+      request.auth.identityId,
+      request.auth.sessionId,
+      organizationId,
+      unitId,
+      installationId,
+      body,
+    );
+  }
+
+  @Delete("push/subscriptions/:installationId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeOperationalPushSubscription(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("installationId", ParseUUIDPipe) installationId: string,
+  ) {
+    await this.pos.removeOperationalPushSubscription(
+      request.auth.identityId,
+      request.auth.sessionId,
+      organizationId,
+      unitId,
+      installationId,
+    );
+  }
+
   @Put("floor/layout")
   updateFloorLayout(
     @Req() request: AuthenticatedRequest,
@@ -237,6 +321,62 @@ export class PilotPosController {
     return this.pos.createTable(request.auth.identityId, organizationId, unitId, roomId, body);
   }
 
+  @Put("rooms/:roomId")
+  updateRoom(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("roomId", ParseUUIDPipe) roomId: string,
+    @Body(new ZodPipe(roomSchema)) body: RoomInput,
+  ) {
+    return this.pos.updateRoom(request.auth.identityId, organizationId, unitId, roomId, body);
+  }
+
+  @Delete("rooms/:roomId")
+  archiveRoom(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("roomId", ParseUUIDPipe) roomId: string,
+    @Query(new ZodPipe(floorRevisionQuerySchema)) query: FloorRevisionQueryInput,
+  ) {
+    return this.pos.archiveRoom(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      roomId,
+      query.expectedRevision,
+    );
+  }
+
+  @Put("tables/:tableId")
+  updateTable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("tableId", ParseUUIDPipe) tableId: string,
+    @Body(new ZodPipe(tableEditSchema)) body: TableEditInput,
+  ) {
+    return this.pos.updateTable(request.auth.identityId, organizationId, unitId, tableId, body);
+  }
+
+  @Delete("tables/:tableId")
+  archiveTable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("tableId", ParseUUIDPipe) tableId: string,
+    @Query(new ZodPipe(floorRevisionQuerySchema)) query: FloorRevisionQueryInput,
+  ) {
+    return this.pos.archiveTable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      tableId,
+      query.expectedRevision,
+    );
+  }
+
   @Put("tables/:tableId/turnover")
   updateTableTurnover(
     @Req() request: AuthenticatedRequest,
@@ -264,6 +404,38 @@ export class PilotPosController {
     return this.pos.createServiceSection(request.auth.identityId, organizationId, unitId, body);
   }
 
+  @Put("service-sections/:serviceSectionId")
+  updateServiceSection(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("serviceSectionId", ParseUUIDPipe) serviceSectionId: string,
+    @Body(new ZodPipe(serviceSectionSchema)) body: ServiceSectionInput,
+  ) {
+    return this.pos.updateServiceSection(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      serviceSectionId,
+      body,
+    );
+  }
+
+  @Delete("service-sections/:serviceSectionId")
+  archiveServiceSection(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("serviceSectionId", ParseUUIDPipe) serviceSectionId: string,
+  ) {
+    return this.pos.archiveServiceSection(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      serviceSectionId,
+    );
+  }
+
   @Post("shifts/open")
   openOperationalShift(
     @Req() request: AuthenticatedRequest,
@@ -289,6 +461,23 @@ export class PilotPosController {
       unitId,
       shiftId,
       shiftSectionId,
+      body,
+    );
+  }
+
+  @Put("shifts/:shiftId/sections")
+  updateShiftSectionsAssignments(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("shiftId", ParseUUIDPipe) shiftId: string,
+    @Body(new ZodPipe(shiftSectionsBatchAssignmentSchema)) body: ShiftSectionsBatchAssignmentInput,
+  ) {
+    return this.pos.updateShiftSectionsAssignments(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      shiftId,
       body,
     );
   }
@@ -410,6 +599,29 @@ export class PilotPosController {
     @Param("unitId", ParseUUIDPipe) unitId: string,
   ) {
     return this.pos.listTabs(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Get("counter-queue")
+  @ApiQuery({
+    name: "stage",
+    required: false,
+    enum: ["all", "new", "production", "ready", "waiting", "delivered", "late"],
+  })
+  @ApiQuery({
+    name: "channel",
+    required: false,
+    enum: ["all", "pickup", "dine_in", "delivery"],
+  })
+  @ApiQuery({ name: "query", required: false, type: String })
+  @ApiQuery({ name: "page", required: false, type: Number })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  counterQueue(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(counterQueueQuerySchema)) query: CounterQueueQueryInput,
+  ) {
+    return this.pos.listCounterQueue(request.auth.identityId, organizationId, unitId, query);
   }
 
   @Get("tabs/:tabId")
@@ -713,6 +925,25 @@ export class PilotPosController {
     );
   }
 
+  @Post("tabs/:tabId/print-splits")
+  createPrintSplit(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("tabId", ParseUUIDPipe) tabId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(printSplitSchema)) body: PrintSplitInput,
+  ) {
+    return this.pos.createPrintSplit(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      tabId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Get("print-jobs")
   listPrintJobs(
     @Req() request: AuthenticatedRequest,
@@ -972,6 +1203,29 @@ export class PilotPosController {
       unitId,
       orderId,
       idempotencyKey,
+    );
+  }
+
+  @Post("orders/:orderId/reject")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  @ApiBody({ schema: toOpenApiSchema(rejectPublicTableOrderSchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(rejectPublicTableOrderResponseSchema) })
+  rejectPublicTableOrder(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("orderId", ParseUUIDPipe) orderId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(rejectPublicTableOrderSchema)) body: RejectPublicTableOrderInput,
+  ) {
+    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
+    return this.pos.rejectPublicTableOrder(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      orderId,
+      idempotencyKey,
+      body,
     );
   }
 

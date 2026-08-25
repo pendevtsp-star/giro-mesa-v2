@@ -19,7 +19,8 @@
     width: 100%;
   }
   .capability-grid,
-  .plan-grid {
+  .plan-grid,
+  .testimonial-grid {
     grid-template-columns: 1fr 1fr;
   }
   .plan:last-child {
@@ -113,6 +114,7 @@
   }
   .capability-grid,
   .plan-grid,
+  .testimonial-grid,
   .trust-cards,
   .support-grid,
   .field-row,

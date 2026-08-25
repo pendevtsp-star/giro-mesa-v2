@@ -7,10 +7,14 @@ import {
   createOrganizationSchema,
   type EnrollDeviceInput,
   enrollDeviceSchema,
+  establishmentSettingsHistoryEntrySchema,
   establishmentSettingsSchema,
+  establishmentSpecializedSettingsSummarySchema,
   type InviteMembershipInput,
   idSchema,
   inviteMembershipSchema,
+  type RestoreEstablishmentSettingsInput,
+  restoreEstablishmentSettingsSchema,
   type UpdateOrganizationSettingsInput,
   type UpdateUnitSettingsInput,
   updateOrganizationSettingsSchema,
@@ -120,6 +124,56 @@ export class OrganizationsController {
       request.auth.identityId,
       organizationId,
       unitId,
+      body,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(establishmentSpecializedSettingsSummarySchema) })
+  @Get(":organizationId/units/:unitId/settings/specialized-summary")
+  specializedSettingsSummary(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.establishmentSettings.specializedSummary(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+    );
+  }
+
+  @ApiOkResponse({
+    schema: { type: "array", items: toOpenApiSchema(establishmentSettingsHistoryEntrySchema) },
+  })
+  @Get(":organizationId/units/:unitId/settings/history")
+  settingsHistory(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.establishmentSettings.history(request.auth.identityId, organizationId, unitId);
+  }
+
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(restoreEstablishmentSettingsSchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(establishmentSettingsSchema) })
+  @Post(":organizationId/units/:unitId/settings/restore")
+  restoreUnitSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(restoreEstablishmentSettingsSchema)) body: RestoreEstablishmentSettingsInput,
+  ) {
+    return this.establishmentSettings.restore(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
       body,
     );
   }

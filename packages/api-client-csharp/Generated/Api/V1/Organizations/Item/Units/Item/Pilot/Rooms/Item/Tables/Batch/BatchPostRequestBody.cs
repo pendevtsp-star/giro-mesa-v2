@@ -9,11 +9,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class BatchPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class BatchPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The tables property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -22,13 +22,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
 #else
         public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables> Tables { get; set; }
 #endif
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody"/> and sets the default values.
-        /// </summary>
-        public BatchPostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -47,6 +40,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "tables", n => { Tables = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables.CreateFromDiscriminatorValue)?.AsList(); } },
             };
         }
@@ -57,8 +51,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.It
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Rooms.Item.Tables.Batch.BatchPostRequestBody_tables>("tables", Tables);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

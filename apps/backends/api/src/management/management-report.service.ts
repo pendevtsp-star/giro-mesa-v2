@@ -1351,6 +1351,7 @@ export class ManagementReportService {
           and(
             eq(managementReceivablePayments.organizationId, organizationId),
             eq(managementReceivablePayments.unitId, unitId),
+            eq(managementReceivablePayments.status, "posted"),
             gte(localDate, query.from),
             lte(localDate, query.to),
           ),
@@ -1385,6 +1386,7 @@ export class ManagementReportService {
           and(
             eq(managementPayablePayments.organizationId, organizationId),
             eq(managementPayablePayments.unitId, unitId),
+            eq(managementPayablePayments.status, "posted"),
             gte(localDate, query.from),
             lte(localDate, query.to),
           ),
@@ -1693,6 +1695,7 @@ export class ManagementReportService {
           and(
             eq(table.organizationId, organizationId),
             eq(table.unitId, unitId),
+            eq(table.status, "posted"),
             gte(localDate, query.from),
             lte(localDate, query.to),
           ),

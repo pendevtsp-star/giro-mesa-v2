@@ -1,17 +1,60 @@
 import type {
+  ApiCapability,
   ApiError,
+  ApiHealthResponse,
+  ApiOperations,
+  BillingCheckoutInput,
   CopyUnitSettingsInput,
   EstablishmentSettings,
+  EstablishmentSettingsHistoryEntry,
+  EstablishmentSpecializedSettingsSummary,
   LoginInput,
   OperationalCommandInput,
+  OperationalPushConfig,
+  OperationalPushSubscription,
+  PrintDocumentPayloadV2,
+  RestoreEstablishmentSettingsInput,
   UpdateOrganizationSettingsInput,
   UpdateUnitSettingsInput,
 } from "@giromesa/contracts";
+import { apiHealthResponseSchema } from "@giromesa/contracts";
 
-export interface ApiHealth {
-  status: "ok";
-  database: "up";
-  integrations: Record<string, string>;
+type AccountantPackageResponse =
+  ApiOperations["FiscalController_accountantPackage[1]"]["responses"][200]["content"]["application/json"];
+type AccountantRequestsResponse =
+  ApiOperations["FiscalController_accountantRequests[1]"]["responses"][200]["content"]["application/json"];
+type AccountantRequestMutationResponse =
+  ApiOperations["FiscalController_createAccountantRequest[1]"]["responses"][201]["content"]["application/json"];
+type AccountantRequestResolutionResponse =
+  ApiOperations["FiscalController_resolveAccountantRequest[1]"]["responses"][201]["content"]["application/json"];
+type AccountantAttachmentMutationResponse =
+  ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
+
+export const OPS_REQUIRED_SCHEMA_VERSION = 73;
+export const OPS_REQUIRED_API_CAPABILITIES = [
+  "table_qr_lifecycle_v1",
+  "table_qr_metrics_v1",
+  "table_qr_presence_code_v1",
+  "ops_background_notifications_v1",
+  "table_qr_brand_upload_v1",
+  "ops_web_push_v1",
+  "public_menu_cover_image_v1",
+  "platform_backoffice_v1",
+  "platform_commercial_site_v1",
+] satisfies ApiCapability[];
+
+export function apiCompatibilityError(value: unknown): string | null {
+  const parsed = apiHealthResponseSchema.safeParse(value);
+  if (!parsed.success) {
+    return "A API em execução é anterior a esta versão do GiroMesa. Atualize e reinicie a API.";
+  }
+  const missing = OPS_REQUIRED_API_CAPABILITIES.filter(
+    (capability) => !parsed.data.capabilities.includes(capability),
+  );
+  if (parsed.data.schemaVersion < OPS_REQUIRED_SCHEMA_VERSION || missing.length > 0) {
+    return `Versão incompatível: frontend exige schema ${OPS_REQUIRED_SCHEMA_VERSION} e a API ${parsed.data.buildSha} oferece ${parsed.data.schemaVersion}. Atualize a API e execute as migrations.`;
+  }
+  return null;
 }
 
 export interface FocusCompanyOnboardingBody {
@@ -58,7 +101,7 @@ export interface CommandResponse {
 }
 
 export type PrintDocumentType = "partial_statement" | "payment_statement" | "final_receipt";
-export type PrintJobStatus = "queued" | "printing" | "printed" | "failed";
+export type PrintJobStatus = "queued" | "printing" | "confirmation_required" | "printed" | "failed";
 
 export interface PosPrintJob {
   id: string;
@@ -69,12 +112,132 @@ export interface PosPrintJob {
   attempts: number;
   terminalId: string | null;
   printerId: string | null;
-  payload: Record<string, unknown>;
+  payload: PrintDocumentPayloadV2;
   reason: string | null;
   reprintOfJobId: string | null;
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DoseClubEligibleProduct {
+  externalProductId: string;
+  name: string;
+  brand: string | null;
+}
+
+export interface DoseClubEligibleMembership {
+  externalClubId: string;
+  status: "active";
+  offer: {
+    externalOfferId: string;
+    name: string;
+    type: "individual" | "combo_pool";
+  };
+  remainingDoses: number;
+  reservedDoses: number;
+  availableDoses: number;
+  doseMl: number;
+  eligibleProducts: DoseClubEligibleProduct[];
+}
+
+export interface DoseClubMembershipsResponse {
+  memberships: DoseClubEligibleMembership[];
+}
+
+export type ProductionPrintMode = "disabled" | "kds_only" | "printer_only" | "both";
+export type ProductionPrintJobStatus =
+  | "queued"
+  | "printing"
+  | "confirmation_required"
+  | "printed"
+  | "failed";
+export type ProductionPrintResolutionOutcome = "printed" | "failed";
+
+export interface ProductionPrintJob {
+  id: string;
+  documentType: "kds_ticket";
+  status: ProductionPrintJobStatus;
+  copies: number;
+  attempts: number;
+  printerId: string | null;
+  stationId: string | null;
+  stationName?: string | null;
+  kdsTicketId: string | null;
+  reason: string | null;
+  reprintOfJobId: string | null;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductionPrintingStation {
+  id: string;
+  name: string;
+  code: string | null;
+  active: boolean;
+  deliveryMode: ProductionPrintMode;
+  copies: number;
+  printerId: string | null;
+  readiness: {
+    ready: boolean;
+    kdsConfigured: boolean;
+    printerConfigured: boolean;
+    hubOnline: boolean;
+    issues: string[];
+  };
+}
+
+export type ProductionPrintingPolicy = Pick<
+  ProductionPrintingStation,
+  "deliveryMode" | "copies" | "printerId"
+>;
+
+export type ProductionPrinterApplyStatus = "pending" | "applied" | "error";
+export type ProductionPrinterLastStatus =
+  | "unknown"
+  | "pending"
+  | "online"
+  | "error"
+  | "confirmation_required";
+export type ProductionPrinterDocumentType = PrintDocumentType | "kds_ticket";
+
+export interface ProductionPrinterInput {
+  hubId: string;
+  label: string;
+  host: string;
+  port: number;
+  paperWidthMm: 58 | 80;
+  charactersPerLine: number;
+  codeTable: number;
+  cut: boolean;
+  supportsRasterGraphics: boolean;
+  isDefault: boolean;
+  documentTypes: ProductionPrinterDocumentType[];
+  fallbackPrinterId?: string | null;
+  active?: boolean;
+}
+
+export interface ProductionPrinter extends ProductionPrinterInput {
+  id: string;
+  stationIds?: string[];
+  revision: number;
+  appliedRevision: number | null;
+  applyStatus: ProductionPrinterApplyStatus;
+  pendingCommandId: string | null;
+  lastAppliedAt: string | null;
+  lastTestAt: string | null;
+  lastStatus: ProductionPrinterLastStatus;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductionPrinterHub {
+  id: string;
+  label: string;
+  lastSeenAt: string | null;
+  online: boolean;
 }
 
 export type TerminalProfileMode =
@@ -98,6 +261,7 @@ export type TerminalQuickAction =
   | "waitlist"
   | "print"
   | "search";
+export type TerminalPaymentMode = "disabled" | "cashier" | "homologated_pos";
 export interface TerminalProfile {
   organizationId: string;
   unitId: string;
@@ -110,6 +274,7 @@ export interface TerminalProfile {
   cashRegisterId: string | null;
   compact: boolean;
   quickActions: TerminalQuickAction[];
+  paymentMode: TerminalPaymentMode;
   createdAt: string;
   updatedAt: string;
   updatedByIdentityId: string;
@@ -124,6 +289,7 @@ export type TerminalProfileInput = Pick<
   | "cashRegisterId"
   | "compact"
   | "quickActions"
+  | "paymentMode"
 >;
 
 export interface CatalogProductAggregateInput {
@@ -225,6 +391,88 @@ export interface CatalogTableQr {
   url: string;
 }
 
+export type TableQrVisualTemplate = "classic" | "compact" | "minimal";
+export type TableQrPrintFormat = "a4_2" | "a4_4" | "a4_6" | "a5" | "table_tent" | "sticker";
+export type TableQrOutput = "print" | "svg" | "png" | "pdf";
+
+export interface TableQrSettings {
+  revision: number;
+  displayName: string;
+  headline: string;
+  instructions: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  wifiNotice: string | null;
+  serviceChargeNotice: string | null;
+  template: TableQrVisualTemplate;
+  presenceProtection: "session_only" | "daily_code";
+  updatedAt: string | null;
+}
+
+export type UpdateTableQrSettingsInput = Omit<TableQrSettings, "revision" | "updatedAt"> & {
+  expectedRevision: number;
+};
+
+export interface TableQrBatchTable {
+  tableId: string;
+  label: string;
+  tokenVersion: number;
+  currentVersion: number | null;
+  isCurrent: boolean;
+  url: string | null;
+}
+
+export interface TableQrPrintBatch {
+  id: string;
+  format: TableQrPrintFormat;
+  output: TableQrOutput;
+  template: TableQrVisualTemplate;
+  menuSlug: string;
+  includeWifi: boolean;
+  status: "generated" | "printed";
+  settingsRevision: number;
+  settings: Omit<TableQrSettings, "revision" | "updatedAt">;
+  tables: TableQrBatchTable[];
+  createdByIdentityId: string;
+  createdByLabel: string;
+  generatedAt: string;
+  printedByIdentityId: string | null;
+  printedByLabel: string | null;
+  printedAt: string | null;
+  idempotentReplay?: boolean;
+}
+
+export interface TableQrLifecycle {
+  settings: TableQrSettings;
+  generalBranding: { logoUrl: string | null; logoThumbnailUrl: string | null };
+  presence: {
+    mode: "session_only" | "daily_code";
+    code: string | null;
+  };
+  tables: Array<CatalogTableQr & { scanCount: number; lastScannedAt: string | null }>;
+  batches: TableQrPrintBatch[];
+  rotations: Array<{
+    id: string;
+    tableId: string;
+    tokenVersion: number;
+    actorIdentityId: string | null;
+    actorLabel: string | null;
+    occurredAt: string;
+  }>;
+}
+
+export interface TableQrTestResult {
+  valid: boolean;
+  slug: string | null;
+  displayName: string | null;
+  unitName: string | null;
+  tableId: string | null;
+  tableLabel: string | null;
+  tokenVersion: number | null;
+  expiresAt: string | null;
+  reason: "invalid_url" | "invalid_signature" | "table_not_found" | "rotated" | null;
+}
+
 export interface CatalogBcgProduct {
   productId: string;
   name: string;
@@ -243,6 +491,38 @@ export interface PurchaseListFilters {
   search?: string;
   from?: string;
   to?: string;
+}
+
+export interface FinanceFilters {
+  direction?: "all" | "payable" | "receivable";
+  status?: "all" | "open" | "partial" | "settled" | "canceled" | "overdue" | "due_soon";
+  search?: string;
+  from?: string;
+  to?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface FinanceEntryInput {
+  description: string;
+  amountCents: number;
+  competenceDate: string;
+  dueDate: string;
+  category?: string;
+  costCenter?: string;
+  documentNumber?: string;
+  notes?: string;
+  attachments?: Array<{ name: string; url: string; mimeType?: string }>;
+  recurrence?: { installments: number; intervalMonths: number };
+}
+
+export interface FinancePaymentInput {
+  amountCents: number;
+  method: string;
+  reference?: string;
+  cashRegisterId?: string;
+  occurredAt?: string;
+  approvalRequestId?: string;
 }
 
 export interface SupplierInput {
@@ -313,10 +593,42 @@ export class ApiClientError extends Error {
     readonly code: string,
     readonly retryable: boolean,
     readonly requestId?: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiClientError";
   }
+}
+
+function referenceSuffix(requestId?: string) {
+  return requestId ? ` Referência: ${requestId}.` : "";
+}
+
+export function operationalApiErrorMessage(
+  status: number,
+  bodyMessage: unknown,
+  requestId?: string,
+  retryAfterSeconds?: number,
+) {
+  const backendMessage = typeof bodyMessage === "string" ? bodyMessage.trim() : "";
+  const technical = /^(?:Cannot\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/|[A-Z_]{3,}:)/i.test(
+    backendMessage,
+  );
+  const message =
+    status === 401
+      ? "Sua sessão expirou. Entre novamente."
+      : status === 403
+        ? "Seu perfil não possui permissão para esta operação."
+        : status === 404
+          ? "Este recurso não está disponível na versão atual da API."
+          : status === 429
+            ? `Muitas solicitações em sequência. Aguarde${Number.isFinite(retryAfterSeconds) ? ` ${retryAfterSeconds} segundos` : " alguns segundos"} e tente novamente.`
+            : status >= 500
+              ? "O servidor não conseguiu concluir a consulta. Tente novamente em instantes."
+              : backendMessage && !technical
+                ? backendMessage
+                : `Não foi possível concluir a operação (${status}).`;
+  return `${message}${referenceSuffix(requestId)}`;
 }
 
 const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replace(/\/$/, "");
@@ -357,16 +669,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (!response.ok) {
       const body = await safeJson<ApiError>(response);
       const retryAfterSeconds = Number.parseInt(response.headers.get("retry-after") ?? "", 10);
+      const requestId = response.headers.get("x-request-id")?.trim() || undefined;
       throw new ApiClientError(
-        response.status === 429
-          ? `Muitas solicitações em sequência. Aguarde${Number.isFinite(retryAfterSeconds) ? ` ${retryAfterSeconds} segundos` : " alguns segundos"} e tente novamente.`
-          : response.status >= 500
-            ? "O servidor não conseguiu concluir a consulta. Tente novamente em instantes."
-            : (body?.message ?? `Falha na API (${response.status})`),
+        operationalApiErrorMessage(response.status, body?.message, requestId, retryAfterSeconds),
         response.status,
         body?.code ?? "API_REQUEST_FAILED",
         response.status >= 500 || response.status === 429,
-        response.headers.get("x-request-id")?.trim() || undefined,
+        requestId,
+        body && typeof body === "object" ? (body as unknown as Record<string, unknown>) : undefined,
       );
     }
     if (response.status === 204) return undefined as T;
@@ -495,7 +805,15 @@ async function managementCommand<T>(
 
 export const api = {
   baseUrl,
-  health: () => request<ApiHealth>("/health"),
+  health: () => request<ApiHealthResponse>("/health"),
+  assertCompatibility: async () => {
+    const health = await request<unknown>("/health");
+    const incompatibility = apiCompatibilityError(health);
+    if (incompatibility) {
+      throw new ApiClientError(incompatibility, 426, "API_VERSION_INCOMPATIBLE", false);
+    }
+    return apiHealthResponseSchema.parse(health);
+  },
   login: async (input: LoginInput) =>
     parseLoginResponse(
       await request<unknown>("/v1/auth/login", { method: "POST", body: JSON.stringify(input) }),
@@ -540,6 +858,26 @@ export const api = {
         idempotentReplay: boolean;
       }>(
         `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(sourceUnitId)}/settings/copy`,
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    specializedSummary: (organizationId: string, unitId: string) =>
+      request<EstablishmentSpecializedSettingsSummary>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings/specialized-summary`,
+      ),
+    history: (organizationId: string, unitId: string) =>
+      request<EstablishmentSettingsHistoryEntry[]>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings/history`,
+      ),
+    restore: (
+      organizationId: string,
+      unitId: string,
+      body: RestoreEstablishmentSettingsInput,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<EstablishmentSettings>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings/restore`,
         "POST",
         body,
         idempotencyKey,
@@ -602,6 +940,8 @@ export const api = {
           cstIcms?: string;
           cstPis: string;
           cstCofins: string;
+          cstIbsCbs?: string;
+          cClassTrib?: string;
         };
       },
     ) =>
@@ -624,6 +964,8 @@ export const api = {
           cstIcms?: string;
           cstPis: string;
           cstCofins: string;
+          cstIbsCbs?: string;
+          cClassTrib?: string;
         };
       },
     ) =>
@@ -647,6 +989,8 @@ export const api = {
             cstIcms?: string;
             cstPis: string;
             cstCofins: string;
+            cstIbsCbs?: string;
+            cClassTrib?: string;
           };
         }>;
       },
@@ -727,7 +1071,7 @@ export const api = {
       ),
     accountingPackage: (organizationId: string, unitId: string, competence: string) => {
       const path = fiscalPath(organizationId, unitId, "accountant/package");
-      return request<unknown>(`${path}?${new URLSearchParams({ competence })}`);
+      return request<AccountantPackageResponse>(`${path}?${new URLSearchParams({ competence })}`);
     },
     accountingPackageContent: (organizationId: string, unitId: string, competence: string) => {
       const path = fiscalPath(organizationId, unitId, "accountant/package/content");
@@ -758,9 +1102,28 @@ export const api = {
           `number-invalidations/${encodeURIComponent(invalidationId)}/artifact`,
         ),
       ),
-    accountantRequests: (organizationId: string, unitId: string, competence?: string) => {
+    accountantRequests: (
+      organizationId: string,
+      unitId: string,
+      filters: {
+        competence?: string;
+        status?: "open" | "resolved";
+        targetAudience?: "accountant" | "establishment";
+        overdue?: boolean;
+        page?: number;
+        pageSize?: number;
+      } = {},
+    ) => {
       const path = fiscalPath(organizationId, unitId, "accountant/requests");
-      return request<unknown>(competence ? `${path}?${new URLSearchParams({ competence })}` : path);
+      const query = new URLSearchParams({
+        page: String(filters.page ?? 1),
+        pageSize: String(filters.pageSize ?? 25),
+      });
+      if (filters.competence) query.set("competence", filters.competence);
+      if (filters.status) query.set("status", filters.status);
+      if (filters.targetAudience) query.set("targetAudience", filters.targetAudience);
+      if (filters.overdue !== undefined) query.set("overdue", String(filters.overdue));
+      return request<AccountantRequestsResponse>(`${path}?${query}`);
     },
     createAccountantRequest: (
       organizationId: string,
@@ -772,14 +1135,238 @@ export const api = {
         dueDate?: string;
       },
     ) =>
-      idempotentRequest<unknown>(
+      idempotentRequest<AccountantRequestMutationResponse>(
         fiscalPath(organizationId, unitId, "accountant/requests"),
         "POST",
         body,
       ),
+    resolveAccountantRequest: (
+      organizationId: string,
+      unitId: string,
+      requestId: string,
+      body: { resolution: string },
+    ) =>
+      request<AccountantRequestResolutionResponse>(
+        fiscalPath(
+          organizationId,
+          unitId,
+          `accountant/requests/${encodeURIComponent(requestId)}/resolve`,
+        ),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    createAttachment: (
+      organizationId: string,
+      unitId: string,
+      requestId: string,
+      body: { fileName: string; contentType: string; contentBase64: string },
+    ) =>
+      request<AccountantAttachmentMutationResponse>(
+        fiscalPath(
+          organizationId,
+          unitId,
+          `accountant/requests/${encodeURIComponent(requestId)}/attachments`,
+        ),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    downloadAttachment: (
+      organizationId: string,
+      unitId: string,
+      requestId: string,
+      attachmentId: string,
+    ) =>
+      requestDownload(
+        fiscalPath(
+          organizationId,
+          unitId,
+          `accountant/requests/${encodeURIComponent(requestId)}/attachments/${encodeURIComponent(attachmentId)}/content`,
+        ),
+      ),
   },
   platform: {
     overview: () => request<unknown>("/v1/platform/overview"),
+    tenants: (
+      filters: {
+        search?: string;
+        status?:
+          | "draft"
+          | "onboarding"
+          | "trial_active"
+          | "active"
+          | "grace"
+          | "restricted"
+          | "suspended"
+          | "canceled";
+        cursor?: string;
+        limit?: number;
+      } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (filters.search) query.set("search", filters.search);
+      if (filters.status) query.set("status", filters.status);
+      if (filters.cursor) query.set("cursor", filters.cursor);
+      if (filters.limit !== undefined) query.set("limit", String(filters.limit));
+      const suffix = query.size ? `?${query}` : "";
+      return request<unknown>(`/v1/platform/tenants${suffix}`);
+    },
+    tenant: (organizationId: string) =>
+      request<unknown>(`/v1/platform/tenants/${encodeURIComponent(organizationId)}`),
+    revealTenantPii: (organizationId: string, reason: string) =>
+      request<unknown>(`/v1/platform/tenants/${encodeURIComponent(organizationId)}/pii-access`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      }),
+    incidents: (
+      filters: {
+        search?: string;
+        status?: "active" | "all" | "open" | "claimed" | "snoozed" | "resolved";
+        severity?: "critical" | "high" | "medium" | "low";
+        assignee?: string;
+        cursor?: string;
+        limit?: number;
+      } = {},
+    ) => {
+      const query = new URLSearchParams();
+      if (filters.search) query.set("search", filters.search);
+      if (filters.status) query.set("status", filters.status);
+      if (filters.severity) query.set("severity", filters.severity);
+      if (filters.assignee) query.set("assignee", filters.assignee);
+      if (filters.cursor) query.set("cursor", filters.cursor);
+      if (filters.limit !== undefined) query.set("limit", String(filters.limit));
+      const suffix = query.size ? `?${query}` : "";
+      return request<unknown>(`/v1/platform/incidents${suffix}`);
+    },
+    updateIncident: (
+      incidentId: string,
+      body: {
+        action: "claim" | "snooze" | "resolve";
+        reason: string;
+        snoozedUntil?: string;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/incidents/${encodeURIComponent(incidentId)}`,
+        "PATCH",
+        body,
+        idempotencyKey,
+      ),
+    retryOutbox: (eventId: string, body: { reason: string }, idempotencyKey?: string) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/outbox/${encodeURIComponent(eventId)}/retry`,
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    commercialOverview: () => request<unknown>("/v1/platform/commercial/overview"),
+    createCommercialDraft: (body: { reason: string; sourceVersionId?: string }) =>
+      idempotentRequest<unknown>("/v1/platform/commercial/drafts", "POST", body),
+    updateCommercialDraft: (
+      draftId: string,
+      body: {
+        reason: string;
+        plans: unknown[];
+        landing: unknown;
+        seo: unknown;
+        promotions: unknown[];
+        experiments: unknown[];
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/drafts/${encodeURIComponent(draftId)}`,
+        "PUT",
+        body,
+      ),
+    commercialDraftPreview: (draftId: string) =>
+      request<unknown>(`/v1/platform/commercial/versions/${encodeURIComponent(draftId)}/preview`),
+    approveCommercialDraft: (draftId: string, reason: string) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/versions/${encodeURIComponent(draftId)}/approve`,
+        "POST",
+        { reason },
+      ),
+    publishCommercialDraft: (draftId: string, body: { reason: string; publishAt?: string }) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/versions/${encodeURIComponent(draftId)}/publish`,
+        "POST",
+        body,
+      ),
+    rollbackCommercialPublication: (versionId: string, reason: string) =>
+      idempotentRequest<unknown>("/v1/platform/commercial/rollback", "POST", {
+        reason,
+        versionId,
+      }),
+    uploadCommercialMedia: (body: {
+      fileName: string;
+      mimeType: "image/jpeg" | "image/png" | "image/webp";
+      base64: string;
+      alt: string;
+      reason: string;
+    }) => idempotentRequest<unknown>("/v1/platform/commercial/media", "POST", body),
+    deleteCommercialMedia: (mediaId: string, reason: string) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/media/${encodeURIComponent(mediaId)}`,
+        "DELETE",
+        { reason },
+      ),
+    commercialLeads: (
+      filters: {
+        search?: string;
+        type?: string;
+        stage?: string;
+        assignedToIdentityId?: string;
+        campaignSlug?: string;
+        cursor?: string;
+        limit?: number;
+      } = {},
+    ) => {
+      const query = new URLSearchParams();
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") query.set(key, String(value));
+      }
+      return request<unknown>(`/v1/platform/commercial/leads${query.size ? `?${query}` : ""}`);
+    },
+    commercialMetrics: () => request<unknown>("/v1/platform/commercial/metrics"),
+    updateCommercialLead: (
+      sourceType: "trial" | "contact",
+      sourceId: string,
+      body: {
+        reason: string;
+        stage: "new" | "qualified" | "contacted" | "converted" | "lost";
+        assignedToIdentityId?: string | null;
+        organizationId?: string | null;
+        notes?: string | null;
+        lastContactAt?: string | null;
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/leads/${sourceType}/${encodeURIComponent(sourceId)}`,
+        "PATCH",
+        body,
+      ),
+    createCommercialCampaign: (body: Record<string, unknown>) =>
+      idempotentRequest<unknown>("/v1/platform/commercial/campaigns", "POST", body),
+    updateCommercialCampaign: (campaignId: string, body: Record<string, unknown>) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/commercial/campaigns/${encodeURIComponent(campaignId)}`,
+        "PUT",
+        body,
+      ),
+  },
+  billing: {
+    summary: (organizationId: string) =>
+      request<unknown>(`/v1/organizations/${encodeURIComponent(organizationId)}/billing/summary`),
+    createUpgradeQuote: (organizationId: string, targetPlanSlug: string) =>
+      idempotentRequest<unknown>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/billing/upgrade-quotes`,
+        "POST",
+        { targetPlanSlug },
+      ),
+    createCheckout: (organizationId: string, body: BillingCheckoutInput) =>
+      idempotentRequest<unknown>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/billing/checkouts`,
+        "POST",
+        body,
+      ),
   },
   management: {
     overview: (organizationId: string, unitId: string, source?: string) =>
@@ -819,6 +1406,169 @@ export const api = {
       managementCommand<unknown>(organizationId, unitId, "overview/visit"),
     inventory: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "inventory")),
+    inventoryControls: (organizationId: string, unitId: string) =>
+      request<unknown>(managementPath(organizationId, unitId, "inventory/controls")),
+    configureInventorySectorPolicy: (
+      organizationId: string,
+      unitId: string,
+      locationId: string,
+      body: {
+        blindCountRequired: boolean;
+        requireDistinctCountReviewer: boolean;
+        scanRequired: boolean;
+        offlineAllowed: boolean;
+        temperatureMinimumCelsius: number | null;
+        temperatureMaximumCelsius: number | null;
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `inventory/controls/sectors/${encodeURIComponent(locationId)}`,
+        ),
+        "PUT",
+        body,
+      ),
+    startBlindInventoryCount: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        locationId: string;
+        shiftReference?: string;
+        reason: string;
+        scheduleIds?: string[];
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/controls/counts",
+        body,
+        idempotencyKey,
+      ),
+    submitBlindInventoryCount: (
+      organizationId: string,
+      unitId: string,
+      sessionId: string,
+      body: {
+        lines: Array<{ lineId: string; countedQuantity: string }>;
+        capturedAt?: string;
+        offline?: boolean;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/counts/${encodeURIComponent(sessionId)}/submit`,
+        body,
+        idempotencyKey,
+      ),
+    reviewBlindInventoryCount: (
+      organizationId: string,
+      unitId: string,
+      sessionId: string,
+      body: { decision: "approved" | "rejected"; note: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/counts/${encodeURIComponent(sessionId)}/review`,
+        body,
+        idempotencyKey,
+      ),
+    recordInventoryTemperature: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        locationId: string;
+        celsius: number;
+        source: "manual" | "sensor" | "import";
+        occurredAt?: string;
+        note?: string;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/controls/temperatures",
+        body,
+        idempotencyKey,
+      ),
+    holdInventoryLot: (
+      organizationId: string,
+      unitId: string,
+      lotId: string,
+      body: { reason: string; evidence?: string[] },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/lots/${encodeURIComponent(lotId)}/holds`,
+        body,
+        idempotencyKey,
+      ),
+    releaseInventoryLot: (
+      organizationId: string,
+      unitId: string,
+      lotId: string,
+      holdId: string,
+      body: { reason: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/lots/${encodeURIComponent(lotId)}/holds/${encodeURIComponent(holdId)}/release`,
+        body,
+        idempotencyKey,
+      ),
+    chargeReturnableDeposit: (
+      organizationId: string,
+      unitId: string,
+      body: { orderId: string; dueDate: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/controls/returnables/deposits",
+        body,
+        idempotencyKey,
+      ),
+    cancelReturnableDepositCharge: (
+      organizationId: string,
+      unitId: string,
+      chargeId: string,
+      body: { reason: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/returnables/deposits/${encodeURIComponent(chargeId)}/cancel`,
+        body,
+        idempotencyKey,
+      ),
+    reconcileReturnableDepositCharge: (
+      organizationId: string,
+      unitId: string,
+      chargeId: string,
+      body: { reason: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/controls/returnables/deposits/${encodeURIComponent(chargeId)}/reconcile`,
+        body,
+        idempotencyKey,
+      ),
     createInventoryReservation: (
       organizationId: string,
       unitId: string,
@@ -987,6 +1737,24 @@ export const api = {
       ),
     returnables: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "inventory/returnables")),
+    returnablePolicy: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        managementPath(organizationId, unitId, "inventory/controls/returnables/policy"),
+      ),
+    updateReturnablePolicy: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        depositMode: "disabled" | "manual";
+        defaultDueDays: number;
+        returnableClosePolicy: "ignore" | "warn" | "block";
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "inventory/controls/returnables/policy"),
+        "PATCH",
+        body,
+      ),
     configureReturnable: (
       organizationId: string,
       unitId: string,
@@ -1006,10 +1774,26 @@ export const api = {
         body,
         idempotencyKey,
       ),
+    classifyReturnableProduct: (
+      organizationId: string,
+      unitId: string,
+      productId: string,
+      body: { status: "returnable" | "non_returnable" },
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `inventory/returnables/products/${encodeURIComponent(productId)}/classification`,
+        ),
+        "PUT",
+        body,
+      ),
     confirmReturnableCustody: (
       organizationId: string,
       unitId: string,
       body: {
+        issueMovementId?: string;
         containerInventoryItemId: string;
         locationId: string;
         quantity: string;
@@ -1022,6 +1806,44 @@ export const api = {
         organizationId,
         unitId,
         "inventory/returnables/custody/confirm",
+        body,
+        idempotencyKey,
+      ),
+    confirmReturnableCustodyBulk: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        lines: Array<{
+          issueMovementId: string;
+          locationId: string;
+          quantity: string;
+          note?: string;
+        }>;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/returnables/custody/confirm-bulk",
+        body,
+        idempotencyKey,
+      ),
+    handoffReturnableCustody: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        issueMovementIds: string[];
+        toIdentityId: string;
+        toShiftReference?: string;
+        note: string;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "inventory/returnables/custody/handoffs",
         body,
         idempotencyKey,
       ),
@@ -1166,6 +1988,8 @@ export const api = {
       importId: string,
       body: {
         locationId: string;
+        purchaseOrderId?: string;
+        dueDate: string;
         receivedAt?: string;
         acceptTotalDivergence?: boolean;
         divergenceReason?: string;
@@ -1186,8 +2010,15 @@ export const api = {
         active?: boolean;
       } = {},
     ) => request<unknown>(managementListPath(organizationId, unitId, "suppliers", filters)),
-    finance: (organizationId: string, unitId: string) =>
-      request<unknown>(managementPath(organizationId, unitId, "finance")),
+    finance: (organizationId: string, unitId: string, filters: FinanceFilters = {}) =>
+      request<unknown>(managementListPath(organizationId, unitId, "finance", filters)),
+    financeSettings: (organizationId: string, unitId: string) =>
+      request<unknown>(managementPath(organizationId, unitId, "finance/settings")),
+    exportFinance: (
+      organizationId: string,
+      unitId: string,
+      filters: Omit<FinanceFilters, "page" | "pageSize"> & { format: "csv" | "pdf" },
+    ) => request<unknown>(managementListPath(organizationId, unitId, "finance/export", filters)),
     reports: (
       organizationId: string,
       unitId: string,
@@ -1493,6 +2324,9 @@ export const api = {
       organizationId: string,
       unitId: string,
       body: {
+        serviceChargeEnabled: boolean;
+        defaultServiceChargeBasisPoints: number;
+        serviceChargeApplication: "manual" | "suggest_dine_in";
         attributionMode: "final_responsible" | "order_creator";
         transferMode: "move_to_final" | "preserve_origin";
         serviceBase: "gross" | "net_after_discounts";
@@ -2694,7 +3528,7 @@ export const api = {
     createPayable: (
       organizationId: string,
       unitId: string,
-      body: { description: string; amountCents: number; competenceDate: string; dueDate: string },
+      body: FinanceEntryInput & { supplierId?: string },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(organizationId, unitId, "finance/payables", body, idempotencyKey),
@@ -2702,7 +3536,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       payableId: string,
-      body: { amountCents: number; method: string; reference?: string; cashRegisterId?: string },
+      body: FinancePaymentInput,
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -2715,7 +3549,7 @@ export const api = {
     createReceivable: (
       organizationId: string,
       unitId: string,
-      body: { description: string; amountCents: number; competenceDate: string; dueDate: string },
+      body: FinanceEntryInput,
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -2729,13 +3563,124 @@ export const api = {
       organizationId: string,
       unitId: string,
       receivableId: string,
-      body: { amountCents: number; method: string; reference?: string; cashRegisterId?: string },
+      body: FinancePaymentInput,
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
         organizationId,
         unitId,
         `finance/receivables/${encodeURIComponent(receivableId)}/payments`,
+        body,
+        idempotencyKey,
+      ),
+    updateFinanceEntry: (
+      organizationId: string,
+      unitId: string,
+      direction: "payable" | "receivable",
+      entryId: string,
+      body: Partial<FinanceEntryInput> & { version: number },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `finance/${direction === "payable" ? "payables" : "receivables"}/${encodeURIComponent(entryId)}`,
+        ),
+        "PATCH",
+        body,
+        idempotencyKey,
+      ),
+    cancelFinanceEntry: (
+      organizationId: string,
+      unitId: string,
+      direction: "payable" | "receivable",
+      entryId: string,
+      body: { version: number; reason: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `finance/${direction === "payable" ? "payables" : "receivables"}/${encodeURIComponent(entryId)}/cancel`,
+        body,
+        idempotencyKey,
+      ),
+    reverseFinancePayment: (
+      organizationId: string,
+      unitId: string,
+      direction: "payable" | "receivable",
+      paymentId: string,
+      body: { reason: string; cashRegisterId?: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `finance/${direction === "payable" ? "payables" : "receivables"}/payments/${encodeURIComponent(paymentId)}/reverse`,
+        body,
+        idempotencyKey,
+      ),
+    requestFinanceApproval: (
+      organizationId: string,
+      unitId: string,
+      body: FinancePaymentInput & { direction: "payable" | "receivable"; entryId: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(organizationId, unitId, "finance/approvals", body, idempotencyKey),
+    decideFinanceApproval: (
+      organizationId: string,
+      unitId: string,
+      approvalRequestId: string,
+      body: { decision: "approve" | "reject"; note?: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `finance/approvals/${encodeURIComponent(approvalRequestId)}/decision`,
+        body,
+        idempotencyKey,
+      ),
+    updateFinanceSettings: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        paymentApprovalThresholdCents: number | null;
+        requireDistinctApprover: boolean;
+        dueSoonDays: number;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(organizationId, unitId, "finance/settings"),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    importFinanceReconciliation: (
+      organizationId: string,
+      unitId: string,
+      body: unknown,
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(organizationId, unitId, "reconciliations", body, idempotencyKey),
+    resolveFinanceReconciliation: (
+      organizationId: string,
+      unitId: string,
+      reconciliationEntryId: string,
+      body: {
+        paymentDirection: "payable" | "receivable";
+        paymentId: string;
+        note: string;
+        version: number;
+      },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `reconciliations/${encodeURIComponent(reconciliationEntryId)}/resolve`,
         body,
         idempotencyKey,
       ),
@@ -2808,6 +3753,20 @@ export const api = {
       },
       idempotencyKey?: string,
     ) => managementCommand<unknown>(organizationId, unitId, "cash-transfers", body, idempotencyKey),
+    decideCashTransfer: (
+      organizationId: string,
+      unitId: string,
+      cashTransferId: string,
+      body: { decision: "accept" | "reject"; note?: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `cash-transfers/${encodeURIComponent(cashTransferId)}/decision`,
+        body,
+        idempotencyKey,
+      ),
     addCashMovement: (
       organizationId: string,
       unitId: string,
@@ -2934,32 +3893,275 @@ export const api = {
         idempotencyKey,
       ),
   },
+  integrations: {
+    doseClubMemberships: (
+      organizationId: string,
+      unitId: string,
+      tabId: string,
+      productId?: string,
+    ) => {
+      const query = new URLSearchParams();
+      if (productId) query.set("productId", productId);
+      const search = query.size ? `?${query.toString()}` : "";
+      return request<DoseClubMembershipsResponse>(
+        `/api/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/integrations/doseclub/tabs/${encodeURIComponent(tabId)}/memberships${search}`,
+      );
+    },
+  },
   pilot: {
     catalog: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "catalog")),
     floor: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "floor")),
+    tableQrPresence: (organizationId: string, unitId: string) =>
+      request<{ mode: "session_only" | "daily_code"; code: string | null }>(
+        pilotPath(organizationId, unitId, "tables/qr/presence"),
+      ),
+    operationalPushConfig: (organizationId: string, unitId: string, installationId: string) =>
+      request<OperationalPushConfig>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `push/subscriptions/${encodeURIComponent(installationId)}`,
+        ),
+      ),
+    upsertOperationalPushSubscription: (
+      organizationId: string,
+      unitId: string,
+      installationId: string,
+      body: OperationalPushSubscription,
+    ) =>
+      request<OperationalPushConfig>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `push/subscriptions/${encodeURIComponent(installationId)}`,
+        ),
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    removeOperationalPushSubscription: (
+      organizationId: string,
+      unitId: string,
+      installationId: string,
+    ) =>
+      request<void>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `push/subscriptions/${encodeURIComponent(installationId)}`,
+        ),
+        { method: "DELETE" },
+      ),
     updateFloorLayout: (
       organizationId: string,
       unitId: string,
       body: {
-        tables: Array<{ tableId: string; x: number; y: number }>;
+        expectedRevision: number;
+        tables: Array<{
+          tableId: string;
+          roomId: string;
+          label: string;
+          seats: number;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          rotation: number;
+          shape: "round" | "square" | "rectangle";
+        }>;
         rooms: Array<{
           roomId: string;
           points: Array<{ x: number; y: number }>;
         }>;
+        layoutElements: Array<{
+          id: string;
+          roomId: string;
+          kind: "label" | "barrier";
+          label?: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          rotation: number;
+        }>;
       },
     ) =>
-      request<unknown>(pilotPath(organizationId, unitId, "floor/layout"), {
+      request<{ revision: number }>(pilotPath(organizationId, unitId, "floor/layout"), {
         method: "PUT",
         body: JSON.stringify(body),
       }),
     tabs: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "tabs")),
+    counterQueue: (
+      organizationId: string,
+      unitId: string,
+      filters: {
+        stage: "all" | "new" | "production" | "ready" | "waiting" | "delivered" | "late";
+        channel: "all" | "pickup" | "dine_in" | "delivery";
+        query: string;
+        page: number;
+        limit: number;
+      },
+    ) =>
+      request<unknown>(
+        `${pilotPath(organizationId, unitId, "counter-queue")}?${new URLSearchParams({
+          stage: filters.stage,
+          channel: filters.channel,
+          query: filters.query,
+          page: String(filters.page),
+          limit: String(filters.limit),
+        })}`,
+      ),
     tab: (organizationId: string, unitId: string, tabId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}`)),
     kds: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "kds")),
+    productionPrintingStations: (organizationId: string, unitId: string) =>
+      request<{ stations: ProductionPrintingStation[] }>(
+        pilotPath(organizationId, unitId, "production-printing/stations"),
+      ),
+    productionPrinters: (organizationId: string, unitId: string) =>
+      request<{ printers: ProductionPrinter[]; hubs: ProductionPrinterHub[] }>(
+        pilotPath(organizationId, unitId, "production-printers"),
+      ),
+    createProductionPrinter: (
+      organizationId: string,
+      unitId: string,
+      body: ProductionPrinterInput,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printer: ProductionPrinter }>(
+        pilotPath(organizationId, unitId, "production-printers"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    updateProductionPrinter: (
+      organizationId: string,
+      unitId: string,
+      printerId: string,
+      body: ProductionPrinterInput & { revision: number },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printer: ProductionPrinter }>(
+        pilotPath(organizationId, unitId, `production-printers/${encodeURIComponent(printerId)}`),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    archiveProductionPrinter: (
+      organizationId: string,
+      unitId: string,
+      printerId: string,
+      revision: number,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printer: ProductionPrinter }>(
+        pilotPath(organizationId, unitId, `production-printers/${encodeURIComponent(printerId)}`),
+        "DELETE",
+        { revision },
+        idempotencyKey,
+      ),
+    testProductionPrinter: (
+      organizationId: string,
+      unitId: string,
+      printerId: string,
+      revision: number,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{
+        commandId: string;
+        printerId: string;
+        revision: number;
+        state: "pending";
+      }>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `production-printers/${encodeURIComponent(printerId)}/test`,
+        ),
+        "POST",
+        { revision },
+        idempotencyKey,
+      ),
+    updateProductionPrintingStationPolicy: (
+      organizationId: string,
+      unitId: string,
+      stationId: string,
+      body: ProductionPrintingPolicy,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ station: ProductionPrintingStation }>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `production-printing/stations/${encodeURIComponent(stationId)}/policy`,
+        ),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    createKdsPrintJob: (
+      organizationId: string,
+      unitId: string,
+      ticketId: string,
+      body: { copies?: number; printerId?: string; reason: string },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printJob: ProductionPrintJob; idempotentReplay?: boolean }>(
+        pilotPath(organizationId, unitId, `kds/${encodeURIComponent(ticketId)}/print-jobs`),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    productionPrintJobs: (
+      organizationId: string,
+      unitId: string,
+      query: {
+        status?: ProductionPrintJobStatus;
+        stationId?: string;
+        kdsTicketId?: string;
+        limit?: number;
+      } = {},
+    ) => {
+      const params = new URLSearchParams({ documentType: "kds_ticket" });
+      for (const [key, value] of Object.entries(query)) {
+        if (value !== undefined) params.set(key, String(value));
+      }
+      return request<ProductionPrintJob[]>(
+        pilotPath(organizationId, unitId, `print-jobs?${params.toString()}`),
+      );
+    },
+    reprintProductionPrintJob: (
+      organizationId: string,
+      unitId: string,
+      printJobId: string,
+      body: { reason: string; copies?: number; printerId?: string },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printJob: ProductionPrintJob }>(
+        pilotPath(organizationId, unitId, `print-jobs/${encodeURIComponent(printJobId)}/reprint`),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    resolveUnknownProductionPrintJob: (
+      organizationId: string,
+      unitId: string,
+      printJobId: string,
+      body: { outcome: ProductionPrintResolutionOutcome; reason: string },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ printJob: ProductionPrintJob; idempotentReplay?: boolean }>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `production-print-jobs/${encodeURIComponent(printJobId)}/resolve-unknown`,
+        ),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
     kdsProductAvailability: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "kds/products/availability")),
     kdsTerminalProfile: (organizationId: string, unitId: string, installationId: string) =>
@@ -3393,14 +4595,76 @@ export const api = {
       ),
     catalogTableQrs: (organizationId: string, unitId: string) =>
       request<CatalogTableQr[]>(pilotPath(organizationId, unitId, "catalog/tables/qr")),
-    rotateCatalogTableQr: (organizationId: string, unitId: string, tableId: string) =>
-      request<CatalogTableQr>(
+    tableQrSettings: (organizationId: string, unitId: string) =>
+      request<TableQrSettings>(pilotPath(organizationId, unitId, "catalog/tables/qr/settings")),
+    updateTableQrSettings: (
+      organizationId: string,
+      unitId: string,
+      body: UpdateTableQrSettingsInput,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<TableQrSettings>(
+        pilotPath(organizationId, unitId, "catalog/tables/qr/settings"),
+        "PUT",
+        body,
+        idempotencyKey,
+      ),
+    tableQrLifecycle: (organizationId: string, unitId: string) =>
+      request<TableQrLifecycle>(pilotPath(organizationId, unitId, "catalog/tables/qr/lifecycle")),
+    testTableQr: (organizationId: string, unitId: string, url: string) =>
+      request<TableQrTestResult>(pilotPath(organizationId, unitId, "catalog/tables/qr/test"), {
+        method: "POST",
+        body: JSON.stringify({ url }),
+      }),
+    createTableQrPrintBatch: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        format: TableQrPrintFormat;
+        includeWifi: boolean;
+        output: TableQrOutput;
+        template?: TableQrVisualTemplate;
+        tableIds: string[];
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<TableQrPrintBatch>(
+        pilotPath(organizationId, unitId, "catalog/tables/qr/print-batches"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    markTableQrPrintBatchPrinted: (
+      organizationId: string,
+      unitId: string,
+      batchId: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<TableQrPrintBatch>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `catalog/tables/qr/print-batches/${encodeURIComponent(batchId)}/printed`,
+        ),
+        "POST",
+        {},
+        idempotencyKey,
+      ),
+    rotateCatalogTableQr: (
+      organizationId: string,
+      unitId: string,
+      tableId: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<CatalogTableQr>(
         pilotPath(
           organizationId,
           unitId,
           `catalog/tables/${encodeURIComponent(tableId)}/qr/rotate`,
         ),
-        { method: "POST" },
+        "POST",
+        undefined,
+        idempotencyKey,
       ),
     uploadCatalogMedia: (
       organizationId: string,
@@ -3414,6 +4678,10 @@ export const api = {
       request<{ key: string; url: string }>(pilotPath(organizationId, unitId, "catalog/media"), {
         method: "POST",
         body: JSON.stringify(body),
+      }),
+    deleteCatalogMedia: (organizationId: string, unitId: string, key: string) =>
+      request<void>(pilotPath(organizationId, unitId, `catalog/media/${encodeURIComponent(key)}`), {
+        method: "DELETE",
       }),
     setProductDailyStock: (
       organizationId: string,
@@ -3437,24 +4705,87 @@ export const api = {
     createRoom: (
       organizationId: string,
       unitId: string,
-      body: { name: string; sortOrder?: number },
+      body: { name: string; sortOrder: number; expectedRevision: number },
     ) =>
-      request<unknown>(pilotPath(organizationId, unitId, "rooms"), {
+      request<{ floorRevision: number }>(pilotPath(organizationId, unitId, "rooms"), {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    updateRoom: (
+      organizationId: string,
+      unitId: string,
+      roomId: string,
+      body: { name: string; sortOrder: number; expectedRevision: number },
+    ) =>
+      request<{ floorRevision: number }>(
+        pilotPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}`),
+        {
+          method: "PUT",
+          body: JSON.stringify(body),
+        },
+      ),
+    archiveRoom: (
+      organizationId: string,
+      unitId: string,
+      roomId: string,
+      expectedRevision: number,
+    ) =>
+      request<{ floorRevision: number }>(
+        `${pilotPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}`)}?expectedRevision=${expectedRevision}`,
+        { method: "DELETE" },
+      ),
     createTable: (
       organizationId: string,
       unitId: string,
       roomId: string,
-      body: { label: string; seats: number },
+      body: {
+        label: string;
+        seats: number;
+        width: number;
+        height: number;
+        rotation: number;
+        shape: "round" | "square" | "rectangle";
+        expectedRevision: number;
+      },
     ) =>
-      request<unknown>(
+      request<{ floorRevision: number }>(
         pilotPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}/tables`),
         {
           method: "POST",
           body: JSON.stringify(body),
         },
+      ),
+    updateTable: (
+      organizationId: string,
+      unitId: string,
+      tableId: string,
+      body: {
+        roomId: string;
+        label: string;
+        seats: number;
+        width: number;
+        height: number;
+        rotation: number;
+        shape: "round" | "square" | "rectangle";
+        expectedRevision: number;
+      },
+    ) =>
+      request<{ floorRevision: number }>(
+        pilotPath(organizationId, unitId, `tables/${encodeURIComponent(tableId)}`),
+        {
+          method: "PUT",
+          body: JSON.stringify(body),
+        },
+      ),
+    archiveTable: (
+      organizationId: string,
+      unitId: string,
+      tableId: string,
+      expectedRevision: number,
+    ) =>
+      request<{ floorRevision: number }>(
+        `${pilotPath(organizationId, unitId, `tables/${encodeURIComponent(tableId)}`)}?expectedRevision=${expectedRevision}`,
+        { method: "DELETE" },
       ),
     updateTableTurnover: (
       organizationId: string,
@@ -3470,9 +4801,19 @@ export const api = {
       organizationId: string,
       unitId: string,
       roomId: string,
-      body: { tables: Array<{ label: string; seats: number }> },
+      body: {
+        expectedRevision: number;
+        tables: Array<{
+          label: string;
+          seats: number;
+          width: number;
+          height: number;
+          rotation: number;
+          shape: "round" | "square" | "rectangle";
+        }>;
+      },
     ) =>
-      request<unknown[]>(
+      request<{ tables: unknown[]; floorRevision: number }>(
         pilotPath(organizationId, unitId, `rooms/${encodeURIComponent(roomId)}/tables/batch`),
         {
           method: "POST",
@@ -3494,6 +4835,35 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    updateServiceSection: (
+      organizationId: string,
+      unitId: string,
+      serviceSectionId: string,
+      body: {
+        name: string;
+        color: string;
+        serviceMode: "full_service" | "quick_service" | "bar" | "hybrid";
+        tableIds: string[];
+        defaultResponsibleIdentityId?: string | null;
+      },
+    ) =>
+      request<unknown>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `service-sections/${encodeURIComponent(serviceSectionId)}`,
+        ),
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
+    archiveServiceSection: (organizationId: string, unitId: string, serviceSectionId: string) =>
+      request<unknown>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `service-sections/${encodeURIComponent(serviceSectionId)}`,
+        ),
+        { method: "DELETE" },
+      ),
     openOperationalShift: (
       organizationId: string,
       unitId: string,
@@ -3526,6 +4896,24 @@ export const api = {
         ),
         { method: "PUT", body: JSON.stringify(body) },
       ),
+    updateShiftSections: (
+      organizationId: string,
+      unitId: string,
+      shiftId: string,
+      body: {
+        expectedRevision: number;
+        assignments: Array<{
+          shiftSectionId: string;
+          tableIds: string[];
+          primaryIdentityId: string | null;
+          supportIdentityIds: string[];
+        }>;
+      },
+    ) =>
+      request<{ revision: number }>(
+        pilotPath(organizationId, unitId, `shifts/${encodeURIComponent(shiftId)}/sections`),
+        { method: "PUT", body: JSON.stringify(body) },
+      ),
     updateShiftSectionCoverage: (
       organizationId: string,
       unitId: string,
@@ -3550,7 +4938,8 @@ export const api = {
         targetShiftSectionId: string;
         durationMinutes: number;
         transferOpenTab: boolean;
-        reason: string;
+        reasonCode: "service_rebalance" | "staff_coverage" | "operational_reorganization" | "other";
+        reasonNote?: string;
       },
     ) =>
       request<unknown>(
@@ -3581,6 +4970,7 @@ export const api = {
       shiftId: string,
       body: {
         acknowledgeOpenTabs: boolean;
+        returnableDecision?: "acknowledge";
         handoverIdentityId?: string | null;
         handoverAssignments?: Array<{
           sourceResponsibleIdentityId: string | null;
@@ -3597,9 +4987,18 @@ export const api = {
       organizationId: string,
       unitId: string,
       shiftId: string,
-      body: { tables: Array<{ tableId: string; roomId: string; x: number; y: number }> },
+      body: {
+        expectedRevision: number;
+        tables: Array<{
+          tableId: string;
+          roomId: string;
+          x: number;
+          y: number;
+          rotation: number;
+        }>;
+      },
     ) =>
-      request<unknown>(
+      request<{ revision: number }>(
         pilotPath(organizationId, unitId, `shifts/${encodeURIComponent(shiftId)}/layout`),
         { method: "PUT", body: JSON.stringify(body) },
       ),
@@ -3611,6 +5010,7 @@ export const api = {
         label?: string;
         guestCount: number;
         fulfillmentType?: "dine_in" | "pickup" | "delivery";
+        customerId?: string;
         customerName?: string;
         customerPhone?: string;
         readyNotificationConsent?: boolean;
@@ -3679,6 +5079,7 @@ export const api = {
           seatNumber?: number;
           course?: "anytime" | "starter" | "main" | "dessert";
           allergyNote?: string;
+          doseClub?: { externalClubId: string };
         }>;
       },
       idempotencyKey?: string,
@@ -3725,7 +5126,11 @@ export const api = {
       organizationId: string,
       unitId: string,
       tabId: string,
-      body: { printRequested: boolean; printOptions?: PrintTarget & { copies?: number } },
+      body: {
+        printRequested: boolean;
+        printOptions?: PrintTarget & { copies?: number };
+        returnableDecision?: "acknowledge";
+      },
       idempotencyKey?: string,
     ) =>
       idempotentRequest<{ tab: unknown; paidCents: number; printJob: PosPrintJob | null }>(
@@ -3747,6 +5152,30 @@ export const api = {
     ) =>
       idempotentRequest<{ printJob: PosPrintJob; idempotentReplay?: boolean }>(
         pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}/print-jobs`),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    createPrintSplit: (
+      organizationId: string,
+      unitId: string,
+      tabId: string,
+      body: PrintTarget & {
+        method: "equal_people" | "fixed_amount";
+        partCount: number;
+        fixedAmountCents?: number;
+        documentType?: "partial_statement" | "payment_statement";
+        copies?: number;
+        serviceCallId?: string;
+      },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{
+        split: { id: string; partCount: number; balanceSnapshotCents: number };
+        parts: Array<{ id: string; partNumber: number; amountCents: number }>;
+        printJobs: PosPrintJob[];
+      }>(
+        pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}/print-splits`),
         "POST",
         body,
         idempotencyKey,
@@ -3872,10 +5301,19 @@ export const api = {
         kind: "assistance" | "bill" | "water" | "other";
         tabId?: string;
         slaMinutes?: number;
+        installationId?: string;
+        terminalId?: string;
+        printerId?: string;
+        copies?: number;
       },
       idempotencyKey?: string,
     ) =>
-      idempotentRequest<unknown>(
+      idempotentRequest<{
+        call: unknown;
+        duplicate: boolean;
+        printJob: PosPrintJob | null;
+        deliveryRoute: "local" | "cashier";
+      }>(
         pilotPath(organizationId, unitId, `tables/${encodeURIComponent(tableId)}/calls`),
         "POST",
         body,
@@ -3912,6 +5350,19 @@ export const api = {
         undefined,
         idempotencyKey,
       ),
+    rejectTableQrOrder: (
+      organizationId: string,
+      unitId: string,
+      orderId: string,
+      reason: string,
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(organizationId, unitId, `orders/${encodeURIComponent(orderId)}/reject`),
+        "POST",
+        { reason },
+        idempotencyKey,
+      ),
     transferTab: (
       organizationId: string,
       unitId: string,
@@ -3928,7 +5379,17 @@ export const api = {
     mergeTabs: (
       organizationId: string,
       unitId: string,
-      body: { targetTabId: string; sourceTabIds: string[] },
+      body: {
+        targetTabId: string;
+        sourceTabIds: string[];
+        reasonCode:
+          | "large_party"
+          | "sit_together"
+          | "accessibility"
+          | "operational_reorganization"
+          | "other";
+        reasonNote?: string;
+      },
       idempotencyKey?: string,
     ) =>
       idempotentRequest<unknown>(
@@ -3946,6 +5407,13 @@ export const api = {
         mode: "physical_only" | "single_tab";
         targetTabId?: string;
         responsibleIdentityId?: string;
+        reasonCode:
+          | "large_party"
+          | "sit_together"
+          | "accessibility"
+          | "operational_reorganization"
+          | "other";
+        reasonNote?: string;
       },
       idempotencyKey?: string,
     ) =>
@@ -3991,7 +5459,13 @@ export const api = {
       },
       idempotencyKey?: string,
     ) =>
-      idempotentRequest<unknown>(
+      idempotentRequest<{
+        sourceTabId: string;
+        targetTabId: string;
+        movedItemIds: string[];
+        printableTabIds: string[];
+        printJobs: PosPrintJob[];
+      }>(
         pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}/split`),
         "POST",
         body,
@@ -4426,14 +5900,67 @@ export const api = {
   growth: {
     customers: (organizationId: string) =>
       request<unknown>(growthPath(organizationId, "customers")),
+    customerPage: (
+      organizationId: string,
+      filters?: { q?: string; unitId?: string; limit?: number; offset?: number },
+    ) => {
+      const query = new URLSearchParams();
+      if (filters?.q) query.set("q", filters.q);
+      if (filters?.unitId) query.set("unitId", filters.unitId);
+      if (filters?.limit !== undefined) query.set("limit", String(filters.limit));
+      if (filters?.offset !== undefined) query.set("offset", String(filters.offset));
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return request<unknown>(growthPath(organizationId, `customers/page${suffix}`));
+    },
+    customerDetail: (organizationId: string, customerId: string) =>
+      request<unknown>(growthPath(organizationId, `customers/${encodeURIComponent(customerId)}`)),
     createCustomer: (
       organizationId: string,
-      body: { defaultUnitId?: string; name: string; email?: string; phone?: string },
+      body: {
+        defaultUnitId?: string;
+        name: string;
+        email?: string;
+        phone?: string;
+        birthDate?: string;
+        notes?: string | null;
+        tags?: string[];
+      },
     ) =>
       request<unknown>(growthPath(organizationId, "customers"), {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    updateCustomer: (
+      organizationId: string,
+      customerId: string,
+      body: {
+        defaultUnitId?: string | null;
+        name?: string;
+        email?: string | null;
+        phone?: string | null;
+        birthDate?: string | null;
+        notes?: string | null;
+        tags?: string[];
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, `customers/${encodeURIComponent(customerId)}`), {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    archiveCustomer: (organizationId: string, customerId: string, body: { reason: string }) =>
+      request<unknown>(
+        growthPath(organizationId, `customers/${encodeURIComponent(customerId)}/archive`),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    mergeCustomer: (
+      organizationId: string,
+      customerId: string,
+      body: { sourceCustomerId: string; reason: string },
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `customers/${encodeURIComponent(customerId)}/merge`),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
     recordConsent: (
       organizationId: string,
       customerId: string,
@@ -4454,6 +5981,8 @@ export const api = {
       request<unknown>(
         growthPath(organizationId, `loyalty/customers/${encodeURIComponent(customerId)}/balance`),
       ),
+    loyaltyProgram: (organizationId: string) =>
+      request<unknown>(growthPath(organizationId, "loyalty/programs/current")),
     createLoyaltyProgram: (
       organizationId: string,
       body: {
@@ -4487,6 +6016,27 @@ export const api = {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    updateCoupon: (
+      organizationId: string,
+      couponId: string,
+      body: {
+        code?: string;
+        type?: "fixed" | "percentage";
+        value?: number;
+        minimumOrderCents?: number;
+        maximumDiscountCents?: number | null;
+        validFrom?: string;
+        validUntil?: string | null;
+        channels?: string[];
+        unitIds?: string[];
+        perCustomerLimit?: number;
+        active?: boolean;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, `coupons/${encodeURIComponent(couponId)}`), {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     segments: (organizationId: string) => request<unknown>(growthPath(organizationId, "segments")),
     createSegment: (
       organizationId: string,
@@ -4495,7 +6045,11 @@ export const api = {
         filters:
           | { kind: "all" }
           | { kind: "marketing_opt_in" }
-          | { kind: "birthday_month"; month: number };
+          | { kind: "birthday_month"; month: number }
+          | { kind: "inactive_days"; days: number }
+          | { kind: "minimum_visits"; visits: number }
+          | { kind: "minimum_spend_cents"; amountCents: number }
+          | { kind: "no_show_count"; count: number };
         active: boolean;
       },
     ) =>
@@ -4509,16 +6063,224 @@ export const api = {
       organizationId: string,
       body: {
         unitId?: string;
+        segmentId?: string;
         name: string;
         channel: "email" | "whatsapp";
         subject?: string;
         content: string;
+        variantBContent?: string;
+        attributionWindowDays?: number;
+        holdoutPercentage?: number;
       },
     ) =>
       request<unknown>(growthPath(organizationId, "campaigns"), {
         method: "POST",
         body: JSON.stringify(body),
       }),
+    campaignPreview: (organizationId: string, campaignId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/preview`),
+      ),
+    campaignDeliveries: (organizationId: string, campaignId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/deliveries`),
+      ),
+    queueCampaign: (organizationId: string, campaignId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/queue`),
+        { method: "POST" },
+      ),
+    cancelCampaign: (organizationId: string, campaignId: string, body: { reason: string }) =>
+      request<unknown>(
+        growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/cancel`),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    evolutionIntegration: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `integrations/evolution-go?unitId=${encodeURIComponent(unitId)}`,
+        ),
+      ),
+    configureEvolution: (
+      organizationId: string,
+      body: {
+        unitId: string;
+        enabled: boolean;
+        quietHoursStart: string;
+        quietHoursEnd: string;
+        maxMessagesPer30Days: number;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, "integrations/evolution-go"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    evolutionStatus: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `integrations/evolution-go/status?unitId=${encodeURIComponent(unitId)}`,
+        ),
+      ),
+    evolutionQr: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `integrations/evolution-go/qr?unitId=${encodeURIComponent(unitId)}`,
+        ),
+      ),
+    evolutionAction: (organizationId: string, unitId: string, action: "reconnect" | "logout") =>
+      request<unknown>(growthPath(organizationId, `integrations/evolution-go/${action}`), {
+        method: "POST",
+        body: JSON.stringify({ unitId }),
+      }),
+    whatsappInbox: (
+      organizationId: string,
+      unitId: string,
+      filters: {
+        cursorAt?: string;
+        cursorId?: string;
+        status?: "open" | "pending" | "closed";
+        priority?: "low" | "normal" | "high" | "urgent";
+        assignedTo?: "me" | "unassigned" | "any";
+        search?: string;
+      } = {},
+    ) => {
+      const query = new URLSearchParams({ unitId });
+      for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);
+      return request<unknown>(
+        growthPath(organizationId, `whatsapp/conversations?${query.toString()}`),
+      );
+    },
+    whatsappMessages: (
+      organizationId: string,
+      conversationId: string,
+      cursor?: { at: string; id: string },
+    ) => {
+      const query = new URLSearchParams();
+      if (cursor) {
+        query.set("beforeAt", cursor.at);
+        query.set("beforeId", cursor.id);
+      }
+      const suffix = query.size ? `?${query.toString()}` : "";
+      return request<unknown>(
+        growthPath(
+          organizationId,
+          `whatsapp/conversations/${encodeURIComponent(conversationId)}/messages${suffix}`,
+        ),
+      );
+    },
+    updateWhatsappConversation: (
+      organizationId: string,
+      conversationId: string,
+      body: {
+        status?: "open" | "pending" | "closed";
+        priority?: "low" | "normal" | "high" | "urgent";
+        assignedIdentityId?: string | null;
+        slaMinutes?: number | null;
+        expectedUpdatedAt: string;
+      },
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `whatsapp/conversations/${encodeURIComponent(conversationId)}`),
+        { method: "PATCH", body: JSON.stringify(body) },
+      ),
+    whatsappAssignees: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `whatsapp/assignees?unitId=${encodeURIComponent(unitId)}`),
+      ),
+    whatsappMessageMedia: (organizationId: string, conversationId: string, messageId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `whatsapp/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/media`,
+        ),
+      ),
+    markWhatsappRead: (organizationId: string, conversationId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `whatsapp/conversations/${encodeURIComponent(conversationId)}/read`,
+        ),
+        { method: "POST" },
+      ),
+    sendWhatsappMessage: (
+      organizationId: string,
+      body: {
+        unitId: string;
+        conversationId?: string;
+        customerId?: string;
+        phone?: string;
+        body?: string;
+        media?: { fileName: string; mimeType: string; base64: string };
+        idempotencyKey: string;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, "whatsapp/messages"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    crmAutomations: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `crm/automations?unitId=${encodeURIComponent(unitId)}`),
+      ),
+    upsertCrmAutomation: (
+      organizationId: string,
+      body: {
+        unitId: string;
+        trigger: "birthday" | "inactive" | "post_visit" | "no_show" | "survey";
+        enabled: boolean;
+        delayMinutes: number;
+        inactiveDays?: number | null;
+        messageTemplate: string;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, "crm/automations"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    crmAutomationExecutions: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `crm/automation-executions?unitId=${encodeURIComponent(unitId)}`,
+        ),
+      ),
+    retryCrmAutomationExecution: (organizationId: string, executionId: string) =>
+      request<unknown>(
+        growthPath(
+          organizationId,
+          `crm/automation-executions/${encodeURIComponent(executionId)}/retry`,
+        ),
+        { method: "POST" },
+      ),
+    testCrmAutomation: (
+      organizationId: string,
+      ruleId: string,
+      body: { unitId: string; phone: string },
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `crm/automations/${encodeURIComponent(ruleId)}/test`),
+        { method: "POST", body: JSON.stringify(body) },
+      ),
+    crmQuickReplies: (organizationId: string, unitId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `crm/quick-replies?unitId=${encodeURIComponent(unitId)}`),
+      ),
+    upsertCrmQuickReply: (
+      organizationId: string,
+      body: { id?: string; unitId: string; title: string; body: string; active: boolean },
+    ) =>
+      request<unknown>(growthPath(organizationId, "crm/quick-replies"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    deleteCrmQuickReply: (organizationId: string, replyId: string) =>
+      request<unknown>(
+        growthPath(organizationId, `crm/quick-replies/${encodeURIComponent(replyId)}`),
+        { method: "DELETE" },
+      ),
     reservations: (
       organizationId: string,
       unitId: string,
@@ -4605,6 +6367,7 @@ export const api = {
       organizationId: string,
       body: {
         unitId: string;
+        customerId?: string;
         guestName: string;
         guestPhone?: string;
         partySize: number;
@@ -4622,6 +6385,7 @@ export const api = {
       organizationId: string,
       body: {
         unitId: string;
+        customerId?: string;
         guestName: string;
         guestPhone?: string;
         partySize: number;

@@ -55,8 +55,8 @@ export function saveKdsLastOperationalArea(unitId: string, area: KdsOperationalA
 
 export function kdsStationMenuLabel(unitId: string): string {
   const prefix = kdsStoragePrefix(unitId);
-  if (readLocalValue(`${prefix}:station-locked`) !== "true") return "Praça — não fixada";
-  return `Praça — ${readLocalValue(`${prefix}:station-label`) ?? "não identificada"}`;
+  if (readLocalValue(`${prefix}:station-locked`) !== "true") return "Estação — não fixada";
+  return `Estação — ${readLocalValue(`${prefix}:station-label`) ?? "não identificada"}`;
 }
 
 export function saveKdsStationLabel(unitId: string, stationLabel: string): void {

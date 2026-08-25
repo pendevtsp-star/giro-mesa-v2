@@ -10,6 +10,8 @@ export interface FiscalTaxImportRow {
     cstIcms?: string;
     cstPis: string;
     cstCofins: string;
+    cstIbsCbs?: string;
+    cClassTrib?: string;
   };
 }
 
@@ -24,6 +26,8 @@ const headers = [
   "cstIcms",
   "cstPis",
   "cstCofins",
+  "cstIbsCbs",
+  "cClassTrib",
   "effectiveFrom",
 ] as const;
 
@@ -34,7 +38,21 @@ export function fiscalTaxCsvTemplate(
   return [
     headers.join(","),
     ...products.map((product) =>
-      [product.id, product.name, product.categoryName, "", "", "", "", "", "", "", effectiveFrom]
+      [
+        product.id,
+        product.name,
+        product.categoryName,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        effectiveFrom,
+      ]
         .map(csvCell)
         .join(","),
     ),
@@ -74,6 +92,8 @@ export function parseFiscalTaxCsv(csv: string, allowedProductIds: ReadonlySet<st
     const cstIcms = value(row, "cstIcms");
     const cstPis = value(row, "cstPis");
     const cstCofins = value(row, "cstCofins");
+    const cstIbsCbs = value(row, "cstIbsCbs");
+    const cClassTrib = value(row, "cClassTrib");
     if (!allowedProductIds.has(productId)) throw new Error(`Linha ${line}: produto inválido.`);
     if (seen.has(productId)) throw new Error(`Linha ${line}: produto repetido.`);
     if (!/^\d{8}$/.test(ncm)) throw new Error(`Linha ${line}: NCM deve ter 8 dígitos.`);
@@ -84,6 +104,15 @@ export function parseFiscalTaxCsv(csv: string, allowedProductIds: ReadonlySet<st
     if (!csosn && !cstIcms) throw new Error(`Linha ${line}: informe CSOSN ou CST ICMS.`);
     if (!/^\d{2}$/.test(cstPis)) throw new Error(`Linha ${line}: CST PIS inválido.`);
     if (!/^\d{2}$/.test(cstCofins)) throw new Error(`Linha ${line}: CST COFINS inválido.`);
+    if (Boolean(cstIbsCbs) !== Boolean(cClassTrib)) {
+      throw new Error(`Linha ${line}: informe CST IBS/CBS e cClassTrib em conjunto.`);
+    }
+    if (cstIbsCbs && !/^\d{3}$/.test(cstIbsCbs)) {
+      throw new Error(`Linha ${line}: CST IBS/CBS inválido.`);
+    }
+    if (cClassTrib && !/^\d{6}$/.test(cClassTrib)) {
+      throw new Error(`Linha ${line}: cClassTrib inválido.`);
+    }
     if (!validDate(effectiveFrom)) throw new Error(`Linha ${line}: vigência inválida.`);
     seen.add(productId);
     parsed.push({
@@ -98,6 +127,8 @@ export function parseFiscalTaxCsv(csv: string, allowedProductIds: ReadonlySet<st
         ...(cstIcms ? { cstIcms } : {}),
         cstPis,
         cstCofins,
+        ...(cstIbsCbs ? { cstIbsCbs } : {}),
+        ...(cClassTrib ? { cClassTrib } : {}),
       },
     });
   });

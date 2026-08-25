@@ -9,6 +9,9 @@ import type { Session } from "./types";
 const RealCatalogPage = lazy(() =>
   import("../features/catalog/CatalogPage").then((module) => ({ default: module.RealCatalogPage })),
 );
+const TableQrsPage = lazy(() =>
+  import("../features/table-qrs/TableQrsPage").then((module) => ({ default: module.TableQrsPage })),
+);
 const RealCounterPage = lazy(() =>
   import("../features/counter/CounterPage").then((module) => ({ default: module.RealCounterPage })),
 );
@@ -87,6 +90,9 @@ const DeviceSetupPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("../features/settings/SettingsPage").then((module) => ({ default: module.SettingsPage })),
 );
+const BillingPage = lazy(() =>
+  import("../features/billing/BillingPage").then((module) => ({ default: module.BillingPage })),
+);
 
 export const pageMeta: Partial<Record<RouteId, { title: string; description: string }>> = {
   dashboard: {
@@ -104,6 +110,10 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   catalog: {
     title: "Cardápio operacional",
     description: "Produtos, preços, disponibilidade e complementos desta unidade.",
+  },
+  "table-qrs": {
+    title: "QR das mesas",
+    description: "Personalize, valide, gere e acompanhe as placas desta unidade.",
   },
   kds: { title: "Produção", description: "Fila de preparo por estação." },
   cash: {
@@ -157,6 +167,10 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   multiunit: {
     title: "Multiunidade",
     description: "Resumo consolidado dos registros persistidos na organização.",
+  },
+  billing: {
+    title: "Assinatura e cobrança",
+    description: "Plano, renovação e cobranças da organização.",
   },
   settings: {
     title: "Configurações do estabelecimento",
@@ -244,6 +258,8 @@ export function PageContent({
       return <RealCounterPage scope={pilotScope} />;
     case "catalog":
       return <RealCatalogPage scope={pilotScope} />;
+    case "table-qrs":
+      return <TableQrsPage scope={managementScope} />;
     case "kds":
       return (
         <RealKdsPage
@@ -274,7 +290,12 @@ export function PageContent({
         />
       );
     case "accountant":
-      return <RealAccountantPage scope={managementScope} />;
+      return (
+        <RealAccountantPage
+          audience={profile.id === "accountant" ? "accountant" : "establishment"}
+          scope={managementScope}
+        />
+      );
     case "people":
       return <RealPeoplePage scope={managementScope} />;
     case "waiter-settlements":
@@ -292,6 +313,8 @@ export function PageContent({
       return <RealCrmPage scope={managementScope} />;
     case "multiunit":
       return <RealMultiunitPage scope={managementScope} />;
+    case "billing":
+      return <BillingPage scope={managementScope} />;
     case "settings":
       return (
         <SettingsPage

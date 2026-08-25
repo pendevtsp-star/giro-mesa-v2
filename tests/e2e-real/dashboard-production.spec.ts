@@ -168,13 +168,81 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
   });
 }
 
-test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async ({ page }) => {
+test("back office pesquisa tenant, trata incidentes e explicita dados parciais", async ({
+  page,
+}) => {
+  const tenantId = "11111111-1111-4111-8111-111111111111";
+  const eventId = "22222222-2222-4222-8222-222222222222";
+  let failOverview = false;
+  await page.route("**/health", (route) =>
+    route.fulfill({
+      json: {
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "platform-e2e",
+        schemaVersion: 73,
+        capabilities: [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+        ],
+        database: "up",
+        integrations: {},
+      },
+    }),
+  );
   await page.route("**/v1/**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
+    const request = route.request();
+    const url = new URL(request.url());
+    const pathname = url.pathname;
     if (pathname === "/v1/auth/terminal-session") {
       await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
       return;
     }
+    if (pathname === "/v1/platform/overview" && failOverview) {
+      await route.fulfill({ status: 503, json: { message: "Fonte temporariamente indisponível" } });
+      return;
+    }
+    if (request.method() !== "GET") {
+      if (pathname.endsWith("/pii-access")) {
+        await route.fulfill({
+          json: {
+            organization: { document: "05953016000132" },
+            legalEntities: [],
+            members: [{ email: "owner@casacentro.test" }],
+          },
+        });
+        return;
+      }
+      await route.fulfill({ json: { ok: true } });
+      return;
+    }
+    const incident = {
+      fingerprint: `outbox:${eventId}:3`,
+      source: "outbox",
+      sourceId: eventId,
+      organizationId: tenantId,
+      organizationName: "Casa Centro",
+      unitId: null,
+      unitName: null,
+      severity: "critical",
+      title: "Falha em job assíncrono",
+      detail: { topic: "billing.sync", attempts: 3, errorCode: "PROVIDER_TIMEOUT" },
+      occurredAt: "2026-08-25T14:00:00.000Z",
+      state: "open",
+      claimedByIdentityId: null,
+      claimedAt: null,
+      snoozedUntil: null,
+      resolvedAt: null,
+      reason: null,
+      ageMinutes: 30,
+    };
     const payload =
       pathname === "/v1/auth/me"
         ? {
@@ -189,43 +257,107 @@ test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async 
                 counts: { organizations: 12, units: 19, activeTrials: 4 },
                 health: { pendingJobs: 5, failedJobs: 1, staleHubs: 2, failedIntegrations: 1 },
                 trialFunnel: { applications: 10, activations: 4, conversionPercent: 40 },
+                generatedAt: "2026-08-25T14:30:00.000Z",
+                sources: [
+                  { key: "overview", status: "ok", checkedAt: "2026-08-25T14:30:00.000Z" },
+                  {
+                    key: "metrics",
+                    status: "unavailable",
+                    checkedAt: "2026-08-25T14:30:00.000Z",
+                    error: "UNAVAILABLE",
+                  },
+                ],
+                access: {
+                  role: "admin",
+                  capabilities: [
+                    "tenants:read",
+                    "billing:read",
+                    "fiscal:read",
+                    "incidents:write",
+                    "outbox:retry",
+                    "pii:read",
+                  ],
+                  mfaEnforced: true,
+                },
                 recentTrialApplications: [],
                 recentContacts: [],
-                fiscalIntegrations: [
-                  {
-                    organizationId: "org-risk",
-                    organizationName: "Restaurante em atenção",
-                    unitId: "unit-risk",
-                    unitName: "Centro",
-                    document: "05953016000132",
-                    provider: "focus",
-                    environment: "homologation",
-                    profileUpdatedAt: "2026-08-16T22:30:00.000Z",
-                    companyId: "42",
-                    status: "ready",
-                    certificateValidUntil: "2027-08-16",
-                    lastCheckedAt: "2026-08-16T22:30:00.000Z",
-                    hasHomologationCredential: true,
-                    hasProductionCredential: false,
-                    lastErrorCode: null,
-                    lastErrorMessage: null,
-                  },
-                ],
-                recentOrganizations: [
-                  {
-                    id: "org-risk",
-                    name: "Restaurante em atenção",
-                    billingState: "active",
-                    createdAt: "2026-08-16T22:30:00.000Z",
-                    unitCount: 2,
-                    staleHubs: 1,
-                    failedIntegrations: 1,
-                    issues: 2,
-                    tone: "danger",
-                  },
-                ],
+                fiscalIntegrations: [],
+                recentOrganizations: [],
               }
-            : null;
+            : pathname === "/v1/platform/tenants"
+              ? {
+                  items: [
+                    {
+                      id: tenantId,
+                      name: "Casa Centro",
+                      legalName: "Casa Centro Alimentos Ltda.",
+                      document: "**********0132",
+                      billingState: "active",
+                      billingStateChangedAt: "2026-08-01T12:00:00.000Z",
+                      unitCount: 2,
+                      createdAt: "2026-07-01T12:00:00.000Z",
+                      updatedAt: "2026-08-25T14:00:00.000Z",
+                    },
+                  ],
+                  nextCursor: null,
+                  total: 1,
+                  page: 1,
+                  limit: 20,
+                  pages: 1,
+                }
+              : pathname === `/v1/platform/tenants/${tenantId}`
+                ? {
+                    organization: {
+                      id: tenantId,
+                      tradeName: "Casa Centro",
+                      legalName: "Casa Centro Alimentos Ltda.",
+                      document: "**********0132",
+                      billingState: "active",
+                      billingStateChangedAt: "2026-08-01T12:00:00.000Z",
+                      createdAt: "2026-07-01T12:00:00.000Z",
+                    },
+                    units: [
+                      { id: "unit-1", name: "Centro", active: true },
+                      { id: "unit-2", name: "Norte", active: true },
+                    ],
+                    onboarding: {
+                      activatedAt: null,
+                      missingItems: ["Configurar fiscal"],
+                      updatedAt: "2026-08-25T13:00:00.000Z",
+                    },
+                    billing: {
+                      subscriptions: [
+                        { state: "active", provider: "asaas", plan: { slug: "pro" } },
+                      ],
+                      charges: [],
+                    },
+                    hubs: [
+                      {
+                        hubId: "hub-1",
+                        unitName: "Centro",
+                        stale: false,
+                        version: "2.4.0",
+                        lastSeenAt: "2026-08-25T14:29:00.000Z",
+                      },
+                    ],
+                    fiscal: [],
+                    incidents: [incident],
+                    timeline: [
+                      {
+                        id: "audit-1",
+                        action: "platform.tenant.created",
+                        entityType: "organization",
+                        entityId: tenantId,
+                        metadata: {},
+                        occurredAt: "2026-07-01T12:00:00.000Z",
+                        actor: "Equipe GiroMesa",
+                        actorEmail: "e***@giromesa.test",
+                      },
+                    ],
+                  }
+                : pathname === "/v1/platform/incidents"
+                  ? { items: [incident], nextCursor: null, generatedAt: "2026-08-25T14:30:00.000Z" }
+                  : null;
     await route.fulfill(
       payload === null
         ? { status: 404, json: { message: `Mock ausente para ${pathname}` } }
@@ -234,13 +366,66 @@ test("admin da plataforma enxerga saúde de tenants, jobs e ativações", async 
   });
 
   await page.goto("/#/platform");
-  await expect(page.getByRole("heading", { level: 1, name: "Plataforma" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Integrações e processamento" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Integrações por unidade" })).toBeVisible();
-  await expect(page.getByText("Homologação ok · Produção pendente")).toBeVisible();
-  await expect(page.getByText("40%")).toBeVisible();
-  await expect(page.getByText("Restaurante em atenção", { exact: true })).toBeVisible();
-  await expect(page.getByText("2 alerta(s)")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Central de controle" })).toBeVisible();
+  await expect(page.getByText("MFA obrigatório")).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Dados parciais" })).toContainText(
+    "metrics",
+  );
+
+  const tenantSearch = page
+    .getByRole("search")
+    .filter({ has: page.getByLabel("Nome, CNPJ, e-mail ou ID") });
+  const tenantRequest = page.waitForRequest(
+    (request) => new URL(request.url()).searchParams.get("search") === "Casa Centro",
+  );
+  await tenantSearch.getByLabel("Nome, CNPJ, e-mail ou ID").fill("Casa Centro");
+  await tenantSearch.getByRole("button", { name: "Buscar" }).click();
+  await tenantRequest;
+  await page.getByRole("button", { name: /Casa Centro/ }).click();
+  await expect(page.getByRole("heading", { name: "Cobrança do assinante" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Linha do tempo" })).toBeVisible();
+
+  const piiRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && request.url().endsWith(`/tenants/${tenantId}/pii-access`),
+  );
+  await page.getByRole("button", { name: "Revelar dados" }).click();
+  const piiDialog = page.getByRole("dialog", { name: "Revelar dados do tenant" });
+  await piiDialog.getByLabel("Motivo do acesso").fill("Chamado interno GM-42");
+  await piiDialog.getByRole("checkbox").check();
+  await piiDialog.getByRole("button", { name: "Revelar dados" }).click();
+  expect((await piiRequest).postDataJSON()).toEqual({ reason: "Chamado interno GM-42" });
+  await expect(page.getByText("owner@casacentro.test")).toBeVisible();
+
+  const incidentRequest = page.waitForRequest(
+    (request) => request.method() === "PATCH" && request.url().includes("/platform/incidents/"),
+  );
+  await page.getByRole("button", { name: "Assumir" }).click();
+  const incidentDialog = page.getByRole("dialog", { name: "Assumir incidente" });
+  await incidentDialog.getByLabel("Motivo").fill("Investigando timeout do provedor");
+  await incidentDialog.getByRole("checkbox").check();
+  await incidentDialog.getByRole("button", { name: "Confirmar" }).click();
+  const incidentAction = await incidentRequest;
+  expect(incidentAction.postDataJSON()).toMatchObject({ action: "claim" });
+  expect(incidentAction.headers()["idempotency-key"]).toBeTruthy();
+
+  const retryRequest = page.waitForRequest(
+    (request) => request.method() === "POST" && request.url().endsWith(`/outbox/${eventId}/retry`),
+  );
+  await page.getByRole("button", { name: "Reprocessar" }).click();
+  const retryDialog = page.getByRole("dialog", { name: "Reprocessar evento" });
+  await retryDialog.getByLabel("Motivo").fill("Provedor recuperado e conferido");
+  await retryDialog.getByRole("checkbox").check();
+  await retryDialog.getByRole("button", { name: "Confirmar" }).click();
+  expect((await retryRequest).headers()["idempotency-key"]).toBeTruthy();
+
+  expect(
+    (await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze())
+      .violations,
+  ).toEqual([]);
+  failOverview = true;
+  await page.getByRole("button", { name: "Atualizar" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Dados desatualizados" })).toBeVisible();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

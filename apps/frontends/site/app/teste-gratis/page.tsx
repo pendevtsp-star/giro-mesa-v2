@@ -1,14 +1,26 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LeadForm } from "../../components/lead-form";
+import {
+  commercialAttributionForCatalog,
+  commercialAttributionFromSearchParams,
+  commercialVisitorId,
+  getCommercialCatalog,
+} from "../../lib/commercial";
 
 export const metadata: Metadata = { title: "Teste assistido de 14 dias" };
 
 export default async function TrialPage({
   searchParams,
 }: {
-  searchParams: Promise<{ plano?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { plano } = await searchParams;
+  const visitorId = commercialVisitorId((await headers()).get("x-giromesa-visitor-id"));
+  const [parameters, catalogState] = await Promise.all([
+    searchParams,
+    getCommercialCatalog(visitorId),
+  ]);
+  const plano = Array.isArray(parameters.plano) ? parameters.plano[0] : parameters.plano;
   const initialPlan =
     plano === "crescimento" || plano === "rede" || plano === "operacao" ? plano : "operacao";
   return (
@@ -30,7 +42,21 @@ export default async function TrialPage({
         <aside>
           <h2>Solicitar avaliação</h2>
           <p>Preencha os dados e retornaremos para entender o cenário.</p>
-          <LeadForm kind="trial" initialPlan={initialPlan} />
+          {catalogState.catalog ? (
+            <LeadForm
+              attribution={commercialAttributionForCatalog(
+                commercialAttributionFromSearchParams(parameters),
+                catalogState.catalog,
+                visitorId,
+              )}
+              kind="trial"
+              initialPlan={initialPlan}
+            />
+          ) : (
+            <p className="catalog-note" role="status">
+              Solicitações temporariamente indisponíveis. Nenhum dado foi enviado.
+            </p>
+          )}
         </aside>
       </section>
     </main>

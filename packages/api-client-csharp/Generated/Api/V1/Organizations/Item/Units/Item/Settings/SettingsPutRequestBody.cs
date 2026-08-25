@@ -20,6 +20,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
 #else
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_businessHours BusinessHours { get; set; }
 #endif
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The name property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -63,6 +65,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "businessHours", n => { BusinessHours = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_businessHours>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_businessHours.CreateFromDiscriminatorValue); } },
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "presentation", n => { Presentation = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_presentation>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_presentation.CreateFromDiscriminatorValue); } },
                 { "timezone", n => { Timezone = n.GetStringValue(); } },
@@ -76,6 +79,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_businessHours>("businessHours", BusinessHours);
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("name", Name);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutRequestBody_presentation>("presentation", Presentation);
             writer.WriteStringValue("timezone", Timezone);

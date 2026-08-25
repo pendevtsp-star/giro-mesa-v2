@@ -1,7 +1,7 @@
 import type { EstablishmentSettings } from "@giromesa/contracts";
 import { Button, Card, Icon, type IconName, Modal, SearchField } from "@giromesa/ui";
 import { type ChangeEvent, Suspense, useCallback, useEffect, useState } from "react";
-import { api, type TerminalProfile } from "../../api";
+import { ApiClientError, api, type TerminalProfile } from "../../api";
 import { PageContent, PageHeading, pageMeta } from "../../app/PageContent";
 import type { Session, SyncState } from "../../app/types";
 import { connectShell, type DeviceContext, loadShellOperationalState } from "../../bridge";
@@ -16,6 +16,7 @@ import {
   type PilotLoader,
   replayOperationalQueue,
 } from "../../operational-dispatch";
+import { operationalPushInstallationId } from "../../pwa";
 import { type RealtimeStatus, subscribeScopeRealtime } from "../../realtime";
 import { parseRoute, routeHref } from "../../router";
 import { canAccess } from "../../rules";
@@ -43,37 +44,22 @@ import {
 import { TerminalProfileSettings } from "./TerminalProfileSettings";
 import { readActiveTerminalProfile, saveTerminalProfile } from "./terminal-profile";
 
-const browserInstallationId = () => {
-  if (typeof window === "undefined") return "00000000-0000-4000-8000-000000000000";
-  const key = "giromesa:browser-installation-id";
-  try {
-    const stored = window.localStorage.getItem(key);
-    if (
-      stored &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)
-    ) {
-      return stored;
-    }
-    const created = crypto.randomUUID();
-    window.localStorage.setItem(key, created);
-    return created;
-  } catch {
-    return crypto.randomUUID();
-  }
-};
-
 const browserRuntime: DeviceContext = {
   embedded: false,
-  deviceId: browserInstallationId(),
+  deviceId: operationalPushInstallationId(),
   deviceName: "Navegador atual",
   platform: "web",
 };
 
-const navItems: { route: RouteId; label: string; icon: IconName; group: string }[] = [
+const navGroups = ["Operação", "Gestão", "Financeiro e fiscal", "Administração"] as const;
+type NavGroup = (typeof navGroups)[number];
+
+const navItems: { route: RouteId; label: string; icon: IconName; group: NavGroup }[] = [
   { route: "dashboard", label: "Visão geral", icon: "dashboard", group: "Operação" },
   { route: "salon", label: "Mesas e comandas", icon: "salon", group: "Operação" },
   { route: "counter", label: "Balcão e retirada", icon: "counter", group: "Operação" },
-  { route: "catalog", label: "Cardápio", icon: "catalog", group: "Operação" },
+  { route: "catalog", label: "Cardápio", icon: "catalog", group: "Gestão" },
+  { route: "table-qrs", label: "QR das mesas", icon: "grid", group: "Gestão" },
   { route: "kds", label: "Produção KDS", icon: "kds", group: "Operação" },
   { route: "cash", label: "Contas e caixa", icon: "cash", group: "Operação" },
   { route: "delivery", label: "Delivery", icon: "delivery", group: "Operação" },
@@ -85,28 +71,29 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: string }
   },
   { route: "inventory", label: "Estoque", icon: "inventory", group: "Gestão" },
   { route: "purchases", label: "Compras", icon: "purchases", group: "Gestão" },
-  { route: "finance", label: "Financeiro", icon: "finance", group: "Gestão" },
-  { route: "reports", label: "Relatórios", icon: "dashboard", group: "Gestão" },
-  { route: "fiscal", label: "Fiscal", icon: "finance", group: "Gestão" },
-  { route: "accountant", label: "Contador", icon: "people", group: "Gestão" },
+  { route: "finance", label: "Financeiro", icon: "finance", group: "Financeiro e fiscal" },
+  { route: "reports", label: "Relatórios", icon: "dashboard", group: "Financeiro e fiscal" },
+  { route: "fiscal", label: "Fiscal", icon: "check", group: "Financeiro e fiscal" },
+  { route: "accountant", label: "Contador", icon: "user", group: "Financeiro e fiscal" },
   { route: "people", label: "Pessoas", icon: "people", group: "Gestão" },
   {
     route: "waiter-settlements",
     label: "Fechamento da equipe",
-    icon: "people",
+    icon: "clock",
     group: "Gestão",
   },
   { route: "crm", label: "Clientes & CRM", icon: "crm", group: "Gestão" },
-  { route: "multiunit", label: "Multiunidade", icon: "multiunit", group: "Sistema" },
-  { route: "settings", label: "Configurações", icon: "settings", group: "Sistema" },
-  { route: "platform", label: "Plataforma", icon: "platform", group: "Sistema" },
-  { route: "alerts", label: "Alertas", icon: "alerts", group: "Sistema" },
+  { route: "multiunit", label: "Multiunidade", icon: "multiunit", group: "Administração" },
+  { route: "billing", label: "Assinatura e cobrança", icon: "finance", group: "Administração" },
+  { route: "settings", label: "Configurações", icon: "settings", group: "Administração" },
+  { route: "platform", label: "Plataforma", icon: "platform", group: "Administração" },
+  { route: "alerts", label: "Alertas", icon: "alerts", group: "Administração" },
 ];
 
-const centralOperationalRoutes: RouteId[] = ["reservations", "salon", "counter", "cash"];
+const attendanceRoutes: RouteId[] = ["reservations", "salon", "counter", "delivery"];
 
-function isCentralOperationalRoute(route: RouteId) {
-  return centralOperationalRoutes.includes(route);
+function isAttendanceRoute(route: RouteId) {
+  return attendanceRoutes.includes(route);
 }
 
 function lastOperationalRouteStorageKey(session: Pick<Session, "identityId" | "unitId">) {
@@ -202,8 +189,8 @@ export function OperationalApp({
   onSwitchUser,
 }: {
   session: Session;
-  onLogout: () => void;
-  onSwitchUser?: () => void;
+  onLogout: () => void | Promise<void>;
+  onSwitchUser?: () => void | Promise<void>;
 }) {
   const lastRouteStorageKey = lastOperationalRouteStorageKey(session);
   const canManageKdsUnitSettings =
@@ -227,11 +214,20 @@ export function OperationalApp({
   const [kdsNavigationOpen, setKdsNavigationOpen] = useState(route === "kds");
   const [kdsStationLabel, setKdsStationLabel] = useState(() => kdsStationMenuLabel(session.unitId));
   const [navOpen, setNavOpen] = useState(false);
-  const [centralOperationalOpen, setCentralOperationalOpen] = useState(true);
-  const [centralMobileOpen, setCentralMobileOpen] = useState(false);
+  const [openNavGroups, setOpenNavGroups] = useState<Set<NavGroup>>(
+    () => new Set([navItems.find((item) => item.route === route)?.group ?? navGroups[0]]),
+  );
+  const [attendanceOpen, setAttendanceOpen] = useState(true);
+  const [attendanceMobileOpen, setAttendanceMobileOpen] = useState(false);
   const [receptionPendingCount, setReceptionPendingCount] = useState<number | null>(null);
+  const [accountantPendingCount, setAccountantPendingCount] = useState<number | null>(null);
   const [scopeRevision, setScopeRevision] = useState(0);
   const [profileMenu, setProfileMenu] = useState(false);
+  const [sessionActionBusy, setSessionActionBusy] = useState(false);
+  const [sessionActionIssue, setSessionActionIssue] = useState<{
+    cashBlocked: boolean;
+    message: string;
+  } | null>(null);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -276,6 +272,31 @@ export function OperationalApp({
       }
     };
     void refresh();
+    return () => {
+      active = false;
+    };
+  }, [scopeRevision, session.organizationId, session.profile, session.unitId]);
+
+  useEffect(() => {
+    void scopeRevision;
+    if (!canAccess(session.profile, "accountant")) {
+      setAccountantPendingCount(null);
+      return;
+    }
+    let active = true;
+    void api.fiscal
+      .accountantRequests(session.organizationId, session.unitId, {
+        status: "open",
+        targetAudience: session.profile.id === "accountant" ? "accountant" : "establishment",
+        page: 1,
+        pageSize: 1,
+      })
+      .then((payload) => {
+        if (active) setAccountantPendingCount(payload.pagination.total);
+      })
+      .catch(() => {
+        if (active) setAccountantPendingCount(null);
+      });
     return () => {
       active = false;
     };
@@ -352,6 +373,23 @@ export function OperationalApp({
   function closeAllPopovers() {
     setNetworkPopoverOpen(false);
     setProfileMenu(false);
+  }
+
+  async function runSessionAction(action: () => void | Promise<void>) {
+    if (sessionActionBusy) return;
+    setSessionActionBusy(true);
+    setSessionActionIssue(null);
+    setProfileMenu(false);
+    try {
+      await action();
+    } catch (error) {
+      setSessionActionIssue({
+        cashBlocked: error instanceof ApiClientError && error.code === "CASH_SHIFT_OPEN",
+        message: error instanceof Error ? error.message : "Não foi possível encerrar a operação.",
+      });
+    } finally {
+      setSessionActionBusy(false);
+    }
   }
 
   const hasAnyPopoverOpen = networkPopoverOpen || profileMenu;
@@ -535,8 +573,10 @@ export function OperationalApp({
   }, [session.unitId]);
 
   useEffect(() => {
-    if (isCentralOperationalRoute(route)) setCentralOperationalOpen(true);
+    if (isAttendanceRoute(route)) setAttendanceOpen(true);
     if (route === "kds") setKdsNavigationOpen(true);
+    const routeGroup = navItems.find((item) => item.route === route)?.group;
+    if (routeGroup) setOpenNavGroups(new Set([routeGroup]));
   }, [route]);
 
   useEffect(() => {
@@ -585,11 +625,22 @@ export function OperationalApp({
 
   useEffect(() => {
     if (session.platformAdmin) return undefined;
-    return subscribeScopeRealtime(
+    let invalidationTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const unsubscribe = subscribeScopeRealtime(
       { organizationId: session.organizationId, unitId: session.unitId },
-      () => setScopeRevision((value) => value + 1),
+      () => {
+        if (invalidationTimer !== undefined) return;
+        invalidationTimer = globalThis.setTimeout(() => {
+          invalidationTimer = undefined;
+          setScopeRevision((value) => value + 1);
+        }, 1_000);
+      },
       setRealtimeStatus,
     );
+    return () => {
+      if (invalidationTimer !== undefined) globalThis.clearTimeout(invalidationTimer);
+      unsubscribe();
+    };
   }, [session.organizationId, session.platformAdmin, session.unitId]);
 
   useEffect(() => {
@@ -691,12 +742,12 @@ export function OperationalApp({
     .filter((item) => item.route !== "people" || peopleNavAllowed !== false)
     .filter((item) => item.route !== "alerts")
     .filter((item) => pageMeta[item.route] !== undefined);
-  const authorizedCentralItems = centralOperationalRoutes
-    .map((centralRoute) => visibleNav.find((item) => item.route === centralRoute))
+  const authorizedAttendanceItems = attendanceRoutes
+    .map((attendanceRoute) => visibleNav.find((item) => item.route === attendanceRoute))
     .filter((item): item is (typeof navItems)[number] => Boolean(item));
-  const centralMobileNav =
-    visibleNav.find((item) => item.route === route && isCentralOperationalRoute(item.route)) ??
-    authorizedCentralItems[0];
+  const attendanceMobileNav =
+    visibleNav.find((item) => item.route === route && isAttendanceRoute(item.route)) ??
+    authorizedAttendanceItems[0];
   const orderedMobileNav = [
     "kds",
     "cash",
@@ -711,12 +762,12 @@ export function OperationalApp({
   ]
     .map((candidate) => visibleNav.find((item) => item.route === candidate))
     .filter((item): item is (typeof navItems)[number] => Boolean(item))
-    .filter((item) => !isCentralOperationalRoute(item.route));
+    .filter((item) => !isAttendanceRoute(item.route));
   const dashboardNav = session.platformAdmin
     ? undefined
     : orderedMobileNav.find((item) => item.route === "dashboard");
   const mobileNav = [
-    ...(centralMobileNav ? [centralMobileNav] : []),
+    ...(attendanceMobileNav ? [attendanceMobileNav] : []),
     ...orderedMobileNav.filter((item) => item.route !== "dashboard").slice(0, 2),
     ...(dashboardNav ? [dashboardNav] : []),
   ].slice(0, 4);
@@ -817,7 +868,7 @@ export function OperationalApp({
     if (!normalizedCommandQuery) return true;
     const meta = pageMeta[item.route];
     if (!meta) return false;
-    return `${isCentralOperationalRoute(item.route) ? "Central Operacional " : ""}${item.label} ${meta.title} ${meta.description}`
+    return `${isAttendanceRoute(item.route) ? "Atendimento " : ""}${item.label} ${meta.title} ${meta.description}`
       .toLocaleLowerCase("pt-BR")
       .includes(normalizedCommandQuery);
   });
@@ -853,6 +904,9 @@ export function OperationalApp({
         {item.route === "reservations" &&
           receptionPendingCount !== null &&
           receptionPendingCount > 0 && <span className="nav-count">{receptionPendingCount}</span>}
+        {item.route === "accountant" &&
+          accountantPendingCount !== null &&
+          accountantPendingCount > 0 && <span className="nav-count">{accountantPendingCount}</span>}
       </a>
     );
   }
@@ -891,7 +945,7 @@ export function OperationalApp({
             onClick={() => setKdsNavigationOpen((open) => !open)}
             type="button"
           >
-            <span aria-hidden="true">⌄</span>
+            <Icon className="nav-submenu__chevron" name="chevron-right" size={14} />
           </Button>
         </div>
         <div
@@ -958,35 +1012,51 @@ export function OperationalApp({
         </div>
         {(!compactNavigation || navOpen) && (
           <nav aria-label="Navegação principal">
-            {["Operação", "Gestão", "Sistema"].map((groupName) => {
+            {navGroups.map((groupName) => {
               const itemsInGroup = visibleNav.filter((i) => i.group === groupName);
               if (itemsInGroup.length === 0) return null;
-              const centralItems = centralOperationalRoutes
-                .map((centralRoute) => itemsInGroup.find((item) => item.route === centralRoute))
+              const attendanceItems = attendanceRoutes
+                .map((attendanceRoute) =>
+                  itemsInGroup.find((item) => item.route === attendanceRoute),
+                )
                 .filter((item): item is (typeof navItems)[number] => Boolean(item));
-              const regularItems = itemsInGroup.filter(
-                (item) => !isCentralOperationalRoute(item.route),
-              );
+              const regularItems = itemsInGroup.filter((item) => !isAttendanceRoute(item.route));
               return (
-                <div key={groupName} className="nav-group">
-                  <div className="nav-group__title">{groupName}</div>
-                  {regularItems
-                    .filter((item) => item.route === "dashboard")
-                    .map(renderNavigationItem)}
-                  {centralItems.length > 0 && (
-                    <details
-                      aria-label="Central Operacional"
-                      onToggle={(event) => setCentralOperationalOpen(event.currentTarget.open)}
-                      open={centralOperationalOpen}
-                    >
-                      <summary className="nav-group__title">Central Operacional</summary>
-                      {centralItems.map(renderNavigationItem)}
-                    </details>
-                  )}
-                  {regularItems
-                    .filter((item) => item.route !== "dashboard")
-                    .map(renderNavigationItem)}
-                </div>
+                <details
+                  className="nav-group"
+                  key={groupName}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setOpenNavGroups((current) => {
+                      if (current.has(groupName) === open) return current;
+                      return open ? new Set([groupName]) : new Set();
+                    });
+                  }}
+                  open={openNavGroups.has(groupName)}
+                >
+                  <summary className="nav-group__title">{groupName}</summary>
+                  <div className="nav-group__items">
+                    {regularItems
+                      .filter((item) => item.route === "dashboard")
+                      .map(renderNavigationItem)}
+                    {attendanceItems.length > 0 && (
+                      <details
+                        aria-label="Atendimento"
+                        className="nav-section"
+                        onToggle={(event) => setAttendanceOpen(event.currentTarget.open)}
+                        open={attendanceOpen}
+                      >
+                        <summary className="nav-section__title">Atendimento</summary>
+                        <div className="nav-section__items">
+                          {attendanceItems.map(renderNavigationItem)}
+                        </div>
+                      </details>
+                    )}
+                    {regularItems
+                      .filter((item) => item.route !== "dashboard")
+                      .map(renderNavigationItem)}
+                  </div>
+                </details>
               );
             })}
           </nav>
@@ -1005,7 +1075,7 @@ export function OperationalApp({
             }
             variant="ghost"
           >
-            <Icon name={sidebarIsCollapsed ? "arrow-down" : "arrow-up"} size={14} />
+            <Icon className="sidebar__toggle-icon" name="chevron-right" size={14} />
             {!sidebarIsCollapsed && <span>Recolher menu</span>}
           </Button>
 
@@ -1089,6 +1159,8 @@ export function OperationalApp({
             <OperationalAttentionInbox
               canCounter={canAccess(session.profile, "counter")}
               canSalon={canAccess(session.profile, "salon")}
+              identityId={session.identityId}
+              installationId={operationalPushInstallationId()}
               onChanged={() => setScopeRevision((value) => value + 1)}
               onNavigate={(target) => {
                 window.location.hash = routeHref(target);
@@ -1233,6 +1305,25 @@ export function OperationalApp({
                   )}
 
                   <div className="profile-popover__tools">
+                    {!session.terminalMode &&
+                      session.profile.permissions.includes("billing.manage") && (
+                        <Button
+                          className="theme-toggle"
+                          onClick={() => {
+                            closeAllPopovers();
+                            window.location.hash = routeHref("billing");
+                          }}
+                          variant="ghost"
+                        >
+                          <span aria-hidden="true">
+                            <Icon name="finance" size={14} />
+                          </span>
+                          <span>
+                            <strong>Assinatura e cobrança</strong>
+                            <small>Plano, renovação e cobranças</small>
+                          </span>
+                        </Button>
+                      )}
                     {["owner", "manager"].includes(session.profile.id) && (
                       <Button
                         className="theme-toggle"
@@ -1302,14 +1393,20 @@ export function OperationalApp({
 
                   <div className="profile-popover__session-actions">
                     {session.terminalMode && onSwitchUser && (
-                      <Button onClick={onSwitchUser} size="sm" variant="ghost">
+                      <Button
+                        disabled={sessionActionBusy}
+                        onClick={() => void runSessionAction(onSwitchUser)}
+                        size="sm"
+                        variant="ghost"
+                      >
                         <Icon name="people" size={14} />
                         Trocar colaborador
                       </Button>
                     )}
                     <Button
                       className="profile-popover__logout"
-                      onClick={onLogout}
+                      disabled={sessionActionBusy}
+                      onClick={() => void runSessionAction(onLogout)}
                       size="sm"
                       variant="ghost"
                     >
@@ -1322,6 +1419,39 @@ export function OperationalApp({
             </div>
           </div>
         </header>
+
+        <Modal
+          isOpen={sessionActionIssue !== null}
+          onClose={() => setSessionActionIssue(null)}
+          size="sm"
+          title={
+            sessionActionIssue?.cashBlocked
+              ? "Feche o caixa antes de sair"
+              : "Encerramento não concluído"
+          }
+        >
+          <div className="gm-form-stack">
+            <p role="alert">{sessionActionIssue?.message}</p>
+            {sessionActionIssue?.cashBlocked && !canAccess(session.profile, "cash") && (
+              <p>Peça a um gerente para fechar o caixa ou transferir a responsabilidade.</p>
+            )}
+            <div className="gm-toolbar">
+              {sessionActionIssue?.cashBlocked && canAccess(session.profile, "cash") && (
+                <Button
+                  onClick={() => {
+                    setSessionActionIssue(null);
+                    window.location.hash = routeHref("cash");
+                  }}
+                >
+                  Conferir e fechar caixa
+                </Button>
+              )}
+              <Button onClick={() => setSessionActionIssue(null)} variant="secondary">
+                Continuar operação
+              </Button>
+            </div>
+          </div>
+        </Modal>
 
         <Modal
           className="shell-command-modal"
@@ -1481,15 +1611,15 @@ export function OperationalApp({
         {compactNavigation && !navOpen && (
           <nav aria-label="Navegação rápida mobile" className="mobile-bottom-nav">
             {mobileNav.map((item) =>
-              isCentralOperationalRoute(item.route) ? (
+              isAttendanceRoute(item.route) ? (
                 <Button
-                  className={isCentralOperationalRoute(route) ? "active" : ""}
-                  key="central-operational"
-                  onClick={() => setCentralMobileOpen(true)}
+                  className={isAttendanceRoute(route) ? "active" : ""}
+                  key="attendance"
+                  onClick={() => setAttendanceMobileOpen(true)}
                   type="button"
                 >
                   <Icon name="salon" size={20} />
-                  <span>Central</span>
+                  <span>Atendimento</span>
                   {receptionPendingCount !== null && receptionPendingCount > 0 && (
                     <small>{receptionPendingCount}</small>
                   )}
@@ -1510,18 +1640,18 @@ export function OperationalApp({
       </div>
       {helpOpen && <HelpDrawer onClose={() => setHelpOpen(false)} route={route} />}
       <Modal
-        isOpen={centralMobileOpen}
-        onClose={() => setCentralMobileOpen(false)}
+        isOpen={attendanceMobileOpen}
+        onClose={() => setAttendanceMobileOpen(false)}
         size="sm"
-        title="Central Operacional"
+        title="Atendimento"
       >
-        <nav aria-label="Áreas autorizadas da Central" className="central-mobile-sheet">
-          {authorizedCentralItems.map((item) => (
+        <nav aria-label="Áreas autorizadas de Atendimento" className="central-mobile-sheet">
+          {authorizedAttendanceItems.map((item) => (
             <a
               aria-current={route === item.route ? "page" : undefined}
               href={navigationHref(item)}
               key={item.route}
-              onClick={() => setCentralMobileOpen(false)}
+              onClick={() => setAttendanceMobileOpen(false)}
             >
               <Icon name={item.icon} size={22} />
               <span>

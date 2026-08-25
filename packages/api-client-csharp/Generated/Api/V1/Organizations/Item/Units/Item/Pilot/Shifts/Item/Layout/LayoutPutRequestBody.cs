@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
     public partial class LayoutPutRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The tables property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -38,6 +40,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "tables", n => { Tables = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Layout.LayoutPutRequestBody_tables>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Layout.LayoutPutRequestBody_tables.CreateFromDiscriminatorValue)?.AsList(); } },
             };
         }
@@ -48,6 +51,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Layout.LayoutPutRequestBody_tables>("tables", Tables);
         }
     }

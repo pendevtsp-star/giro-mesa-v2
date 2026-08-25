@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { LeadForm } from "../../components/lead-form";
+import {
+  commercialAttributionForCatalog,
+  commercialAttributionFromSearchParams,
+  commercialVisitorId,
+  getCommercialCatalog,
+} from "../../lib/commercial";
 
 export const metadata: Metadata = { title: "Contato" };
 
@@ -13,7 +20,11 @@ export default async function ContactPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const parameters = await searchParams;
+  const visitorId = commercialVisitorId((await headers()).get("x-giromesa-visitor-id"));
+  const [parameters, catalogState] = await Promise.all([
+    searchParams,
+    getCommercialCatalog(visitorId),
+  ]);
   const smartPosRequest = readQueryValue(parameters.assunto, 60) === "homologacao-smartpos";
   const provider = readQueryValue(parameters.fornecedor, 40);
   const model = readQueryValue(parameters.modelo, 120);
@@ -44,7 +55,21 @@ export default async function ContactPage({
         </div>
         <aside>
           <h2>Enviar mensagem</h2>
-          <LeadForm kind="contact" initialMessage={initialMessage} />
+          {catalogState.catalog ? (
+            <LeadForm
+              attribution={commercialAttributionForCatalog(
+                commercialAttributionFromSearchParams(parameters),
+                catalogState.catalog,
+                visitorId,
+              )}
+              kind="contact"
+              initialMessage={initialMessage}
+            />
+          ) : (
+            <p className="catalog-note" role="status">
+              Mensagens temporariamente indisponíveis. Nenhum dado foi enviado.
+            </p>
+          )}
         </aside>
       </section>
     </main>

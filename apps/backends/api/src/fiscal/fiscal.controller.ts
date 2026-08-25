@@ -11,11 +11,20 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
+import {
+  ApiBody,
+  ApiCreatedResponse,
+  ApiOkResponse,
+  ApiQuery,
+  type OpenAPIObject,
+} from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import {
+  type AccountantAttachmentUploadInput,
   type AccountantRequestInput,
   type AccountantRequestListQuery,
+  accountantAttachmentUploadSchema,
   accountantRequestListQuerySchema,
   accountantRequestSchema,
   type CancelFiscalDocumentInput,
@@ -45,6 +54,63 @@ import {
   resolveAccountantRequestSchema,
 } from "./fiscal.schemas.js";
 import { FiscalService } from "./fiscal.service.js";
+
+type OpenApiSchema = NonNullable<NonNullable<OpenAPIObject["components"]>["schemas"]>[string];
+
+const publicAccountantRequestOpenApi: OpenApiSchema = {
+  type: "object",
+  required: [
+    "id",
+    "competence",
+    "title",
+    "description",
+    "status",
+    "targetAudience",
+    "createdByName",
+    "createdAt",
+    "attachments",
+  ],
+  properties: {
+    id: { type: "string", format: "uuid" },
+    competence: { type: "string", format: "date" },
+    title: { type: "string" },
+    description: { type: "string" },
+    status: { type: "string", enum: ["open", "resolved"] },
+    targetAudience: { type: "string", enum: ["accountant", "establishment"] },
+    dueDate: { type: "string", format: "date", nullable: true },
+    resolution: { type: "string", nullable: true },
+    createdByName: { type: "string" },
+    resolvedByName: { type: "string", nullable: true },
+    createdAt: { type: "string", format: "date-time" },
+    resolvedAt: { type: "string", format: "date-time", nullable: true },
+    updatedAt: { type: "string", format: "date-time" },
+    attachments: {
+      type: "array",
+      items: {
+        type: "object",
+        required: ["id", "fileName", "contentType", "sizeBytes", "sha256", "createdAt"],
+        properties: {
+          id: { type: "string", format: "uuid" },
+          fileName: { type: "string" },
+          contentType: {
+            type: "string",
+            enum: [
+              "application/pdf",
+              "application/xml",
+              "text/xml",
+              "text/csv",
+              "image/jpeg",
+              "image/png",
+            ],
+          },
+          sizeBytes: { type: "integer", maximum: 3_145_728 },
+          sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+          createdAt: { type: "string", format: "date-time" },
+        },
+      },
+    },
+  },
+};
 
 @UseGuards(SessionGuard)
 @Controller([
@@ -278,6 +344,34 @@ export class FiscalController {
   }
 
   @Get("accountant/package")
+  @ApiQuery({
+    name: "competence",
+    required: true,
+    schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+  })
+  @ApiOkResponse({
+    schema: {
+      type: "object",
+      required: ["status", "competence"],
+      properties: {
+        status: { type: "string", enum: ["available", "unavailable"] },
+        competence: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+        reason: { type: "string", enum: ["period_not_closed"] },
+        closedAt: { type: "string", format: "date-time", nullable: true },
+        generatedAt: { type: "string", format: "date-time", nullable: true },
+        sha256: { type: "string", nullable: true },
+        summary: {
+          type: "object",
+          properties: {
+            documents: { type: "integer" },
+            totalCents: { type: "integer" },
+            taxCents: { type: "integer" },
+          },
+        },
+        files: { type: "array", items: { type: "string" } },
+      },
+    },
+  })
   accountantPackage(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -293,6 +387,24 @@ export class FiscalController {
   }
 
   @Get("accountant/package/content")
+  @ApiQuery({
+    name: "competence",
+    required: true,
+    schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+  })
+  @ApiOkResponse({
+    schema: {
+      type: "object",
+      required: ["filename", "content", "contentEncoding", "mimeType", "sha256"],
+      properties: {
+        filename: { type: "string" },
+        content: { type: "string", format: "byte" },
+        contentEncoding: { type: "string", enum: ["base64"] },
+        mimeType: { type: "string", enum: ["application/zip"] },
+        sha256: { type: "string" },
+      },
+    },
+  })
   accountantPackageContent(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -349,6 +461,34 @@ export class FiscalController {
   }
 
   @Get("accountant/requests")
+  @ApiQuery({ name: "status", required: false, enum: ["open", "resolved"] })
+  @ApiQuery({ name: "targetAudience", required: false, enum: ["accountant", "establishment"] })
+  @ApiQuery({ name: "overdue", required: false, type: Boolean })
+  @ApiQuery({
+    name: "competence",
+    required: false,
+    schema: { type: "string", pattern: "^\\d{4}-(0[1-9]|1[0-2])$" },
+  })
+  @ApiQuery({ name: "page", required: false, type: Number })
+  @ApiQuery({ name: "pageSize", required: false, type: Number })
+  @ApiOkResponse({
+    schema: {
+      type: "object",
+      required: ["items", "pagination"],
+      properties: {
+        items: { type: "array", items: publicAccountantRequestOpenApi },
+        pagination: {
+          type: "object",
+          required: ["page", "pageSize", "total"],
+          properties: {
+            page: { type: "integer" },
+            pageSize: { type: "integer" },
+            total: { type: "integer" },
+          },
+        },
+      },
+    },
+  })
   accountantRequests(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -359,6 +499,16 @@ export class FiscalController {
   }
 
   @Post("accountant/requests")
+  @ApiCreatedResponse({
+    schema: {
+      type: "object",
+      required: ["request", "replayed"],
+      properties: {
+        request: publicAccountantRequestOpenApi,
+        replayed: { type: "boolean" },
+      },
+    },
+  })
   createAccountantRequest(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
@@ -375,7 +525,106 @@ export class FiscalController {
     );
   }
 
+  @Post("accountant/requests/:requestId/attachments")
+  @ApiBody({
+    schema: {
+      type: "object",
+      required: ["fileName", "contentType", "contentBase64"],
+      properties: {
+        fileName: { type: "string", maxLength: 180 },
+        contentType: {
+          type: "string",
+          enum: [
+            "application/pdf",
+            "application/xml",
+            "text/xml",
+            "text/csv",
+            "image/jpeg",
+            "image/png",
+          ],
+        },
+        contentBase64: { type: "string", format: "byte", maxLength: 4_194_304 },
+      },
+    },
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: "object",
+      required: ["attachment", "replayed"],
+      properties: {
+        attachment: {
+          type: "object",
+          required: ["id", "fileName", "contentType", "sizeBytes", "sha256", "createdAt"],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            fileName: { type: "string" },
+            contentType: { type: "string" },
+            sizeBytes: { type: "integer" },
+            sha256: { type: "string" },
+            createdAt: { type: "string", format: "date-time" },
+          },
+        },
+        replayed: { type: "boolean" },
+      },
+    },
+  })
+  createAccountantAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("requestId", ParseUUIDPipe) requestId: string,
+    @Body(new ZodPipe(accountantAttachmentUploadSchema)) body: AccountantAttachmentUploadInput,
+  ) {
+    return this.fiscal.createAccountantAttachment(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      requestId,
+      body,
+    );
+  }
+
+  @Get("accountant/requests/:requestId/attachments/:attachmentId/content")
+  @ApiOkResponse({
+    schema: {
+      type: "object",
+      required: ["filename", "content", "contentEncoding", "mimeType", "sha256"],
+      properties: {
+        filename: { type: "string" },
+        content: { type: "string", format: "byte" },
+        contentEncoding: { type: "string", enum: ["base64"] },
+        mimeType: { type: "string" },
+        sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+      },
+    },
+  })
+  accountantAttachmentContent(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("requestId", ParseUUIDPipe) requestId: string,
+    @Param("attachmentId", ParseUUIDPipe) attachmentId: string,
+  ) {
+    return this.fiscal.accountantAttachmentContent(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      requestId,
+      attachmentId,
+    );
+  }
+
   @Post("accountant/requests/:requestId/resolve")
+  @ApiCreatedResponse({
+    schema: {
+      type: "object",
+      required: ["request", "replayed"],
+      properties: {
+        request: publicAccountantRequestOpenApi,
+        replayed: { type: "boolean" },
+      },
+    },
+  })
   resolveAccountantRequest(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,

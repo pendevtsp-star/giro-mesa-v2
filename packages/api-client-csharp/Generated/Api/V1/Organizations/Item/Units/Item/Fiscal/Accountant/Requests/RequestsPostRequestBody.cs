@@ -14,14 +14,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
-        /// <summary>The attachments property</summary>
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody_attachments>? Attachments { get; set; }
-#nullable restore
-#else
-        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody_attachments> Attachments { get; set; }
-#endif
         /// <summary>The competence property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -79,7 +71,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
         {
             return new Dictionary<string, Action<IParseNode>>
             {
-                { "attachments", n => { Attachments = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody_attachments>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody_attachments.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "competence", n => { Competence = n.GetStringValue(); } },
                 { "description", n => { Description = n.GetStringValue(); } },
                 { "dueDate", n => { DueDate = n.GetStringValue(); } },
@@ -93,7 +84,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody_attachments>("attachments", Attachments);
             writer.WriteStringValue("competence", Competence);
             writer.WriteStringValue("description", Description);
             writer.WriteStringValue("dueDate", DueDate);

@@ -99,6 +99,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
         growth.createCustomer(identityA.id, organizationA.id, {
           defaultUnitId: unitB.id,
           name: "Cross tenant customer",
+          tags: [],
         }),
       hasCode("UNIT_NOT_FOUND"),
     );
@@ -108,6 +109,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       name: "Maria Integration",
       email: "maria.integration@example.test",
       phone: "+5511999999999",
+      tags: [],
     });
     await growth.recordConsent(identityA.id, organizationA.id, customer.id, {
       decision: "granted",

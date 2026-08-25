@@ -171,6 +171,7 @@ fieldset label input {
 }
 .cart-shell {
   max-height: calc(100dvh - 40px);
+  padding-bottom: env(safe-area-inset-bottom);
   overflow-y: auto;
 }
 .cart-shell > header {
@@ -250,8 +251,54 @@ fieldset label input {
   align-self: center;
 }
 .cart-lines .quantity button {
-  width: 27px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+}
+.order-mode-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 16px 22px 0;
+  padding: 0;
+  border: 0;
+}
+.order-mode-options legend {
+  margin-bottom: 8px;
+  color: var(--gm-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.order-mode-options label {
+  display: flex;
+  gap: 9px;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px solid var(--gm-border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.order-mode-options label:has(input:checked) {
+  border-color: var(--restaurant-brand, var(--gm-brand-strong));
+  background: var(--gm-success-soft);
+}
+.order-mode-options label:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.order-mode-options input {
+  accent-color: var(--restaurant-brand, var(--gm-brand-strong));
+}
+.order-mode-options span {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+}
+.cart-shell .order-mode-options label b {
+  font-size: 12px;
+}
+.cart-shell .order-mode-options label small {
+  color: var(--gm-muted);
+  font-size: 10px;
 }
 .cart-summary {
   padding: 20px 22px 5px;
@@ -503,6 +550,71 @@ fieldset label input {
   color: white;
   font-weight: 800;
   cursor: pointer;
+}
+.public-order-flow,
+.table-order-flow {
+  display: contents;
+}
+.table-order-flow > div:first-child,
+.table-order-receipt {
+  margin: 20px 22px;
+  padding: 20px;
+  border: 1px solid var(--gm-border);
+  border-radius: 16px;
+  background: var(--gm-surface);
+}
+.cart-shell .table-order-flow h3,
+.cart-shell .table-order-flow p,
+.cart-shell .table-order-receipt h3,
+.cart-shell .table-order-receipt p {
+  margin: 0;
+}
+.table-order-flow h3,
+.table-order-receipt h3 {
+  font:
+    24px Georgia,
+    serif;
+}
+.table-order-flow > div:first-child > p:last-child,
+.table-order-receipt > span {
+  display: block;
+  margin-top: 8px;
+  color: var(--gm-muted);
+  font-size: 12px;
+}
+.table-order-receipt.warning {
+  background: var(--gm-warning-soft);
+}
+.table-order-receipt.success {
+  background: var(--gm-success-soft);
+}
+.table-order-receipt.danger {
+  background: var(--gm-danger-soft);
+}
+.table-order-receipt ul {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.table-order-receipt li,
+.table-order-receipt > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--gm-border);
+  font-size: 12px;
+}
+.table-order-receipt > div {
+  margin-top: 5px;
+  border: 0;
+  font-size: 14px;
+}
+.dialog-error {
+  margin: 10px 0;
+  color: var(--gm-danger-on-soft);
+  font-size: 12px;
+  font-weight: 700;
 }
 .place-order:disabled {
   background: #a5aaa6;

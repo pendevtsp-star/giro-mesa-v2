@@ -245,6 +245,33 @@ export function settlement(totalCents: number, settledCents: number, deltaCents:
   return { settledCents: next, status: next === totalCents ? "settled" : "partial" } as const;
 }
 
+export function addMonthsToFinancialDate(value: string, months: number) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) throw new Error("INVALID_FINANCIAL_DATE");
+  const target = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1 + months, 1));
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  return new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(Number(match[3]), lastDay)),
+  )
+    .toISOString()
+    .slice(0, 10);
+}
+
+export function financialInstallmentSchedule(
+  competenceDate: string,
+  dueDate: string,
+  installments = 1,
+  intervalMonths = 1,
+) {
+  return Array.from({ length: installments }, (_, index) => ({
+    installmentNumber: index + 1,
+    competenceDate: addMonthsToFinancialDate(competenceDate, index * intervalMonths),
+    dueDate: addMonthsToFinancialDate(dueDate, index * intervalMonths),
+  }));
+}
+
 export function cashConference(input: {
   openingCents: number;
   drawerInCents: number;

@@ -40,6 +40,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
   const [opening, setOpening] = useState("");
   const [selectedRegisterId, setSelectedRegisterId] = useState("");
   const [registerName, setRegisterName] = useState("");
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
   const [editingRegisterId, setEditingRegisterId] = useState("");
   const [editingRegisterName, setEditingRegisterName] = useState("");
   const [transferToShiftId, setTransferToShiftId] = useState("");
@@ -57,6 +58,22 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [lastClosure, setLastClosure] = useState<ReturnType<typeof parseCashClosure> | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+
+  function selectRegister(cashRegisterId: string) {
+    setSelectedRegisterId(cashRegisterId);
+    setMovementAmount("");
+    setMovementReason("");
+    setTransferToShiftId("");
+    setTransferAmount("");
+    setTransferReason("");
+    setCounted("");
+    setTenderCounts({});
+    setCloseReason("");
+    setConfirmClose(false);
+    setReviewNote("");
+    setFeedback("");
+    setActionError("");
+  }
 
   function begin(action: Exclude<BusyAction, null>) {
     setFeedback("");
@@ -111,6 +128,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
         operationalKey("cash-register"),
       );
       setRegisterName("");
+      setShowRegisterForm(false);
       setFeedback("Gaveta criada.");
       remote.retry();
     } catch (error) {
@@ -195,7 +213,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
       setFeedback(
         isPendingApproval(response)
           ? "Transferência enviada para aprovação."
-          : "Transferência entre gavetas registrada.",
+          : "Transferência enviada; aguardando aceite do responsável pelo destino.",
       );
       remote.retry();
     } catch (error) {
@@ -368,47 +386,148 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   <p className="eyebrow">Gavetas físicas</p>
                   <h2>Caixas da unidade</h2>
                 </div>
-                <Badge tone={openShifts.length > 0 ? "success" : "neutral"}>
-                  {openShifts.length} aberto(s)
-                </Badge>
+                <div className="cash-register-header__actions">
+                  <Badge tone={openShifts.length > 0 ? "success" : "neutral"}>
+                    {openShifts.length === 1 ? "1 aberto" : `${openShifts.length} abertos`}
+                  </Badge>
+                  {data.capabilities.canManageRegisters && (
+                    <Button
+                      disabled={busy !== null || !online}
+                      onClick={() => {
+                        setShowRegisterForm((visible) => !visible);
+                        setEditingRegisterId("");
+                        setEditingRegisterName("");
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      {showRegisterForm ? "Cancelar" : "Adicionar gaveta"}
+                    </Button>
+                  )}
+                </div>
               </div>
+              {showRegisterForm && data.capabilities.canManageRegisters && (
+                <form className="cash-register-create" onSubmit={createRegister}>
+                  <label>
+                    Nome da gaveta
+                    <Input
+                      autoFocus
+                      maxLength={120}
+                      onChange={(event) => setRegisterName(event.target.value)}
+                      placeholder="Ex.: Bar"
+                      value={registerName}
+                    />
+                  </label>
+                  <Button disabled={busy !== null || !online} type="submit">
+                    {busy === "register" ? "Salvando…" : "Salvar gaveta"}
+                  </Button>
+                </form>
+              )}
               {data.registers.length > 0 ? (
                 <div className="cash-register-grid">
                   {data.registers.map((cashRegister) => {
                     const shift = openShifts.find(
                       (candidate) => candidate.cashRegisterId === cashRegister.id,
                     );
+                    const selected = selectedRegister?.id === cashRegister.id;
                     return (
-                      <span className="cash-register-control" key={cashRegister.id}>
+                      <article
+                        className="cash-register-card"
+                        data-selected={selected}
+                        key={cashRegister.id}
+                      >
                         <Button
-                          aria-pressed={selectedRegister?.id === cashRegister.id}
-                          onClick={() => {
-                            setSelectedRegisterId(cashRegister.id);
-                            setConfirmClose(false);
-                            setTenderCounts({});
-                          }}
+                          aria-label={`Selecionar ${cashRegister.name}, ${
+                            shift ? "aberto" : cashRegister.active ? "fechado" : "inativo"
+                          }`}
+                          aria-pressed={selected}
+                          className="cash-register-card__select"
+                          onClick={() => selectRegister(cashRegister.id)}
                           type="button"
-                          variant={
-                            selectedRegister?.id === cashRegister.id ? "primary" : "secondary"
-                          }
+                          variant="ghost"
                         >
-                          {cashRegister.name} ·{" "}
-                          {shift ? "aberto" : cashRegister.active ? "fechado" : "inativo"}
+                          <span className="cash-register-card__title">
+                            <strong>{cashRegister.name}</strong>
+                            <Badge
+                              tone={shift ? "success" : cashRegister.active ? "neutral" : "warning"}
+                            >
+                              {shift ? "Aberto" : cashRegister.active ? "Fechado" : "Inativo"}
+                            </Badge>
+                          </span>
+                          <small>
+                            {shift
+                              ? `Responsável: ${
+                                  shift.responsibleName ?? shift.operatorName ?? "não informado"
+                                }`
+                              : cashRegister.active
+                                ? "Disponível para abertura"
+                                : "Fora de uso"}
+                          </small>
+                          {shift?.openedAt && <small>Desde {dateLabel(shift.openedAt)}</small>}
                         </Button>
                         {data.capabilities.canManageRegisters && (
-                          <Button
-                            disabled={busy !== null || Boolean(shift)}
-                            onClick={() =>
-                              void toggleRegister(cashRegister.id, !cashRegister.active)
-                            }
-                            size="sm"
-                            type="button"
-                            variant="ghost"
-                          >
-                            {cashRegister.active ? "Desativar" : "Ativar"}
-                          </Button>
+                          <details className="cash-register-menu">
+                            <summary aria-label={`Ações da gaveta ${cashRegister.name}`}>⋯</summary>
+                            <div className="cash-register-menu__content">
+                              <Button
+                                onClick={(event) => {
+                                  event.currentTarget.closest("details")?.removeAttribute("open");
+                                  setShowRegisterForm(false);
+                                  setEditingRegisterId(cashRegister.id);
+                                  setEditingRegisterName(cashRegister.name);
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                Renomear
+                              </Button>
+                              <Button
+                                disabled={busy !== null || Boolean(shift)}
+                                onClick={() =>
+                                  void toggleRegister(cashRegister.id, !cashRegister.active)
+                                }
+                                size="sm"
+                                type="button"
+                                variant={cashRegister.active ? "danger" : "ghost"}
+                              >
+                                {cashRegister.active ? "Desativar" : "Ativar"}
+                              </Button>
+                              {shift && <small>Feche o caixa para desativar.</small>}
+                            </div>
+                          </details>
                         )}
-                      </span>
+                        {editingRegisterId === cashRegister.id && (
+                          <form className="cash-register-rename" onSubmit={renameRegister}>
+                            <label>
+                              Novo nome
+                              <Input
+                                autoFocus
+                                maxLength={120}
+                                onChange={(event) => setEditingRegisterName(event.target.value)}
+                                value={editingRegisterName}
+                              />
+                            </label>
+                            <div className="cash-register-rename__actions">
+                              <Button disabled={busy !== null || !online} size="sm" type="submit">
+                                {busy === "register" ? "Salvando…" : "Salvar nome"}
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setEditingRegisterId("");
+                                  setEditingRegisterName("");
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </form>
+                        )}
+                      </article>
                     );
                   })}
                 </div>
@@ -418,63 +537,6 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   icon="$"
                   title="Nenhuma gaveta cadastrada"
                 />
-              )}
-              {data.capabilities.canManageRegisters && (
-                <div className="cash-register-management">
-                  <form className="inline-action-form" onSubmit={createRegister}>
-                    <label>
-                      Nova gaveta
-                      <Input
-                        maxLength={120}
-                        onChange={(event) => setRegisterName(event.target.value)}
-                        placeholder="Ex.: Bar"
-                        value={registerName}
-                      />
-                    </label>
-                    <Button disabled={busy !== null || !online} type="submit" variant="secondary">
-                      {busy === "register" ? "Salvando…" : "Adicionar gaveta"}
-                    </Button>
-                  </form>
-                  {data.registers.length > 0 && (
-                    <form className="inline-action-form" onSubmit={renameRegister}>
-                      <label>
-                        Renomear gaveta
-                        <NativeSelect
-                          onChange={(event) => {
-                            const cashRegister = data.registers.find(
-                              (candidate) => candidate.id === event.target.value,
-                            );
-                            setEditingRegisterId(event.target.value);
-                            setEditingRegisterName(cashRegister?.name ?? "");
-                          }}
-                          value={editingRegisterId}
-                        >
-                          <option value="">Selecione</option>
-                          {data.registers.map((cashRegister) => (
-                            <option key={cashRegister.id} value={cashRegister.id}>
-                              {cashRegister.name}
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      </label>
-                      <label>
-                        Novo nome
-                        <Input
-                          disabled={!editingRegisterId}
-                          maxLength={120}
-                          onChange={(event) => setEditingRegisterName(event.target.value)}
-                          value={editingRegisterName}
-                        />
-                      </label>
-                      <Button
-                        disabled={busy !== null || !online || !editingRegisterId}
-                        type="submit"
-                      >
-                        Renomear
-                      </Button>
-                    </form>
-                  )}
-                </div>
               )}
             </Card>
 
@@ -939,6 +1001,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             <CashAdministrationPanels
+              key={open?.id ?? selectedRegister?.id ?? "no-register"}
               data={data}
               online={online}
               onChanged={remote.retry}

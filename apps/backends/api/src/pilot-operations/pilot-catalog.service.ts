@@ -1,9 +1,16 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import type {
+  CreateTableQrPrintBatchInput,
+  TableQrSettings,
+  TestTableQrUrlInput,
+  UpdateTableQrSettingsInput,
+} from "@giromesa/contracts";
 import {
   auditEvents,
   type Database,
+  identities,
   organizations,
   outboxEvents,
   posAllergens,
@@ -28,6 +35,9 @@ import {
   posProductStations,
   posProducts,
   posRecipeComponents,
+  posTableQrMetrics,
+  posTableQrPrintBatches,
+  posTableQrSettings,
   publicMenus,
   units,
 } from "@giromesa/db";
@@ -38,14 +48,20 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { tablePresenceCode } from "../common/table-presence-code.js";
 import { DatabaseService } from "../database/database.module.js";
 import {
   EstablishmentSettingsService,
+  normalizeStoredBranding,
   projectPublicBranding,
 } from "../organizations/establishment-settings.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
-import { createTableAccessToken, tableAccessSecret } from "../public-menu/table-access-token.js";
+import {
+  createTableAccessToken,
+  tableAccessSecret,
+  verifyTableAccessToken,
+} from "../public-menu/table-access-token.js";
 import { MAX_STORED_CENTS, replayResult, requestHash } from "./pilot-rules.js";
 import type {
   AggregateProductInput,
@@ -78,6 +94,11 @@ import type {
 import { promotionSchema } from "./pilot-schemas.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
+type TableQrSettingsRow = typeof posTableQrSettings.$inferSelect;
+type TableQrPrintBatchRow = typeof posTableQrPrintBatches.$inferSelect;
+
+const tableQrUuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class PilotCatalogService {
@@ -2674,7 +2695,97 @@ export class PilotCatalogService {
       throw error;
     }
     const apiUrl = new URL(process.env.API_URL ?? "http://localhost:3200");
-    return { key, url: new URL(`/public/v1/media/${key}`, apiUrl).toString() };
+    const url = new URL(`/public/v1/media/${key}`, apiUrl).toString();
+    try {
+      await this.database.db.transaction(async (tx) => {
+        await tx.insert(auditEvents).values({
+          organizationId,
+          unitId,
+          actorIdentityId: identityId,
+          action: "media.uploaded",
+          entityType: "media",
+          entityId: key,
+          metadata: {
+            key,
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            size: bytes.length,
+          },
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "media.uploaded",
+          aggregateType: "media",
+          aggregateId: key,
+          payload: { organizationId, unitId, key },
+        });
+      });
+    } catch (error) {
+      await unlink(target).catch(() => undefined);
+      throw error;
+    }
+    return { key, url };
+  }
+
+  async deleteMedia(identityId: string, organizationId: string, unitId: string, key: string) {
+    await this.requireManager(identityId, organizationId, unitId);
+    if (!/^[a-f0-9]{32}\.(jpg|png|webp)$/.test(key)) {
+      throw new BadRequestException({ code: "MEDIA_KEY_INVALID" });
+    }
+    const [owned] = await this.database.db
+      .select({ id: auditEvents.id })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationId),
+          eq(auditEvents.unitId, unitId),
+          eq(auditEvents.action, "media.uploaded"),
+          eq(auditEvents.entityId, key),
+        ),
+      )
+      .limit(1);
+    if (!owned) throw new NotFoundException({ code: "MEDIA_NOT_FOUND" });
+    const [branding, products, menus] = await Promise.all([
+      this.database.db
+        .select({ config: posCatalogBranding.config })
+        .from(posCatalogBranding)
+        .where(
+          and(
+            eq(posCatalogBranding.organizationId, organizationId),
+            eq(posCatalogBranding.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select({ imageUrl: posProducts.imageUrl })
+        .from(posProducts)
+        .where(eq(posProducts.organizationId, organizationId)),
+      this.database.db
+        .select({ metadata: publicMenus.metadata })
+        .from(publicMenus)
+        .where(and(eq(publicMenus.organizationId, organizationId), eq(publicMenus.unitId, unitId))),
+    ]);
+    const referenced = [...branding, ...products, ...menus].some((row) =>
+      JSON.stringify(row).includes(key),
+    );
+    if (referenced) throw new ConflictException({ code: "MEDIA_IN_USE" });
+    await unlink(resolve(process.env.MEDIA_ROOT ?? "data/media", key)).catch((error: unknown) => {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    });
+    await this.database.db.transaction(async (tx) => {
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "media.deleted",
+        entityType: "media",
+        entityId: key,
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "media.deleted",
+        aggregateType: "media",
+        aggregateId: key,
+        payload: { organizationId, unitId, key },
+      });
+    });
   }
 
   async setDailyStock(
@@ -2734,8 +2845,619 @@ export class PilotCatalogService {
     });
   }
 
+  async getTableQrSettings(identityId: string, organizationId: string, unitId: string) {
+    await this.requireManager(identityId, organizationId, unitId);
+    const [settings, unit, branding] = await Promise.all([
+      this.database.db
+        .select()
+        .from(posTableQrSettings)
+        .where(
+          and(
+            eq(posTableQrSettings.organizationId, organizationId),
+            eq(posTableQrSettings.unitId, unitId),
+          ),
+        )
+        .limit(1),
+      this.database.db
+        .select({ name: units.name })
+        .from(units)
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1),
+      this.database.db
+        .select({ config: posCatalogBranding.config })
+        .from(posCatalogBranding)
+        .where(
+          and(
+            eq(posCatalogBranding.organizationId, organizationId),
+            eq(posCatalogBranding.unitId, unitId),
+          ),
+        )
+        .limit(1),
+    ]);
+    if (!unit[0]) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    return this.tableQrSettingsView(settings[0], unit[0].name, branding[0]?.config);
+  }
+
+  async updateTableQrSettings(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: UpdateTableQrSettingsInput,
+  ) {
+    await this.requireManager(identityId, organizationId, unitId);
+    return this.idempotentCreate(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "table-qr.settings.update",
+      "table_qr_settings",
+      input,
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`table-qr-settings:${organizationId}:${unitId}`}))`,
+        );
+        const [existing] = await tx
+          .select({ revision: posTableQrSettings.revision })
+          .from(posTableQrSettings)
+          .where(
+            and(
+              eq(posTableQrSettings.organizationId, organizationId),
+              eq(posTableQrSettings.unitId, unitId),
+            ),
+          )
+          .limit(1);
+        const currentRevision = existing?.revision ?? 0;
+        if (currentRevision !== input.expectedRevision) {
+          throw new ConflictException({
+            code: "TABLE_QR_SETTINGS_REVISION_CONFLICT",
+            message: "As configurações de QR foram alteradas. Recarregue antes de salvar.",
+            currentRevision,
+          });
+        }
+        const revision = currentRevision + 1;
+        const { expectedRevision: _, ...values } = input;
+        const [settings] = await tx
+          .insert(posTableQrSettings)
+          .values({
+            organizationId,
+            unitId,
+            revision,
+            ...values,
+            updatedByIdentityId: identityId,
+          })
+          .onConflictDoUpdate({
+            target: [posTableQrSettings.organizationId, posTableQrSettings.unitId],
+            set: { revision, ...values, updatedByIdentityId: identityId, updatedAt: new Date() },
+          })
+          .returning();
+        if (!settings) throw new Error("Table QR settings write did not return a row");
+        await this.recordChange(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "pos.table_qr.settings_updated",
+          "table_qr_settings",
+          unitId,
+          { revision },
+        );
+        return this.tableQrSettingsView(settings, "", null);
+      },
+    );
+  }
+
+  async createTableQrPrintBatch(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: CreateTableQrPrintBatchInput,
+  ) {
+    await this.requireManager(identityId, organizationId, unitId);
+    return this.idempotentCreate(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "table-qr.print-batch.create",
+      "table_qr_print_batch",
+      input,
+      async (tx) => {
+        const [menu] = await tx
+          .select({ slug: publicMenus.slug })
+          .from(publicMenus)
+          .where(
+            and(
+              eq(publicMenus.organizationId, organizationId),
+              eq(publicMenus.unitId, unitId),
+              eq(publicMenus.active, true),
+            ),
+          )
+          .limit(1);
+        if (!menu) throw new NotFoundException({ code: "PUBLIC_MENU_NOT_FOUND" });
+
+        const [storedSettings, unit, branding, author] = await Promise.all([
+          tx
+            .select()
+            .from(posTableQrSettings)
+            .where(
+              and(
+                eq(posTableQrSettings.organizationId, organizationId),
+                eq(posTableQrSettings.unitId, unitId),
+              ),
+            )
+            .limit(1),
+          tx
+            .select({ name: units.name })
+            .from(units)
+            .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+            .limit(1),
+          tx
+            .select({ config: posCatalogBranding.config })
+            .from(posCatalogBranding)
+            .where(
+              and(
+                eq(posCatalogBranding.organizationId, organizationId),
+                eq(posCatalogBranding.unitId, unitId),
+              ),
+            )
+            .limit(1),
+          tx
+            .select({ displayName: identities.displayName })
+            .from(identities)
+            .where(eq(identities.id, identityId))
+            .limit(1),
+        ]);
+        if (!unit[0]) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+        const settings = this.tableQrSettingsView(
+          storedSettings[0],
+          unit[0].name,
+          branding[0]?.config,
+        );
+        const tableIds = [...new Set(input.tableIds)];
+        const tables = await tx
+          .select({
+            tableId: posDiningTables.id,
+            label: posDiningTables.label,
+            tokenVersion: posDiningTables.publicAccessVersion,
+          })
+          .from(posDiningTables)
+          .where(
+            and(
+              eq(posDiningTables.organizationId, organizationId),
+              eq(posDiningTables.unitId, unitId),
+              eq(posDiningTables.active, true),
+              inArray(posDiningTables.id, tableIds),
+            ),
+          )
+          .orderBy(asc(posDiningTables.label), asc(posDiningTables.id));
+        if (tables.length !== tableIds.length) {
+          throw new NotFoundException({ code: "TABLE_QR_BATCH_TABLE_NOT_FOUND" });
+        }
+        const { revision: settingsRevision, updatedAt: _, ...settingsSnapshot } = settings;
+        if (!input.includeWifi) settingsSnapshot.wifiNotice = null;
+        const [batch] = await tx
+          .insert(posTableQrPrintBatches)
+          .values({
+            organizationId,
+            unitId,
+            format: input.format,
+            output: input.output,
+            template: input.template ?? settings.template,
+            menuSlug: menu.slug,
+            includeWifi: input.includeWifi,
+            settingsRevision,
+            settingsSnapshot,
+            tablesSnapshot: tables,
+            createdByIdentityId: identityId,
+          })
+          .returning();
+        if (!batch) throw new Error("Table QR print batch insert did not return a row");
+        await this.recordChange(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "pos.table_qr.print_batch_generated",
+          "table_qr_print_batch",
+          batch.id,
+          {
+            format: input.format,
+            output: input.output,
+            tableCount: tables.length,
+            includeWifi: input.includeWifi,
+            settingsRevision,
+          },
+        );
+        return this.tableQrPrintBatchView(
+          batch,
+          new Map(tables.map((table) => [table.tableId, table.tokenVersion])),
+          menu.slug,
+          new Map([[identityId, author[0]?.displayName ?? "Usuário"]]),
+        );
+      },
+    );
+  }
+
+  async markTableQrPrintBatchPrinted(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    batchId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireManager(identityId, organizationId, unitId);
+    return this.idempotentCreate(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "table-qr.print-batch.mark-printed",
+      "table_qr_print_batch",
+      { batchId },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`table-qr-print-batch:${organizationId}:${unitId}:${batchId}`}))`,
+        );
+        const [batch] = await tx
+          .select()
+          .from(posTableQrPrintBatches)
+          .where(
+            and(
+              eq(posTableQrPrintBatches.organizationId, organizationId),
+              eq(posTableQrPrintBatches.unitId, unitId),
+              eq(posTableQrPrintBatches.id, batchId),
+            ),
+          )
+          .limit(1);
+        if (!batch) throw new NotFoundException({ code: "TABLE_QR_PRINT_BATCH_NOT_FOUND" });
+        const tableIds = batch.tablesSnapshot.map((table) => table.tableId);
+        const currentTables = tableIds.length
+          ? await tx
+              .select({
+                tableId: posDiningTables.id,
+                tokenVersion: posDiningTables.publicAccessVersion,
+              })
+              .from(posDiningTables)
+              .where(
+                and(
+                  eq(posDiningTables.organizationId, organizationId),
+                  eq(posDiningTables.unitId, unitId),
+                  eq(posDiningTables.active, true),
+                  inArray(posDiningTables.id, tableIds),
+                ),
+              )
+          : [];
+        const versions = new Map(currentTables.map((table) => [table.tableId, table.tokenVersion]));
+        const [menu] = await tx
+          .select({ slug: publicMenus.slug })
+          .from(publicMenus)
+          .where(
+            and(
+              eq(publicMenus.organizationId, organizationId),
+              eq(publicMenus.unitId, unitId),
+              eq(publicMenus.active, true),
+            ),
+          )
+          .limit(1);
+        const stale =
+          !menu ||
+          menu.slug !== batch.menuSlug ||
+          batch.tablesSnapshot.some((table) => versions.get(table.tableId) !== table.tokenVersion);
+        if (stale) {
+          throw new ConflictException({
+            code: "TABLE_QR_PRINT_BATCH_STALE",
+            message: "Há QR Codes rotacionados neste lote. Gere um novo lote antes de imprimir.",
+          });
+        }
+
+        let printedBatch = batch;
+        if (batch.status !== "printed") {
+          const [updated] = await tx
+            .update(posTableQrPrintBatches)
+            .set({
+              status: "printed",
+              printedByIdentityId: identityId,
+              printedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(posTableQrPrintBatches.organizationId, organizationId),
+                eq(posTableQrPrintBatches.unitId, unitId),
+                eq(posTableQrPrintBatches.id, batchId),
+              ),
+            )
+            .returning();
+          if (!updated) throw new Error("Table QR print batch update did not return a row");
+          printedBatch = updated;
+          await this.recordChange(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            "pos.table_qr.print_batch_marked_printed",
+            "table_qr_print_batch",
+            batchId,
+            { tableCount: batch.tablesSnapshot.length },
+          );
+        }
+        const actorIds = [
+          printedBatch.createdByIdentityId,
+          printedBatch.printedByIdentityId,
+        ].filter((value): value is string => Boolean(value));
+        const actors = await tx
+          .select({ id: identities.id, displayName: identities.displayName })
+          .from(identities)
+          .where(inArray(identities.id, actorIds));
+        return this.tableQrPrintBatchView(
+          printedBatch,
+          versions,
+          menu.slug,
+          new Map(actors.map((actor) => [actor.id, actor.displayName])),
+        );
+      },
+    );
+  }
+
+  async tableQrLifecycle(identityId: string, organizationId: string, unitId: string) {
+    await this.requireManager(identityId, organizationId, unitId);
+    const [settings, menus, unitRows, brandingRows] = await Promise.all([
+      this.getTableQrSettings(identityId, organizationId, unitId),
+      this.database.db
+        .select({ slug: publicMenus.slug })
+        .from(publicMenus)
+        .where(
+          and(
+            eq(publicMenus.organizationId, organizationId),
+            eq(publicMenus.unitId, unitId),
+            eq(publicMenus.active, true),
+          ),
+        )
+        .limit(1),
+      this.database.db
+        .select({ name: units.name, timezone: units.timezone })
+        .from(units)
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1),
+      this.database.db
+        .select({ config: posCatalogBranding.config })
+        .from(posCatalogBranding)
+        .where(
+          and(
+            eq(posCatalogBranding.organizationId, organizationId),
+            eq(posCatalogBranding.unitId, unitId),
+          ),
+        )
+        .limit(1),
+    ]);
+    const menu = menus[0];
+    const unit = unitRows[0];
+    if (!menu) throw new NotFoundException({ code: "PUBLIC_MENU_NOT_FOUND" });
+    if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const [tables, batches, rotations] = await Promise.all([
+      this.database.db
+        .select({
+          tableId: posDiningTables.id,
+          label: posDiningTables.label,
+          tokenVersion: posDiningTables.publicAccessVersion,
+          scanCount: posTableQrMetrics.scanCount,
+          lastScannedAt: posTableQrMetrics.lastScannedAt,
+        })
+        .from(posDiningTables)
+        .leftJoin(
+          posTableQrMetrics,
+          and(
+            eq(posTableQrMetrics.organizationId, posDiningTables.organizationId),
+            eq(posTableQrMetrics.unitId, posDiningTables.unitId),
+            eq(posTableQrMetrics.tableId, posDiningTables.id),
+          ),
+        )
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.active, true),
+          ),
+        )
+        .orderBy(asc(posDiningTables.label), asc(posDiningTables.id)),
+      this.database.db
+        .select()
+        .from(posTableQrPrintBatches)
+        .where(
+          and(
+            eq(posTableQrPrintBatches.organizationId, organizationId),
+            eq(posTableQrPrintBatches.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(posTableQrPrintBatches.generatedAt), desc(posTableQrPrintBatches.id)),
+      this.database.db
+        .select({
+          id: auditEvents.id,
+          tableId: auditEvents.entityId,
+          actorIdentityId: auditEvents.actorIdentityId,
+          metadata: auditEvents.metadata,
+          occurredAt: auditEvents.occurredAt,
+        })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.organizationId, organizationId),
+            eq(auditEvents.unitId, unitId),
+            eq(auditEvents.action, "pos.table_qr.rotated"),
+            eq(auditEvents.entityType, "dining_table"),
+          ),
+        )
+        .orderBy(desc(auditEvents.occurredAt), desc(auditEvents.id)),
+    ]);
+    const identityIds = [
+      ...batches.flatMap((batch) => [batch.createdByIdentityId, batch.printedByIdentityId]),
+      ...rotations.map((rotation) => rotation.actorIdentityId),
+    ].filter((value): value is string => Boolean(value));
+    const actors = identityIds.length
+      ? await this.database.db
+          .select({ id: identities.id, displayName: identities.displayName })
+          .from(identities)
+          .where(inArray(identities.id, [...new Set(identityIds)]))
+      : [];
+    const labels = new Map(actors.map((actor) => [actor.id, actor.displayName]));
+    const versions = new Map(tables.map((table) => [table.tableId, table.tokenVersion]));
+    const presentation = normalizeStoredBranding(brandingRows[0]?.config, unit.name).presentation;
+    return {
+      settings,
+      generalBranding: {
+        logoUrl: presentation.logoUrl,
+        logoThumbnailUrl: presentation.logoThumbnailUrl,
+      },
+      presence: {
+        mode: settings.presenceProtection,
+        code:
+          settings.presenceProtection === "daily_code"
+            ? tablePresenceCode(tableAccessSecret(), organizationId, unitId, unit.timezone)
+            : null,
+      },
+      tables: tables.map((table) => ({
+        tableId: table.tableId,
+        label: table.label,
+        tokenVersion: table.tokenVersion,
+        scanCount: table.scanCount ?? 0,
+        lastScannedAt: table.lastScannedAt?.toISOString() ?? null,
+        url: this.tableQr(menu.slug, {
+          id: table.tableId,
+          label: table.label,
+          tokenVersion: table.tokenVersion,
+        }).url,
+      })),
+      batches: batches.map((batch) =>
+        this.tableQrPrintBatchView(batch, versions, menu.slug, labels),
+      ),
+      rotations: rotations.flatMap((rotation) => {
+        const tokenVersion = rotation.metadata.tokenVersion;
+        if (
+          !rotation.tableId ||
+          !tableQrUuidPattern.test(rotation.tableId) ||
+          typeof tokenVersion !== "number" ||
+          !Number.isInteger(tokenVersion) ||
+          tokenVersion < 1
+        ) {
+          return [];
+        }
+        return [
+          {
+            id: rotation.id,
+            tableId: rotation.tableId,
+            tokenVersion,
+            actorIdentityId: rotation.actorIdentityId,
+            actorLabel: rotation.actorIdentityId
+              ? (labels.get(rotation.actorIdentityId) ?? "Usuário removido")
+              : null,
+            occurredAt: rotation.occurredAt.toISOString(),
+          },
+        ];
+      }),
+    };
+  }
+
+  async testTableQrUrl(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: TestTableQrUrlInput,
+  ) {
+    await this.requireManager(identityId, organizationId, unitId);
+    const [menus, context, settings] = await Promise.all([
+      this.database.db
+        .select({ slug: publicMenus.slug })
+        .from(publicMenus)
+        .where(
+          and(
+            eq(publicMenus.organizationId, organizationId),
+            eq(publicMenus.unitId, unitId),
+            eq(publicMenus.active, true),
+          ),
+        )
+        .limit(1),
+      this.database.db
+        .select({ displayName: organizations.tradeName, unitName: units.name })
+        .from(units)
+        .innerJoin(organizations, eq(organizations.id, units.organizationId))
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1),
+      this.database.db
+        .select({ displayName: posTableQrSettings.displayName })
+        .from(posTableQrSettings)
+        .where(
+          and(
+            eq(posTableQrSettings.organizationId, organizationId),
+            eq(posTableQrSettings.unitId, unitId),
+          ),
+        )
+        .limit(1),
+    ]);
+    const menu = menus[0];
+    const invalid = (
+      reason: "invalid_url" | "invalid_signature" | "table_not_found" | "rotated",
+    ) => ({
+      valid: false,
+      displayName: null,
+      unitName: null,
+      slug: null,
+      tableId: null,
+      tableLabel: null,
+      tokenVersion: null,
+      expiresAt: null,
+      reason,
+    });
+    if (!menu) return invalid("invalid_url");
+    const url = new URL(input.url);
+    const expectedOrigin = new URL(process.env.CUSTOMER_APP_URL ?? "http://localhost:3101").origin;
+    if (
+      url.origin !== expectedOrigin ||
+      url.pathname !== `/m/${menu.slug}` ||
+      url.search ||
+      url.username ||
+      url.password
+    ) {
+      return invalid("invalid_url");
+    }
+    const token = new URLSearchParams(url.hash.slice(1)).get("mesa");
+    const claims = token ? verifyTableAccessToken(token, menu.slug, tableAccessSecret()) : null;
+    if (!claims) return invalid("invalid_signature");
+    const [table] = await this.database.db
+      .select({
+        tableId: posDiningTables.id,
+        tableLabel: posDiningTables.label,
+        tokenVersion: posDiningTables.publicAccessVersion,
+      })
+      .from(posDiningTables)
+      .where(
+        and(
+          eq(posDiningTables.organizationId, organizationId),
+          eq(posDiningTables.unitId, unitId),
+          eq(posDiningTables.id, claims.tableId),
+          eq(posDiningTables.active, true),
+        ),
+      )
+      .limit(1);
+    if (!table) return invalid("table_not_found");
+    if (table.tokenVersion !== claims.tokenVersion) return invalid("rotated");
+    return {
+      valid: true,
+      displayName: settings[0]?.displayName ?? context[0]?.displayName ?? "Estabelecimento",
+      unitName: context[0]?.unitName ?? "Unidade",
+      slug: menu.slug,
+      tableId: table.tableId,
+      tableLabel: table.tableLabel,
+      tokenVersion: table.tokenVersion,
+      expiresAt: new Date(claims.exp * 1_000).toISOString(),
+      reason: null,
+    };
+  }
+
   async listTableQr(identityId: string, organizationId: string, unitId: string) {
-    await this.requireAccess(identityId, organizationId, unitId);
+    await this.requireManager(identityId, organizationId, unitId);
     const [menu] = await this.database.db
       .select({ slug: publicMenus.slug })
       .from(publicMenus)
@@ -2761,56 +3483,166 @@ export class PilotCatalogService {
           eq(posDiningTables.unitId, unitId),
           eq(posDiningTables.active, true),
         ),
-      );
+      )
+      .orderBy(asc(posDiningTables.label), asc(posDiningTables.id));
     return tables.map((table) => this.tableQr(menu.slug, table));
   }
 
-  async rotateTableQr(identityId: string, organizationId: string, unitId: string, tableId: string) {
+  async rotateTableQr(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    idempotencyKey: string,
+  ) {
     await this.requireManager(identityId, organizationId, unitId);
-    return this.database.db.transaction(async (tx) => {
-      const [menu] = await tx
-        .select({ slug: publicMenus.slug })
-        .from(publicMenus)
-        .where(
-          and(
-            eq(publicMenus.organizationId, organizationId),
-            eq(publicMenus.unitId, unitId),
-            eq(publicMenus.active, true),
-          ),
+    return this.idempotentCreate(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "table-qr.rotate",
+      "dining_table",
+      { tableId },
+      async (tx) => {
+        const [menu] = await tx
+          .select({ slug: publicMenus.slug })
+          .from(publicMenus)
+          .where(
+            and(
+              eq(publicMenus.organizationId, organizationId),
+              eq(publicMenus.unitId, unitId),
+              eq(publicMenus.active, true),
+            ),
+          )
+          .limit(1);
+        if (!menu) throw new NotFoundException({ code: "PUBLIC_MENU_NOT_FOUND" });
+        const [table] = await tx
+          .update(posDiningTables)
+          .set({
+            publicAccessVersion: sql`${posDiningTables.publicAccessVersion} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(posDiningTables.organizationId, organizationId),
+              eq(posDiningTables.unitId, unitId),
+              eq(posDiningTables.id, tableId),
+              eq(posDiningTables.active, true),
+            ),
+          )
+          .returning({
+            id: posDiningTables.id,
+            label: posDiningTables.label,
+            tokenVersion: posDiningTables.publicAccessVersion,
+          });
+        if (!table) throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
+        await this.recordChange(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "pos.table_qr.rotated",
+          "dining_table",
+          tableId,
+          { tokenVersion: table.tokenVersion },
+        );
+        return this.tableQr(menu.slug, table);
+      },
+    );
+  }
+
+  private tableQrSettingsView(
+    row: TableQrSettingsRow | undefined,
+    fallbackDisplayName: string,
+    branding: unknown,
+  ): TableQrSettings {
+    if (row) {
+      return {
+        revision: row.revision,
+        displayName: row.displayName,
+        headline: row.headline,
+        instructions: row.instructions,
+        logoUrl: row.logoUrl,
+        primaryColor: row.primaryColor,
+        wifiNotice: row.wifiNotice,
+        serviceChargeNotice: row.serviceChargeNotice,
+        template: row.template as TableQrSettings["template"],
+        presenceProtection: row.presenceProtection as TableQrSettings["presenceProtection"],
+        updatedAt: row.updatedAt.toISOString(),
+      };
+    }
+    const presentation = normalizeStoredBranding(branding, fallbackDisplayName).presentation;
+    const headline =
+      presentation.slogan && presentation.slogan.trim().length >= 2
+        ? presentation.slogan.trim().slice(0, 160)
+        : "Atendimento direto na sua mesa";
+    const wifiNotice = presentation.wifi
+      ? `Wi-Fi: ${presentation.wifi.ssid}${presentation.wifi.password ? ` · Senha: ${presentation.wifi.password}` : ""}`.slice(
+          0,
+          200,
         )
-        .limit(1);
-      if (!menu) throw new NotFoundException({ code: "PUBLIC_MENU_NOT_FOUND" });
-      const [table] = await tx
-        .update(posDiningTables)
-        .set({
-          publicAccessVersion: sql`${posDiningTables.publicAccessVersion} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(posDiningTables.organizationId, organizationId),
-            eq(posDiningTables.unitId, unitId),
-            eq(posDiningTables.id, tableId),
-            eq(posDiningTables.active, true),
-          ),
-        )
-        .returning({
-          id: posDiningTables.id,
-          label: posDiningTables.label,
-          tokenVersion: posDiningTables.publicAccessVersion,
-        });
-      if (!table) throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
-      await tx.insert(auditEvents).values({
-        organizationId,
-        unitId,
-        actorIdentityId: identityId,
-        action: "pos.table_qr.rotated",
-        entityType: "dining_table",
-        entityId: tableId,
-        metadata: { tokenVersion: table.tokenVersion },
-      });
-      return this.tableQr(menu.slug, table);
-    });
+      : null;
+    return {
+      revision: 0,
+      displayName: presentation.displayName.trim().slice(0, 120),
+      headline,
+      instructions: "Escaneie o QR Code para ver o cardápio e pedir atendimento.",
+      logoUrl: presentation.logoUrl,
+      primaryColor: presentation.primaryColor,
+      wifiNotice,
+      serviceChargeNotice: presentation.serviceTaxNotice?.slice(0, 200) ?? null,
+      template: "classic",
+      presenceProtection: "session_only",
+      updatedAt: null,
+    };
+  }
+
+  private tableQrPrintBatchView(
+    batch: TableQrPrintBatchRow,
+    currentVersions: Map<string, number>,
+    currentMenuSlug: string,
+    identityLabels: Map<string, string>,
+  ) {
+    return {
+      id: batch.id,
+      format: batch.format,
+      output: batch.output,
+      template: batch.template,
+      status: batch.status,
+      menuSlug: batch.menuSlug,
+      includeWifi: batch.includeWifi,
+      settingsRevision: batch.settingsRevision,
+      settings: {
+        ...batch.settingsSnapshot,
+        presenceProtection: batch.settingsSnapshot.presenceProtection ?? "session_only",
+      },
+      tables: batch.tablesSnapshot.map((table) => {
+        const currentVersion = currentVersions.get(table.tableId) ?? null;
+        const isCurrent =
+          batch.menuSlug === currentMenuSlug && currentVersion === table.tokenVersion;
+        return {
+          ...table,
+          currentVersion,
+          isCurrent,
+          url: isCurrent
+            ? this.tableQr(currentMenuSlug, {
+                id: table.tableId,
+                label: table.label,
+                tokenVersion: table.tokenVersion,
+              }).url
+            : null,
+        };
+      }),
+      createdByIdentityId: batch.createdByIdentityId,
+      createdByLabel: identityLabels.get(batch.createdByIdentityId) ?? "Usuário removido",
+      generatedAt: batch.generatedAt.toISOString(),
+      printedByIdentityId: batch.printedByIdentityId,
+      printedByLabel: batch.printedByIdentityId
+        ? (identityLabels.get(batch.printedByIdentityId) ?? "Usuário removido")
+        : null,
+      printedAt: batch.printedAt?.toISOString() ?? null,
+    };
   }
 
   private tableQr(slug: string, table: { id: string; label: string; tokenVersion: number }) {
@@ -2825,8 +3657,7 @@ export class PilotCatalogService {
     );
     const base = new URL(process.env.CUSTOMER_APP_URL ?? "http://localhost:3101");
     const url = new URL(`/m/${slug}`, base);
-    url.searchParams.set("table", table.id);
-    url.searchParams.set("token", token);
+    url.hash = `mesa=${encodeURIComponent(token)}`;
     return {
       tableId: table.id,
       label: table.label,

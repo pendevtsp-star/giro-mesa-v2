@@ -42,6 +42,15 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Produtos sem preço ou indisponíveis ficam bloqueados na operação.",
     ],
   },
+  "table-qrs": {
+    title: "Gerenciar QR das mesas",
+    steps: [
+      "Personalize a placa e salve antes de gerar novos arquivos.",
+      "Selecione mesas reais, valide o QR e escolha o formato de saída.",
+      "Marque o lote como impresso somente após confirmar a produção física.",
+    ],
+    warning: "Ao rotacionar um QR, placas antigas daquela mesa deixam de funcionar.",
+  },
   kds: {
     title: "Movimentar a produção",
     steps: [
@@ -130,6 +139,14 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     steps: [
       "Compare unidades usando registros persistidos.",
       "Use conciliação financeira para números contábeis.",
+    ],
+  },
+  billing: {
+    title: "Acompanhar assinatura e cobranças",
+    steps: [
+      "Confira o plano, o ciclo e a próxima renovação da organização.",
+      "Use somente o checkout hospedado para assinar, regularizar ou fazer upgrade.",
+      "Aguarde a confirmação do pagamento pelo servidor antes de considerar o plano atualizado.",
     ],
   },
   settings: {

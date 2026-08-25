@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import {
   api,
+  type TerminalPaymentMode,
   type TerminalProfile,
   type TerminalProfileInput,
   type TerminalProfileMode,
@@ -19,17 +20,9 @@ import {
 } from "../../api";
 import { type DeviceContext, loadShellPrinters, testShellPrinter } from "../../bridge";
 import { type CashRegister, parseCash } from "../../management.shared";
+import { type PrinterDiagnostic, parsePrinterDiagnostics } from "../device/printer-diagnostics";
 import { saveTerminalProfile } from "./terminal-profile";
 import "./terminal-profile.css";
-
-type PrinterStatus = {
-  id: string;
-  configured: boolean;
-  available: boolean;
-  isDefault: boolean;
-  paperWidthMm: number;
-  errorCode: string | null;
-};
 
 const modes: Array<{ value: TerminalProfileMode; label: string }> = [
   { value: "waiter_mobile", label: "Celular do garçom" },
@@ -55,6 +48,27 @@ const actions: Array<{ value: TerminalQuickAction; label: string }> = [
   { value: "print", label: "Imprimir" },
   { value: "search", label: "Buscar" },
 ];
+const paymentModes: Array<{
+  value: TerminalPaymentMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "disabled",
+    label: "Pagamento no caixa",
+    description: "Este terminal apenas solicita a conta e encaminha o atendimento ao caixa.",
+  },
+  {
+    value: "cashier",
+    label: "Caixa neste terminal",
+    description: "Habilita recebimento e impressão vinculados à gaveta deste terminal.",
+  },
+  {
+    value: "homologated_pos",
+    label: "POS homologada",
+    description: "Libera cobrança local somente pela integração POS homologada e saudável.",
+  },
+];
 
 const initialProfile = (runtime: DeviceContext): TerminalProfileInput => ({
   label: runtime.deviceName,
@@ -65,39 +79,8 @@ const initialProfile = (runtime: DeviceContext): TerminalProfileInput => ({
   cashRegisterId: null,
   compact: true,
   quickActions: ["search"],
+  paymentMode: "disabled",
 });
-
-function parsePrinters(value: unknown): PrinterStatus[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const candidates = (value as Record<string, unknown>).printers;
-  if (!Array.isArray(candidates)) return [];
-  return candidates.flatMap((candidate) => {
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return [];
-    const row = candidate as Record<string, unknown>;
-    const id = typeof row.id === "string" ? row.id : typeof row.Id === "string" ? row.Id : null;
-    if (!id) return [];
-    return [
-      {
-        id,
-        configured: row.configured === true || row.Configured === true,
-        available: row.available === true || row.Available === true,
-        isDefault: row.isDefault === true || row.IsDefault === true,
-        paperWidthMm:
-          typeof row.paperWidthMm === "number"
-            ? row.paperWidthMm
-            : typeof row.PaperWidthMm === "number"
-              ? row.PaperWidthMm
-              : 80,
-        errorCode:
-          typeof row.errorCode === "string"
-            ? row.errorCode
-            : typeof row.ErrorCode === "string"
-              ? row.ErrorCode
-              : null,
-      },
-    ];
-  });
-}
 
 export function TerminalProfileSettings({
   isOpen,
@@ -115,7 +98,7 @@ export function TerminalProfileSettings({
   runtime: DeviceContext;
 }) {
   const [form, setForm] = useState<TerminalProfileInput>(() => initialProfile(runtime));
-  const [printers, setPrinters] = useState<PrinterStatus[]>([]);
+  const [printers, setPrinters] = useState<PrinterDiagnostic[]>([]);
   const [cashRegisters, setCashRegisters] = useState<CashRegister[]>([]);
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -130,8 +113,16 @@ export function TerminalProfileSettings({
         loadShellPrinters(),
         api.management.cashShifts(organizationId, unitId),
       ]);
-      setForm(profile ?? initialProfile(runtime));
-      setPrinters(printerResult?.success ? parsePrinters(printerResult.payload) : []);
+      setForm(
+        profile
+          ? {
+              ...profile,
+              paymentMode:
+                profile.paymentMode ?? (profile.mode === "cashier" ? "cashier" : "disabled"),
+            }
+          : initialProfile(runtime),
+      );
+      setPrinters(printerResult?.success ? parsePrinterDiagnostics(printerResult.payload) : []);
       setCashRegisters(
         parseCash(cashResult).registers.filter((cashRegister) => cashRegister.active),
       );
@@ -209,6 +200,9 @@ export function TerminalProfileSettings({
                 setForm((current) => ({
                   ...current,
                   mode: event.target.value as TerminalProfileMode,
+                  ...(event.target.value === "cashier" && current.mode !== "cashier"
+                    ? { defaultRoute: "salon" as const, paymentMode: "cashier" as const }
+                    : {}),
                 }))
               }
               value={form.mode}
@@ -219,6 +213,34 @@ export function TerminalProfileSettings({
                 </option>
               ))}
             </NativeSelect>
+          </FormField>
+          <FormField
+            htmlFor="terminal-profile-payment-mode"
+            label="Pagamento neste terminal"
+            required
+          >
+            <NativeSelect
+              id="terminal-profile-payment-mode"
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  paymentMode: event.target.value as TerminalPaymentMode,
+                }))
+              }
+              value={form.paymentMode}
+            >
+              {paymentModes.map((paymentMode) => (
+                <option key={paymentMode.value} value={paymentMode.value}>
+                  {paymentMode.label}
+                </option>
+              ))}
+            </NativeSelect>
+            <small>
+              {
+                paymentModes.find((paymentMode) => paymentMode.value === form.paymentMode)
+                  ?.description
+              }
+            </small>
           </FormField>
           <FormField htmlFor="terminal-profile-route" label="Tela inicial" required>
             <NativeSelect
@@ -238,7 +260,7 @@ export function TerminalProfileSettings({
               ))}
             </NativeSelect>
           </FormField>
-          <FormField htmlFor="terminal-profile-printer" label="Impressora padrão">
+          <FormField htmlFor="terminal-profile-printer" label="Impressora deste terminal">
             <NativeSelect
               id="terminal-profile-printer"
               onChange={(event) =>

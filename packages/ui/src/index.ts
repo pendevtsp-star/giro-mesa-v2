@@ -70,4 +70,5 @@ export { VisuallyHidden } from "./components/VisuallyHidden/VisuallyHidden";
 export { AppShell } from "./layouts/AppShell/AppShell";
 export { KanbanBoard, KanbanColumn } from "./layouts/KanbanBoard/KanbanBoard";
 export { SplitLayout } from "./layouts/SplitLayout/SplitLayout";
+export { commercialEntitlementLabels } from "./lib/commercial-entitlements";
 export { cn } from "./lib/utils";

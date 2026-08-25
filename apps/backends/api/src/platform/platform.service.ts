@@ -1,4 +1,6 @@
 import {
+  accountantRequests,
+  auditEvents,
   contactRequests,
   fiscalProfiles,
   hubHeartbeats,
@@ -9,13 +11,68 @@ import {
   trials,
   units,
 } from "@giromesa/db";
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 
 @Injectable()
 export class PlatformService {
   constructor(private readonly database: DatabaseService) {}
+
+  async setAccountantAttachmentLegalHold(
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    requestId: string,
+    attachmentId: string,
+    active: boolean,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`accountant-request:${organizationId}:${unitId}:${requestId}`}, 0))`,
+      );
+      const [request] = await tx
+        .select({ attachments: accountantRequests.attachments })
+        .from(accountantRequests)
+        .where(
+          and(
+            eq(accountantRequests.organizationId, organizationId),
+            eq(accountantRequests.unitId, unitId),
+            eq(accountantRequests.id, requestId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!request) throw new NotFoundException({ code: "ACCOUNTANT_REQUEST_NOT_FOUND" });
+      const attachment = request.attachments.find((candidate) => candidate.id === attachmentId);
+      if (!attachment) throw new NotFoundException({ code: "ACCOUNTANT_ATTACHMENT_NOT_FOUND" });
+      if (active && (attachment.deletedAt || attachment.purgedAt))
+        throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_ALREADY_DELETED" });
+      if (Boolean(attachment.legalHold) === active)
+        return { attachmentId, legalHold: active, replayed: true };
+      await tx
+        .update(accountantRequests)
+        .set({
+          attachments: request.attachments.map((candidate) =>
+            candidate.id === attachmentId ? { ...candidate, legalHold: active } : candidate,
+          ),
+          updatedAt: new Date(),
+        })
+        .where(eq(accountantRequests.id, requestId));
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId,
+        action: active
+          ? "accounting.request.attachment.legal_hold_applied"
+          : "accounting.request.attachment.legal_hold_released",
+        entityType: "accountant_request",
+        entityId: requestId,
+        metadata: { attachmentId },
+      });
+      return { attachmentId, legalHold: active, replayed: false };
+    });
+  }
 
   async overview() {
     const now = new Date();

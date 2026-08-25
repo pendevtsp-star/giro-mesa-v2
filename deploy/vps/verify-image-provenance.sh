@@ -213,19 +213,24 @@ try:
     if role == "recovery":
         evidence_file = pathlib.Path(evidence_path)
         evidence = json.loads(evidence_file.read_text(encoding="utf-8"))
+        recovery_entries=json.loads((root/"packages/db/drizzle/meta/_journal.json").read_text(encoding="utf-8")).get("entries",[])
+        recovery_tag=recovery_entries[-1].get("tag","") if recovery_entries else ""
+        recovery_match=re.fullmatch(r"([0-9]{4})_[A-Za-z0-9_.-]+",recovery_tag)
+        target_tag=evidence.get("targetMigration","")
+        target_match=re.fullmatch(r"([0-9]{4})_[A-Za-z0-9_.-]+",target_tag)
+        expected_levels=[int(recovery_match.group(1)),int(target_match.group(1))] if recovery_match and target_match else None
         evidence_valid = (
             evidence_hash == "sha256:" + hashlib.sha256(evidence_file.read_bytes()).hexdigest()
             and evidence.get("schemaVersion") == 1
             and evidence.get("role") == "recovery"
             and evidence.get("recoveryArtifact") == "git:" + artifact
             and evidence.get("postgresMajors") == [16, 17]
-            and evidence.get("schemaLevels") == [45, 53]
-            and evidence.get("targetMigration") == "0053_petite_trauma"
+            and evidence.get("schemaLevels") == expected_levels
             and evidence.get("testedUpgrade") is True
             and evidence.get("doseClubReconciliation") == "legacy-source-upgraded"
             and evidence.get("legacyUpgrade") == {"sourceArtifact":"git:4d408037c3fbcb67e2ad57f8ad47b6300a10ec77","sourceMigration":"0026_doseclub_integration","sourceAppliedAt":"1786493658116","postgresMajors":[16,17],"result":"passed"}
             and evidence.get("result") == "passed"
-            and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":53,"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
+            and evidence.get("runtime") == {"postgresMajor":17,"schemaLevel":expected_levels[1],"apiHealth":"passed","workerStabilitySeconds":15,"outboxProbe":"passed"}
         )
     valid = (
         re.fullmatch(r"[0-9a-f]{40}", artifact)

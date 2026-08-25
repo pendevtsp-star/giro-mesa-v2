@@ -131,7 +131,7 @@ export function KdsOpeningChecklist({
             <Badge tone={stationLocked ? "success" : "warning"}>
               {stationLocked ? "OK" : "Pendente"}
             </Badge>
-            <span>Praça específica fixada neste terminal</span>
+            <span>Estação específica fixada neste terminal</span>
           </li>
         </ul>
         <fieldset className="kds-optional-checks">
@@ -183,7 +183,7 @@ export function KdsReadyNotices({
         <Card key={notice.orderId} role="status">
           <div>
             <strong>Pedido pronto · {notice.reference}</strong>
-            <span>{notice.context ?? "Todas as praças concluíram o pedido."}</span>
+            <span>{notice.context ?? "Todas as estações concluíram o pedido."}</span>
           </div>
           <Button onClick={() => onDismiss(notice.orderId)} size="sm" variant="secondary">
             Dispensar aviso
@@ -356,7 +356,7 @@ export function KdsBatchesPanel({
       <div className="kds-support-panel__body">
         <form className="kds-batch-form" onSubmit={submit}>
           <label>
-            Praça
+            Estação
             <NativeSelect
               onChange={(event) => setStationId(event.target.value)}
               required

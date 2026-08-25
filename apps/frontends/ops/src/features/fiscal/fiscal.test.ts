@@ -1,10 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountantOpenRequestTitle,
+  accountantRequestHref,
+  accountantRequestStatusLabel,
+  accountantRequestViewFromHash,
+  canResolveAccountantRequest,
   fiscalRejectionGuidance,
   InvalidFiscalPayloadError,
   parseAccountantWorkspace,
   parseFiscalDocumentDetail,
   parseFiscalWorkspace,
+  validateAccountantAttachment,
 } from "./fiscal";
 
 const period = {
@@ -82,6 +88,7 @@ describe("contrato fiscal do Ops", () => {
     expect(workspace.dashboard.provider.registered).toBe(true);
     expect(workspace.dashboard.provider.status).toBe("ready");
     expect(workspace.dashboard.pending).toHaveLength(4);
+    expect(workspace.dashboard.pending.at(-1)?.title).toBe("1 solicitação do contador aberta");
     expect(workspace.profile?.series.nfce).toBe("1");
     expect(workspace.profile?.stateCode).toBe("");
     expect(workspace.products.map((product) => product.name)).toContain("Produto pendente");
@@ -89,7 +96,7 @@ describe("contrato fiscal do Ops", () => {
     expect(workspace.periods[0]?.competence).toBe("2026-08");
   });
 
-  it("valida pacote e solicitações retornados pelo backend", () => {
+  it("valida o DTO público do contador e tolera o pacote legado", () => {
     const workspace = parseAccountantWorkspace({
       periods: [period],
       accountingPackage: {
@@ -109,16 +116,101 @@ describe("contrato fiscal do Ops", () => {
           status: "open",
           dueDate: null,
           createdAt: "2026-08-17T12:00:00Z",
+          createdByName: "Ana Contadora",
+          storageKey: "internal/nao-expor.xml",
+          idempotencyKey: "nao-expor",
         },
       ],
     });
 
-    expect(workspace.accountingPackage?.payload).toMatchObject({ schemaVersion: 1 });
+    expect(workspace.accountingPackage).toMatchObject({
+      competence: "2026-08",
+      status: "ready",
+      generatedAt: "2026-08-17T12:00:00Z",
+    });
+    expect(workspace.pagination).toBeNull();
     expect(workspace.periods[0]?.blockers).toEqual([
       "1 documento(s) rejeitado(s)",
       "2 documento(s) pendente(s)",
     ]);
-    expect(workspace.requests[0]?.detail).toBe("Enviar XML da compra 42.");
+    expect(workspace.requests[0]).toEqual({
+      id: "r1",
+      competence: "2026-08",
+      title: "XML faltante",
+      detail: "Enviar XML da compra 42.",
+      status: "open",
+      dueAt: null,
+      createdAt: "2026-08-17T12:00:00Z",
+      requestedBy: "Ana Contadora",
+      resolution: null,
+      resolvedAt: null,
+      resolvedBy: null,
+      targetAudience: "accountant",
+      attachments: [],
+    });
+
+    expect(
+      parseAccountantWorkspace({
+        periods: [period],
+        accountingPackage: {
+          competence: "2026-08",
+          status: "available",
+          generatedAt: "2026-08-18T12:00:00Z",
+          files: ["contabilidade-2026-08.zip"],
+        },
+        requests: {
+          items: [
+            {
+              id: "r2",
+              competence: "2026-08",
+              title: "Conferência concluída",
+              detail: "Documentos conferidos.",
+              status: "resolved",
+              dueAt: null,
+              createdAt: "2026-08-17T12:00:00Z",
+              resolution: "Tudo certo para o fechamento.",
+              resolvedAt: "2026-08-18T12:00:00Z",
+              resolvedByName: "Bruno Gestor",
+              targetAudience: "establishment",
+              attachments: [
+                {
+                  id: "attachment-1",
+                  fileName: "compras.xml",
+                  contentType: "application/xml",
+                  sizeBytes: 1024,
+                  createdAt: "2026-08-18T11:00:00Z",
+                  storageKey: "internal/nao-expor.xml",
+                  sha256: "a".repeat(64),
+                },
+              ],
+            },
+          ],
+          pagination: { page: 1, pageSize: 50, total: 1 },
+        },
+      }),
+    ).toMatchObject({
+      accountingPackage: {
+        status: "ready",
+        files: [{ name: "contabilidade-2026-08.zip", sizeBytes: 0 }],
+      },
+      requests: [
+        {
+          detail: "Documentos conferidos.",
+          resolution: "Tudo certo para o fechamento.",
+          resolvedBy: "Bruno Gestor",
+          targetAudience: "establishment",
+          attachments: [
+            {
+              id: "attachment-1",
+              fileName: "compras.xml",
+              contentType: "application/xml",
+              sizeBytes: 1024,
+            },
+          ],
+        },
+      ],
+      pagination: { page: 1, pageSize: 50, total: 1 },
+    });
     expect(() =>
       parseAccountantWorkspace({
         periods: [{ ...period, status: "deleted" }],
@@ -126,6 +218,51 @@ describe("contrato fiscal do Ops", () => {
         requests: [],
       }),
     ).toThrow(InvalidFiscalPayloadError);
+  });
+
+  it("preserva audiência, deep-link e valida anexos antes do envio", () => {
+    const request = parseAccountantWorkspace({
+      periods: [],
+      accountingPackage: null,
+      requests: [
+        {
+          id: "r1",
+          competence: "2026-08",
+          title: "Conferir compra",
+          description: "Confira o XML.",
+          status: "open",
+          targetAudience: "establishment",
+          dueDate: "2026-08-20",
+          createdAt: "2026-08-17T12:00:00Z",
+        },
+      ],
+    }).requests[0];
+
+    expect(request && accountantRequestStatusLabel(request)).toBe("Aguardando empresa");
+    expect(request && canResolveAccountantRequest(request, "establishment")).toBe(true);
+    expect(request && canResolveAccountantRequest(request, "accountant")).toBe(false);
+    expect(accountantOpenRequestTitle(2)).toBe("2 solicitações do contador abertas");
+    expect(
+      accountantRequestViewFromHash(accountantRequestHref("overdue", 3, "establishment")),
+    ).toEqual({ filter: "overdue", page: 3, targetAudience: "establishment" });
+    expect(validateAccountantAttachment({ name: "compras.xml", type: "", size: 1024 })).toEqual({
+      valid: true,
+      contentType: "application/xml",
+    });
+    expect(
+      validateAccountantAttachment({
+        name: "arquivo.exe",
+        type: "application/octet-stream",
+        size: 1024,
+      }),
+    ).toMatchObject({ valid: false });
+    expect(
+      validateAccountantAttachment({
+        name: "grande.pdf",
+        type: "application/pdf",
+        size: 3 * 1024 * 1024 + 1,
+      }),
+    ).toMatchObject({ valid: false });
   });
 
   it("normaliza o detalhe da nota e traduz rejeições em próxima ação", () => {

@@ -34,6 +34,7 @@ export function CashAdministrationPanels({
   const [handoverIdentityId, setHandoverIdentityId] = useState("");
   const [handoverReason, setHandoverReason] = useState("");
   const [approvalNote, setApprovalNote] = useState("");
+  const [transferDecisionNote, setTransferDecisionNote] = useState("");
   const [movementThreshold, setMovementThreshold] = useState("");
   const [differenceThreshold, setDifferenceThreshold] = useState("");
   const [maxShiftMinutes, setMaxShiftMinutes] = useState("");
@@ -117,6 +118,30 @@ export function CashAdministrationPanels({
     );
   }
 
+  function decideTransfer(cashTransferId: string, decision: "accept" | "reject") {
+    const note = transferDecisionNote.trim();
+    if (decision === "reject" && note.length < 3) {
+      setNotice("Informe o motivo da rejeição.");
+      return;
+    }
+    void run(
+      `transfer:${decision}:${cashTransferId}`,
+      () =>
+        api.management.decideCashTransfer(
+          scope.organizationId,
+          scope.unitId,
+          cashTransferId,
+          { decision, note: note || undefined },
+          operationalKey(`cash-transfer-${decision}`),
+        ),
+      decision === "accept"
+        ? "Transferência aceita e registrada nas duas gavetas."
+        : "Transferência rejeitada.",
+    ).then((changed) => {
+      if (changed) setTransferDecisionNote("");
+    });
+  }
+
   const pendingApprovals = data.approvals.filter((approval) => approval.status === "pending");
   return (
     <>
@@ -189,6 +214,64 @@ export function CashAdministrationPanels({
         </details>
       )}
 
+      {data.pendingTransfers.length > 0 && (
+        <Card className="cash-approvals">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Custódia entre gavetas</p>
+              <h2>Transferências aguardando aceite</h2>
+            </div>
+            <Badge tone="warning">{data.pendingTransfers.length}</Badge>
+          </div>
+          <label>
+            Observação da decisão
+            <Input
+              onChange={(event) => setTransferDecisionNote(event.target.value)}
+              value={transferDecisionNote}
+            />
+          </label>
+          <div className="cash-approval-list">
+            {data.pendingTransfers.map((transfer) => (
+              <div className="cash-approval" key={transfer.id}>
+                <span>
+                  <strong>
+                    {transfer.fromCashRegisterName} → {transfer.toCashRegisterName} ·{" "}
+                    {formatMoney(transfer.amountCents)}
+                  </strong>
+                  <small>
+                    {transfer.requestedByName} · {dateLabel(transfer.requestedAt)} ·{" "}
+                    {transfer.reason}
+                  </small>
+                </span>
+                {transfer.canDecide ? (
+                  <span className="cash-approval__actions">
+                    <Button
+                      disabled={Boolean(busy) || !online}
+                      onClick={() => decideTransfer(transfer.id, "accept")}
+                      size="sm"
+                      type="button"
+                    >
+                      Aceitar
+                    </Button>
+                    <Button
+                      disabled={Boolean(busy) || !online || transferDecisionNote.trim().length < 3}
+                      onClick={() => decideTransfer(transfer.id, "reject")}
+                      size="sm"
+                      type="button"
+                      variant="danger"
+                    >
+                      Rejeitar
+                    </Button>
+                  </span>
+                ) : (
+                  <Badge tone="neutral">Aguardando responsável do destino</Badge>
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       {data.capabilities.canApproveCashRequests && pendingApprovals.length > 0 && (
         <Card className="cash-approvals">
           <div className="card-header">
@@ -228,7 +311,9 @@ export function CashAdministrationPanels({
                             { decision: "approve", note: approvalNote.trim() || undefined },
                             operationalKey("cash-approval"),
                           ),
-                        "Movimento aprovado e executado.",
+                        approval.kind === "transfer"
+                          ? "Transferência aprovada; aguardando aceite do destino."
+                          : "Movimento aprovado e executado.",
                       )
                     }
                     size="sm"

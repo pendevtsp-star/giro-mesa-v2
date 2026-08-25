@@ -43,9 +43,11 @@ public sealed class PrinterOptions
     public int CharactersPerLine { get; init; } = 48;
     public int CodeTable { get; init; } = 16;
     public bool Cut { get; init; } = true;
+    public bool SupportsRasterGraphics { get; init; }
     public int TimeoutSeconds { get; init; } = 5;
     public bool Default { get; init; }
     public string? FallbackPrinterId { get; init; }
+    public string[] StationIds { get; init; } = [];
     public string[] Stations { get; init; } = [];
     public string[] DocumentTypes { get; init; } = [];
 }

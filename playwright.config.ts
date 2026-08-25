@@ -16,6 +16,12 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: "node tests/e2e/commercial-api-fixture.mjs",
+      url: "http://127.0.0.1:3200/health",
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
       command: "pnpm --filter @giromesa/site exec next dev -p 3110",
       env: {
         NEXT_PUBLIC_API_URL: "http://localhost:3200",

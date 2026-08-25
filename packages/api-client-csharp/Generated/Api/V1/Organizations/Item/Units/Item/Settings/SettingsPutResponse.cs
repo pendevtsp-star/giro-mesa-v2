@@ -44,6 +44,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
 #else
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_publication Publication { get; set; }
 #endif
+        /// <summary>The revision property</summary>
+        public int? Revision { get; set; }
         /// <summary>The unit property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -74,6 +76,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
                 { "organization", n => { Organization = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_organization>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_organization.CreateFromDiscriminatorValue); } },
                 { "presentation", n => { Presentation = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_presentation>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_presentation.CreateFromDiscriminatorValue); } },
                 { "publication", n => { Publication = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_publication>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_publication.CreateFromDiscriminatorValue); } },
+                { "revision", n => { Revision = n.GetIntValue(); } },
                 { "unit", n => { Unit = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_unit>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_unit.CreateFromDiscriminatorValue); } },
             };
         }
@@ -88,6 +91,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_organization>("organization", Organization);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_presentation>("presentation", Presentation);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_publication>("publication", Publication);
+            writer.WriteIntValue("revision", Revision);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsPutResponse_unit>("unit", Unit);
         }
     }

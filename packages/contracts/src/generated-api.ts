@@ -708,6 +708,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_createAccountantAttachment[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["FiscalController_createAccountantAttachment[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/attachments/{attachmentId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantAttachmentContent[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/attachments/{attachmentId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["FiscalController_accountantAttachmentContent[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/fiscal/accountant/requests/{requestId}/resolve": {
     parameters: {
       query?: never;
@@ -1876,6 +1940,102 @@ export interface paths {
     patch: operations["OrganizationsController_updateOrganizationSettings[1]"];
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/settings/specialized-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_specializedSettingsSummary[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/settings/specialized-summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_specializedSettingsSummary[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/settings/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_settingsHistory[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/settings/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_settingsHistory[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/settings/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_restoreUnitSettings[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/settings/restore": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_restoreUnitSettings[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{sourceUnitId}/settings/copy": {
     parameters: {
       query?: never;
@@ -2100,6 +2260,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/public/commercial-experiment-impressions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_experimentImpression[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/commercial-experiment-impressions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["CatalogController_experimentImpression[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/public/trial-applications": {
     parameters: {
       query?: never;
@@ -2254,6 +2446,102 @@ export interface paths {
     get: operations["BillingController_access[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/billing/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["BillingController_summary[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/billing/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["BillingController_summary[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/billing/upgrade-quotes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BillingController_upgradeQuote[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/billing/upgrade-quotes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BillingController_upgradeQuote[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/billing/checkouts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BillingController_checkout[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/billing/checkouts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["BillingController_checkout[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -2516,6 +2804,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/public/menus/{slug}/table-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tableSessionStatus[0]"];
+    put?: never;
+    post: operations["PublicMenuController_tableSession[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-session": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tableSessionStatus[1]"];
+    put?: never;
+    post: operations["PublicMenuController_tableSession[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/consumption": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_consumption[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/consumption": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_consumption[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/table-orders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableOrder[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-orders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PublicMenuController_tableOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/public/menus/{slug}/table-orders/{orderId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tableOrderStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/public/v1/menus/{slug}/table-orders/{orderId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PublicMenuController_tableOrderStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/public/media/{key}": {
     parameters: {
       query?: never;
@@ -2542,38 +2958,6 @@ export interface paths {
     get: operations["PublicMediaController_media[1]"];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/sync/batches": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations["SyncController_synchronize[0]"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/v1/sync/batches": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations["SyncController_synchronize[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3476,6 +3860,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/media/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["PilotCatalogController_deleteMedia[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/media/{key}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["PilotCatalogController_deleteMedia[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/products/{productId}/daily-stock": {
     parameters: {
       query?: never;
@@ -3534,6 +3950,166 @@ export interface paths {
     get: operations["PilotCatalogController_tableQr[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQrSettings[0]"];
+    put: operations["PilotCatalogController_updateTableQrSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQrSettings[1]"];
+    put: operations["PilotCatalogController_updateTableQrSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/lifecycle": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQrLifecycle[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/lifecycle": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotCatalogController_tableQrLifecycle[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/print-batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createTableQrPrintBatch[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/print-batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_createTableQrPrintBatch[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/print-batches/{batchId}/printed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_markTableQrPrintBatchPrinted[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/print-batches/{batchId}/printed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_markTableQrPrintBatchPrinted[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_testTableQrUrl[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/catalog/tables/qr/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotCatalogController_testTableQrUrl[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3599,6 +4175,70 @@ export interface paths {
     put?: never;
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/qr/presence": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_tableQrPresence[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/qr/presence": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_tableQrPresence[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/push/subscriptions/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_operationalPushConfig[0]"];
+    put: operations["PilotPosController_upsertOperationalPushSubscription[0]"];
+    post?: never;
+    delete: operations["PilotPosController_removeOperationalPushSubscription[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/push/subscriptions/{installationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_operationalPushConfig[1]"];
+    put: operations["PilotPosController_upsertOperationalPushSubscription[1]"];
+    post?: never;
+    delete: operations["PilotPosController_removeOperationalPushSubscription[1]"];
     options?: never;
     head?: never;
     patch?: never;
@@ -3700,6 +4340,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/rooms/{roomId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateRoom[0]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveRoom[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/rooms/{roomId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateRoom[1]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveRoom[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateTable[0]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveTable[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateTable[1]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveTable[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tables/{tableId}/turnover": {
     parameters: {
       query?: never;
@@ -3764,6 +4468,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/service-sections/{serviceSectionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateServiceSection[0]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveServiceSection[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/service-sections/{serviceSectionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateServiceSection[1]"];
+    post?: never;
+    delete: operations["PilotPosController_archiveServiceSection[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/open": {
     parameters: {
       query?: never;
@@ -3821,6 +4557,38 @@ export interface paths {
     };
     get?: never;
     put: operations["PilotPosController_updateShiftSectionAssignment[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionsAssignments[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shifts/{shiftId}/sections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PilotPosController_updateShiftSectionsAssignments[1]"];
     post?: never;
     delete?: never;
     options?: never;
@@ -4044,6 +4812,38 @@ export interface paths {
       cookie?: never;
     };
     get: operations["PilotPosController_listTabs[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/counter-queue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_counterQueue[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/counter-queue": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_counterQueue[1]"];
     put?: never;
     post?: never;
     delete?: never;
@@ -4660,6 +5460,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/print-splits": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPrintSplit[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/print-splits": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_createPrintSplit[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/print-jobs": {
     parameters: {
       query?: never;
@@ -5134,6 +5966,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["PilotPosController_sendOrder[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rejectPublicTableOrder[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/orders/{orderId}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_rejectPublicTableOrder[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -6644,6 +7508,742 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_listPrinters[0]"];
+    put?: never;
+    post: operations["ProductionPrintingController_createPrinter[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_listPrinters[1]"];
+    put?: never;
+    post: operations["ProductionPrintingController_createPrinter[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/{printerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ProductionPrintingController_updatePrinter[0]"];
+    post?: never;
+    delete: operations["ProductionPrintingController_archivePrinter[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/{printerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ProductionPrintingController_updatePrinter[1]"];
+    post?: never;
+    delete: operations["ProductionPrintingController_archivePrinter[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/{printerId}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_testPrinter[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/{printerId}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_testPrinter[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/stations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_listStationPolicies[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/stations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_listStationPolicies[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/stations/{stationId}/policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ProductionPrintingController_updateStationPolicy[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/stations/{stationId}/policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ProductionPrintingController_updateStationPolicy[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_printKdsTicket[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/kds/{ticketId}/print-jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_printKdsTicket[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-print-jobs/{printJobId}/resolve-unknown": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_resolveUnknownPrintJob[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-print-jobs/{printJobId}/resolve-unknown": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_resolveUnknownPrintJob[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/integrations/doseclub/activate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubIntegrationController_activate[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/integrations/doseclub/activate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["DoseClubIntegrationController_activate[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/integrations/doseclub/tabs/{tabId}/memberships": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DoseClubIntegrationController_memberships[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/integrations/doseclub/tabs/{tabId}/memberships": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["DoseClubIntegrationController_memberships[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialOverview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialOverview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/versions/{versionId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialPreview[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/versions/{versionId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialPreview[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/drafts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_createCommercialDraft[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/drafts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_createCommercialDraft[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/drafts/{versionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PlatformController_updateCommercialDraft[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/drafts/{versionId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PlatformController_updateCommercialDraft[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/versions/{versionId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approveCommercialVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/versions/{versionId}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_approveCommercialVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/versions/{versionId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_publishCommercialVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/versions/{versionId}/publish": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_publishCommercialVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/rollback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_rollbackCommercialVersion[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/rollback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_rollbackCommercialVersion[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_uploadCommercialMedia[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_uploadCommercialMedia[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/media/{mediaId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["PlatformController_deleteCommercialMedia[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/media/{mediaId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["PlatformController_deleteCommercialMedia[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/campaigns": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_createCommercialCampaign[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/campaigns": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_createCommercialCampaign[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/campaigns/{campaignId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PlatformController_updateCommercialCampaign[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/campaigns/{campaignId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["PlatformController_updateCommercialCampaign[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/leads": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialLeads[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/leads": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialLeads[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/leads/{sourceType}/{sourceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_updateCommercialLead[0]"];
+    trace?: never;
+  };
+  "/v1/platform/commercial/leads/{sourceType}/{sourceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_updateCommercialLead[1]"];
+    trace?: never;
+  };
+  "/api/v1/platform/commercial/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialMetrics[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/commercial/metrics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_commercialMetrics[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/overview": {
     parameters: {
       query?: never;
@@ -6674,6 +8274,230 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_tenants[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_tenants[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_tenant[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_tenant[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/tenants/{organizationId}/pii-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_revealTenantPii[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/pii-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_revealTenantPii[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_incidents[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/incidents": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PlatformController_incidents[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/incidents/{fingerprint}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_updateIncident[0]"];
+    trace?: never;
+  };
+  "/v1/platform/incidents/{fingerprint}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_updateIncident[1]"];
+    trace?: never;
+  };
+  "/api/v1/platform/outbox/{eventId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_retryOutbox[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/outbox/{eventId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_retryOutbox[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/platform/fiscal/organizations/{organizationId}/units/{unitId}/accountant/requests/{requestId}/attachments/{attachmentId}/legal-hold": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_setAccountantAttachmentLegalHold[0]"];
+    trace?: never;
+  };
+  "/v1/platform/fiscal/organizations/{organizationId}/units/{unitId}/accountant/requests/{requestId}/attachments/{attachmentId}/legal-hold": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["PlatformController_setAccountantAttachmentLegalHold[1]"];
     trace?: never;
   };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/overview": {
@@ -7022,6 +8846,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_confirmReturnableCustody[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/confirm-bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmReturnableCustodyBulk[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/confirm-bulk": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_confirmReturnableCustodyBulk[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/handoffs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_handoffReturnableCustodies[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/handoffs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_handoffReturnableCustodies[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/products/{productId}/classification": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_classifyProductReturnable[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/products/{productId}/classification": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_classifyProductReturnable[1]"];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -8436,6 +10356,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_financeSettings[0]"];
+    put: operations["ManagementController_updateFinanceSettings[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_financeSettings[1]"];
+    put: operations["ManagementController_updateFinanceSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_exportFinance[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/export": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_exportFinance[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/approvals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_requestFinanceApproval[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/approvals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_requestFinanceApproval[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/approvals/{approvalRequestId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideFinanceApproval[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/approvals/{approvalRequestId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideFinanceApproval[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables": {
     parameters: {
       query?: never;
@@ -8462,6 +10510,70 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_createPayable[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePayable[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updatePayable[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPayable[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/{payableId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelPayable[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -8500,6 +10612,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/payments/{paymentId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reversePayablePayment[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/payables/payments/{paymentId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reversePayablePayment[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables": {
     parameters: {
       query?: never;
@@ -8532,6 +10676,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReceivable[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementController_updateReceivable[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelReceivable[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_cancelReceivable[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/{receivableId}/payments": {
     parameters: {
       query?: never;
@@ -8558,6 +10766,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_receiveReceivable[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/payments/{paymentId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reverseReceivablePayment[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/receivables/payments/{paymentId}/reverse": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_reverseReceivablePayment[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -8916,6 +11156,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-transfers/{cashTransferId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideCashTransfer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/cash-transfers/{cashTransferId}/decision": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_decideCashTransfer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/cash-shifts/{cashShiftId}/movements": {
     parameters: {
       query?: never;
@@ -9070,6 +11342,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["ManagementController_reconciliation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/reconciliations/{reconciliationEntryId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveFinanceReconciliation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/reconciliations/{reconciliationEntryId}/resolve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_resolveFinanceReconciliation[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -11028,6 +13332,390 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementInventoryControlsController_dashboard[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementInventoryControlsController_dashboard[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/sectors/{locationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementInventoryControlsController_configureSector[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/sectors/{locationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementInventoryControlsController_configureSector[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_startCount[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_startCount[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts/{sessionId}/submit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_submitCount[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts/{sessionId}/submit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_submitCount[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts/{sessionId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_reviewCount[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/counts/{sessionId}/review": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_reviewCount[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/temperatures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_recordTemperature[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/temperatures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_recordTemperature[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/lots/{lotId}/holds": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_holdLot[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/lots/{lotId}/holds": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_holdLot[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/lots/{lotId}/holds/{holdId}/release": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_releaseLot[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/lots/{lotId}/holds/{holdId}/release": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_releaseLot[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_chargeDeposit[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_chargeDeposit[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementInventoryControlsController_returnablePolicy[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementInventoryControlsController_configureReturnablePolicy[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementInventoryControlsController_returnablePolicy[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["ManagementInventoryControlsController_configureReturnablePolicy[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits/{chargeId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_reconcileDeposit[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits/{chargeId}/reconcile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_reconcileDeposit[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits/{chargeId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_cancelDeposit[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/controls/returnables/deposits/{chargeId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementInventoryControlsController_cancelDeposit[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/waiter-settlements": {
     parameters: {
       query?: never;
@@ -11380,6 +14068,134 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/growth/customers/page": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listCustomerPage[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/customers/page": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listCustomerPage[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/customers/{customerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_customerDetail[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateCustomer[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/customers/{customerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_customerDetail[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateCustomer[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/archive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_archiveCustomer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/customers/{customerId}/archive": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_archiveCustomer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_mergeCustomer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/customers/{customerId}/merge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_mergeCustomer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/consents": {
     parameters: {
       query?: never;
@@ -11470,6 +14286,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["GrowthController_configureLoyalty[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/loyalty/programs/current": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_loyaltyProgram[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/loyalty/programs/current": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_loyaltyProgram[1]"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -11636,6 +14484,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/growth/coupons/{couponId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateCoupon[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/coupons/{couponId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateCoupon[1]"];
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/growth/coupons/redeem": {
     parameters: {
       query?: never;
@@ -11758,6 +14638,102 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["GrowthController_queueCampaign[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_previewCampaign[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/preview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_previewCampaign[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/deliveries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_campaignDeliveries[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/deliveries": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_campaignDeliveries[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_cancelCampaign[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/campaigns/{campaignId}/cancel": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_cancelCampaign[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -12660,6 +15636,582 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/growth/integrations/evolution-go": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_getEvolution[0]"];
+    put?: never;
+    post: operations["GrowthController_configureEvolution[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/evolution-go": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_getEvolution[1]"];
+    put?: never;
+    post: operations["GrowthController_configureEvolution[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/evolution-go/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_evolutionStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/evolution-go/status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_evolutionStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/evolution-go/qr": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_evolutionQr[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/evolution-go/qr": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_evolutionQr[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/evolution-go/reconnect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_reconnectEvolution[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/evolution-go/reconnect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_reconnectEvolution[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/integrations/evolution-go/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_logoutEvolution[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/integrations/evolution-go/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_logoutEvolution[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappInbox[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappInbox[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappMessages[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappMessages[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateWhatsappConversation[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateWhatsappConversation[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/assignees": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappAssignees[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/assignees": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappAssignees[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/messages/{messageId}/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappMessageMedia[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/messages/{messageId}/media": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_whatsappMessageMedia[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_markWhatsappRead[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/conversations/{conversationId}/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_markWhatsappRead[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/whatsapp/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_sendWhatsappMessage[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/whatsapp/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_sendWhatsappMessage[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/automations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmAutomations[0]"];
+    put?: never;
+    post: operations["GrowthController_upsertCrmAutomation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/automations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmAutomations[1]"];
+    put?: never;
+    post: operations["GrowthController_upsertCrmAutomation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/automation-executions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmAutomationExecutions[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/automation-executions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmAutomationExecutions[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/automation-executions/{executionId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_retryCrmAutomationExecution[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/automation-executions/{executionId}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_retryCrmAutomationExecution[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/automations/{ruleId}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_testCrmAutomation[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/automations/{ruleId}/test": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthController_testCrmAutomation[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/quick-replies": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmQuickReplies[0]"];
+    put?: never;
+    post: operations["GrowthController_upsertCrmQuickReply[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/quick-replies": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_crmQuickReplies[1]"];
+    put?: never;
+    post: operations["GrowthController_upsertCrmQuickReply[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/crm/quick-replies/{replyId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["GrowthController_deleteCrmQuickReply[0]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/crm/quick-replies/{replyId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations["GrowthController_deleteCrmQuickReply[1]"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/growth/opt-out": {
     parameters: {
       query?: never;
@@ -12686,6 +16238,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["GrowthPublicController_optOut[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/growth/evolution-go/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthPublicController_evolutionWebhook[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/growth/evolution-go/webhook": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["GrowthPublicController_evolutionWebhook[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -12814,6 +16398,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["GrowthPublicApiController_publish[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/sync/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_synchronize[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sync/batches": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["SyncController_synchronize[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -14675,7 +18291,9 @@ export interface operations {
   };
   "FiscalController_accountantPackage[0]": {
     parameters: {
-      query?: never;
+      query: {
+        competence: string;
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14689,13 +18307,34 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "available" | "unavailable";
+            competence: string;
+            /** @enum {string} */
+            reason?: "period_not_closed";
+            /** Format: date-time */
+            closedAt?: string | null;
+            /** Format: date-time */
+            generatedAt?: string | null;
+            sha256?: string | null;
+            summary?: {
+              documents?: number;
+              totalCents?: number;
+              taxCents?: number;
+            };
+            files?: string[];
+          };
+        };
       };
     };
   };
   "FiscalController_accountantPackage[1]": {
     parameters: {
-      query?: never;
+      query: {
+        competence: string;
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14709,13 +18348,34 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "available" | "unavailable";
+            competence: string;
+            /** @enum {string} */
+            reason?: "period_not_closed";
+            /** Format: date-time */
+            closedAt?: string | null;
+            /** Format: date-time */
+            generatedAt?: string | null;
+            sha256?: string | null;
+            summary?: {
+              documents?: number;
+              totalCents?: number;
+              taxCents?: number;
+            };
+            files?: string[];
+          };
+        };
       };
     };
   };
   "FiscalController_accountantPackageContent[0]": {
     parameters: {
-      query?: never;
+      query: {
+        competence: string;
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14729,13 +18389,26 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            filename: string;
+            /** Format: byte */
+            content: string;
+            /** @enum {string} */
+            contentEncoding: "base64";
+            /** @enum {string} */
+            mimeType: "application/zip";
+            sha256: string;
+          };
+        };
       };
     };
   };
   "FiscalController_accountantPackageContent[1]": {
     parameters: {
-      query?: never;
+      query: {
+        competence: string;
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14749,7 +18422,18 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            filename: string;
+            /** Format: byte */
+            content: string;
+            /** @enum {string} */
+            contentEncoding: "base64";
+            /** @enum {string} */
+            mimeType: "application/zip";
+            sha256: string;
+          };
+        };
       };
     };
   };
@@ -14899,7 +18583,14 @@ export interface operations {
   };
   "FiscalController_accountantRequests[0]": {
     parameters: {
-      query?: never;
+      query?: {
+        pageSize?: number;
+        page?: number;
+        competence?: string;
+        overdue?: boolean;
+        targetAudience?: "accountant" | "establishment";
+        status?: "open" | "resolved";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14913,7 +18604,55 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            items: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            }[];
+            pagination: {
+              page: number;
+              pageSize: number;
+              total: number;
+            };
+          };
+        };
       };
     };
   };
@@ -14936,12 +18675,6 @@ export interface operations {
           title: string;
           description: string;
           dueDate?: string;
-          /** @default [] */
-          attachments?: {
-            name: string;
-            storageKey: string;
-            sha256?: string;
-          }[];
         };
       };
     };
@@ -14950,13 +18683,64 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            request: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            };
+            replayed: boolean;
+          };
+        };
       };
     };
   };
   "FiscalController_accountantRequests[1]": {
     parameters: {
-      query?: never;
+      query?: {
+        pageSize?: number;
+        page?: number;
+        competence?: string;
+        overdue?: boolean;
+        targetAudience?: "accountant" | "establishment";
+        status?: "open" | "resolved";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -14970,7 +18754,55 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            items: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            }[];
+            pagination: {
+              page: number;
+              pageSize: number;
+              total: number;
+            };
+          };
+        };
       };
     };
   };
@@ -14993,12 +18825,6 @@ export interface operations {
           title: string;
           description: string;
           dueDate?: string;
-          /** @default [] */
-          attachments?: {
-            name: string;
-            storageKey: string;
-            sha256?: string;
-          }[];
         };
       };
     };
@@ -15007,7 +18833,215 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            request: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            };
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
+  "FiscalController_createAccountantAttachment[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          contentType:
+            | "application/pdf"
+            | "application/xml"
+            | "text/xml"
+            | "text/csv"
+            | "image/jpeg"
+            | "image/png";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attachment: {
+              /** Format: uuid */
+              id: string;
+              fileName: string;
+              contentType: string;
+              sizeBytes: number;
+              sha256: string;
+              /** Format: date-time */
+              createdAt: string;
+            };
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
+  "FiscalController_createAccountantAttachment[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          contentType:
+            | "application/pdf"
+            | "application/xml"
+            | "text/xml"
+            | "text/csv"
+            | "image/jpeg"
+            | "image/png";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            attachment: {
+              /** Format: uuid */
+              id: string;
+              fileName: string;
+              contentType: string;
+              sizeBytes: number;
+              sha256: string;
+              /** Format: date-time */
+              createdAt: string;
+            };
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
+  "FiscalController_accountantAttachmentContent[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            filename: string;
+            /** Format: byte */
+            content: string;
+            /** @enum {string} */
+            contentEncoding: "base64";
+            mimeType: string;
+            sha256: string;
+          };
+        };
+      };
+    };
+  };
+  "FiscalController_accountantAttachmentContent[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            filename: string;
+            /** Format: byte */
+            content: string;
+            /** @enum {string} */
+            contentEncoding: "base64";
+            mimeType: string;
+            sha256: string;
+          };
+        };
       };
     };
   };
@@ -15034,7 +19068,51 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            request: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            };
+            replayed: boolean;
+          };
+        };
       };
     };
   };
@@ -15061,7 +19139,51 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            request: {
+              /** Format: uuid */
+              id: string;
+              /** Format: date */
+              competence: string;
+              title: string;
+              description: string;
+              /** @enum {string} */
+              status: "open" | "resolved";
+              /** @enum {string} */
+              targetAudience: "accountant" | "establishment";
+              /** Format: date */
+              dueDate?: string | null;
+              resolution?: string | null;
+              createdByName: string;
+              resolvedByName?: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              resolvedAt?: string | null;
+              /** Format: date-time */
+              updatedAt?: string;
+              attachments: {
+                /** Format: uuid */
+                id: string;
+                fileName: string;
+                /** @enum {string} */
+                contentType:
+                  | "application/pdf"
+                  | "application/xml"
+                  | "text/xml"
+                  | "text/csv"
+                  | "image/jpeg"
+                  | "image/png";
+                sizeBytes: number;
+                sha256: string;
+                /** Format: date-time */
+                createdAt: string;
+              }[];
+            };
+            replayed: boolean;
+          };
+        };
       };
     };
   };
@@ -16489,7 +20611,17 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          reason?: "manual" | "idle" | "switch";
+        };
+      };
+    };
     responses: {
       200: {
         headers: {
@@ -16506,7 +20638,17 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          reason?: "manual" | "idle" | "switch";
+        };
+      };
+    };
     responses: {
       200: {
         headers: {
@@ -16666,12 +20808,15 @@ export interface operations {
         };
         content: {
           "application/json": {
+            revision: number;
             organization: {
               /** Format: uuid */
               id: string;
               legalName: string;
               tradeName: string;
               document: string;
+              /** Format: date-time */
+              revision: string;
             };
             unit: {
               /** Format: uuid */
@@ -16685,12 +20830,26 @@ export interface operations {
               slogan: string | null;
               /** @default null */
               logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
               primaryColor: string;
               accentColor: string;
               /** @default null */
               notice: string | null;
               /** @default null */
               address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
               /** @default null */
               phone: string | null;
               /** @default null */
@@ -16736,18 +20895,21 @@ export interface operations {
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "closed";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "open24h";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "periods";
                     periods: {
@@ -16762,7 +20924,10 @@ export interface operations {
             publication: {
               active: boolean;
               publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
               hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
             };
           };
         };
@@ -16782,6 +20947,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           name: string;
           timezone: string;
           presentation: {
@@ -16790,12 +20956,26 @@ export interface operations {
             slogan?: string | null;
             /** @default null */
             logoUrl?: string | null;
+            /** @default null */
+            logoThumbnailUrl?: string | null;
+            /** @default null */
+            coverImageUrl?: string | null;
             primaryColor: string;
             accentColor: string;
             /** @default null */
             notice?: string | null;
             /** @default null */
             address?: string | null;
+            addressDetails?: {
+              postalCode: string;
+              street: string;
+              number: string;
+              /** @default null */
+              complement?: string | null;
+              district: string;
+              city: string;
+              state: string;
+            } | null;
             /** @default null */
             phone?: string | null;
             /** @default null */
@@ -16841,18 +21021,21 @@ export interface operations {
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "closed";
                 }
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "open24h";
                 }
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "periods";
                   periods: {
@@ -16874,12 +21057,15 @@ export interface operations {
         };
         content: {
           "application/json": {
+            revision: number;
             organization: {
               /** Format: uuid */
               id: string;
               legalName: string;
               tradeName: string;
               document: string;
+              /** Format: date-time */
+              revision: string;
             };
             unit: {
               /** Format: uuid */
@@ -16893,12 +21079,26 @@ export interface operations {
               slogan: string | null;
               /** @default null */
               logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
               primaryColor: string;
               accentColor: string;
               /** @default null */
               notice: string | null;
               /** @default null */
               address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
               /** @default null */
               phone: string | null;
               /** @default null */
@@ -16944,18 +21144,21 @@ export interface operations {
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "closed";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "open24h";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "periods";
                     periods: {
@@ -16970,7 +21173,10 @@ export interface operations {
             publication: {
               active: boolean;
               publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
               hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
             };
           };
         };
@@ -16995,12 +21201,15 @@ export interface operations {
         };
         content: {
           "application/json": {
+            revision: number;
             organization: {
               /** Format: uuid */
               id: string;
               legalName: string;
               tradeName: string;
               document: string;
+              /** Format: date-time */
+              revision: string;
             };
             unit: {
               /** Format: uuid */
@@ -17014,12 +21223,26 @@ export interface operations {
               slogan: string | null;
               /** @default null */
               logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
               primaryColor: string;
               accentColor: string;
               /** @default null */
               notice: string | null;
               /** @default null */
               address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
               /** @default null */
               phone: string | null;
               /** @default null */
@@ -17065,18 +21288,21 @@ export interface operations {
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "closed";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "open24h";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "periods";
                     periods: {
@@ -17091,7 +21317,10 @@ export interface operations {
             publication: {
               active: boolean;
               publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
               hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
             };
           };
         };
@@ -17111,6 +21340,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           name: string;
           timezone: string;
           presentation: {
@@ -17119,12 +21349,26 @@ export interface operations {
             slogan?: string | null;
             /** @default null */
             logoUrl?: string | null;
+            /** @default null */
+            logoThumbnailUrl?: string | null;
+            /** @default null */
+            coverImageUrl?: string | null;
             primaryColor: string;
             accentColor: string;
             /** @default null */
             notice?: string | null;
             /** @default null */
             address?: string | null;
+            addressDetails?: {
+              postalCode: string;
+              street: string;
+              number: string;
+              /** @default null */
+              complement?: string | null;
+              district: string;
+              city: string;
+              state: string;
+            } | null;
             /** @default null */
             phone?: string | null;
             /** @default null */
@@ -17170,18 +21414,21 @@ export interface operations {
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "closed";
                 }
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "open24h";
                 }
               | {
                   /** Format: date */
                   date: string;
+                  label?: string;
                   /** @enum {string} */
                   mode: "periods";
                   periods: {
@@ -17203,12 +21450,15 @@ export interface operations {
         };
         content: {
           "application/json": {
+            revision: number;
             organization: {
               /** Format: uuid */
               id: string;
               legalName: string;
               tradeName: string;
               document: string;
+              /** Format: date-time */
+              revision: string;
             };
             unit: {
               /** Format: uuid */
@@ -17222,12 +21472,26 @@ export interface operations {
               slogan: string | null;
               /** @default null */
               logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
               primaryColor: string;
               accentColor: string;
               /** @default null */
               notice: string | null;
               /** @default null */
               address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
               /** @default null */
               phone: string | null;
               /** @default null */
@@ -17273,18 +21537,21 @@ export interface operations {
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "closed";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "open24h";
                   }
                 | {
                     /** Format: date */
                     date: string;
+                    label?: string;
                     /** @enum {string} */
                     mode: "periods";
                     periods: {
@@ -17299,7 +21566,10 @@ export interface operations {
             publication: {
               active: boolean;
               publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
               hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
             };
           };
         };
@@ -17319,6 +21589,8 @@ export interface operations {
       content: {
         "application/json": {
           tradeName: string;
+          /** Format: date-time */
+          expectedRevision: string;
         };
       };
     };
@@ -17334,6 +21606,8 @@ export interface operations {
             legalName: string;
             tradeName: string;
             document: string;
+            /** Format: date-time */
+            revision: string;
           };
         };
       };
@@ -17352,6 +21626,8 @@ export interface operations {
       content: {
         "application/json": {
           tradeName: string;
+          /** Format: date-time */
+          expectedRevision: string;
         };
       };
     };
@@ -17367,6 +21643,472 @@ export interface operations {
             legalName: string;
             tradeName: string;
             document: string;
+            /** Format: date-time */
+            revision: string;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_specializedSettingsSummary[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            catalog: {
+              active: boolean;
+              publishedVersion: number | null;
+            };
+            cash: {
+              configured: boolean;
+            };
+            people: {
+              timeTrackingConfigured: boolean;
+            };
+            kds: {
+              activeStations: number;
+            };
+            fiscal: {
+              configured: boolean;
+            };
+            devices: {
+              activeCount: number;
+            };
+            billing: {
+              state: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_specializedSettingsSummary[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            catalog: {
+              active: boolean;
+              publishedVersion: number | null;
+            };
+            cash: {
+              configured: boolean;
+            };
+            people: {
+              timeTrackingConfigured: boolean;
+            };
+            kds: {
+              activeStations: number;
+            };
+            fiscal: {
+              configured: boolean;
+            };
+            devices: {
+              activeCount: number;
+            };
+            billing: {
+              state: string;
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_settingsHistory[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "updated" | "copied" | "restored";
+            actorDisplayName: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+            revision: number;
+            changedSections: ("unit" | "brand" | "contacts" | "hours" | "timezone")[];
+          }[];
+        };
+      };
+    };
+  };
+  "OrganizationsController_settingsHistory[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            action: "updated" | "copied" | "restored";
+            actorDisplayName: string | null;
+            /** Format: date-time */
+            occurredAt: string;
+            revision: number;
+            changedSections: ("unit" | "brand" | "contacts" | "hours" | "timezone")[];
+          }[];
+        };
+      };
+    };
+  };
+  "OrganizationsController_restoreUnitSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          auditEventId: string;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            revision: number;
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+              /** Format: date-time */
+              revision: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
+              hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
+            };
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_restoreUnitSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          auditEventId: string;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            revision: number;
+            organization: {
+              /** Format: uuid */
+              id: string;
+              legalName: string;
+              tradeName: string;
+              document: string;
+              /** Format: date-time */
+              revision: string;
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              timezone: string;
+            };
+            presentation: {
+              displayName: string;
+              /** @default null */
+              slogan: string | null;
+              /** @default null */
+              logoUrl: string | null;
+              /** @default null */
+              logoThumbnailUrl: string | null;
+              /** @default null */
+              coverImageUrl: string | null;
+              primaryColor: string;
+              accentColor: string;
+              /** @default null */
+              notice: string | null;
+              /** @default null */
+              address: string | null;
+              addressDetails?: {
+                postalCode: string;
+                street: string;
+                number: string;
+                /** @default null */
+                complement: string | null;
+                district: string;
+                city: string;
+                state: string;
+              } | null;
+              /** @default null */
+              phone: string | null;
+              /** @default null */
+              instagram: string | null;
+              /** @default null */
+              openingHours: string | null;
+              /** @default null */
+              serviceTaxNotice: string | null;
+              /** @default null */
+              corkageFeeNotice: string | null;
+              /** @default null */
+              wifi: {
+                ssid: string;
+                password: string;
+              } | null;
+            };
+            businessHours: {
+              weekly: (
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    weekday: number;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+              /** @default [] */
+              exceptions: (
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "closed";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "open24h";
+                  }
+                | {
+                    /** Format: date */
+                    date: string;
+                    label?: string;
+                    /** @enum {string} */
+                    mode: "periods";
+                    periods: {
+                      start: string;
+                      end: string;
+                      /** @default false */
+                      endsNextDay: boolean;
+                    }[];
+                  }
+              )[];
+            };
+            publication: {
+              active: boolean;
+              publishedAt: string | null;
+              publishedVersion: number | null;
+              publicUrl: string | null;
+              hasUnpublishedChanges: boolean;
+              pendingSections: ("brand" | "contacts" | "hours" | "timezone")[];
+            };
           };
         };
       };
@@ -17388,6 +22130,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           targetUnitIds: string[];
         };
       };
@@ -17424,6 +22167,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           targetUnitIds: string[];
         };
       };
@@ -17637,7 +22381,33 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "ok";
+            version: string;
+            buildSha: string;
+            schemaVersion: number;
+            capabilities: (
+              | "table_qr_lifecycle_v1"
+              | "table_qr_metrics_v1"
+              | "table_qr_presence_code_v1"
+              | "ops_background_notifications_v1"
+              | "table_qr_brand_upload_v1"
+              | "ops_web_push_v1"
+              | "public_menu_cover_image_v1"
+              | "platform_backoffice_v1"
+              | "platform_commercial_site_v1"
+              | "crm_evolution_go_v1"
+              | "crm_operational_inbox_v1"
+            )[];
+            /** @enum {string} */
+            database: "up";
+            integrations: {
+              [key: string]: string;
+            };
+          };
+        };
       };
     };
   };
@@ -17654,7 +22424,33 @@ export interface operations {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "ok";
+            version: string;
+            buildSha: string;
+            schemaVersion: number;
+            capabilities: (
+              | "table_qr_lifecycle_v1"
+              | "table_qr_metrics_v1"
+              | "table_qr_presence_code_v1"
+              | "ops_background_notifications_v1"
+              | "table_qr_brand_upload_v1"
+              | "ops_web_push_v1"
+              | "public_menu_cover_image_v1"
+              | "platform_backoffice_v1"
+              | "platform_commercial_site_v1"
+              | "crm_evolution_go_v1"
+              | "crm_operational_inbox_v1"
+            )[];
+            /** @enum {string} */
+            database: "up";
+            integrations: {
+              [key: string]: string;
+            };
+          };
+        };
       };
     };
   };
@@ -17695,7 +22491,9 @@ export interface operations {
   "CatalogController_catalog[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "x-giromesa-visitor-id": string;
+      };
       path?: never;
       cookie?: never;
     };
@@ -17712,13 +22510,67 @@ export interface operations {
   "CatalogController_catalog[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "x-giromesa-visitor-id": string;
+      };
       path?: never;
       cookie?: never;
     };
     requestBody?: never;
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_experimentImpression[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          catalogVersion: number;
+          experimentSlug: string;
+          variantKey: string;
+          visitorId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "CatalogController_experimentImpression[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          catalogVersion: number;
+          experimentSlug: string;
+          variantKey: string;
+          visitorId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };
@@ -17747,6 +22599,20 @@ export interface operations {
               planSlug: "operacao" | "crescimento" | "rede";
               /** @enum {boolean} */
               consent: true;
+              attribution: {
+                campaignSlug?: string;
+                experimentSlug?: string;
+                variantKey?: string;
+                visitorId?: string;
+                landingVersion: number;
+                utmSource?: string;
+                utmMedium?: string;
+                utmCampaign?: string;
+                utmTerm?: string;
+                utmContent?: string;
+                termsVersion: string;
+                privacyVersion: string;
+              };
             }
           | {
               name: string;
@@ -17758,6 +22624,20 @@ export interface operations {
               /** @enum {string} */
               plan: "Operação" | "Crescimento" | "Rede";
               privacyAccepted: true | "true";
+              attribution: {
+                campaignSlug?: string;
+                experimentSlug?: string;
+                variantKey?: string;
+                visitorId?: string;
+                landingVersion: number;
+                utmSource?: string;
+                utmMedium?: string;
+                utmCampaign?: string;
+                utmTerm?: string;
+                utmContent?: string;
+                termsVersion: string;
+                privacyVersion: string;
+              };
             };
       };
     };
@@ -17791,6 +22671,20 @@ export interface operations {
               planSlug: "operacao" | "crescimento" | "rede";
               /** @enum {boolean} */
               consent: true;
+              attribution: {
+                campaignSlug?: string;
+                experimentSlug?: string;
+                variantKey?: string;
+                visitorId?: string;
+                landingVersion: number;
+                utmSource?: string;
+                utmMedium?: string;
+                utmCampaign?: string;
+                utmTerm?: string;
+                utmContent?: string;
+                termsVersion: string;
+                privacyVersion: string;
+              };
             }
           | {
               name: string;
@@ -17802,6 +22696,20 @@ export interface operations {
               /** @enum {string} */
               plan: "Operação" | "Crescimento" | "Rede";
               privacyAccepted: true | "true";
+              attribution: {
+                campaignSlug?: string;
+                experimentSlug?: string;
+                variantKey?: string;
+                visitorId?: string;
+                landingVersion: number;
+                utmSource?: string;
+                utmMedium?: string;
+                utmCampaign?: string;
+                utmTerm?: string;
+                utmContent?: string;
+                termsVersion: string;
+                privacyVersion: string;
+              };
             };
       };
     };
@@ -17830,6 +22738,20 @@ export interface operations {
           phone: string;
           message: string;
           privacyAccepted: true | "true";
+          attribution: {
+            campaignSlug?: string;
+            experimentSlug?: string;
+            variantKey?: string;
+            visitorId?: string;
+            landingVersion: number;
+            utmSource?: string;
+            utmMedium?: string;
+            utmCampaign?: string;
+            utmTerm?: string;
+            utmContent?: string;
+            termsVersion: string;
+            privacyVersion: string;
+          };
         };
       };
     };
@@ -17858,6 +22780,20 @@ export interface operations {
           phone: string;
           message: string;
           privacyAccepted: true | "true";
+          attribution: {
+            campaignSlug?: string;
+            experimentSlug?: string;
+            variantKey?: string;
+            visitorId?: string;
+            landingVersion: number;
+            utmSource?: string;
+            utmMedium?: string;
+            utmCampaign?: string;
+            utmTerm?: string;
+            utmContent?: string;
+            termsVersion: string;
+            privacyVersion: string;
+          };
         };
       };
     };
@@ -18068,6 +23004,188 @@ export interface operations {
       };
     };
   };
+  "BillingController_summary[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "BillingController_summary[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "BillingController_upgradeQuote[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          targetPlanSlug: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "BillingController_upgradeQuote[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          targetPlanSlug: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "BillingController_checkout[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              intent: "subscribe";
+              planSlug: string;
+              /** @enum {string} */
+              cycle: "monthly" | "annual";
+              promotionCode?: string;
+            }
+          | {
+              /** @enum {string} */
+              intent: "regularize";
+              /** Format: uuid */
+              chargeId: string;
+            }
+          | {
+              /** @enum {string} */
+              intent: "upgrade";
+              /** Format: uuid */
+              quoteId: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "BillingController_checkout[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              intent: "subscribe";
+              planSlug: string;
+              /** @enum {string} */
+              cycle: "monthly" | "annual";
+              promotionCode?: string;
+            }
+          | {
+              /** @enum {string} */
+              intent: "regularize";
+              /** Format: uuid */
+              chargeId: string;
+            }
+          | {
+              /** @enum {string} */
+              intent: "upgrade";
+              /** Format: uuid */
+              quoteId: string;
+            };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "BillingController_event[0]": {
     parameters: {
       query?: never;
@@ -18145,9 +23263,18 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          id: string;
+          event: string;
+        } & {
+          [key: string]: unknown;
+        };
+      };
+    };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -18162,9 +23289,18 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          id: string;
+          event: string;
+        } & {
+          [key: string]: unknown;
+        };
+      };
+    };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -18473,7 +23609,10 @@ export interface operations {
   "PublicMenuController_command[0]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "X-GiroMesa-Table-Token"?: string;
+        "Idempotency-Key": string;
+      };
       path: {
         slug: string;
       };
@@ -18481,26 +23620,93 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "call_waiter";
+              /** @default {} */
+              payload?: Record<string, never>;
+            }
+          | {
+              /** @enum {string} */
+              type: "request_check";
+              /** @default {} */
+              payload?: Record<string, never>;
+            };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {boolean} */
+            acknowledged: true;
+            /** Format: uuid */
+            callId: string;
+            /** @enum {string} */
+            kind: "assistance" | "bill";
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved";
+            duplicate: boolean;
           };
         };
       };
     };
+  };
+  "PublicMenuController_command[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-GiroMesa-Table-Token"?: string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json":
+          | {
+              /** @enum {string} */
+              type: "call_waiter";
+              /** @default {} */
+              payload?: Record<string, never>;
+            }
+          | {
+              /** @enum {string} */
+              type: "request_check";
+              /** @default {} */
+              payload?: Record<string, never>;
+            };
+      };
+    };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {boolean} */
+            acknowledged: true;
+            /** Format: uuid */
+            callId: string;
+            /** @enum {string} */
+            kind: "assistance" | "bill";
+            /** @enum {string} */
+            status: "open" | "acknowledged" | "resolved";
+            duplicate: boolean;
+          };
+        };
       };
     };
   };
-  "PublicMenuController_command[1]": {
+  "PublicMenuController_tableSessionStatus[0]": {
     parameters: {
       query?: never;
       header?: never;
@@ -18509,24 +23715,358 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody: {
-      content: {
-        "application/json": {
-          /** @enum {string} */
-          type: "place_order" | "call_waiter" | "request_check";
-          /** @default {} */
-          payload?: {
-            [key: string]: unknown;
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "awaiting_tab" | "active";
+            activeTab: boolean;
+            tableLabel: string;
+            /** Format: date-time */
+            expiresAt: string;
           };
         };
       };
     };
+  };
+  "PublicMenuController_tableSession[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-GiroMesa-Table-Token": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          presenceCode?: string;
+        };
+      };
+    };
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
-        content?: never;
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "awaiting_tab" | "active";
+            activeTab: boolean;
+            tableLabel: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableSessionStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "awaiting_tab" | "active";
+            activeTab: boolean;
+            tableLabel: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableSession[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "X-GiroMesa-Table-Token": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          presenceCode?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "awaiting_tab" | "active";
+            activeTab: boolean;
+            tableLabel: string;
+            /** Format: date-time */
+            expiresAt: string;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_consumption[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "open";
+            tableLabel: string;
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            subtotalCents: number;
+            totalCents: number;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_consumption[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            status: "open";
+            tableLabel: string;
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            subtotalCents: number;
+            totalCents: number;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            productId: string;
+            quantity: number;
+            /** @default [] */
+            modifierOptionIds?: string[];
+            notes?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "draft" | "sent" | "canceled" | "preparing" | "ready" | "served";
+            /** @enum {string} */
+            source: "qr_table";
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            totalCents: number;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        slug: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          items: {
+            /** Format: uuid */
+            productId: string;
+            quantity: number;
+            /** @default [] */
+            modifierOptionIds?: string[];
+            notes?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "draft" | "sent" | "canceled" | "preparing" | "ready" | "served";
+            /** @enum {string} */
+            source: "qr_table";
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            totalCents: number;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableOrderStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "draft" | "sent" | "canceled" | "preparing" | "ready" | "served";
+            /** @enum {string} */
+            source: "qr_table";
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            totalCents: number;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PublicMenuController_tableOrderStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        slug: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "draft" | "sent" | "canceled" | "preparing" | "ready" | "served";
+            /** @enum {string} */
+            source: "qr_table";
+            items: {
+              name: string;
+              quantity: number;
+              totalCents: number;
+            }[];
+            totalCents: number;
+            idempotentReplay?: boolean;
+          };
+        };
       };
     };
   };
@@ -18559,102 +24099,6 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "SyncController_synchronize[0]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
-            };
-            version: number;
-            /** Format: date-time */
-            occurredAt: string;
-          }[];
-        };
-      };
-    };
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "SyncController_synchronize[1]": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": {
-          /** @enum {number} */
-          protocolVersion: 1;
-          hubVersion: string;
-          /** @default {} */
-          metadata?: {
-            [key: string]: unknown;
-          };
-          /** @default [] */
-          acknowledgedCommandIds?: string[];
-          /** @default [] */
-          events?: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            actorId: string;
-            /** Format: uuid */
-            deviceId: string;
-            idempotencyKey: string;
-            type: string;
-            payload: {
-              [key: string]: unknown;
-            };
-            version: number;
-            /** Format: date-time */
-            occurredAt: string;
-          }[];
-        };
-      };
-    };
     responses: {
       200: {
         headers: {
@@ -20834,6 +26278,7 @@ export interface operations {
           displayName: string;
           slogan?: string | null;
           logoUrl?: string | null;
+          coverImageUrl?: string | null;
           primaryColor: string;
           accentColor: string;
           notice?: string | null;
@@ -20895,6 +26340,7 @@ export interface operations {
           displayName: string;
           slogan?: string | null;
           logoUrl?: string | null;
+          coverImageUrl?: string | null;
           primaryColor: string;
           accentColor: string;
           notice?: string | null;
@@ -21314,6 +26760,48 @@ export interface operations {
       };
     };
   };
+  "PilotCatalogController_deleteMedia[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_deleteMedia[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        key: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotCatalogController_setDailyStock[0]": {
     parameters: {
       query?: never;
@@ -21410,10 +26898,350 @@ export interface operations {
       };
     };
   };
-  "PilotCatalogController_rotateTableQr[0]": {
+  "PilotCatalogController_tableQrSettings[0]": {
     parameters: {
       query?: never;
       header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateTableQrSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedRevision: number;
+          displayName: string;
+          headline: string;
+          instructions: string;
+          logoUrl: string | null;
+          primaryColor: string;
+          wifiNotice: string | null;
+          serviceChargeNotice: string | null;
+          /** @enum {string} */
+          template: "classic" | "compact" | "minimal";
+          /** @enum {string} */
+          presenceProtection: "session_only" | "daily_code";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_tableQrSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_updateTableQrSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedRevision: number;
+          displayName: string;
+          headline: string;
+          instructions: string;
+          logoUrl: string | null;
+          primaryColor: string;
+          wifiNotice: string | null;
+          serviceChargeNotice: string | null;
+          /** @enum {string} */
+          template: "classic" | "compact" | "minimal";
+          /** @enum {string} */
+          presenceProtection: "session_only" | "daily_code";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_tableQrLifecycle[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_tableQrLifecycle[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createTableQrPrintBatch[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          format: "a4_2" | "a4_4" | "a4_6" | "a5" | "table_tent" | "sticker";
+          /** @enum {string} */
+          output: "print" | "svg" | "png" | "pdf";
+          /** @enum {string} */
+          template?: "classic" | "compact" | "minimal";
+          /** @default false */
+          includeWifi?: boolean;
+          tableIds: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_createTableQrPrintBatch[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          format: "a4_2" | "a4_4" | "a4_6" | "a5" | "table_tent" | "sticker";
+          /** @enum {string} */
+          output: "print" | "svg" | "png" | "pdf";
+          /** @enum {string} */
+          template?: "classic" | "compact" | "minimal";
+          /** @default false */
+          includeWifi?: boolean;
+          tableIds: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_markTableQrPrintBatchPrinted[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_markTableQrPrintBatchPrinted[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        batchId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_testTableQrUrl[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uri */
+          url: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_testTableQrUrl[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uri */
+          url: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotCatalogController_rotateTableQr[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -21434,7 +27262,9 @@ export interface operations {
   "PilotCatalogController_rotateTableQr[1]": {
     parameters: {
       query?: never;
-      header?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
       path: {
         organizationId: string;
         unitId: string;
@@ -21492,6 +27322,232 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_tableQrPresence[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            mode: "session_only" | "daily_code";
+            code: string | null;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_tableQrPresence[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            mode: "session_only" | "daily_code";
+            code: string | null;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_operationalPushConfig[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            configured: boolean;
+            publicKey: string | null;
+            active: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_upsertOperationalPushSubscription[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uri */
+          endpoint: string;
+          expirationTime: number | null;
+          keys: {
+            p256dh: string;
+            auth: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            configured: boolean;
+            publicKey: string | null;
+            active: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_removeOperationalPushSubscription[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_operationalPushConfig[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            configured: boolean;
+            publicKey: string | null;
+            active: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_upsertOperationalPushSubscription[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uri */
+          endpoint: string;
+          expirationTime: number | null;
+          keys: {
+            p256dh: string;
+            auth: string;
+          };
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            configured: boolean;
+            publicKey: string | null;
+            active: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_removeOperationalPushSubscription[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        installationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotPosController_updateFloorLayout[0]": {
     parameters: {
       query?: never;
@@ -21505,12 +27561,28 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           /** @default [] */
           tables?: {
             /** Format: uuid */
             tableId: string;
+            /** Format: uuid */
+            roomId: string;
+            label: string;
+            seats: number;
             x: number;
             y: number;
+            /** @default 122 */
+            width?: number;
+            /** @default 76 */
+            height?: number;
+            /** @default 0 */
+            rotation?: number;
+            /**
+             * @default rectangle
+             * @enum {string}
+             */
+            shape?: "round" | "square" | "rectangle";
           }[];
           /** @default [] */
           rooms?: {
@@ -21520,6 +27592,21 @@ export interface operations {
               x: number;
               y: number;
             }[];
+          }[];
+          layoutElements?: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            roomId: string;
+            /** @enum {string} */
+            kind: "label" | "barrier";
+            label?: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            /** @default 0 */
+            rotation?: number;
           }[];
         };
       };
@@ -21546,12 +27633,28 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           /** @default [] */
           tables?: {
             /** Format: uuid */
             tableId: string;
+            /** Format: uuid */
+            roomId: string;
+            label: string;
+            seats: number;
             x: number;
             y: number;
+            /** @default 122 */
+            width?: number;
+            /** @default 76 */
+            height?: number;
+            /** @default 0 */
+            rotation?: number;
+            /**
+             * @default rectangle
+             * @enum {string}
+             */
+            shape?: "round" | "square" | "rectangle";
           }[];
           /** @default [] */
           rooms?: {
@@ -21561,6 +27664,21 @@ export interface operations {
               x: number;
               y: number;
             }[];
+          }[];
+          layoutElements?: {
+            /** Format: uuid */
+            id?: string;
+            /** Format: uuid */
+            roomId: string;
+            /** @enum {string} */
+            kind: "label" | "barrier";
+            label?: string;
+            x: number;
+            y: number;
+            width: number;
+            height: number;
+            /** @default 0 */
+            rotation?: number;
           }[];
         };
       };
@@ -21590,6 +27708,7 @@ export interface operations {
           name: string;
           /** @default 0 */
           sortOrder?: number;
+          expectedRevision: number;
         };
       };
     };
@@ -21618,6 +27737,7 @@ export interface operations {
           name: string;
           /** @default 0 */
           sortOrder?: number;
+          expectedRevision: number;
         };
       };
     };
@@ -21647,6 +27767,18 @@ export interface operations {
           label: string;
           /** @default 4 */
           seats?: number;
+          /** @default 122 */
+          width?: number;
+          /** @default 76 */
+          height?: number;
+          /** @default 0 */
+          rotation?: number;
+          /**
+           * @default rectangle
+           * @enum {string}
+           */
+          shape?: "round" | "square" | "rectangle";
+          expectedRevision: number;
         };
       };
     };
@@ -21676,11 +27808,253 @@ export interface operations {
           label: string;
           /** @default 4 */
           seats?: number;
+          /** @default 122 */
+          width?: number;
+          /** @default 76 */
+          height?: number;
+          /** @default 0 */
+          rotation?: number;
+          /**
+           * @default rectangle
+           * @enum {string}
+           */
+          shape?: "round" | "square" | "rectangle";
+          expectedRevision: number;
         };
       };
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateRoom[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @default 0 */
+          sortOrder?: number;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveRoom[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateRoom[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          /** @default 0 */
+          sortOrder?: number;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveRoom[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        roomId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateTable[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 4 */
+          seats?: number;
+          /** @default 122 */
+          width?: number;
+          /** @default 76 */
+          height?: number;
+          /** @default 0 */
+          rotation?: number;
+          /**
+           * @default rectangle
+           * @enum {string}
+           */
+          shape?: "round" | "square" | "rectangle";
+          /** Format: uuid */
+          roomId: string;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveTable[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateTable[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 4 */
+          seats?: number;
+          /** @default 122 */
+          width?: number;
+          /** @default 76 */
+          height?: number;
+          /** @default 0 */
+          rotation?: number;
+          /**
+           * @default rectangle
+           * @enum {string}
+           */
+          shape?: "round" | "square" | "rectangle";
+          /** Format: uuid */
+          roomId: string;
+          expectedRevision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveTable[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -21812,6 +28186,118 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_updateServiceSection[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        serviceSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          color: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          tableIds: string[];
+          defaultResponsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveServiceSection[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        serviceSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateServiceSection[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        serviceSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          name: string;
+          color: string;
+          /**
+           * @default hybrid
+           * @enum {string}
+           */
+          serviceMode?: "full_service" | "quick_service" | "bar" | "hybrid";
+          tableIds: string[];
+          defaultResponsibleIdentityId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_archiveServiceSection[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        serviceSectionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotPosController_openOperationalShift[0]": {
     parameters: {
       query?: never;
@@ -21893,6 +28379,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tableIds: string[];
           primaryIdentityId: string | null;
           /** @default [] */
@@ -21924,10 +28411,81 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tableIds: string[];
           primaryIdentityId: string | null;
           /** @default [] */
           supportIdentityIds?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionsAssignments[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedRevision: number;
+          assignments: {
+            tableIds: string[];
+            primaryIdentityId: string | null;
+            /** @default [] */
+            supportIdentityIds?: string[];
+            /** Format: uuid */
+            shiftSectionId: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_updateShiftSectionsAssignments[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        shiftId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          expectedRevision: number;
+          assignments: {
+            tableIds: string[];
+            primaryIdentityId: string | null;
+            /** @default [] */
+            supportIdentityIds?: string[];
+            /** Format: uuid */
+            shiftSectionId: string;
+          }[];
         };
       };
     };
@@ -22018,6 +28576,8 @@ export interface operations {
             /** Format: uuid */
             targetResponsibleIdentityId: string;
           }[];
+          /** @enum {string} */
+          returnableDecision?: "acknowledge";
           reason?: string;
         };
       };
@@ -22053,6 +28613,8 @@ export interface operations {
             /** Format: uuid */
             targetResponsibleIdentityId: string;
           }[];
+          /** @enum {string} */
+          returnableDecision?: "acknowledge";
           reason?: string;
         };
       };
@@ -22086,7 +28648,13 @@ export interface operations {
           durationMinutes: number;
           /** @default true */
           transferOpenTab?: boolean;
-          reason: string;
+          /** @enum {string} */
+          reasonCode:
+            | "service_rebalance"
+            | "staff_coverage"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -22141,7 +28709,13 @@ export interface operations {
           durationMinutes: number;
           /** @default true */
           transferOpenTab?: boolean;
-          reason: string;
+          /** @enum {string} */
+          reasonCode:
+            | "service_rebalance"
+            | "staff_coverage"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -22190,13 +28764,16 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tables: {
             /** Format: uuid */
             tableId: string;
-            x: number;
-            y: number;
             /** Format: uuid */
             roomId: string;
+            x: number;
+            y: number;
+            /** @default 0 */
+            rotation?: number;
           }[];
         };
       };
@@ -22224,13 +28801,16 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tables: {
             /** Format: uuid */
             tableId: string;
-            x: number;
-            y: number;
             /** Format: uuid */
             roomId: string;
+            x: number;
+            y: number;
+            /** @default 0 */
+            rotation?: number;
           }[];
         };
       };
@@ -22258,10 +28838,22 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tables: {
             label: string;
             /** @default 4 */
             seats?: number;
+            /** @default 122 */
+            width?: number;
+            /** @default 76 */
+            height?: number;
+            /** @default 0 */
+            rotation?: number;
+            /**
+             * @default rectangle
+             * @enum {string}
+             */
+            shape?: "round" | "square" | "rectangle";
           }[];
         };
       };
@@ -22289,10 +28881,22 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedRevision: number;
           tables: {
             label: string;
             /** @default 4 */
             seats?: number;
+            /** @default 122 */
+            width?: number;
+            /** @default 76 */
+            height?: number;
+            /** @default 0 */
+            rotation?: number;
+            /**
+             * @default rectangle
+             * @enum {string}
+             */
+            shape?: "round" | "square" | "rectangle";
           }[];
         };
       };
@@ -22381,6 +28985,58 @@ export interface operations {
   "PilotPosController_listTabs[1]": {
     parameters: {
       query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_counterQueue[0]": {
+    parameters: {
+      query?: {
+        limit?: number;
+        page?: number;
+        query?: string;
+        channel?: "all" | "pickup" | "dine_in" | "delivery";
+        stage?: "all" | "new" | "production" | "ready" | "waiting" | "delivered" | "late";
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_counterQueue[1]": {
+    parameters: {
+      query?: {
+        limit?: number;
+        page?: number;
+        query?: string;
+        channel?: "all" | "pickup" | "dine_in" | "delivery";
+        stage?: "all" | "new" | "production" | "ready" | "waiting" | "delivered" | "late";
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -22638,6 +29294,8 @@ export interface operations {
           label?: string;
           /** @enum {string} */
           fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          /** Format: uuid */
+          customerId?: string;
           customerName?: string;
           customerPhone?: string;
           readyNotificationConsent?: boolean;
@@ -22685,6 +29343,8 @@ export interface operations {
           label?: string;
           /** @enum {string} */
           fulfillmentType?: "dine_in" | "pickup" | "delivery";
+          /** Format: uuid */
+          customerId?: string;
           customerName?: string;
           customerPhone?: string;
           readyNotificationConsent?: boolean;
@@ -22739,6 +29399,10 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             allergyNote?: string;
+            doseClub?: {
+              /** Format: uuid */
+              externalClubId: string;
+            };
           }[];
         };
       };
@@ -22779,6 +29443,10 @@ export interface operations {
             /** @enum {string} */
             course?: "anytime" | "starter" | "main" | "dessert";
             allergyNote?: string;
+            doseClub?: {
+              /** Format: uuid */
+              externalClubId: string;
+            };
           }[];
         };
       };
@@ -24402,10 +31070,14 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
           documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          /** Format: uuid */
+          serviceCallId?: string;
           /** @default 1 */
           copies?: number;
           reason?: string;
@@ -24437,13 +31109,107 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
           documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          /** Format: uuid */
+          serviceCallId?: string;
           /** @default 1 */
           copies?: number;
           reason?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createPrintSplit[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          method: "equal_people" | "fixed_amount";
+          partCount: number;
+          fixedAmountCents?: number;
+          /**
+           * @default partial_statement
+           * @enum {string}
+           */
+          documentType?: "partial_statement" | "payment_statement";
+          /** @default 1 */
+          copies?: number;
+          /** Format: uuid */
+          serviceCallId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_createPrintSplit[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** @enum {string} */
+          method: "equal_people" | "fixed_amount";
+          partCount: number;
+          fixedAmountCents?: number;
+          /**
+           * @default partial_statement
+           * @enum {string}
+           */
+          documentType?: "partial_statement" | "payment_statement";
+          /** @default 1 */
+          copies?: number;
+          /** Format: uuid */
+          serviceCallId?: string;
         };
       };
     };
@@ -24512,10 +31278,12 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
-          status: "printing" | "printed" | "failed";
+          status: "printing" | "confirmation_required" | "printed" | "failed";
           error?: string;
         };
       };
@@ -24545,10 +31313,12 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
-          status: "printing" | "printed" | "failed";
+          status: "printing" | "confirmation_required" | "printed" | "failed";
           error?: string;
         };
       };
@@ -24578,6 +31348,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
         };
@@ -24608,6 +31380,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
         };
@@ -24638,6 +31412,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           copies?: number;
@@ -24670,6 +31446,8 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** Format: uuid */
+          installationId?: string;
           terminalId?: string;
           printerId?: string;
           copies?: number;
@@ -24704,7 +31482,11 @@ export interface operations {
         "application/json": {
           /** @default false */
           printRequested?: boolean;
+          /** @enum {string} */
+          returnableDecision?: "acknowledge";
           printOptions?: {
+            /** Format: uuid */
+            installationId?: string;
             terminalId?: string;
             printerId?: string;
             /** @default 1 */
@@ -24740,7 +31522,11 @@ export interface operations {
         "application/json": {
           /** @default false */
           printRequested?: boolean;
+          /** @enum {string} */
+          returnableDecision?: "acknowledge";
           printOptions?: {
+            /** Format: uuid */
+            installationId?: string;
             terminalId?: string;
             printerId?: string;
             /** @default 1 */
@@ -25113,6 +31899,12 @@ export interface operations {
           tabId?: string;
           /** @default 3 */
           slaMinutes?: number;
+          /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** @default 1 */
+          copies?: number;
         };
       };
     };
@@ -25150,6 +31942,12 @@ export interface operations {
           tabId?: string;
           /** @default 3 */
           slaMinutes?: number;
+          /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** @default 1 */
+          copies?: number;
         };
       };
     };
@@ -25300,6 +32098,98 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_rejectPublicTableOrder[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "canceled";
+            /** @enum {string} */
+            source: "qr_table";
+            totals: {
+              subtotalCents: number;
+              discountCents: number;
+              serviceChargeCents: number;
+              tipCents: number;
+              totalCents: number;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_rejectPublicTableOrder[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        orderId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            orderId: string;
+            /** @enum {string} */
+            status: "canceled";
+            /** @enum {string} */
+            source: "qr_table";
+            totals: {
+              subtotalCents: number;
+              discountCents: number;
+              serviceChargeCents: number;
+              tipCents: number;
+              totalCents: number;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
   "PilotPosController_transfer[0]": {
     parameters: {
       query?: never;
@@ -25380,6 +32270,14 @@ export interface operations {
           /** Format: uuid */
           targetTabId: string;
           sourceTabIds: string[];
+          /** @enum {string} */
+          reasonCode:
+            | "large_party"
+            | "sit_together"
+            | "accessibility"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -25410,6 +32308,14 @@ export interface operations {
           /** Format: uuid */
           targetTabId: string;
           sourceTabIds: string[];
+          /** @enum {string} */
+          reasonCode:
+            | "large_party"
+            | "sit_together"
+            | "accessibility"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -25446,6 +32352,14 @@ export interface operations {
           targetTabId?: string;
           /** Format: uuid */
           responsibleIdentityId?: string;
+          /** @enum {string} */
+          reasonCode:
+            | "large_party"
+            | "sit_together"
+            | "accessibility"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -25482,6 +32396,14 @@ export interface operations {
           targetTabId?: string;
           /** Format: uuid */
           responsibleIdentityId?: string;
+          /** @enum {string} */
+          reasonCode:
+            | "large_party"
+            | "sit_together"
+            | "accessibility"
+            | "operational_reorganization"
+            | "other";
+          reasonNote?: string;
         };
       };
     };
@@ -25617,6 +32539,10 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** Format: uuid */
           tableId?: string;
           label?: string;
           items: {
@@ -25624,6 +32550,7 @@ export interface operations {
             orderItemId: string;
             quantity: number;
           }[];
+          copies?: number;
         };
       };
     };
@@ -25653,6 +32580,10 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
+          installationId?: string;
+          terminalId?: string;
+          printerId?: string;
+          /** Format: uuid */
           tableId?: string;
           label?: string;
           items: {
@@ -25660,6 +32591,7 @@ export interface operations {
             orderItemId: string;
             quantity: number;
           }[];
+          copies?: number;
         };
       };
     };
@@ -26007,6 +32939,8 @@ export interface operations {
           cashRegisterId?: string | null;
           compact: boolean;
           quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
+          /** @enum {string} */
+          paymentMode?: "disabled" | "cashier" | "homologated_pos";
         };
       };
     };
@@ -26134,6 +33068,8 @@ export interface operations {
           cashRegisterId?: string | null;
           compact: boolean;
           quickActions: ("open_tab" | "new_order" | "receive" | "waitlist" | "print" | "search")[];
+          /** @enum {string} */
+          paymentMode?: "disabled" | "cashier" | "homologated_pos";
         };
       };
     };
@@ -33506,6 +40442,2312 @@ export interface operations {
       };
     };
   };
+  "ProductionPrintingController_listPrinters[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printers: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
+            hubs: {
+              /** Format: uuid */
+              id: string;
+              label: string;
+              lastSeenAt: string | null;
+              online: boolean;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_createPrinter[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          label: string;
+          host: string;
+          port: number;
+          paperWidthMm: 58 | 80;
+          charactersPerLine: number;
+          codeTable: number;
+          cut: boolean;
+          supportsRasterGraphics: boolean;
+          isDefault: boolean;
+          documentTypes: (
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "kds_ticket"
+          )[];
+          /** @default null */
+          fallbackPrinterId?: string | null;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_listPrinters[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printers: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            }[];
+            hubs: {
+              /** Format: uuid */
+              id: string;
+              label: string;
+              lastSeenAt: string | null;
+              online: boolean;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_createPrinter[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          label: string;
+          host: string;
+          port: number;
+          paperWidthMm: 58 | 80;
+          charactersPerLine: number;
+          codeTable: number;
+          cut: boolean;
+          supportsRasterGraphics: boolean;
+          isDefault: boolean;
+          documentTypes: (
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "kds_ticket"
+          )[];
+          /** @default null */
+          fallbackPrinterId?: string | null;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updatePrinter[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          label: string;
+          host: string;
+          port: number;
+          paperWidthMm: 58 | 80;
+          charactersPerLine: number;
+          codeTable: number;
+          cut: boolean;
+          supportsRasterGraphics: boolean;
+          isDefault: boolean;
+          documentTypes: (
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "kds_ticket"
+          )[];
+          /** @default null */
+          fallbackPrinterId?: string | null;
+          /** @default true */
+          active?: boolean;
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_archivePrinter[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updatePrinter[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          label: string;
+          host: string;
+          port: number;
+          paperWidthMm: 58 | 80;
+          charactersPerLine: number;
+          codeTable: number;
+          cut: boolean;
+          supportsRasterGraphics: boolean;
+          isDefault: boolean;
+          documentTypes: (
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "kds_ticket"
+          )[];
+          /** @default null */
+          fallbackPrinterId?: string | null;
+          /** @default true */
+          active?: boolean;
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_archivePrinter[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printer: {
+              /** Format: uuid */
+              hubId: string;
+              label: string;
+              host: string;
+              port: number;
+              paperWidthMm: 58 | 80;
+              charactersPerLine: number;
+              codeTable: number;
+              cut: boolean;
+              supportsRasterGraphics: boolean;
+              isDefault: boolean;
+              documentTypes: (
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket"
+              )[];
+              /** @default null */
+              fallbackPrinterId: string | null;
+              /** @default true */
+              active: boolean;
+              /** Format: uuid */
+              id: string;
+              revision: number;
+              appliedRevision: number | null;
+              /** @enum {string} */
+              applyStatus: "pending" | "applied" | "error";
+              pendingCommandId: string | null;
+              lastAppliedAt: string | null;
+              lastTestAt: string | null;
+              /** @enum {string} */
+              lastStatus: "unknown" | "pending" | "online" | "error" | "confirmation_required";
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_testPrinter[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            printerId: string;
+            revision: number;
+            /** @enum {string} */
+            state: "pending";
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_testPrinter[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** Format: uuid */
+            printerId: string;
+            revision: number;
+            /** @enum {string} */
+            state: "pending";
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_listStationPolicies[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            stations: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              active: boolean;
+              /** @enum {string} */
+              deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+              copies: number;
+              printerId: string | null;
+              readiness: {
+                ready: boolean;
+                issues: (
+                  | "DELIVERY_DISABLED"
+                  | "KDS_NOT_CONFIGURED"
+                  | "PRINT_PRINTER_NOT_CONFIGURED"
+                  | "PRINT_POLICY_INVALID"
+                  | "EDGE_HUB_OFFLINE"
+                )[];
+                kdsConfigured: boolean;
+                printerConfigured: boolean;
+                hubOnline: boolean;
+              };
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_listStationPolicies[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            stations: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              active: boolean;
+              /** @enum {string} */
+              deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+              copies: number;
+              printerId: string | null;
+              readiness: {
+                ready: boolean;
+                issues: (
+                  | "DELIVERY_DISABLED"
+                  | "KDS_NOT_CONFIGURED"
+                  | "PRINT_PRINTER_NOT_CONFIGURED"
+                  | "PRINT_POLICY_INVALID"
+                  | "EDGE_HUB_OFFLINE"
+                )[];
+                kdsConfigured: boolean;
+                printerConfigured: boolean;
+                hubOnline: boolean;
+              };
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updateStationPolicy[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+          copies: number;
+          /** @default null */
+          printerId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            station: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              active: boolean;
+              /** @enum {string} */
+              deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+              copies: number;
+              printerId: string | null;
+              readiness: {
+                ready: boolean;
+                issues: (
+                  | "DELIVERY_DISABLED"
+                  | "KDS_NOT_CONFIGURED"
+                  | "PRINT_PRINTER_NOT_CONFIGURED"
+                  | "PRINT_POLICY_INVALID"
+                  | "EDGE_HUB_OFFLINE"
+                )[];
+                kdsConfigured: boolean;
+                printerConfigured: boolean;
+                hubOnline: boolean;
+              };
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updateStationPolicy[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        stationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+          copies: number;
+          /** @default null */
+          printerId?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            station: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+              code: string;
+              active: boolean;
+              /** @enum {string} */
+              deliveryMode: "kds_only" | "printer_only" | "both" | "disabled";
+              copies: number;
+              printerId: string | null;
+              readiness: {
+                ready: boolean;
+                issues: (
+                  | "DELIVERY_DISABLED"
+                  | "KDS_NOT_CONFIGURED"
+                  | "PRINT_PRINTER_NOT_CONFIGURED"
+                  | "PRINT_POLICY_INVALID"
+                  | "EDGE_HUB_OFFLINE"
+                )[];
+                kdsConfigured: boolean;
+                printerConfigured: boolean;
+                hubOnline: boolean;
+              };
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_printKdsTicket[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          copies?: number;
+          /** Format: uuid */
+          printerId?: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printJob: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              tabId: string;
+              stationId: string | null;
+              kdsTicketId: string | null;
+              hubCommandId: string | null;
+              dispatchKey: string | null;
+              serviceCallId: string | null;
+              splitPartId: string | null;
+              /** @enum {string} */
+              documentType:
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket";
+              /** @enum {string} */
+              status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
+              copies: number;
+              terminalId: string | null;
+              printerId: string | null;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              requestedByIdentityId: string;
+              reprintOfJobId: string | null;
+              reason: string | null;
+              attempts: number;
+              printingAt: string | null;
+              printedAt: string | null;
+              failedAt: string | null;
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_printKdsTicket[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        ticketId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          copies?: number;
+          /** Format: uuid */
+          printerId?: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printJob: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              tabId: string;
+              stationId: string | null;
+              kdsTicketId: string | null;
+              hubCommandId: string | null;
+              dispatchKey: string | null;
+              serviceCallId: string | null;
+              splitPartId: string | null;
+              /** @enum {string} */
+              documentType:
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket";
+              /** @enum {string} */
+              status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
+              copies: number;
+              terminalId: string | null;
+              printerId: string | null;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              requestedByIdentityId: string;
+              reprintOfJobId: string | null;
+              reason: string | null;
+              attempts: number;
+              printingAt: string | null;
+              printedAt: string | null;
+              failedAt: string | null;
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_resolveUnknownPrintJob[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          outcome: "printed" | "failed";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printJob: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              tabId: string;
+              stationId: string | null;
+              kdsTicketId: string | null;
+              hubCommandId: string | null;
+              dispatchKey: string | null;
+              serviceCallId: string | null;
+              splitPartId: string | null;
+              /** @enum {string} */
+              documentType:
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket";
+              /** @enum {string} */
+              status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
+              copies: number;
+              terminalId: string | null;
+              printerId: string | null;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              requestedByIdentityId: string;
+              reprintOfJobId: string | null;
+              reason: string | null;
+              attempts: number;
+              printingAt: string | null;
+              printedAt: string | null;
+              failedAt: string | null;
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_resolveUnknownPrintJob[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        printJobId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          outcome: "printed" | "failed";
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            printJob: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              organizationId: string;
+              /** Format: uuid */
+              unitId: string;
+              /** Format: uuid */
+              tabId: string;
+              stationId: string | null;
+              kdsTicketId: string | null;
+              hubCommandId: string | null;
+              dispatchKey: string | null;
+              serviceCallId: string | null;
+              splitPartId: string | null;
+              /** @enum {string} */
+              documentType:
+                | "partial_statement"
+                | "payment_statement"
+                | "final_receipt"
+                | "kds_ticket";
+              /** @enum {string} */
+              status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
+              copies: number;
+              terminalId: string | null;
+              printerId: string | null;
+              payload: {
+                [key: string]: unknown;
+              };
+              /** Format: uuid */
+              requestedByIdentityId: string;
+              reprintOfJobId: string | null;
+              reason: string | null;
+              attempts: number;
+              printingAt: string | null;
+              printedAt: string | null;
+              failedAt: string | null;
+              lastError: string | null;
+              /** Format: date-time */
+              createdAt: string;
+              /** Format: date-time */
+              updatedAt: string;
+            };
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "DoseClubIntegrationController_activate[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubIntegrationController_activate[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubIntegrationController_memberships[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "DoseClubIntegrationController_memberships[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialOverview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialOverview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialPreview[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialPreview[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_createCommercialDraft[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          sourceVersionId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_createCommercialDraft[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          sourceVersionId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialDraft[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          plans: {
+            slug: string;
+            name: string;
+            description: string;
+            monthlyPriceCents: number;
+            annualPriceCents: number;
+            includedUnits: number;
+            entitlements: string[];
+            features: string[];
+            featured: boolean;
+            displayOrder: number;
+            ctaLabel: string;
+            ctaHref: string;
+          }[];
+          landing: {
+            hero: {
+              eyebrow: string;
+              title: string;
+              description: string;
+              primaryCtaLabel: string;
+              primaryCtaHref: string;
+              secondaryCtaLabel?: string;
+              secondaryCtaHref?: string;
+              /** Format: uuid */
+              mediaId?: string;
+            };
+            socialProof: {
+              title: string;
+              items: {
+                label: string;
+                value: string;
+              }[];
+            };
+            benefits: {
+              title: string;
+              items: {
+                title: string;
+                description: string;
+                /** @enum {string} */
+                icon: "operations" | "growth" | "finance" | "insights" | "support" | "security";
+              }[];
+            };
+            howItWorks: {
+              title: string;
+              steps: {
+                title: string;
+                description: string;
+              }[];
+            };
+            testimonials: {
+              title: string;
+              items: {
+                quote: string;
+                name: string;
+                role: string;
+              }[];
+            };
+            faq: {
+              title: string;
+              items: {
+                question: string;
+                answer: string;
+              }[];
+            };
+            finalCta: {
+              title: string;
+              description: string;
+              ctaLabel: string;
+              ctaHref: string;
+            };
+            legal: {
+              terms: {
+                version: string;
+                /** Format: date-time */
+                effectiveAt: string;
+                title: string;
+                sections: {
+                  heading: string;
+                  body: string;
+                }[];
+              };
+              privacy: {
+                version: string;
+                /** Format: date-time */
+                effectiveAt: string;
+                title: string;
+                sections: {
+                  heading: string;
+                  body: string;
+                }[];
+              };
+            };
+          };
+          seo: {
+            title: string;
+            description: string;
+            canonicalPath: string;
+            /** Format: uuid */
+            ogMediaId?: string;
+          };
+          promotions: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            type: "percentage" | "fixed" | "price";
+            value: number;
+            planSlugs: string[];
+            cycles: ("monthly" | "annual")[];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** @default true */
+            newCustomersOnly?: boolean;
+            code?: string;
+            redemptionLimit?: number;
+            active: boolean;
+          }[];
+          experiments: {
+            slug: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "paused" | "ended";
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            variants: {
+              key: string;
+              weight: number;
+              headline: string;
+              description: string;
+              ctaLabel: string;
+              ctaHref: string;
+            }[];
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialDraft[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          plans: {
+            slug: string;
+            name: string;
+            description: string;
+            monthlyPriceCents: number;
+            annualPriceCents: number;
+            includedUnits: number;
+            entitlements: string[];
+            features: string[];
+            featured: boolean;
+            displayOrder: number;
+            ctaLabel: string;
+            ctaHref: string;
+          }[];
+          landing: {
+            hero: {
+              eyebrow: string;
+              title: string;
+              description: string;
+              primaryCtaLabel: string;
+              primaryCtaHref: string;
+              secondaryCtaLabel?: string;
+              secondaryCtaHref?: string;
+              /** Format: uuid */
+              mediaId?: string;
+            };
+            socialProof: {
+              title: string;
+              items: {
+                label: string;
+                value: string;
+              }[];
+            };
+            benefits: {
+              title: string;
+              items: {
+                title: string;
+                description: string;
+                /** @enum {string} */
+                icon: "operations" | "growth" | "finance" | "insights" | "support" | "security";
+              }[];
+            };
+            howItWorks: {
+              title: string;
+              steps: {
+                title: string;
+                description: string;
+              }[];
+            };
+            testimonials: {
+              title: string;
+              items: {
+                quote: string;
+                name: string;
+                role: string;
+              }[];
+            };
+            faq: {
+              title: string;
+              items: {
+                question: string;
+                answer: string;
+              }[];
+            };
+            finalCta: {
+              title: string;
+              description: string;
+              ctaLabel: string;
+              ctaHref: string;
+            };
+            legal: {
+              terms: {
+                version: string;
+                /** Format: date-time */
+                effectiveAt: string;
+                title: string;
+                sections: {
+                  heading: string;
+                  body: string;
+                }[];
+              };
+              privacy: {
+                version: string;
+                /** Format: date-time */
+                effectiveAt: string;
+                title: string;
+                sections: {
+                  heading: string;
+                  body: string;
+                }[];
+              };
+            };
+          };
+          seo: {
+            title: string;
+            description: string;
+            canonicalPath: string;
+            /** Format: uuid */
+            ogMediaId?: string;
+          };
+          promotions: {
+            /** Format: uuid */
+            id?: string;
+            name: string;
+            /** @enum {string} */
+            type: "percentage" | "fixed" | "price";
+            value: number;
+            planSlugs: string[];
+            cycles: ("monthly" | "annual")[];
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt?: string;
+            /** @default true */
+            newCustomersOnly?: boolean;
+            code?: string;
+            redemptionLimit?: number;
+            active: boolean;
+          }[];
+          experiments: {
+            slug: string;
+            /** @enum {string} */
+            status: "draft" | "active" | "paused" | "ended";
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            variants: {
+              key: string;
+              weight: number;
+              headline: string;
+              description: string;
+              ctaLabel: string;
+              ctaHref: string;
+            }[];
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_approveCommercialVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_approveCommercialVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_publishCommercialVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: date-time */
+          publishAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_publishCommercialVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        versionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: date-time */
+          publishAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_rollbackCommercialVersion[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          versionId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_rollbackCommercialVersion[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          versionId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_uploadCommercialMedia[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          fileName: string;
+          /** @enum {string} */
+          mimeType: "image/jpeg" | "image/png" | "image/webp";
+          base64: string;
+          alt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_uploadCommercialMedia[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          fileName: string;
+          /** @enum {string} */
+          mimeType: "image/jpeg" | "image/png" | "image/webp";
+          base64: string;
+          alt: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_deleteCommercialMedia[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        mediaId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_deleteCommercialMedia[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        mediaId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_createCommercialCampaign[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          slug: string;
+          name: string;
+          /** @enum {string} */
+          status: "draft" | "active" | "paused" | "ended";
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_createCommercialCampaign[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          slug: string;
+          name: string;
+          /** @enum {string} */
+          status: "draft" | "active" | "paused" | "ended";
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialCampaign[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          slug: string;
+          name: string;
+          /** @enum {string} */
+          status: "draft" | "active" | "paused" | "ended";
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialCampaign[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          slug: string;
+          name: string;
+          /** @enum {string} */
+          status: "draft" | "active" | "paused" | "ended";
+          /** Format: date-time */
+          startsAt?: string;
+          /** Format: date-time */
+          endsAt?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialLeads[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialLeads[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialLead[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sourceType: string;
+        sourceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** @enum {string} */
+          stage: "new" | "qualified" | "contacted" | "converted" | "lost";
+          assignedToIdentityId?: string | null;
+          organizationId?: string | null;
+          notes?: string | null;
+          lastContactAt?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateCommercialLead[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        sourceType: string;
+        sourceId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** @enum {string} */
+          stage: "new" | "qualified" | "contacted" | "converted" | "lost";
+          assignedToIdentityId?: string | null;
+          organizationId?: string | null;
+          notes?: string | null;
+          lastContactAt?: string | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialMetrics[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_commercialMetrics[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PlatformController_overview[0]": {
     parameters: {
       query?: never;
@@ -33537,6 +42779,340 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  "PlatformController_tenants[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_tenants[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_tenant[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_tenant[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_revealTenantPii[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_revealTenantPii[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_incidents[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_incidents[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateIncident[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "claim" | "snooze" | "resolve";
+          reason: string;
+          /** Format: date-time */
+          snoozedUntil?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_updateIncident[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        fingerprint: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          action: "claim" | "snooze" | "resolve";
+          reason: string;
+          /** Format: date-time */
+          snoozedUntil?: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_retryOutbox[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        eventId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_retryOutbox[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        eventId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PlatformController_setAccountantAttachmentLegalHold[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            attachmentId: string;
+            legalHold: boolean;
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PlatformController_setAccountantAttachmentLegalHold[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        requestId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          active: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            attachmentId: string;
+            legalHold: boolean;
+            replayed: boolean;
+          };
+        };
       };
     };
   };
@@ -34224,12 +43800,12 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
+          issueMovementId: string;
+          /** Format: uuid */
           containerInventoryItemId: string;
           /** Format: uuid */
           locationId: string;
           quantity: string | number;
-          /** Format: uuid */
-          orderId?: string;
           note?: string;
         };
       };
@@ -34259,18 +43835,212 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
+          issueMovementId: string;
+          /** Format: uuid */
           containerInventoryItemId: string;
           /** Format: uuid */
           locationId: string;
           quantity: string | number;
-          /** Format: uuid */
-          orderId?: string;
           note?: string;
         };
       };
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmReturnableCustodyBulk[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          lines: {
+            /** Format: uuid */
+            issueMovementId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: string | number;
+            note?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_confirmReturnableCustodyBulk[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          lines: {
+            /** Format: uuid */
+            issueMovementId: string;
+            /** Format: uuid */
+            locationId: string;
+            quantity: string | number;
+            note?: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_handoffReturnableCustodies[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          issueMovementIds: string[];
+          /** Format: uuid */
+          toIdentityId: string;
+          toShiftReference?: string;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_handoffReturnableCustodies[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          issueMovementIds: string[];
+          /** Format: uuid */
+          toIdentityId: string;
+          toShiftReference?: string;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_classifyProductReturnable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "returnable" | "non_returnable";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_classifyProductReturnable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "returnable" | "non_returnable";
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -36864,6 +46634,9 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           locationId: string;
+          /** Format: uuid */
+          purchaseOrderId?: string;
+          dueDate: string;
           /** Format: date-time */
           receivedAt?: string;
           /** @default false */
@@ -36899,6 +46672,9 @@ export interface operations {
         "application/json": {
           /** Format: uuid */
           locationId: string;
+          /** Format: uuid */
+          purchaseOrderId?: string;
+          dueDate: string;
           /** Format: date-time */
           receivedAt?: string;
           /** @default false */
@@ -37644,6 +47420,292 @@ export interface operations {
       };
     };
   };
+  "ManagementController_financeSettings[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateFinanceSettings[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default null */
+          paymentApprovalThresholdCents?: number | null;
+          /** @default true */
+          requireDistinctApprover?: boolean;
+          /** @default 7 */
+          dueSoonDays?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_financeSettings[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateFinanceSettings[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default null */
+          paymentApprovalThresholdCents?: number | null;
+          /** @default true */
+          requireDistinctApprover?: boolean;
+          /** @default 7 */
+          dueSoonDays?: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportFinance[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_exportFinance[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_requestFinanceApproval[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
+          reference?: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {string} */
+          direction: "payable" | "receivable";
+          /** Format: uuid */
+          entryId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_requestFinanceApproval[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          amountCents: number;
+          /** @enum {string} */
+          method: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+          /** Format: uuid */
+          cashRegisterId?: string;
+          reference?: string;
+          /** Format: date-time */
+          occurredAt?: string;
+          /** @enum {string} */
+          direction: "payable" | "receivable";
+          /** Format: uuid */
+          entryId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideFinanceApproval[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        approvalRequestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideFinanceApproval[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        approvalRequestId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approve" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_createPayable[0]": {
     parameters: {
       query?: never;
@@ -37659,12 +47721,29 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
           /** Format: uuid */
           supplierId?: string;
           description: string;
           amountCents: number;
           competenceDate: string;
           dueDate: string;
+          recurrence?: {
+            /** @default 1 */
+            installments?: number;
+            /** @default 1 */
+            intervalMonths?: number;
+          };
         };
       };
     };
@@ -37692,12 +47771,179 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
           /** Format: uuid */
           supplierId?: string;
           description: string;
           amountCents: number;
           competenceDate: string;
           dueDate: string;
+          recurrence?: {
+            /** @default 1 */
+            installments?: number;
+            /** @default 1 */
+            intervalMonths?: number;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePayable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        payableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
+          description?: string;
+          amountCents?: number;
+          competenceDate?: string;
+          dueDate?: string;
+          supplierId?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updatePayable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        payableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
+          description?: string;
+          amountCents?: number;
+          competenceDate?: string;
+          dueDate?: string;
+          supplierId?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPayable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        payableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelPayable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        payableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
         };
       };
     };
@@ -37734,6 +47980,8 @@ export interface operations {
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
+          /** Format: uuid */
+          approvalRequestId?: string;
         };
       };
     };
@@ -37770,6 +48018,70 @@ export interface operations {
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
+          /** Format: uuid */
+          approvalRequestId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reversePayablePayment[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reversePayablePayment[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
         };
       };
     };
@@ -37797,12 +48109,29 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
           /** Format: uuid */
           sourceOrderId?: string;
           description: string;
           amountCents: number;
           competenceDate: string;
           dueDate: string;
+          recurrence?: {
+            /** @default 1 */
+            installments?: number;
+            /** @default 1 */
+            intervalMonths?: number;
+          };
           /** @default [] */
           lines?: {
             /** Format: uuid */
@@ -37838,12 +48167,29 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
           /** Format: uuid */
           sourceOrderId?: string;
           description: string;
           amountCents: number;
           competenceDate: string;
           dueDate: string;
+          recurrence?: {
+            /** @default 1 */
+            installments?: number;
+            /** @default 1 */
+            intervalMonths?: number;
+          };
           /** @default [] */
           lines?: {
             /** Format: uuid */
@@ -37852,6 +48198,156 @@ export interface operations {
             revenueCents: number;
             costCents?: number | null;
           }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateReceivable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receivableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
+          description?: string;
+          amountCents?: number;
+          competenceDate?: string;
+          dueDate?: string;
+          supplierId?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_updateReceivable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receivableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          category?: string;
+          costCenter?: string;
+          documentNumber?: string;
+          notes?: string;
+          /** @default [] */
+          attachments?: {
+            name: string;
+            /** Format: uri */
+            url: string;
+            mimeType?: string;
+          }[];
+          description?: string;
+          amountCents?: number;
+          competenceDate?: string;
+          dueDate?: string;
+          supplierId?: string | null;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelReceivable[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receivableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_cancelReceivable[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        receivableId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          version: number;
         };
       };
     };
@@ -37888,6 +48384,8 @@ export interface operations {
           reference?: string;
           /** Format: date-time */
           occurredAt?: string;
+          /** Format: uuid */
+          approvalRequestId?: string;
           /** Format: uuid */
           cashShiftId?: string;
         };
@@ -37927,7 +48425,71 @@ export interface operations {
           /** Format: date-time */
           occurredAt?: string;
           /** Format: uuid */
+          approvalRequestId?: string;
+          /** Format: uuid */
           cashShiftId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reverseReceivablePayment[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reverseReceivablePayment[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        paymentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** Format: uuid */
+          cashRegisterId?: string;
         };
       };
     };
@@ -38604,6 +49166,68 @@ export interface operations {
       };
     };
   };
+  "ManagementController_decideCashTransfer[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashTransferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "accept" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_decideCashTransfer[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        cashTransferId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "accept" | "reject";
+          note?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_cashMovement[0]": {
     parameters: {
       query?: never;
@@ -38942,6 +49566,74 @@ export interface operations {
             status: "matched" | "unmatched" | "divergent" | "resolved";
             resolutionNote?: string;
           }[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveFinanceReconciliation[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        reconciliationEntryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          paymentDirection: "payable" | "receivable";
+          /** Format: uuid */
+          paymentId: string;
+          note: string;
+          version: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_resolveFinanceReconciliation[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        reconciliationEntryId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          paymentDirection: "payable" | "receivable";
+          /** Format: uuid */
+          paymentId: string;
+          note: string;
+          version: number;
         };
       };
     };
@@ -43460,6 +54152,816 @@ export interface operations {
       };
     };
   };
+  "ManagementInventoryControlsController_dashboard[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_dashboard[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_configureSector[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default true */
+          blindCountRequired?: boolean;
+          /** @default true */
+          requireDistinctCountReviewer?: boolean;
+          /** @default true */
+          scanRequired?: boolean;
+          /** @default true */
+          offlineAllowed?: boolean;
+          /** @default null */
+          temperatureMinimumCelsius?: number | null;
+          /** @default null */
+          temperatureMaximumCelsius?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_configureSector[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        locationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @default true */
+          blindCountRequired?: boolean;
+          /** @default true */
+          requireDistinctCountReviewer?: boolean;
+          /** @default true */
+          scanRequired?: boolean;
+          /** @default true */
+          offlineAllowed?: boolean;
+          /** @default null */
+          temperatureMinimumCelsius?: number | null;
+          /** @default null */
+          temperatureMaximumCelsius?: number | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_startCount[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          shiftReference?: string;
+          reason: string;
+          scheduleIds?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_startCount[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          shiftReference?: string;
+          reason: string;
+          scheduleIds?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_submitCount[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            countedQuantity: string | number;
+          }[];
+          /** Format: date-time */
+          capturedAt?: string;
+          /** @default false */
+          offline?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_submitCount[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          lines: {
+            /** Format: uuid */
+            lineId: string;
+            countedQuantity: string | number;
+          }[];
+          /** Format: date-time */
+          capturedAt?: string;
+          /** @default false */
+          offline?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_reviewCount[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_reviewCount[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          decision: "approved" | "rejected";
+          note: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_recordTemperature[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          celsius: number;
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          source?: "manual" | "sensor" | "import";
+          note?: string;
+          /** Format: date-time */
+          occurredAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_recordTemperature[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          locationId: string;
+          celsius: number;
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          source?: "manual" | "sensor" | "import";
+          note?: string;
+          /** Format: date-time */
+          occurredAt?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_holdLot[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** @default [] */
+          evidence?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_holdLot[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+          /** @default [] */
+          evidence?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_releaseLot[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+        holdId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_releaseLot[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        lotId: string;
+        holdId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_chargeDeposit[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          orderId: string;
+          /** Format: date */
+          dueDate?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_chargeDeposit[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          orderId: string;
+          /** Format: date */
+          dueDate?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_returnablePolicy[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_configureReturnablePolicy[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default disabled
+           * @enum {string}
+           */
+          depositMode?: "disabled" | "manual";
+          /** @default 7 */
+          defaultDueDays?: number;
+          /**
+           * @default warn
+           * @enum {string}
+           */
+          returnableClosePolicy?: "ignore" | "warn" | "block";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_returnablePolicy[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_configureReturnablePolicy[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /**
+           * @default disabled
+           * @enum {string}
+           */
+          depositMode?: "disabled" | "manual";
+          /** @default 7 */
+          defaultDueDays?: number;
+          /**
+           * @default warn
+           * @enum {string}
+           */
+          returnableClosePolicy?: "ignore" | "warn" | "block";
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_reconcileDeposit[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        chargeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_reconcileDeposit[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        chargeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_cancelDeposit[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        chargeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementInventoryControlsController_cancelDeposit[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        chargeId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementSettlementsController_overview[0]": {
     parameters: {
       query?: never;
@@ -43555,6 +55057,15 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** @default false */
+          serviceChargeEnabled?: boolean;
+          /** @default 0 */
+          defaultServiceChargeBasisPoints?: number;
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          serviceChargeApplication?: "manual" | "suggest_dine_in";
           /** @enum {string} */
           attributionMode: "final_responsible" | "order_creator";
           /** @enum {string} */
@@ -43607,6 +55118,15 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          /** @default false */
+          serviceChargeEnabled?: boolean;
+          /** @default 0 */
+          defaultServiceChargeBasisPoints?: number;
+          /**
+           * @default manual
+           * @enum {string}
+           */
+          serviceChargeApplication?: "manual" | "suggest_dine_in";
           /** @enum {string} */
           attributionMode: "final_responsible" | "order_creator";
           /** @enum {string} */
@@ -44104,6 +55624,9 @@ export interface operations {
           email?: string | null;
           phone?: string | null;
           birthDate?: string | null;
+          notes?: string | null;
+          /** @default [] */
+          tags?: string[];
         };
       };
     };
@@ -44152,6 +55675,259 @@ export interface operations {
           email?: string | null;
           phone?: string | null;
           birthDate?: string | null;
+          notes?: string | null;
+          /** @default [] */
+          tags?: string[];
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listCustomerPage[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listCustomerPage[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_customerDetail[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateCustomer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          defaultUnitId?: string | null;
+          name?: string;
+          email?: string | null;
+          phone?: string | null;
+          birthDate?: string | null;
+          notes?: string | null;
+          tags?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_customerDetail[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateCustomer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          defaultUnitId?: string | null;
+          name?: string;
+          email?: string | null;
+          phone?: string | null;
+          birthDate?: string | null;
+          notes?: string | null;
+          tags?: string[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_archiveCustomer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_archiveCustomer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_mergeCustomer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          sourceCustomerId: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_mergeCustomer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          sourceCustomerId: string;
+          reason: string;
         };
       };
     };
@@ -44331,6 +56107,44 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_loyaltyProgram[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_loyaltyProgram[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -44678,6 +56492,82 @@ export interface operations {
       };
     };
   };
+  "GrowthController_updateCoupon[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        couponId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code?: string;
+          /** @enum {string} */
+          type?: "fixed" | "percentage";
+          value?: number;
+          minimumOrderCents?: number;
+          maximumDiscountCents?: number | null;
+          /** Format: date-time */
+          validFrom?: string;
+          validUntil?: string | null;
+          channels?: string[];
+          unitIds?: string[];
+          perCustomerLimit?: number;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateCoupon[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        couponId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code?: string;
+          /** @enum {string} */
+          type?: "fixed" | "percentage";
+          value?: number;
+          minimumOrderCents?: number;
+          maximumDiscountCents?: number | null;
+          /** Format: date-time */
+          validFrom?: string;
+          validUntil?: string | null;
+          channels?: string[];
+          unitIds?: string[];
+          perCustomerLimit?: number;
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "GrowthController_redeemCoupon[0]": {
     parameters: {
       query?: never;
@@ -44789,6 +56679,26 @@ export interface operations {
                 /** @enum {string} */
                 kind: "birthday_month";
                 month: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "inactive_days";
+                days: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "minimum_visits";
+                visits: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "minimum_spend_cents";
+                amountCents: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "no_show_count";
+                count: number;
               };
           /** @default true */
           active?: boolean;
@@ -44849,6 +56759,26 @@ export interface operations {
                 /** @enum {string} */
                 kind: "birthday_month";
                 month: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "inactive_days";
+                days: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "minimum_visits";
+                visits: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "minimum_spend_cents";
+                amountCents: number;
+              }
+            | {
+                /** @enum {string} */
+                kind: "no_show_count";
+                count: number;
               };
           /** @default true */
           active?: boolean;
@@ -44902,6 +56832,11 @@ export interface operations {
           channel: "email" | "whatsapp";
           subject?: string | null;
           content: string;
+          variantBContent?: string | null;
+          /** @default 7 */
+          attributionWindowDays?: number;
+          /** @default 0 */
+          holdoutPercentage?: number;
         };
       };
     };
@@ -44952,6 +56887,11 @@ export interface operations {
           channel: "email" | "whatsapp";
           subject?: string | null;
           content: string;
+          variantBContent?: string | null;
+          /** @default 7 */
+          attributionWindowDays?: number;
+          /** @default 0 */
+          holdoutPercentage?: number;
         };
       };
     };
@@ -44995,6 +56935,138 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_previewCampaign[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_previewCampaign[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_campaignDeliveries[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_campaignDeliveries[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_cancelCampaign[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_cancelCampaign[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        campaignId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -46689,9 +58761,10 @@ export interface operations {
         "application/json": {
           unitId?: string | null;
           credentialReference: string;
-          /** @default {} */
-          config?: {
-            [key: string]: unknown;
+          config: {
+            /** Format: uri */
+            apiBaseUrl: string;
+            clientId: string;
           };
         };
       };
@@ -46738,15 +58811,1044 @@ export interface operations {
         "application/json": {
           unitId?: string | null;
           credentialReference: string;
-          /** @default {} */
-          config?: {
-            [key: string]: unknown;
+          config: {
+            /** Format: uri */
+            apiBaseUrl: string;
+            clientId: string;
           };
         };
       };
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_getEvolution[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_configureEvolution[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @default true */
+          enabled?: boolean;
+          /** @default 21:00 */
+          quietHoursStart?: string;
+          /** @default 08:00 */
+          quietHoursEnd?: string;
+          /** @default 4 */
+          maxMessagesPer30Days?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_getEvolution[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_configureEvolution[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @default true */
+          enabled?: boolean;
+          /** @default 21:00 */
+          quietHoursStart?: string;
+          /** @default 08:00 */
+          quietHoursEnd?: string;
+          /** @default 4 */
+          maxMessagesPer30Days?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_evolutionStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_evolutionStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_evolutionQr[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_evolutionQr[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_reconnectEvolution[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_reconnectEvolution[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_logoutEvolution[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_logoutEvolution[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappInbox[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappInbox[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappMessages[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappMessages[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateWhatsappConversation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status?: "open" | "pending" | "closed";
+          /** @enum {string} */
+          priority?: "low" | "normal" | "high" | "urgent";
+          assignedIdentityId?: string | null;
+          slaMinutes?: number | null;
+          /** Format: date-time */
+          expectedUpdatedAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateWhatsappConversation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status?: "open" | "pending" | "closed";
+          /** @enum {string} */
+          priority?: "low" | "normal" | "high" | "urgent";
+          assignedIdentityId?: string | null;
+          slaMinutes?: number | null;
+          /** Format: date-time */
+          expectedUpdatedAt: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappAssignees[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappAssignees[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappMessageMedia[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+        messageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_whatsappMessageMedia[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+        messageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_markWhatsappRead[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_markWhatsappRead[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_sendWhatsappMessage[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          conversationId?: string;
+          /** Format: uuid */
+          customerId?: string;
+          phone?: string;
+          /** @default  */
+          body?: string;
+          media?: {
+            fileName: string;
+            /** @enum {string} */
+            mimeType:
+              | "image/jpeg"
+              | "image/png"
+              | "image/webp"
+              | "video/mp4"
+              | "audio/mp4"
+              | "audio/mpeg"
+              | "audio/ogg"
+              | "audio/wav"
+              | "application/pdf";
+            base64: string;
+          };
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_sendWhatsappMessage[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          conversationId?: string;
+          /** Format: uuid */
+          customerId?: string;
+          phone?: string;
+          /** @default  */
+          body?: string;
+          media?: {
+            fileName: string;
+            /** @enum {string} */
+            mimeType:
+              | "image/jpeg"
+              | "image/png"
+              | "image/webp"
+              | "video/mp4"
+              | "audio/mp4"
+              | "audio/mpeg"
+              | "audio/ogg"
+              | "audio/wav"
+              | "application/pdf";
+            base64: string;
+          };
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmAutomations[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_upsertCrmAutomation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @enum {string} */
+          trigger: "birthday" | "inactive" | "post_visit" | "no_show" | "survey";
+          enabled: boolean;
+          /** @default 0 */
+          delayMinutes?: number;
+          inactiveDays?: number | null;
+          messageTemplate: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmAutomations[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_upsertCrmAutomation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** @enum {string} */
+          trigger: "birthday" | "inactive" | "post_visit" | "no_show" | "survey";
+          enabled: boolean;
+          /** @default 0 */
+          delayMinutes?: number;
+          inactiveDays?: number | null;
+          messageTemplate: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmAutomationExecutions[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmAutomationExecutions[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_retryCrmAutomationExecution[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_retryCrmAutomationExecution[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_testCrmAutomation[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        ruleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          phone: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_testCrmAutomation[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        ruleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          phone: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmQuickReplies[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_upsertCrmQuickReply[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          id?: string;
+          title: string;
+          body: string;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_crmQuickReplies[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_upsertCrmQuickReply[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          /** Format: uuid */
+          id?: string;
+          title: string;
+          body: string;
+          /** @default true */
+          active?: boolean;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_deleteCrmQuickReply[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        replyId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_deleteCrmQuickReply[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        replyId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };
@@ -46788,6 +59890,68 @@ export interface operations {
       content: {
         "application/json": {
           token: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthPublicController_evolutionWebhook[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          event: string;
+          instanceToken: string;
+          state?: string;
+          /** @default {} */
+          data?: {
+            [key: string]: unknown;
+          };
+        } & {
+          [key: string]: unknown;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthPublicController_evolutionWebhook[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          event: string;
+          instanceToken: string;
+          state?: string;
+          /** @default {} */
+          data?: {
+            [key: string]: unknown;
+          };
+        } & {
+          [key: string]: unknown;
         };
       };
     };
@@ -47039,6 +60203,182 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SyncController_synchronize[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {number} */
+          protocolVersion: 1;
+          hubVersion: string;
+          /** @default {} */
+          metadata?: {
+            [key: string]: unknown;
+          };
+          /** @default [] */
+          acknowledgedCommandIds?: string[];
+          /** @default [] */
+          commandResults?: (
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "print_job.execute";
+                cloudPrintJobId?: string | null;
+                localPrintJobId?: string | null;
+                printerId?: string | null;
+                /** @enum {string} */
+                status: "printed" | "failed" | "confirmation_required";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.configuration.upsert" | "printer.configuration.archive";
+                printerId?: string | null;
+                revision?: number | null;
+                /** @enum {string} */
+                status: "applied" | "failed";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.test";
+                printerId?: string | null;
+                revision?: number | null;
+                /** @enum {string} */
+                status: "printed" | "failed" | "confirmation_required";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+          )[];
+          /** @default [] */
+          events?: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            actorId: string;
+            /** Format: uuid */
+            deviceId: string;
+            idempotencyKey: string;
+            type: string;
+            payload: {
+              [key: string]: unknown;
+            };
+            version: number;
+            /** Format: date-time */
+            occurredAt: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "SyncController_synchronize[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {number} */
+          protocolVersion: 1;
+          hubVersion: string;
+          /** @default {} */
+          metadata?: {
+            [key: string]: unknown;
+          };
+          /** @default [] */
+          acknowledgedCommandIds?: string[];
+          /** @default [] */
+          commandResults?: (
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "print_job.execute";
+                cloudPrintJobId?: string | null;
+                localPrintJobId?: string | null;
+                printerId?: string | null;
+                /** @enum {string} */
+                status: "printed" | "failed" | "confirmation_required";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.configuration.upsert" | "printer.configuration.archive";
+                printerId?: string | null;
+                revision?: number | null;
+                /** @enum {string} */
+                status: "applied" | "failed";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.test";
+                printerId?: string | null;
+                revision?: number | null;
+                /** @enum {string} */
+                status: "printed" | "failed" | "confirmation_required";
+                errorCode?: string | null;
+                duplicate?: boolean;
+              }
+          )[];
+          /** @default [] */
+          events?: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            actorId: string;
+            /** Format: uuid */
+            deviceId: string;
+            idempotencyKey: string;
+            type: string;
+            payload: {
+              [key: string]: unknown;
+            };
+            version: number;
+            /** Format: date-time */
+            occurredAt: string;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };

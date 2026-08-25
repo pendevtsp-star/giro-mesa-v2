@@ -1,5 +1,5 @@
 import { Button, Input, Label, NativeSelect } from "@giromesa/ui";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { type CartItem, cartTotal, formatMoney } from "../../lib/menu";
 import type { PublicOrderOptions } from "../../lib/public-order";
 
@@ -28,7 +28,7 @@ export function OrderFlow({
   address,
   privacyAccepted,
   pending,
-  canPlace,
+  error,
   onFulfillment,
   onCustomerName,
   onCustomerPhone,
@@ -46,7 +46,7 @@ export function OrderFlow({
   address: AddressState;
   privacyAccepted: boolean;
   pending: boolean;
-  canPlace: boolean;
+  error?: string;
   onFulfillment: (value: "pickup" | "delivery") => void;
   onCustomerName: (value: string) => void;
   onCustomerPhone: (value: string) => void;
@@ -64,9 +64,13 @@ export function OrderFlow({
     Boolean(selectedZone && cartTotal(cart, fulfillment) < selectedZone.minimumOrderCents);
   const setField = (field: keyof AddressState, value: string) =>
     setAddress((current) => ({ ...current, [field]: value }));
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onPlace();
+  };
 
   return (
-    <>
+    <form className="public-order-flow" onSubmit={submit}>
       <section className="checkout-form" aria-labelledby="checkout-title">
         <div>
           <p className="overline">Dados do pedido</p>
@@ -78,6 +82,11 @@ export function OrderFlow({
         {options.status === "unavailable" && (
           <p className="checkout-state checkout-state-warning">
             Esta unidade ainda não habilitou pedidos públicos.
+          </p>
+        )}
+        {error && (
+          <p className="checkout-state checkout-state-warning" role="alert">
+            {error}
           </p>
         )}
         {options.status === "ready" && (
@@ -115,6 +124,8 @@ export function OrderFlow({
                 Nome
                 <Input
                   required
+                  name="customerName"
+                  minLength={2}
                   autoComplete="name"
                   value={customerName}
                   onChange={(event) => onCustomerName(event.target.value)}
@@ -125,6 +136,8 @@ export function OrderFlow({
                 Celular
                 <Input
                   required
+                  name="customerPhone"
+                  minLength={10}
                   inputMode="tel"
                   autoComplete="tel"
                   value={customerPhone}
@@ -139,6 +152,7 @@ export function OrderFlow({
                   Região de entrega
                   <NativeSelect
                     required
+                    name="deliveryZone"
                     value={deliveryZone}
                     onChange={(event) => onDeliveryZone(event.target.value)}
                   >
@@ -160,6 +174,7 @@ export function OrderFlow({
                     Rua
                     <Input
                       required
+                      name="street"
                       autoComplete="address-line1"
                       value={address.street}
                       onChange={(event) => setField("street", event.target.value)}
@@ -169,6 +184,7 @@ export function OrderFlow({
                     Número
                     <Input
                       required
+                      name="number"
                       value={address.number}
                       onChange={(event) => setField("number", event.target.value)}
                     />
@@ -177,6 +193,7 @@ export function OrderFlow({
                     Complemento
                     <Input
                       autoComplete="address-line2"
+                      name="complement"
                       value={address.complement}
                       onChange={(event) => setField("complement", event.target.value)}
                     />
@@ -185,6 +202,7 @@ export function OrderFlow({
                     Bairro
                     <Input
                       required
+                      name="neighborhood"
                       value={address.neighborhood}
                       onChange={(event) => setField("neighborhood", event.target.value)}
                     />
@@ -193,6 +211,7 @@ export function OrderFlow({
                     Cidade
                     <Input
                       required
+                      name="city"
                       autoComplete="address-level2"
                       value={address.city}
                       onChange={(event) => setField("city", event.target.value)}
@@ -202,6 +221,7 @@ export function OrderFlow({
                     UF
                     <Input
                       required
+                      name="state"
                       maxLength={2}
                       autoComplete="address-level1"
                       value={address.state}
@@ -212,6 +232,7 @@ export function OrderFlow({
                     CEP
                     <Input
                       required
+                      name="postalCode"
                       inputMode="numeric"
                       autoComplete="postal-code"
                       value={address.postalCode}
@@ -231,6 +252,8 @@ export function OrderFlow({
             <Label className="privacy-check">
               <Input
                 type="checkbox"
+                name="privacyAccepted"
+                required
                 checked={privacyAccepted}
                 onChange={(event) => onPrivacy(event.target.checked)}
               />
@@ -262,12 +285,11 @@ export function OrderFlow({
       </p>
       <Button
         className="place-order"
-        type="button"
-        disabled={!canPlace || !cart.length || pending || belowMinimum}
-        onClick={onPlace}
+        type="submit"
+        disabled={options.status !== "ready" || !cart.length || pending || belowMinimum}
       >
         {pending ? "Registrando pedido…" : "Confirmar pedido"}
       </Button>
-    </>
+    </form>
   );
 }

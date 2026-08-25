@@ -469,6 +469,9 @@
   border-top: 1px solid var(--line);
   font-size: 12px;
 }
+.legal-body {
+  white-space: pre-line;
+}
 
 .install-page-content {
   padding-top: 48px;

@@ -29,6 +29,10 @@ export interface InventoryCapabilities {
   canManagePlanning?: boolean;
   canCloseInventory?: boolean;
   canTransferBetweenUnits?: boolean;
+  canManageReturnablePolicy?: boolean;
+  canTransferReturnableResponsibility?: boolean;
+  canConfigureReturnables?: boolean;
+  canManageReturnableDeposits?: boolean;
 }
 
 export interface InventoryItem {
@@ -88,6 +92,67 @@ export interface ReturnableMovement {
   occurredAt: string;
 }
 
+export interface ReturnableCustody {
+  id: string;
+  inventoryItemId: string;
+  locationId: string | null;
+  orderId: string | null;
+  orderItemId: string | null;
+  responsibleIdentityId: string | null;
+  responsibleName: string | null;
+  counterpartyName: string | null;
+  orderCode: string | null;
+  tableLabel: string | null;
+  dueAt: string | null;
+  occurredAt: string;
+  issuedQuantity: number;
+  returnedQuantity: number;
+  openQuantity: number;
+  depositCents: number;
+  ageDays: number;
+  handoff: {
+    toIdentityId: string;
+    toIdentityName: string | null;
+    toShiftReference: string | null;
+    at: string;
+  } | null;
+}
+
+export interface ReturnablePolicy {
+  depositMode: "disabled" | "manual";
+  defaultDueDays: number;
+  returnableClosePolicy: "ignore" | "warn" | "block";
+}
+
+export interface ReturnableSectorReconciliation {
+  inventoryItemId: string | null;
+  locationId: string | null;
+  fullEquivalentQuantity: number;
+  emptyPhysicalQuantity: number;
+  openCustodyQuantity: number;
+  supplierInTransitQuantity: number;
+  approvedLossQuantity: number;
+  explainableBalanceQuantity: number | null;
+  lastCountedAt: string | null;
+  lastCountDifferenceQuantity: number | null;
+}
+
+export interface ReturnableConfigurationHealth {
+  status: "healthy" | "attention";
+  undecidedProductIds: string[];
+  unlinkedReturnableProductIds: string[];
+  missingDepositValueProductIds: string[];
+  inactiveContainerLinkProductIds: string[];
+}
+
+export interface ReturnableClassificationStatus {
+  productId: string;
+  productName: string | null;
+  containerInventoryItemId: string | null;
+  active: boolean;
+  classification: "returnable" | "non_returnable" | "undecided";
+}
+
 export interface StockLocation {
   id: string;
   name: string;
@@ -131,6 +196,7 @@ export interface StockBalance {
   inventoryItemId: string;
   quantity: number;
   reservedQuantity: number;
+  blockedQuantity: number;
   availableQuantity: number;
   averageCostCents: number | null;
 }
@@ -226,6 +292,7 @@ export interface InventoryClosing {
   shiftReference: string | null;
   totalValueCents: number;
   totalReservedValueCents: number;
+  totalInTransitValueCents: number;
   lineCount: number;
   closedAt: string;
 }
@@ -379,14 +446,44 @@ export interface InventoryData {
   fullContainersByLocation?: ReturnablesData["fullContainersByLocation"];
   supplierExchanges?: ReturnablesData["supplierExchanges"];
   lossIndicators?: ReturnablesData["lossIndicators"];
+  openCustodies?: ReturnablesData["openCustodies"];
+  reconciliation?: ReturnablesData["reconciliation"];
+  configurationHealth?: ReturnablesData["configurationHealth"];
+  classificationStatus?: ReturnablesData["classificationStatus"];
+  returnablePendingActions?: ReturnablesData["pendingActions"];
+  returnableClosings?: ReturnablesData["closings"];
   capabilities?: InventoryCapabilities | null;
 }
 
 export interface ReturnablesData {
   returnables: ReturnablePosition[];
   returnableIncidents: ReturnableIncident[];
+  policy: ReturnablePolicy;
   capabilities: InventoryCapabilities | null;
   recentReturnableMovements: ReturnableMovement[];
+  openCustodies: ReturnableCustody[];
+  reconciliation: {
+    totals: ReturnableSectorReconciliation;
+    byLocation: ReturnableSectorReconciliation[];
+  };
+  configurationHealth: ReturnableConfigurationHealth;
+  classificationStatus: ReturnableClassificationStatus[];
+  pendingActions: Array<{
+    id: string;
+    title: string;
+    detail: string;
+    priority: "high" | "medium" | "low";
+    createdAt: string;
+  }>;
+  closings: Array<{
+    id: string;
+    period: string;
+    locationId: string | null;
+    pendingCustodyQuantity: number;
+    supplierInTransitQuantity: number;
+    approvedLossQuantity: number;
+    closedAt: string;
+  }>;
   physicalByLocation: Array<{
     inventoryItemId: string;
     locationId: string;
@@ -560,7 +657,19 @@ export interface PurchaseInvoiceLine {
 
 export interface PurchaseSuggestion {
   inventoryItemId: string;
+  itemName: string;
+  supplierId: string | null;
+  supplierName: string | null;
+  currentQuantity: number;
+  minimumQuantity: number;
   suggestedQuantity: string;
+  purchaseUnit: string;
+  stockUnit: string;
+  purchaseToStockFactor: number;
+  leadTimeDays: number;
+  dailyConsumption: number;
+  coverageDays: number | null;
+  outstandingStockQuantity: number;
   reason: string | null;
 }
 
@@ -607,14 +716,89 @@ export interface FinancialEntry {
   status: string;
   amountCents: number;
   settledCents: number;
+  competenceDate: string;
   dueDate: string;
   direction: "payable" | "receivable";
+  category: string | null;
+  costCenter: string | null;
+  documentNumber: string | null;
+  notes: string | null;
+  supplierName: string | null;
+  installmentNumber: number | null;
+  installmentCount: number | null;
+  attachments: Array<{ name: string; url: string }>;
+  version: number;
+  payments: FinancialPayment[];
+}
+
+export interface FinancialPayment {
+  id: string;
+  amountCents: number;
+  method: string;
+  reference: string | null;
+  status: "posted" | "reversed";
+  occurredAt: string;
+  reversalReason: string | null;
+}
+
+export interface FinanceApproval {
+  id: string;
+  direction: "payable" | "receivable";
+  entryId: string;
+  amountCents: number;
+  method: string;
+  reference: string | null;
+  cashRegisterId: string | null;
+  occurredAt: string | null;
+  status: "pending" | "approved";
+  requestedByIdentityId: string;
+}
+
+export interface FinanceReconciliationEntry {
+  id: string;
+  externalKey: string;
+  paymentDirection: "payable" | "receivable";
+  paymentId: string | null;
+  grossCents: number;
+  feeCents: number;
+  netCents: number;
+  status: "matched" | "unmatched" | "divergent" | "resolved";
+  resolutionNote: string | null;
+  version: number;
 }
 
 export interface FinanceData {
   entries: FinancialEntry[];
   reconciliationImports: Row[];
-  reconciliationEntries: Row[];
+  reconciliationEntries: FinanceReconciliationEntry[];
+  approvals: FinanceApproval[];
+  settings: {
+    paymentApprovalThresholdCents: number | null;
+    requireDistinctApprover: boolean;
+    dueSoonDays: number;
+  };
+  summary: {
+    payableCents: number;
+    receivableCents: number;
+    projectedBalanceCents: number;
+    overdueCount: number;
+    dueTodayCount: number;
+    dueSoonCount: number;
+    unresolvedReconciliations: number;
+  };
+  projection: Array<{
+    date: string;
+    payableCents: number;
+    receivableCents: number;
+    balanceCents: number;
+  }>;
+  pagination: { page: number; pageSize: number; total: number; pageCount: number };
+  capabilities: {
+    canManage: boolean;
+    canConfigure: boolean;
+    canApprove: boolean;
+    canOperateCash: boolean;
+  };
 }
 
 export interface ReportData {
@@ -1128,6 +1312,19 @@ export interface CashApproval {
   requestedAt: string | null;
 }
 
+export interface PendingCashTransfer {
+  id: string;
+  fromCashShiftId: string;
+  toCashShiftId: string;
+  fromCashRegisterName: string;
+  toCashRegisterName: string;
+  amountCents: number;
+  reason: string;
+  requestedByName: string;
+  requestedAt: string | null;
+  canDecide: boolean;
+}
+
 export interface CashAdjustment {
   id: string;
   cashRegisterId: string | null;
@@ -1182,6 +1379,7 @@ export interface CashData {
   alerts: CashAlert[];
   operators: CashOperator[];
   approvals: CashApproval[];
+  pendingTransfers: PendingCashTransfer[];
   adjustments: CashAdjustment[];
   registers: CashRegister[];
   availableTerminals: CashRegisterTerminal[];
@@ -1869,6 +2067,7 @@ export function parseInventory(value: unknown): InventoryData {
       inventoryItemId: requiredString(balance.inventoryItemId),
       quantity: numeric(balance.quantity) ?? 0,
       reservedQuantity: numeric(balance.reservedQuantity, true) ?? 0,
+      blockedQuantity: numeric(balance.blockedQuantity, true) ?? 0,
       availableQuantity: numeric(balance.availableQuantity, true) ?? numeric(balance.quantity) ?? 0,
       averageCostCents: numeric(balance.averageCostCents, true),
     })),
@@ -2052,6 +2251,7 @@ export function parseInventory(value: unknown): InventoryData {
       shiftReference: optionalString(closing.shiftReference),
       totalValueCents: integer(closing.totalValueCents),
       totalReservedValueCents: integer(closing.totalReservedValueCents),
+      totalInTransitValueCents: integer(closing.totalInTransitValueCents ?? 0),
       lineCount: integer(closing.lineCount),
       closedAt: requiredString(closing.closedAt),
     })),
@@ -2086,9 +2286,9 @@ export function parseInventory(value: unknown): InventoryData {
     supplierPerformance: optionalRows(payload, "supplierPerformance").map((supplier) => ({
       supplierId: requiredString(supplier.supplierId),
       supplierName: requiredString(supplier.supplierName),
-      fillRatePercent: numeric(supplier.fillRatePercent) ?? 0,
-      onTimePercent: numeric(supplier.onTimePercent) ?? 0,
-      divergencePercent: numeric(supplier.divergencePercent) ?? 0,
+      fillRatePercent: numeric(supplier.fillRatePercent, true) ?? 0,
+      onTimePercent: numeric(supplier.onTimePercent, true) ?? 0,
+      divergencePercent: numeric(supplier.divergencePercent, true) ?? 0,
       priceVariationPercent: numeric(supplier.priceVariationPercent, true),
     })),
     pendingActions: optionalRows(payload, "pendingActions").map((action) => ({
@@ -2140,8 +2340,58 @@ export function parseInventory(value: unknown): InventoryData {
   };
 }
 
+export function aggregateReturnableReconciliation(
+  rows: ReturnableSectorReconciliation[],
+): ReturnableSectorReconciliation {
+  const latestCountedAt = rows
+    .map((row) => row.lastCountedAt)
+    .filter((value): value is string => value !== null)
+    .sort()
+    .at(-1);
+  const countDifferences = rows
+    .map((row) => row.lastCountDifferenceQuantity)
+    .filter((value): value is number => value !== null);
+  return {
+    inventoryItemId: rows.length === 1 ? (rows[0]?.inventoryItemId ?? null) : null,
+    locationId: rows.every((row) => row.locationId === rows[0]?.locationId)
+      ? (rows[0]?.locationId ?? null)
+      : null,
+    fullEquivalentQuantity: rows.reduce((sum, row) => sum + row.fullEquivalentQuantity, 0),
+    emptyPhysicalQuantity: rows.reduce((sum, row) => sum + row.emptyPhysicalQuantity, 0),
+    openCustodyQuantity: rows.reduce((sum, row) => sum + row.openCustodyQuantity, 0),
+    supplierInTransitQuantity: rows.reduce((sum, row) => sum + row.supplierInTransitQuantity, 0),
+    approvedLossQuantity: rows.reduce((sum, row) => sum + row.approvedLossQuantity, 0),
+    explainableBalanceQuantity: rows.every((row) => row.explainableBalanceQuantity !== null)
+      ? rows.reduce((sum, row) => sum + (row.explainableBalanceQuantity ?? 0), 0)
+      : null,
+    lastCountedAt: latestCountedAt ?? null,
+    lastCountDifferenceQuantity: countDifferences.length
+      ? countDifferences.reduce((sum, value) => sum + value, 0)
+      : null,
+  };
+}
+
 export function parseReturnables(value: unknown): ReturnablesData {
   const payload = record(value);
+  const stringArray = (source: unknown) =>
+    Array.isArray(source)
+      ? source.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  const parseReconciliation = (source: Row): ReturnableSectorReconciliation => ({
+    inventoryItemId: optionalString(source.containerInventoryItemId ?? source.inventoryItemId),
+    locationId: optionalString(source.locationId),
+    fullEquivalentQuantity: numeric(source.fullEquivalentQuantity ?? 0) ?? 0,
+    emptyPhysicalQuantity: numeric(source.emptyPhysicalQuantity ?? 0) ?? 0,
+    openCustodyQuantity: numeric(source.openCustodyQuantity ?? 0) ?? 0,
+    supplierInTransitQuantity: numeric(source.supplierInTransitQuantity ?? 0) ?? 0,
+    approvedLossQuantity: numeric(source.approvedLossQuantity ?? 0) ?? 0,
+    explainableBalanceQuantity: numeric(source.explainableBalanceQuantity, true),
+    lastCountedAt: optionalString(source.lastCountedAt),
+    lastCountDifferenceQuantity: numeric(
+      source.lastCountDifferenceQuantity ?? source.recentCountDifferenceQuantity,
+      true,
+    ),
+  });
   const explicitPositions =
     payload.returnables === undefined
       ? optionalRows(payload, "positions")
@@ -2181,7 +2431,76 @@ export function parseReturnables(value: unknown): ReturnablesData {
     payload.returnableIncidents === undefined
       ? optionalRows(payload, "incidents")
       : rows(payload, "returnableIncidents");
+  const physicalByLocation = optionalRows(payload, "physicalByLocation").map((position) => ({
+    inventoryItemId: requiredString(position.containerInventoryItemId),
+    locationId: requiredString(position.locationId),
+    physicalQuantity: numeric(position.physicalQuantity) ?? 0,
+  }));
+  const custodyByLocation = optionalRows(payload, "custodyByLocation").map((position) => ({
+    inventoryItemId: requiredString(position.containerInventoryItemId),
+    locationId: requiredString(position.locationId),
+    expectedQuantity: numeric(position.expectedQuantity ?? position.openCustodyQuantity) ?? 0,
+  }));
+  const fullContainersByLocation = optionalRows(payload, "fullContainersByLocation").map(
+    (position) => ({
+      inventoryItemId: requiredString(position.containerInventoryItemId),
+      locationId: requiredString(position.locationId),
+      quantity: numeric(position.quantity) ?? 0,
+    }),
+  );
+  const supplierExchanges = optionalRows(payload, "supplierExchanges").map((exchange) => ({
+    id: requiredString(exchange.id),
+    inventoryItemId: requiredString(exchange.containerInventoryItemId),
+    locationId: requiredString(exchange.locationId),
+    supplierId: requiredString(exchange.supplierId),
+    quantity: numeric(exchange.quantity) ?? 0,
+    status: requiredString(
+      exchange.status,
+    ) as ReturnablesData["supplierExchanges"][number]["status"],
+    note: requiredString(exchange.note),
+    sentAt: requiredString(exchange.sentAt),
+    resolvedAt: optionalString(exchange.resolvedAt),
+  }));
+  const lossIndicators = optionalRows(payload, "lossIndicators").map((indicator) => ({
+    kind: returnableIncidentKind(indicator.type),
+    locationId: optionalString(indicator.locationId),
+    quantity: numeric(indicator.quantity) ?? 0,
+    estimatedCostCents: integer(indicator.estimatedCostCents),
+    incidentCount: integer(indicator.incidentCount),
+  }));
+  const reconciliationSource =
+    payload.reconciliation && typeof payload.reconciliation === "object"
+      ? record(payload.reconciliation)
+      : {};
+  const fallbackTotals: ReturnableSectorReconciliation = {
+    inventoryItemId: null,
+    locationId: null,
+    fullEquivalentQuantity: fullContainersByLocation.reduce((sum, row) => sum + row.quantity, 0),
+    emptyPhysicalQuantity: physicalByLocation.reduce((sum, row) => sum + row.physicalQuantity, 0),
+    openCustodyQuantity: custodyByLocation.reduce((sum, row) => sum + row.expectedQuantity, 0),
+    supplierInTransitQuantity: supplierExchanges
+      .filter((row) => row.status === "in_transit")
+      .reduce((sum, row) => sum + row.quantity, 0),
+    approvedLossQuantity: lossIndicators.reduce((sum, row) => sum + row.quantity, 0),
+    explainableBalanceQuantity: null,
+    lastCountedAt: null,
+    lastCountDifferenceQuantity: null,
+  };
+  const reconciliationTotalRows = Array.isArray(reconciliationSource.totals)
+    ? optionalRows(reconciliationSource, "totals").map(parseReconciliation)
+    : [];
+  const reconciliationTotalsSource =
+    reconciliationSource.totals &&
+    !Array.isArray(reconciliationSource.totals) &&
+    typeof reconciliationSource.totals === "object"
+      ? record(reconciliationSource.totals)
+      : reconciliationSource;
+  const configurationSource =
+    payload.configurationHealth && typeof payload.configurationHealth === "object"
+      ? record(payload.configurationHealth)
+      : {};
   return {
+    policy: parseReturnablePolicy(payload.policy),
     returnables: explicitPositions.length
       ? explicitPositions.map((position) => ({
           inventoryItemId: requiredString(
@@ -2216,15 +2535,23 @@ export function parseReturnables(value: unknown): ReturnablesData {
         : (() => {
             const capabilities = record(payload.capabilities);
             return {
-              canConfirmReturnables: boolean(
-                capabilities.canConfirmReturnables ?? capabilities.canConfirmCustody,
-              ),
-              canRecordReturnableIncident: boolean(
-                capabilities.canRecordReturnableIncident ?? capabilities.canReportIncident,
-              ),
-              canApproveReturnableIncident: boolean(
-                capabilities.canApproveReturnableIncident ?? capabilities.canApproveIncident,
-              ),
+              canConfirmReturnables:
+                capabilities.canConfirmReturnables === true ||
+                capabilities.canConfirmCustody === true,
+              canRecordReturnableIncident:
+                capabilities.canRecordReturnableIncident === true ||
+                capabilities.canReportIncident === true,
+              canApproveReturnableIncident:
+                capabilities.canApproveReturnableIncident === true ||
+                capabilities.canApproveIncident === true,
+              canManageReturnablePolicy:
+                capabilities.canConfigurePolicy === true ||
+                capabilities.canManageReturnablePolicy === true,
+              canTransferReturnableResponsibility:
+                capabilities.canHandoffCustody === true ||
+                capabilities.canTransferReturnableResponsibility === true,
+              canConfigureReturnables: capabilities.canConfigure === true,
+              canManageReturnableDeposits: capabilities.canManageDeposit === true,
             };
           })(),
     recentReturnableMovements: optionalRows(payload, "recentMovements").map((movement) => ({
@@ -2238,41 +2565,131 @@ export function parseReturnables(value: unknown): ReturnablesData {
       context: movement.context === undefined ? {} : record(movement.context),
       occurredAt: requiredString(movement.occurredAt),
     })),
-    physicalByLocation: optionalRows(payload, "physicalByLocation").map((position) => ({
-      inventoryItemId: requiredString(position.containerInventoryItemId),
-      locationId: requiredString(position.locationId),
-      physicalQuantity: numeric(position.physicalQuantity) ?? 0,
+    openCustodies: optionalRows(
+      payload,
+      payload.openCustodies === undefined ? "custodyInbox" : "openCustodies",
+    ).map((custody) => {
+      const handoff =
+        custody.handoff && typeof custody.handoff === "object" ? record(custody.handoff) : null;
+      const issuedQuantity = numeric(custody.issuedQuantity, true);
+      const returnedQuantity = numeric(custody.returnedQuantity, true) ?? 0;
+      const openQuantity = numeric(custody.openQuantity ?? custody.outstandingQuantity) ?? 0;
+      return {
+        id: requiredString(custody.id ?? custody.issueMovementId),
+        inventoryItemId: requiredString(
+          custody.containerInventoryItemId ?? custody.inventoryItemId,
+        ),
+        locationId: optionalString(custody.locationId),
+        orderId: optionalString(custody.orderId),
+        orderItemId: optionalString(custody.orderItemId),
+        responsibleIdentityId: optionalString(custody.responsibleIdentityId),
+        responsibleName: optionalString(custody.responsibleName),
+        counterpartyName: optionalString(custody.counterpartyName),
+        orderCode: optionalString(custody.orderCode),
+        tableLabel: optionalString(custody.tableLabel),
+        dueAt: optionalString(custody.dueAt),
+        occurredAt: requiredString(custody.occurredAt ?? custody.oldestOutstandingAt),
+        issuedQuantity: issuedQuantity ?? openQuantity + returnedQuantity,
+        returnedQuantity,
+        openQuantity,
+        depositCents: integer(custody.depositCents ?? custody.depositExposureCents ?? 0),
+        ageDays: integer(
+          custody.ageDays ??
+            Math.max(
+              0,
+              Math.floor(
+                (Date.now() -
+                  new Date(
+                    requiredString(custody.occurredAt ?? custody.oldestOutstandingAt),
+                  ).getTime()) /
+                  86_400_000,
+              ),
+            ),
+        ),
+        handoff: handoff
+          ? {
+              toIdentityId: requiredString(handoff.toIdentityId),
+              toIdentityName: optionalString(handoff.toIdentityName),
+              toShiftReference: optionalString(handoff.toShiftReference),
+              at: requiredString(handoff.at),
+            }
+          : null,
+      };
+    }),
+    reconciliation: {
+      totals: reconciliationTotalRows.length
+        ? aggregateReturnableReconciliation(reconciliationTotalRows)
+        : Object.keys(reconciliationTotalsSource).length
+          ? parseReconciliation(reconciliationTotalsSource)
+          : fallbackTotals,
+      byLocation: optionalRows(reconciliationSource, "byLocation").map(parseReconciliation),
+    },
+    configurationHealth: {
+      status:
+        configurationSource.status === "attention" ||
+        stringArray(configurationSource.undecidedProductIds).length > 0 ||
+        stringArray(configurationSource.unlinkedReturnableProductIds).length > 0 ||
+        stringArray(configurationSource.inactiveContainerLinkProductIds).length > 0
+          ? "attention"
+          : "healthy",
+      undecidedProductIds: stringArray(configurationSource.undecidedProductIds),
+      unlinkedReturnableProductIds: stringArray(configurationSource.unlinkedReturnableProductIds),
+      missingDepositValueProductIds: stringArray(configurationSource.missingDepositValueProductIds),
+      inactiveContainerLinkProductIds: stringArray(
+        configurationSource.inactiveContainerLinkProductIds,
+      ),
+    },
+    classificationStatus: optionalRows(payload, "classificationStatus").map((entry) => {
+      const activeLink =
+        entry.activeLink && typeof entry.activeLink === "object" ? record(entry.activeLink) : null;
+      const classification = entry.status ?? entry.classification;
+      return {
+        productId: requiredString(entry.productId),
+        productName: optionalString(entry.productName),
+        containerInventoryItemId: optionalString(
+          activeLink?.containerInventoryItemId ?? entry.containerInventoryItemId,
+        ),
+        active: activeLink ? activeLink.containerActive !== false : entry.active !== false,
+        classification:
+          classification === "returnable" || classification === "non_returnable"
+            ? classification
+            : "undecided",
+      };
+    }),
+    pendingActions: optionalRows(payload, "pendingActions").map((entry) => ({
+      id: requiredString(entry.id),
+      title: requiredString(entry.title),
+      detail: requiredString(entry.detail),
+      priority: entry.priority === "high" || entry.priority === "low" ? entry.priority : "medium",
+      createdAt: requiredString(entry.createdAt),
     })),
-    custodyByLocation: optionalRows(payload, "custodyByLocation").map((position) => ({
-      inventoryItemId: requiredString(position.containerInventoryItemId),
-      locationId: requiredString(position.locationId),
-      expectedQuantity: numeric(position.expectedQuantity) ?? 0,
+    closings: optionalRows(payload, "closings").map((entry) => ({
+      id: requiredString(entry.id),
+      period: requiredString(entry.period),
+      locationId: optionalString(entry.locationId),
+      pendingCustodyQuantity: numeric(entry.pendingCustodyQuantity) ?? 0,
+      supplierInTransitQuantity: numeric(entry.supplierInTransitQuantity) ?? 0,
+      approvedLossQuantity: numeric(entry.approvedLossQuantity) ?? 0,
+      closedAt: requiredString(entry.closedAt),
     })),
-    fullContainersByLocation: optionalRows(payload, "fullContainersByLocation").map((position) => ({
-      inventoryItemId: requiredString(position.containerInventoryItemId),
-      locationId: requiredString(position.locationId),
-      quantity: numeric(position.quantity) ?? 0,
-    })),
-    supplierExchanges: optionalRows(payload, "supplierExchanges").map((exchange) => ({
-      id: requiredString(exchange.id),
-      inventoryItemId: requiredString(exchange.containerInventoryItemId),
-      locationId: requiredString(exchange.locationId),
-      supplierId: requiredString(exchange.supplierId),
-      quantity: numeric(exchange.quantity) ?? 0,
-      status: requiredString(
-        exchange.status,
-      ) as ReturnablesData["supplierExchanges"][number]["status"],
-      note: requiredString(exchange.note),
-      sentAt: requiredString(exchange.sentAt),
-      resolvedAt: optionalString(exchange.resolvedAt),
-    })),
-    lossIndicators: optionalRows(payload, "lossIndicators").map((indicator) => ({
-      kind: returnableIncidentKind(indicator.type),
-      locationId: optionalString(indicator.locationId),
-      quantity: numeric(indicator.quantity) ?? 0,
-      estimatedCostCents: integer(indicator.estimatedCostCents),
-      incidentCount: integer(indicator.incidentCount),
-    })),
+    physicalByLocation,
+    custodyByLocation,
+    fullContainersByLocation,
+    supplierExchanges,
+    lossIndicators,
+  };
+}
+
+export function parseReturnablePolicy(value: unknown): ReturnablePolicy {
+  const payload =
+    value && typeof value === "object" && !Array.isArray(value) ? record(value) : ({} as Row);
+  return {
+    depositMode: payload.depositMode === "manual" ? "manual" : "disabled",
+    defaultDueDays: integer(payload.defaultDueDays ?? 7),
+    returnableClosePolicy:
+      payload.returnableClosePolicy === "ignore" || payload.returnableClosePolicy === "block"
+        ? payload.returnableClosePolicy
+        : "warn",
   };
 }
 
@@ -2437,7 +2854,19 @@ export function parsePurchases(value: unknown): PurchasesData {
     })),
     suggestions: optionalRows(payload, "suggestions").map((suggestion) => ({
       inventoryItemId: requiredString(suggestion.inventoryItemId),
+      itemName: optionalString(suggestion.itemName) ?? "Item",
+      supplierId: optionalString(suggestion.supplierId),
+      supplierName: optionalString(suggestion.supplierName),
+      currentQuantity: numeric(suggestion.currentQuantity, true) ?? 0,
+      minimumQuantity: numeric(suggestion.minimumQuantity, true) ?? 0,
       suggestedQuantity: requiredString(suggestion.suggestedQuantity),
+      purchaseUnit: optionalString(suggestion.purchaseUnit) ?? "un",
+      stockUnit: optionalString(suggestion.stockUnit) ?? "un",
+      purchaseToStockFactor: numeric(suggestion.purchaseToStockFactor, true) ?? 1,
+      leadTimeDays: Math.trunc(numeric(suggestion.leadTimeDays, true) ?? 0),
+      dailyConsumption: numeric(suggestion.dailyConsumption, true) ?? 0,
+      coverageDays: numeric(suggestion.coverageDays, true),
+      outstandingStockQuantity: numeric(suggestion.outstandingStockQuantity, true) ?? 0,
       reason: optionalString(suggestion.reason),
     })),
     metrics: metricRows.map((metric) => ({
@@ -2503,32 +2932,135 @@ export function parseSuppliers(value: unknown): Supplier[] {
 
 export function parseFinance(value: unknown): FinanceData {
   const payload = record(value);
-  const payables = rows(payload, "payables").map(
-    (entry): FinancialEntry => ({
-      id: requiredString(entry.id),
-      description: requiredString(entry.description),
-      status: requiredString(entry.status),
-      amountCents: numeric(entry.amountCents) ?? 0,
-      settledCents: numeric(entry.paidCents) ?? 0,
-      dueDate: requiredString(entry.dueDate),
-      direction: "payable",
-    }),
-  );
-  const receivables = rows(payload, "receivables").map(
-    (entry): FinancialEntry => ({
-      id: requiredString(entry.id),
-      description: requiredString(entry.description),
-      status: requiredString(entry.status),
-      amountCents: numeric(entry.amountCents) ?? 0,
-      settledCents: numeric(entry.receivedCents) ?? 0,
-      dueDate: requiredString(entry.dueDate),
+  const paymentRows: Row[] = [
+    ...rows(payload, "payablePayments").map((payment) => ({ ...payment, direction: "payable" })),
+    ...rows(payload, "receivablePayments").map((payment) => ({
+      ...payment,
       direction: "receivable",
-    }),
-  );
+    })),
+  ];
+  const parsePayment = (payment: Row): FinancialPayment => ({
+    id: requiredString(payment.id),
+    amountCents: numeric(payment.amountCents) ?? 0,
+    method: requiredString(payment.method),
+    reference: optionalString(payment.reference),
+    status: payment.status === "reversed" ? "reversed" : "posted",
+    occurredAt: requiredString(payment.paidAt ?? payment.receivedAt),
+    reversalReason: optionalString(payment.reversalReason),
+  });
+  const entryRows = rows(payload, "entries");
+  const sourceEntries: Row[] = entryRows.length
+    ? entryRows
+    : [
+        ...rows(payload, "payables").map((entry) => ({ ...entry, direction: "payable" })),
+        ...rows(payload, "receivables").map((entry) => ({ ...entry, direction: "receivable" })),
+      ];
+  const entries = sourceEntries.map((entry): FinancialEntry => {
+    const direction = entry.direction === "receivable" ? "receivable" : "payable";
+    const attachments = Array.isArray(entry.attachments)
+      ? records(entry.attachments).map((attachment) => ({
+          name: requiredString(attachment.name),
+          url: requiredString(attachment.url),
+        }))
+      : [];
+    return {
+      id: requiredString(entry.id),
+      description: requiredString(entry.description),
+      status: requiredString(entry.status),
+      amountCents: numeric(entry.amountCents) ?? 0,
+      settledCents: numeric(entry.settledCents ?? entry.paidCents ?? entry.receivedCents) ?? 0,
+      competenceDate: requiredString(entry.competenceDate),
+      dueDate: requiredString(entry.dueDate),
+      direction,
+      category: optionalString(entry.category),
+      costCenter: optionalString(entry.costCenter),
+      documentNumber: optionalString(entry.documentNumber),
+      notes: optionalString(entry.notes),
+      supplierName: optionalString(entry.supplierName),
+      installmentNumber: numeric(entry.installmentNumber),
+      installmentCount: numeric(entry.installmentCount),
+      attachments,
+      version: integer(entry.version),
+      payments: paymentRows
+        .filter(
+          (payment) =>
+            payment.direction === direction &&
+            (direction === "payable" ? payment.payableId : payment.receivableId) === entry.id,
+        )
+        .map(parsePayment),
+    };
+  });
+  const settings = record(payload.settings);
+  const summary = record(payload.summary);
+  const pagination = record(payload.pagination);
+  const capabilities = record(payload.capabilities);
   return {
-    entries: [...payables, ...receivables].sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    entries,
     reconciliationImports: rows(payload, "reconciliationImports"),
-    reconciliationEntries: rows(payload, "reconciliationEntries"),
+    reconciliationEntries: rows(payload, "reconciliationEntries").map((entry) => ({
+      id: requiredString(entry.id),
+      externalKey: requiredString(entry.externalKey),
+      paymentDirection: entry.paymentDirection === "payable" ? "payable" : "receivable",
+      paymentId: optionalString(entry.paymentId),
+      grossCents: numeric(entry.grossCents) ?? 0,
+      feeCents: numeric(entry.feeCents) ?? 0,
+      netCents: numeric(entry.netCents) ?? 0,
+      status:
+        entry.status === "matched" || entry.status === "divergent" || entry.status === "resolved"
+          ? entry.status
+          : "unmatched",
+      resolutionNote: optionalString(entry.resolutionNote),
+      version: integer(entry.version),
+    })),
+    approvals: rows(payload, "approvals").map((approval) => {
+      const direction = approval.direction === "receivable" ? "receivable" : "payable";
+      return {
+        id: requiredString(approval.id),
+        direction,
+        entryId: requiredString(
+          direction === "payable" ? approval.payableId : approval.receivableId,
+        ),
+        amountCents: numeric(approval.amountCents) ?? 0,
+        method: requiredString(approval.method),
+        reference: optionalString(approval.reference),
+        cashRegisterId: optionalString(approval.cashRegisterId),
+        occurredAt: optionalString(approval.occurredAt),
+        status: approval.status === "approved" ? "approved" : "pending",
+        requestedByIdentityId: requiredString(approval.requestedByIdentityId),
+      };
+    }),
+    settings: {
+      paymentApprovalThresholdCents: numeric(settings.paymentApprovalThresholdCents),
+      requireDistinctApprover: settings.requireDistinctApprover !== false,
+      dueSoonDays: integer(settings.dueSoonDays ?? 7),
+    },
+    summary: {
+      payableCents: numeric(summary.payableCents) ?? 0,
+      receivableCents: numeric(summary.receivableCents) ?? 0,
+      projectedBalanceCents: numeric(summary.projectedBalanceCents) ?? 0,
+      overdueCount: integer(summary.overdueCount),
+      dueTodayCount: integer(summary.dueTodayCount),
+      dueSoonCount: integer(summary.dueSoonCount),
+      unresolvedReconciliations: integer(summary.unresolvedReconciliations),
+    },
+    projection: rows(payload, "projection").map((item) => ({
+      date: requiredString(item.date),
+      payableCents: numeric(item.payableCents) ?? 0,
+      receivableCents: numeric(item.receivableCents) ?? 0,
+      balanceCents: numeric(item.balanceCents) ?? 0,
+    })),
+    pagination: {
+      page: integer(pagination.page ?? 1),
+      pageSize: integer(pagination.pageSize ?? 25),
+      total: integer(pagination.total),
+      pageCount: integer(pagination.pageCount),
+    },
+    capabilities: {
+      canManage: capabilities.canManage !== false,
+      canConfigure: capabilities.canConfigure === true,
+      canApprove: capabilities.canApprove === true,
+      canOperateCash: capabilities.canOperateCash === true,
+    },
   };
 }
 
@@ -3224,6 +3756,18 @@ export function parseCash(value: unknown): CashData {
             ? "rejected"
             : "pending",
       requestedAt: optionalString(approval.requestedAt),
+    })),
+    pendingTransfers: rows(payload, "pendingTransfers").map((transfer) => ({
+      id: requiredString(transfer.id),
+      fromCashShiftId: requiredString(transfer.fromCashShiftId),
+      toCashShiftId: requiredString(transfer.toCashShiftId),
+      fromCashRegisterName: requiredString(transfer.fromCashRegisterName),
+      toCashRegisterName: requiredString(transfer.toCashRegisterName),
+      amountCents: numeric(transfer.amountCents) ?? 0,
+      reason: requiredString(transfer.reason),
+      requestedByName: requiredString(transfer.requestedByName),
+      requestedAt: optionalString(transfer.requestedAt),
+      canDecide: boolean(transfer.canDecide),
     })),
     adjustments: rows(payload, "adjustments").map((adjustment) => ({
       id: requiredString(adjustment.id),

@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The copies property</summary>
         public int? Copies { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -59,6 +61,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "copies", n => { Copies = n.GetIntValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
@@ -71,6 +74,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("copies", Copies);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteStringValue("printerId", PrinterId);
             writer.WriteStringValue("terminalId", TerminalId);
             writer.WriteAdditionalData(AdditionalData);

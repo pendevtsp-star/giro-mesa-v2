@@ -38,6 +38,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
 #else
         public string Reason { get; set; }
 #endif
+        /// <summary>The returnableDecision property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_returnableDecision? ReturnableDecision { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody"/> and sets the default values.
         /// </summary>
@@ -67,6 +69,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
                 { "handoverAssignments", n => { HandoverAssignments = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_handoverAssignments>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_handoverAssignments.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "handoverIdentityId", n => { HandoverIdentityId = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody.ClosePostRequestBody_handoverIdentityId>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody.ClosePostRequestBody_handoverIdentityId.CreateFromDiscriminatorValue); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
+                { "returnableDecision", n => { ReturnableDecision = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_returnableDecision>(); } },
             };
         }
         /// <summary>
@@ -80,6 +83,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_handoverAssignments>("handoverAssignments", HandoverAssignments);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody.ClosePostRequestBody_handoverIdentityId>("handoverIdentityId", HandoverIdentityId);
             writer.WriteStringValue("reason", Reason);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_returnableDecision>("returnableDecision", ReturnableDecision);
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Close.ClosePostRequestBody_handoverIdentityIdMember1"/>, <see cref="Guid"/>

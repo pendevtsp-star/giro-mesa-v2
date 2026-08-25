@@ -1,5 +1,21 @@
+import type { Metadata } from "next";
 import { MenuExperience } from "../../../components/menu-experience";
 import { getPublicMenu } from "../../../lib/api";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const menu = await getPublicMenu(slug);
+  const name = menu.branding?.displayName;
+  return {
+    title: name ? `Cardápio | ${name}` : "Cardápio | GiroMesa",
+    description:
+      menu.branding?.slogan ?? menu.branding?.notice ?? "Cardápio digital e atendimento na mesa.",
+  };
+}
 
 export default async function PublicMenuPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

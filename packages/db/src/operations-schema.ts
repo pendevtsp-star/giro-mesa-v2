@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   date,
+  ForeignKeyBuilder,
   foreignKey,
   index,
   integer,
@@ -17,7 +18,15 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { deviceEnrollments, identities, memberships, organizations, units } from "./schema.js";
+import {
+  authSessions,
+  deviceEnrollments,
+  hubCommands,
+  identities,
+  memberships,
+  organizations,
+  units,
+} from "./schema.js";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -29,6 +38,24 @@ export type PosAvailabilitySchedule = {
 };
 
 export type PosCatalogMetadata = Record<string, unknown>;
+
+export type PosTableQrSettingsSnapshot = {
+  displayName: string;
+  headline: string;
+  instructions: string;
+  logoUrl: string | null;
+  primaryColor: string;
+  wifiNotice: string | null;
+  serviceChargeNotice: string | null;
+  template: "classic" | "compact" | "minimal";
+  presenceProtection: "session_only" | "daily_code";
+};
+
+export type PosTableQrBatchTableSnapshot = {
+  tableId: string;
+  label: string;
+  tokenVersion: number;
+};
 
 export type PosFloorPoint = { x: number; y: number };
 
@@ -134,12 +161,32 @@ export const posPrintDocumentType = pgEnum("pos_print_document_type", [
   "partial_statement",
   "payment_statement",
   "final_receipt",
+  "kds_ticket",
 ]);
 export const posPrintJobStatus = pgEnum("pos_print_job_status", [
   "queued",
   "printing",
+  "confirmation_required",
   "printed",
   "failed",
+]);
+export const posProductionDeliveryMode = pgEnum("pos_production_delivery_mode", [
+  "kds_only",
+  "printer_only",
+  "both",
+  "disabled",
+]);
+export const posPrinterApplyStatus = pgEnum("pos_printer_apply_status", [
+  "pending",
+  "applied",
+  "error",
+]);
+export const posPrinterHealthStatus = pgEnum("pos_printer_health_status", [
+  "unknown",
+  "pending",
+  "online",
+  "error",
+  "confirmation_required",
 ]);
 
 export const posCatalogCategories = pgTable(
@@ -371,6 +418,97 @@ export const posRecipeComponents = pgTable(
   ],
 );
 
+export const posProductionPrinters = pgTable(
+  "pos_production_printers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    hubId: uuid("hub_id").notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    host: varchar("host", { length: 45 }).notNull(),
+    port: integer("port").notNull().default(9100),
+    paperWidthMm: integer("paper_width_mm").notNull().default(80),
+    charactersPerLine: integer("characters_per_line").notNull().default(48),
+    codeTable: integer("code_table").notNull().default(16),
+    cut: boolean("cut").notNull().default(true),
+    supportsRasterGraphics: boolean("supports_raster_graphics").notNull().default(false),
+    isDefault: boolean("is_default").notNull().default(false),
+    documentTypes: jsonb("document_types")
+      .$type<Array<"partial_statement" | "payment_statement" | "final_receipt" | "kds_ticket">>()
+      .notNull()
+      .default(["kds_ticket"]),
+    fallbackPrinterId: uuid("fallback_printer_id"),
+    active: boolean("active").notNull().default(true),
+    revision: integer("revision").notNull().default(1),
+    appliedRevision: integer("applied_revision"),
+    applyStatus: posPrinterApplyStatus("apply_status").notNull().default("pending"),
+    pendingCommandId: uuid("pending_command_id").references(() => hubCommands.id, {
+      onDelete: "set null",
+    }),
+    lastAppliedAt: timestamp("last_applied_at", { withTimezone: true }),
+    lastTestCommandId: uuid("last_test_command_id").references(() => hubCommands.id, {
+      onDelete: "set null",
+    }),
+    lastTestAt: timestamp("last_test_at", { withTimezone: true }),
+    lastStatus: posPrinterHealthStatus("last_status").notNull().default("unknown"),
+    lastError: varchar("last_error", { length: 500 }),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_production_printers_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("pos_production_printers_default_unique")
+      .on(table.organizationId, table.unitId, table.hubId)
+      .where(sql`${table.isDefault} = true AND ${table.active} = true`),
+    index("pos_production_printers_unit_idx").on(table.organizationId, table.unitId, table.active),
+    foreignKey({
+      name: "pos_production_printers_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_production_printers_hub_fk",
+      columns: [table.organizationId, table.unitId, table.hubId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_production_printers_fallback_fk",
+      columns: [table.organizationId, table.unitId, table.fallbackPrinterId],
+      foreignColumns: [table.organizationId, table.unitId, table.id],
+    }).onDelete("restrict"),
+    check("pos_production_printers_port_check", sql`${table.port} BETWEEN 1 AND 65535`),
+    check("pos_production_printers_paper_width_check", sql`${table.paperWidthMm} IN (58, 80)`),
+    check(
+      "pos_production_printers_characters_check",
+      sql`${table.charactersPerLine} BETWEEN 24 AND 64`,
+    ),
+    check("pos_production_printers_code_table_check", sql`${table.codeTable} BETWEEN 0 AND 255`),
+    check("pos_production_printers_revision_check", sql`${table.revision} > 0`),
+    check(
+      "pos_production_printers_applied_revision_check",
+      sql`${table.appliedRevision} IS NULL OR (${table.appliedRevision} > 0 AND ${table.appliedRevision} <= ${table.revision})`,
+    ),
+    check(
+      "pos_production_printers_fallback_check",
+      sql`${table.fallbackPrinterId} IS NULL OR ${table.fallbackPrinterId} <> ${table.id}`,
+    ),
+  ],
+);
+
 export const posProductionStations = pgTable(
   "pos_production_stations",
   {
@@ -380,6 +518,9 @@ export const posProductionStations = pgTable(
     name: varchar("name", { length: 120 }).notNull(),
     code: varchar("code", { length: 40 }).notNull(),
     active: boolean("active").notNull().default(true),
+    deliveryMode: posProductionDeliveryMode("delivery_mode").notNull().default("kds_only"),
+    printCopies: integer("print_copies").notNull().default(1),
+    printPrinterId: uuid("print_printer_id"),
     ...timestamps,
   },
   (table) => [
@@ -394,6 +535,20 @@ export const posProductionStations = pgTable(
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_stations_print_printer_fk",
+      columns: [table.organizationId, table.unitId, table.printPrinterId],
+      foreignColumns: [
+        posProductionPrinters.organizationId,
+        posProductionPrinters.unitId,
+        posProductionPrinters.id,
+      ],
+    }).onDelete("restrict"),
+    check("pos_stations_print_copies_check", sql`${table.printCopies} BETWEEN 1 AND 5`),
+    check(
+      "pos_stations_print_policy_check",
+      sql`((${table.deliveryMode} IN ('printer_only', 'both') AND ${table.printPrinterId} IS NOT NULL) OR (${table.deliveryMode} IN ('kds_only', 'disabled') AND ${table.printPrinterId} IS NULL))`,
+    ),
   ],
 );
 
@@ -524,6 +679,111 @@ export const posCatalogBranding = pgTable(
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("cascade"),
+  ],
+);
+
+export const posTableQrSettings = pgTable(
+  "pos_table_qr_settings",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    revision: integer("revision").notNull().default(1),
+    displayName: varchar("display_name", { length: 120 }).notNull(),
+    headline: varchar("headline", { length: 160 }).notNull(),
+    instructions: varchar("instructions", { length: 500 }).notNull(),
+    logoUrl: varchar("logo_url", { length: 2_000 }),
+    primaryColor: varchar("primary_color", { length: 7 }).notNull(),
+    wifiNotice: varchar("wifi_notice", { length: 200 }),
+    serviceChargeNotice: varchar("service_charge_notice", { length: 200 }),
+    template: varchar("template", { length: 24 }).notNull().default("classic"),
+    presenceProtection: varchar("presence_protection", { length: 24 })
+      .notNull()
+      .default("session_only"),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId] }),
+    foreignKey({
+      name: "pos_table_qr_settings_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check("pos_table_qr_settings_revision_check", sql`${table.revision} > 0`),
+    check("pos_table_qr_settings_color_check", sql`${table.primaryColor} ~ '^#[0-9A-Fa-f]{6}$'`),
+    check(
+      "pos_table_qr_settings_template_check",
+      sql`${table.template} IN ('classic', 'compact', 'minimal')`,
+    ),
+    check(
+      "pos_table_qr_settings_presence_check",
+      sql`${table.presenceProtection} IN ('session_only', 'daily_code')`,
+    ),
+  ],
+);
+
+export const posTableQrPrintBatches = pgTable(
+  "pos_table_qr_print_batches",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    format: varchar("format", { length: 24 }).notNull(),
+    output: varchar("output", { length: 8 }).notNull(),
+    template: varchar("template", { length: 24 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("generated"),
+    menuSlug: varchar("menu_slug", { length: 100 }).notNull(),
+    includeWifi: boolean("include_wifi").notNull().default(false),
+    settingsRevision: integer("settings_revision").notNull(),
+    settingsSnapshot: jsonb("settings_snapshot").$type<PosTableQrSettingsSnapshot>().notNull(),
+    tablesSnapshot: jsonb("tables_snapshot").$type<PosTableQrBatchTableSnapshot[]>().notNull(),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    printedByIdentityId: uuid("printed_by_identity_id").references(() => identities.id),
+    generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+    printedAt: timestamp("printed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_table_qr_print_batches_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    index("pos_table_qr_print_batches_unit_time_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.generatedAt,
+    ),
+    foreignKey({
+      name: "pos_table_qr_print_batches_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "pos_table_qr_print_batches_format_check",
+      sql`${table.format} IN ('a4_2', 'a4_4', 'a4_6', 'a5', 'table_tent', 'sticker')`,
+    ),
+    check(
+      "pos_table_qr_print_batches_output_check",
+      sql`${table.output} IN ('print', 'svg', 'png', 'pdf')`,
+    ),
+    check(
+      "pos_table_qr_print_batches_template_check",
+      sql`${table.template} IN ('classic', 'compact', 'minimal')`,
+    ),
+    check(
+      "pos_table_qr_print_batches_status_check",
+      sql`${table.status} IN ('generated', 'printed')`,
+    ),
+    check("pos_table_qr_print_batches_revision_check", sql`${table.settingsRevision} >= 0`),
+    check(
+      "pos_table_qr_print_batches_printed_check",
+      sql`(${table.status} = 'generated' AND ${table.printedAt} IS NULL AND ${table.printedByIdentityId} IS NULL) OR (${table.status} = 'printed' AND ${table.printedAt} IS NOT NULL AND ${table.printedByIdentityId} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -712,6 +972,7 @@ export const posTerminalProfiles = pgTable(
     paymentSupportsCancel: boolean("payment_supports_cancel").notNull().default(false),
     paymentSupportsRecover: boolean("payment_supports_recover").notNull().default(false),
     paymentSupportsReversal: boolean("payment_supports_reversal").notNull().default(false),
+    paymentMode: varchar("payment_mode", { length: 24 }).notNull().default("disabled"),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -761,6 +1022,10 @@ export const posTerminalProfiles = pgTable(
     check(
       "pos_terminal_profiles_payment_status_check",
       sql`${table.paymentStatus} IN ('disabled', 'pending', 'homologated', 'suspended')`,
+    ),
+    check(
+      "pos_terminal_profiles_payment_mode_check",
+      sql`${table.paymentMode} IN ('disabled', 'cashier', 'homologated_pos')`,
     ),
     check(
       "pos_terminal_profiles_payment_installments_check",
@@ -942,6 +1207,10 @@ export const posDiningTables = pgTable(
     publicAccessVersion: integer("public_access_version").notNull().default(1),
     layoutX: integer("layout_x"),
     layoutY: integer("layout_y"),
+    layoutWidth: integer("layout_width").notNull().default(122),
+    layoutHeight: integer("layout_height").notNull().default(76),
+    layoutRotation: integer("layout_rotation").notNull().default(0),
+    layoutShape: varchar("layout_shape", { length: 16 }).notNull().default("rectangle"),
     active: boolean("active").notNull().default(true),
     ...timestamps,
   },
@@ -957,6 +1226,86 @@ export const posDiningTables = pgTable(
     check(
       "pos_tables_layout_check",
       sql`(${table.layoutX} IS NULL AND ${table.layoutY} IS NULL) OR (${table.layoutX} BETWEEN -1000000 AND 1000000 AND ${table.layoutY} BETWEEN -1000000 AND 1000000)`,
+    ),
+    check(
+      "pos_tables_geometry_check",
+      sql`${table.layoutWidth} BETWEEN 24 AND 2000 AND ${table.layoutHeight} BETWEEN 24 AND 2000 AND ${table.layoutRotation} BETWEEN 0 AND 359 AND ${table.layoutShape} IN ('rectangle', 'round', 'square') AND (${table.layoutShape} <> 'square' OR ${table.layoutWidth} = ${table.layoutHeight})`,
+    ),
+  ],
+);
+
+export const posTableQrMetrics = pgTable(
+  "pos_table_qr_metrics",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    tableId: uuid("table_id").notNull(),
+    scanCount: integer("scan_count").notNull().default(0),
+    lastScannedAt: timestamp("last_scanned_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.tableId] }),
+    foreignKey({
+      name: "pos_table_qr_metrics_table_fk",
+      columns: [table.organizationId, table.unitId, table.tableId],
+      foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
+    }).onDelete("cascade"),
+    check("pos_table_qr_metrics_scan_count_check", sql`${table.scanCount} >= 0`),
+  ],
+);
+
+export const posFloorLayouts = pgTable(
+  "pos_floor_layouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    revision: integer("revision").notNull().default(1),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_floor_layouts_unit_unique").on(table.organizationId, table.unitId),
+    foreignKey({
+      name: "pos_floor_layouts_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check("pos_floor_layouts_revision_check", sql`${table.revision} > 0`),
+  ],
+);
+
+export const posFloorElements = pgTable(
+  "pos_floor_elements",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    roomId: uuid("room_id").notNull(),
+    kind: varchar("kind", { length: 16 }).notNull(),
+    label: varchar("label", { length: 120 }),
+    layoutX: integer("layout_x").notNull(),
+    layoutY: integer("layout_y").notNull(),
+    layoutWidth: integer("layout_width").notNull(),
+    layoutHeight: integer("layout_height").notNull(),
+    layoutRotation: integer("layout_rotation").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    unique("pos_floor_elements_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    index("pos_floor_elements_room_idx").on(table.organizationId, table.unitId, table.roomId),
+    foreignKey({
+      name: "pos_floor_elements_room_fk",
+      columns: [table.organizationId, table.unitId, table.roomId],
+      foreignColumns: [posDiningRooms.organizationId, posDiningRooms.unitId, posDiningRooms.id],
+    }).onDelete("cascade"),
+    check("pos_floor_elements_kind_check", sql`${table.kind} IN ('label', 'barrier')`),
+    check(
+      "pos_floor_elements_geometry_check",
+      sql`${table.layoutX} BETWEEN -1000000 AND 1000000 AND ${table.layoutY} BETWEEN -1000000 AND 1000000 AND ${table.layoutWidth} BETWEEN 1 AND 1000000 AND ${table.layoutHeight} BETWEEN 1 AND 1000000 AND ${table.layoutRotation} BETWEEN 0 AND 359`,
     ),
   ],
 );
@@ -1041,6 +1390,7 @@ export const posOperationalShifts = pgTable(
       .references(() => identities.id),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    assignmentRevision: integer("assignment_revision").notNull().default(1),
     ...timestamps,
   },
   (table) => [
@@ -1062,6 +1412,7 @@ export const posOperationalShifts = pgTable(
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("restrict"),
+    check("pos_operational_shifts_assignment_revision_check", sql`${table.assignmentRevision} > 0`),
   ],
 );
 
@@ -1207,6 +1558,7 @@ export const posShiftTableLayouts = pgTable(
     roomId: uuid("room_id").notNull(),
     layoutX: integer("layout_x").notNull(),
     layoutY: integer("layout_y").notNull(),
+    layoutRotation: integer("layout_rotation").notNull().default(0),
     movedByIdentityId: uuid("moved_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -1237,7 +1589,7 @@ export const posShiftTableLayouts = pgTable(
     }).onDelete("restrict"),
     check(
       "pos_shift_table_layouts_coordinates_check",
-      sql`${table.layoutX} BETWEEN -1000000 AND 1000000 AND ${table.layoutY} BETWEEN -1000000 AND 1000000`,
+      sql`${table.layoutX} BETWEEN -1000000 AND 1000000 AND ${table.layoutY} BETWEEN -1000000 AND 1000000 AND ${table.layoutRotation} BETWEEN 0 AND 359`,
     ),
   ],
 );
@@ -1255,6 +1607,17 @@ export const posShiftTableTransfers = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     endedAt: timestamp("ended_at", { withTimezone: true }),
     reason: varchar("reason", { length: 500 }).notNull(),
+    reasonCode: varchar("reason_code", { length: 48 }).notNull().default("other"),
+    reasonNote: varchar("reason_note", { length: 500 }),
+    tabId: uuid("tab_id"),
+    previousShiftSectionId: uuid("previous_shift_section_id"),
+    previousResponsibleIdentityId: uuid("previous_responsible_identity_id").references(
+      () => identities.id,
+    ),
+    appliedResponsibleIdentityId: uuid("applied_responsible_identity_id").references(
+      () => identities.id,
+    ),
+    appliedTabVersion: integer("applied_tab_version"),
     transferredByIdentityId: uuid("transferred_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -1281,6 +1644,11 @@ export const posShiftTableTransfers = pgTable(
       ],
     }).onDelete("cascade"),
     foreignKey({
+      name: "pos_shift_table_transfers_tab_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "pos_shift_table_transfers_table_fk",
       columns: [table.organizationId, table.unitId, table.tableId],
       foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
@@ -1305,11 +1673,29 @@ export const posShiftTableTransfers = pgTable(
         posShiftSections.id,
       ],
     }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_shift_table_transfers_previous_section_fk",
+      columns: [table.organizationId, table.unitId, table.shiftId, table.previousShiftSectionId],
+      foreignColumns: [
+        posShiftSections.organizationId,
+        posShiftSections.unitId,
+        posShiftSections.shiftId,
+        posShiftSections.id,
+      ],
+    }).onDelete("restrict"),
     check(
       "pos_shift_table_transfers_distinct_sections_check",
       sql`${table.sourceShiftSectionId} <> ${table.targetShiftSectionId}`,
     ),
     check("pos_shift_table_transfers_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
+    check(
+      "pos_shift_table_transfers_snapshot_check",
+      sql`(${table.tabId} IS NULL AND ${table.appliedTabVersion} IS NULL) OR (${table.tabId} IS NOT NULL AND ${table.appliedTabVersion} IS NOT NULL)`,
+    ),
+    check(
+      "pos_shift_table_transfers_reason_check",
+      sql`${table.reasonCode} IN ('service_rebalance', 'staff_coverage', 'operational_reorganization', 'other') AND (${table.reasonCode} <> 'other' OR ${table.reasonNote} IS NOT NULL)`,
+    ),
   ],
 );
 
@@ -1423,6 +1809,70 @@ export const posTabs = pgTable(
   ],
 );
 
+export const posPrintSplits = pgTable(
+  "pos_print_splits",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    tabId: uuid("tab_id").notNull(),
+    balanceSnapshotCents: integer("balance_snapshot_cents").notNull(),
+    method: varchar("method", { length: 24 }).notNull(),
+    partCount: integer("part_count").notNull(),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("pos_print_splits_scope_id_unique").on(table.organizationId, table.unitId, table.id),
+    foreignKey({
+      name: "pos_print_splits_tab_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("restrict"),
+    check("pos_print_splits_balance_check", sql`${table.balanceSnapshotCents} > 0`),
+    check(
+      "pos_print_splits_method_check",
+      sql`${table.method} IN ('equal_people', 'fixed_amount')`,
+    ),
+    check("pos_print_splits_count_check", sql`${table.partCount} BETWEEN 2 AND 50`),
+  ],
+);
+
+export const posPrintSplitParts = pgTable(
+  "pos_print_split_parts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    splitId: uuid("split_id").notNull(),
+    partNumber: integer("part_number").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("pos_print_split_parts_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("pos_print_split_parts_number_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.splitId,
+      table.partNumber,
+    ),
+    foreignKey({
+      name: "pos_print_split_parts_split_fk",
+      columns: [table.organizationId, table.unitId, table.splitId],
+      foreignColumns: [posPrintSplits.organizationId, posPrintSplits.unitId, posPrintSplits.id],
+    }).onDelete("cascade"),
+    check("pos_print_split_parts_number_check", sql`${table.partNumber} > 0`),
+    check("pos_print_split_parts_amount_check", sql`${table.amountCents} > 0`),
+  ],
+);
+
 export const posServiceCalls = pgTable(
   "pos_service_calls",
   {
@@ -1459,6 +1909,41 @@ export const posServiceCalls = pgTable(
       foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
     }).onDelete("restrict"),
     check("pos_service_calls_sla_check", sql`${table.slaMinutes} BETWEEN 1 AND 120`),
+  ],
+);
+
+export const posOperationalPushSubscriptions = pgTable(
+  "pos_operational_push_subscriptions",
+  {
+    installationId: uuid("installation_id").primaryKey(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    identityId: uuid("identity_id")
+      .notNull()
+      .references(() => identities.id, { onDelete: "cascade" }),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => authSessions.id, { onDelete: "cascade" }),
+    endpointHash: varchar("endpoint_hash", { length: 64 }).notNull(),
+    encryptedSubscription: text("encrypted_subscription").notNull(),
+    encryptionIv: varchar("encryption_iv", { length: 24 }).notNull(),
+    encryptionAuthTag: varchar("encryption_auth_tag", { length: 32 }).notNull(),
+    subscriptionExpiresAt: timestamp("subscription_expires_at", { withTimezone: true }),
+    enabled: boolean("enabled").notNull().default(true),
+    lastDeliveredAt: timestamp("last_delivered_at", { withTimezone: true }),
+    lastFailedAt: timestamp("last_failed_at", { withTimezone: true }),
+    lastFailureCode: varchar("last_failure_code", { length: 80 }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("pos_operational_push_endpoint_unique").on(table.endpointHash),
+    index("pos_operational_push_scope_idx").on(table.organizationId, table.unitId, table.enabled),
+    index("pos_operational_push_identity_idx").on(table.identityId),
+    foreignKey({
+      name: "pos_operational_push_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
   ],
 );
 
@@ -1892,6 +2377,12 @@ export const posPrintJobs = pgTable(
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
     tabId: uuid("tab_id").notNull(),
+    stationId: uuid("station_id"),
+    kdsTicketId: uuid("kds_ticket_id"),
+    hubCommandId: uuid("hub_command_id"),
+    dispatchKey: varchar("dispatch_key", { length: 200 }),
+    serviceCallId: uuid("service_call_id"),
+    splitPartId: uuid("split_part_id"),
     documentType: posPrintDocumentType("document_type").notNull(),
     status: posPrintJobStatus("status").notNull().default("queued"),
     copies: integer("copies").notNull().default(1),
@@ -1924,18 +2415,68 @@ export const posPrintJobs = pgTable(
       table.tabId,
       table.createdAt,
     ),
+    index("pos_print_jobs_station_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.stationId,
+      table.status,
+      table.createdAt,
+    ),
+    uniqueIndex("pos_print_jobs_dispatch_unique")
+      .on(table.organizationId, table.unitId, table.dispatchKey)
+      .where(sql`${table.dispatchKey} IS NOT NULL`),
+    uniqueIndex("pos_print_jobs_hub_command_unique")
+      .on(table.organizationId, table.unitId, table.hubCommandId)
+      .where(sql`${table.hubCommandId} IS NOT NULL`),
     foreignKey({
       name: "pos_print_jobs_unit_fk",
       columns: [table.organizationId, table.unitId],
       foreignColumns: [units.organizationId, units.id],
     }).onDelete("restrict"),
     foreignKey({
+      name: "pos_print_jobs_service_call_fk",
+      columns: [table.organizationId, table.unitId, table.serviceCallId],
+      foreignColumns: [posServiceCalls.organizationId, posServiceCalls.unitId, posServiceCalls.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "pos_print_jobs_split_part_fk",
+      columns: [table.organizationId, table.unitId, table.splitPartId],
+      foreignColumns: [
+        posPrintSplitParts.organizationId,
+        posPrintSplitParts.unitId,
+        posPrintSplitParts.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
       name: "pos_print_jobs_tab_fk",
       columns: [table.organizationId, table.unitId, table.tabId],
       foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
     }).onDelete("restrict"),
-    check("pos_print_jobs_copies_check", sql`${table.copies} BETWEEN 1 AND 10`),
+    foreignKey({
+      name: "pos_print_jobs_station_fk",
+      columns: [table.organizationId, table.unitId, table.stationId],
+      foreignColumns: [
+        posProductionStations.organizationId,
+        posProductionStations.unitId,
+        posProductionStations.id,
+      ],
+    }).onDelete("restrict"),
+    new ForeignKeyBuilder(() => ({
+      name: "pos_print_jobs_kds_ticket_fk",
+      columns: [table.organizationId, table.unitId, table.kdsTicketId],
+      foreignColumns: [posKdsTickets.organizationId, posKdsTickets.unitId, posKdsTickets.id],
+    })).onDelete("restrict"),
+    foreignKey({
+      name: "pos_print_jobs_hub_command_fk",
+      columns: [table.organizationId, table.unitId, table.hubCommandId],
+      foreignColumns: [hubCommands.organizationId, hubCommands.unitId, hubCommands.id],
+    }).onDelete("set null"),
+    check("pos_print_jobs_copies_check", sql`${table.copies} BETWEEN 1 AND 5`),
     check("pos_print_jobs_attempts_check", sql`${table.attempts} >= 0`),
+    check(
+      "pos_print_jobs_production_scope_check",
+      sql`(${table.stationId} IS NULL AND ${table.kdsTicketId} IS NULL) OR (${table.stationId} IS NOT NULL AND ${table.kdsTicketId} IS NOT NULL)`,
+    ),
     check(
       "pos_print_jobs_state_timestamps_check",
       sql`(${table.status} <> 'printing' OR ${table.printingAt} IS NOT NULL)
@@ -1978,6 +2519,8 @@ export const posDiningTableGroups = pgTable(
     primaryTabId: uuid("primary_tab_id"),
     mode: posTableGroupMode("mode").notNull(),
     responsibleIdentityId: uuid("responsible_identity_id").references(() => identities.id),
+    reasonCode: varchar("reason_code", { length: 48 }).notNull().default("other"),
+    reasonNote: varchar("reason_note", { length: 500 }),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -1987,6 +2530,10 @@ export const posDiningTableGroups = pgTable(
   (table) => [
     unique("pos_table_groups_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     index("pos_table_groups_active_idx").on(table.organizationId, table.unitId, table.dissolvedAt),
+    check(
+      "pos_table_groups_reason_check",
+      sql`${table.reasonCode} IN ('large_party', 'sit_together', 'accessibility', 'operational_reorganization', 'other') AND (${table.reasonCode} <> 'other' OR ${table.reasonNote} IS NOT NULL)`,
+    ),
     foreignKey({
       name: "pos_table_groups_unit_fk",
       columns: [table.organizationId, table.unitId],
@@ -2046,6 +2593,7 @@ export const posOrders = pgTable(
     unitId: uuid("unit_id").notNull(),
     tabId: uuid("tab_id").notNull(),
     originTableId: uuid("origin_table_id"),
+    source: varchar("source", { length: 32 }).notNull().default("ops"),
     createdByIdentityId: uuid("created_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -2077,6 +2625,7 @@ export const posOrders = pgTable(
       foreignColumns: [posDiningTables.organizationId, posDiningTables.unitId, posDiningTables.id],
     }).onDelete("restrict"),
     check("pos_orders_kds_priority_check", sql`${table.kdsPriority} BETWEEN 0 AND 100`),
+    check("pos_orders_source_check", sql`${table.source} IN ('ops', 'qr_table')`),
     check(
       "pos_orders_runner_check",
       sql`(${table.runnerIdentityId} IS NULL AND ${table.runnerClaimedAt} IS NULL AND ${table.runnerPickedUpAt} IS NULL) OR (${table.runnerIdentityId} IS NOT NULL AND ${table.runnerClaimedAt} IS NOT NULL AND (${table.runnerPickedUpAt} IS NULL OR ${table.runnerPickedUpAt} >= ${table.runnerClaimedAt}))`,

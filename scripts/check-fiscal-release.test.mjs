@@ -7,6 +7,7 @@ import {
   checkFiscalRelease,
   validateFiscalEnvironment,
   validateFiscalReleaseManifest,
+  validateRecoveryCoverage,
 } from "./check-fiscal-release.mjs";
 
 const blocked = {
@@ -43,6 +44,10 @@ const productionEnvironment = {
   FOCUS_NFE_PRIMARY_TOKEN: "private-focus-token",
   FISCAL_CREDENTIALS_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString("base64"),
   MEDIA_ROOT: "/app/data/media",
+  ACCOUNTANT_ATTACHMENT_SCAN_MODE: "clamd",
+  ACCOUNTANT_ATTACHMENT_CLAMD_HOST: "clamd.internal",
+  ACCOUNTANT_ATTACHMENT_CLAMD_PORT: "3310",
+  ACCOUNTANT_ATTACHMENT_RETENTION_DAYS: "1827",
 };
 
 test("accepts the fail-closed fiscal manifest outside production", () => {
@@ -67,6 +72,16 @@ test("accepts production only with homologation evidence and valid secret config
   assert.deepEqual(validateFiscalEnvironment(productionEnvironment, homologated), []);
 });
 
+test("rejects retention shorter than the five-year fiscal policy", () => {
+  assert.match(
+    validateFiscalEnvironment(
+      { ...productionEnvironment, ACCOUNTANT_ATTACHMENT_RETENTION_DAYS: "1826" },
+      homologated,
+    ).join("\n"),
+    /at least five years/,
+  );
+});
+
 test("rejects malformed fiscal encryption keys before release", () => {
   assert.match(
     validateFiscalEnvironment(
@@ -74,6 +89,17 @@ test("rejects malformed fiscal encryption keys before release", () => {
       homologated,
     ).join("\n"),
     /must be 32 bytes encoded as base64/,
+  );
+});
+
+test("requires recovery evidence for the latest migration before production", () => {
+  assert.deepEqual(
+    validateRecoveryCoverage(
+      { targetMigration: "0053_petite_trauma" },
+      { entries: [{ tag: "0061_accountant_portal_security" }] },
+      homologated,
+    ),
+    ["Recovery compatibility evidence must cover the latest database migration."],
   );
 });
 

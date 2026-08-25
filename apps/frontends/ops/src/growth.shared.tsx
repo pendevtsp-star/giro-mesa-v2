@@ -339,6 +339,7 @@ export function isDeliverySlaOverdue(
 
 export interface Reservation {
   id: string;
+  customerId: string | null;
   guestName: string;
   guestPhone: string | null;
   partySize: number;
@@ -351,6 +352,7 @@ export interface Reservation {
 
 export interface WaitlistEntry {
   id: string;
+  customerId: string | null;
   guestName: string;
   guestPhone: string | null;
   partySize: number;
@@ -363,6 +365,7 @@ export interface WaitlistEntry {
 export function parseReservations(value: unknown): Reservation[] {
   return records(value).map((row) => ({
     id: text(row.id),
+    customerId: optionalText(row.customerId),
     guestName: text(row.guestName),
     guestPhone: optionalText(row.guestPhone),
     partySize: number(row.partySize),
@@ -377,6 +380,7 @@ export function parseReservations(value: unknown): Reservation[] {
 export function parseWaitlist(value: unknown): WaitlistEntry[] {
   return records(value).map((row) => ({
     id: text(row.id),
+    customerId: optionalText(row.customerId),
     guestName: text(row.guestName),
     guestPhone: optionalText(row.guestPhone),
     partySize: number(row.partySize),
@@ -413,6 +417,10 @@ export function parseCustomers(value: unknown): Customer[] {
     phone: optionalText(row.phone),
     marketingOptIn: bool(row.marketingOptIn),
   }));
+}
+
+export function parseCustomerPage(value: unknown): Customer[] {
+  return parseCustomers(record(value).items);
 }
 
 export function parseCampaigns(value: unknown): Campaign[] {

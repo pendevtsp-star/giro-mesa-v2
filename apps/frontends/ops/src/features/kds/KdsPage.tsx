@@ -10,8 +10,7 @@ import {
   Textarea,
 } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../../api";
-import { sendShellPrintJob } from "../../bridge";
+import { api, type ProductionPrintJob } from "../../api";
 import { type PilotAction, pilotMutation } from "../../operational-dispatch";
 import {
   type KdsAttention,
@@ -37,6 +36,7 @@ import {
   type RealtimeStatus,
   subscribeScopeRealtime,
 } from "../../realtime";
+import { currentTerminalPrinterId } from "../shell/terminal-profile";
 import { KdsAdvancedPanels } from "./KdsAdvancedPanels";
 import type { KdsAvailabilityChange } from "./KdsAvailabilityPanel";
 import type { KdsPrinterPreferences } from "./KdsHardwareSettings";
@@ -75,7 +75,7 @@ import {
   saveKdsLastOperationalArea,
   saveKdsStationLabel,
 } from "./kds.navigation";
-import { createKdsThermalPrintRequest } from "./kds.printing";
+import { createKdsInitialPrintRequest, kdsReprintIdempotencyKey } from "./kds.printing";
 
 type KdsViewMode = "station" | "pass";
 type KdsTone = "neutral" | "info" | "warning" | "success" | "danger";
@@ -109,7 +109,7 @@ const KDS_BLOCK_LABEL: Record<KdsBlockCode, string> = {
   missing_ingredient: "Falta de ingrediente",
   equipment_issue: "Problema em equipamento",
   quality_check: "Conferência de qualidade",
-  dependency: "Dependência de outra praça",
+  dependency: "Dependência de outra estação",
   other: "Outro motivo",
 };
 
@@ -151,15 +151,30 @@ function savePersistentValue(key: string, value: string): void {
   }
 }
 
-function printerPreferences(key: string): KdsPrinterPreferences {
+function removePersistentValue(key: string): void {
   try {
-    const parsed = JSON.parse(persistentValue(key) ?? "null") as Partial<KdsPrinterPreferences>;
-    return {
-      printerId: typeof parsed?.printerId === "string" ? parsed.printerId : "default",
+    globalThis.localStorage?.removeItem(key);
+  } catch {
+    // Migração segura: a preferência em memória continua sem carregar printerId legado.
+  }
+}
+
+function printerPreferences(key: string, legacyKey: string): KdsPrinterPreferences {
+  try {
+    const parsed = JSON.parse(
+      persistentValue(key) ?? persistentValue(legacyKey) ?? "null",
+    ) as Partial<KdsPrinterPreferences>;
+    const preferences = {
       copies: parsed?.copies === 2 || parsed?.copies === 3 ? parsed.copies : 1,
     };
+    savePersistentValue(key, JSON.stringify(preferences));
+    removePersistentValue(legacyKey);
+    return preferences;
   } catch {
-    return { printerId: "default", copies: 1 };
+    const preferences = { copies: 1 };
+    savePersistentValue(key, JSON.stringify(preferences));
+    removePersistentValue(legacyKey);
+    return preferences;
   }
 }
 
@@ -612,7 +627,7 @@ function TicketCard({
                               size="sm"
                               variant="ghost"
                             >
-                              Mudar de praça
+                              Mudar de estação
                             </Button>
                           )}
                           {cloudUnavailable &&
@@ -775,8 +790,20 @@ export function RealKdsPage({
     readKdsBumpBarMap(`${storagePrefix}:bump-map`),
   );
   const [printer, setPrinter] = useState<KdsPrinterPreferences>(() =>
-    printerPreferences(`${storagePrefix}:printer`),
+    printerPreferences(`${storagePrefix}:print-copies`, `${storagePrefix}:printer`),
   );
+  const [printBusy, setPrintBusy] = useState(false);
+  const [printJobsByTicket, setPrintJobsByTicket] = useState<Record<string, ProductionPrintJob>>(
+    {},
+  );
+  const [reprintRequest, setReprintRequest] = useState<{
+    ticketId: string;
+    reference: string;
+    printJobId: string;
+    idempotencyKey: string;
+  } | null>(null);
+  const [reprintReason, setReprintReason] = useState("");
+  const [reprintError, setReprintError] = useState<string | null>(null);
   const [terminalProfileStatus, setTerminalProfileStatus] = useState<
     "local" | "loading" | "synced" | "error"
   >("local");
@@ -824,6 +851,7 @@ export function RealKdsPage({
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [focusedPrintTicketId, setFocusedPrintTicketId] = useState<string | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const printInFlightRef = useRef(new Set<string>());
   const confirmationsRef = useRef(new Map<string, PendingConfirmation>());
   const inFlightRef = useRef(new Set<string>());
   const previousAlertsRef = useRef<Set<string> | null>(null);
@@ -934,7 +962,7 @@ export function RealKdsPage({
   useEffect(() => {
     if (remote.state.status !== "ready") return;
     const station = remote.state.data.stations.find((candidate) => candidate.id === stationId);
-    saveKdsStationLabel(scope.unitId, station?.name ?? "Todas as praças");
+    saveKdsStationLabel(scope.unitId, station?.name ?? "Todas as estações");
   }, [remote.state, scope.unitId, stationId]);
 
   useEffect(() => {
@@ -952,7 +980,7 @@ export function RealKdsPage({
   const printTicket = useCallback(
     async (requestedTicketId?: string) => {
       const workspace = workspaceRef.current;
-      if (!workspace || typeof window === "undefined") return;
+      if (!workspace || remote.state.status !== "ready") return;
       const ticketId = requestedTicketId ?? focusedPrintTicketId;
       const candidates = [...workspace.querySelectorAll<HTMLElement>("[data-kds-ticket]")];
       const target =
@@ -961,45 +989,138 @@ export function RealKdsPage({
         setLiveMessage("Nenhum ticket disponível para impressão.");
         return;
       }
-      if (remote.state.status === "ready") {
-        const ticket = remote.state.data.tickets.find(
-          (candidate) => candidate.id === target.dataset.kdsTicket,
-        );
-        if (ticket) {
-          const request = createKdsThermalPrintRequest(
-            ticket,
-            itemsForTicket(remote.state.data, ticket.id),
-            printer,
-          );
-          const result = await sendShellPrintJob(request.job, request.idempotencyKey);
-          if (result?.success) {
-            setLiveMessage(
-              `Ticket ${ticket.reference ?? ticket.id.slice(0, 6)} impresso e confirmado.`,
-            );
-            return;
-          }
-          if (result) {
-            setLiveMessage(
-              `Impressora térmica indisponível (${result.errorCode ?? result.status ?? "erro"}). Abrindo contingência.`,
-            );
-          }
-        }
-      }
-      target.classList.add("kds-print-target");
-      workspace.classList.add("kds-printing");
-      const cleanup = () => {
-        target.classList.remove("kds-print-target");
-        workspace.classList.remove("kds-printing");
-        window.removeEventListener("afterprint", cleanup);
-      };
-      window.addEventListener("afterprint", cleanup, { once: true });
-      window.setTimeout(cleanup, 60_000);
-      setLiveMessage(
-        "Diálogo de impressão aberto. O GiroMesa não confirma a conclusão na impressora.",
+      const ticket = remote.state.data.tickets.find(
+        (candidate) => candidate.id === target.dataset.kdsTicket,
       );
-      window.print();
+      if (!ticket) {
+        setLiveMessage("O ticket focado não está mais na fila.");
+        return;
+      }
+      const operationKey = `initial:${ticket.id}`;
+      if (printInFlightRef.current.has(operationKey)) return;
+      printInFlightRef.current.add(operationKey);
+      setPrintBusy(true);
+      try {
+        const request = createKdsInitialPrintRequest(ticket.id, {
+          copies: printer.copies,
+          printerId: currentTerminalPrinterId(scope.unitId),
+        });
+        const created = await api.pilot.createKdsPrintJob(
+          scope.organizationId,
+          scope.unitId,
+          ticket.id,
+          request.body,
+          request.idempotencyKey,
+        );
+        setPrintJobsByTicket((current) => ({ ...current, [ticket.id]: created.printJob }));
+        const reference = ticket.reference ?? ticket.id.slice(0, 6).toUpperCase();
+        setLiveMessage(
+          created.idempotentReplay
+            ? `A primeira via do ticket ${reference} já havia sido solicitada. Para uma nova saída física, use Reimprimir com motivo.`
+            : `Ticket ${reference} enviado à fila de impressão.`,
+        );
+      } catch (error) {
+        setLiveMessage(
+          error instanceof Error
+            ? `Não foi possível solicitar a impressão: ${error.message}`
+            : "Não foi possível solicitar a impressão.",
+        );
+      } finally {
+        printInFlightRef.current.delete(operationKey);
+        setPrintBusy(false);
+      }
     },
-    [focusedPrintTicketId, printer, remote.state],
+    [focusedPrintTicketId, printer.copies, remote.state, scope.organizationId, scope.unitId],
+  );
+
+  const requestTicketReprint = useCallback(
+    async (requestedTicketId?: string) => {
+      if (remote.state.status !== "ready") return;
+      const workspace = workspaceRef.current;
+      const ticketId =
+        requestedTicketId ??
+        focusedPrintTicketId ??
+        workspace?.querySelector<HTMLElement>("[data-kds-ticket]")?.dataset.kdsTicket;
+      const ticket = remote.state.data.tickets.find((candidate) => candidate.id === ticketId);
+      if (!ticket) {
+        setLiveMessage("Nenhum ticket disponível para reimpressão.");
+        return;
+      }
+      setPrintBusy(true);
+      try {
+        let sourceJob = printJobsByTicket[ticket.id];
+        if (sourceJob?.status !== "printed") {
+          const jobs = await api.pilot.productionPrintJobs(scope.organizationId, scope.unitId, {
+            kdsTicketId: ticket.id,
+            limit: 20,
+          });
+          sourceJob = jobs.find((job) => job.status === "printed" && job.reprintOfJobId === null);
+        }
+        if (sourceJob?.status !== "printed") {
+          setLiveMessage(
+            "A primeira via ainda não tem confirmação de impressão; resolva a fila antes de reimprimir.",
+          );
+          return;
+        }
+        setReprintReason("");
+        setReprintError(null);
+        setReprintRequest({
+          ticketId: ticket.id,
+          reference: ticket.reference ?? ticket.id.slice(0, 6).toUpperCase(),
+          printJobId: sourceJob.id,
+          idempotencyKey: kdsReprintIdempotencyKey(ticket.id, crypto.randomUUID()),
+        });
+      } catch (error) {
+        setLiveMessage(
+          error instanceof Error
+            ? `Não foi possível localizar a impressão original: ${error.message}`
+            : "Não foi possível localizar a impressão original.",
+        );
+      } finally {
+        setPrintBusy(false);
+      }
+    },
+    [focusedPrintTicketId, printJobsByTicket, remote.state, scope.organizationId, scope.unitId],
+  );
+
+  const submitTicketReprint = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!reprintRequest || reprintReason.trim().length < 3 || printBusy) return;
+      const operationKey = `reprint:${reprintRequest.idempotencyKey}`;
+      if (printInFlightRef.current.has(operationKey)) return;
+      printInFlightRef.current.add(operationKey);
+      setPrintBusy(true);
+      setReprintError(null);
+      try {
+        const created = await api.pilot.reprintProductionPrintJob(
+          scope.organizationId,
+          scope.unitId,
+          reprintRequest.printJobId,
+          {
+            copies: printer.copies,
+            printerId: currentTerminalPrinterId(scope.unitId),
+            reason: reprintReason.trim(),
+          },
+          reprintRequest.idempotencyKey,
+        );
+        setPrintJobsByTicket((current) => ({
+          ...current,
+          [reprintRequest.ticketId]: created.printJob,
+        }));
+        setLiveMessage(`Reimpressão do ticket ${reprintRequest.reference} enviada à fila.`);
+        setReprintRequest(null);
+        setReprintReason("");
+      } catch (error) {
+        setReprintError(
+          error instanceof Error ? error.message : "Não foi possível solicitar a reimpressão.",
+        );
+      } finally {
+        printInFlightRef.current.delete(operationKey);
+        setPrintBusy(false);
+      }
+    },
+    [printBusy, printer.copies, reprintReason, reprintRequest, scope.organizationId, scope.unitId],
   );
 
   const refreshManually = useCallback(async () => {
@@ -1457,13 +1578,13 @@ export function RealKdsPage({
     if (itemOperation.kind === "reroute") {
       const targetStationId = itemOperationStationId;
       if (!targetStationId || targetStationId === ticket.stationId) {
-        setItemOperationError("Escolha uma praça diferente da atual.");
+        setItemOperationError("Escolha uma estação diferente da atual.");
         return;
       }
       void runAction({
         action: KDS_PILOT_ACTIONS.rerouteItem,
         key: `ticket:${ticket.id}:item:${item.id}:reroute:${targetStationId}`,
-        label: `Mudança de praça de ${item.productName}`,
+        label: `Mudança de estação de ${item.productName}`,
         eventType: "pos.kds.item_reroute_requested",
         data: { ticketId: ticket.id, itemId: item.id, stationId: targetStationId, reason },
         delivery: "cloud-only",
@@ -1840,7 +1961,9 @@ export function RealKdsPage({
         : null;
     if (viewMode === "station" && selectedStationId === null) {
       setTerminalProfileStatus("error");
-      setTerminalProfileMessage("Escolha uma praça específica antes de sincronizar o modo Praça.");
+      setTerminalProfileMessage(
+        "Escolha uma estação específica antes de sincronizar o modo Estação.",
+      );
       return;
     }
     if (terminalLabel.trim().length === 0) {
@@ -1961,7 +2084,7 @@ export function RealKdsPage({
         const effectiveStationId = stationId === "all" || stationExists ? stationId : "all";
         const stationName =
           data.stations.find((station) => station.id === effectiveStationId)?.name ??
-          "Todas as praças";
+          "Todas as estações";
         const operationalStationId = operationalViewMode === "pass" ? "all" : effectiveStationId;
         const cloudUnavailable =
           data.freshness.status === "offline" || data.freshness.projectionBlocked;
@@ -2128,8 +2251,9 @@ export function RealKdsPage({
                 onPrint={() => void printTicket()}
                 onPrinterPreferencesChange={(preferences) => {
                   setPrinter(preferences);
-                  savePersistentValue(`${storagePrefix}:printer`, JSON.stringify(preferences));
+                  savePersistentValue(`${storagePrefix}:print-copies`, JSON.stringify(preferences));
                 }}
+                onReprint={() => void requestTicketReprint()}
                 onSelectStation={selectStation}
                 onTestSound={testSound}
                 onToggleFullscreen={() => void toggleFullscreen()}
@@ -2140,6 +2264,10 @@ export function RealKdsPage({
                 onViewModeChange={changePreferredMode}
                 operatingDay={openingDay}
                 printerPreferences={printer}
+                printerLabel={
+                  currentTerminalPrinterId(scope.unitId) ?? "Roteamento automático por estação"
+                }
+                printBusy={printBusy}
                 realtimeStatus={realtimeStatus}
                 soundEnabled={soundEnabled}
                 stationId={effectiveStationId}
@@ -2164,14 +2292,14 @@ export function RealKdsPage({
                       <div className="kds-station-context">
                         <strong>{stationName}</strong>
                         <Badge tone={stationLocked ? "info" : "warning"}>
-                          {stationLocked ? "Praça fixada" : "Praça não fixada"}
+                          {stationLocked ? "Estação fixada" : "Estação não fixada"}
                         </Badge>
                       </div>
                     )}
                     {operationalViewMode === "pass" && (
                       <div className="kds-pass-context">
                         <strong>Passe / expedição</strong>
-                        <small>Todos os pedidos e praças</small>
+                        <small>Todos os pedidos e estações</small>
                       </div>
                     )}
                   </div>
@@ -2210,11 +2338,20 @@ export function RealKdsPage({
                         </Button>
                         <Button
                           aria-keyshortcuts="P"
-                          onClick={() => printTicket()}
+                          disabled={printBusy}
+                          onClick={() => void printTicket()}
                           size="sm"
                           variant="ghost"
                         >
                           Imprimir ticket focado
+                        </Button>
+                        <Button
+                          disabled={printBusy}
+                          onClick={() => void requestTicketReprint()}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          Reimprimir com motivo…
                         </Button>
                       </div>
                     </details>
@@ -2337,7 +2474,7 @@ export function RealKdsPage({
                           : "Fila acima do ritmo esperado"}
                         {capacityAttention.capacity.recommendation.suggestedDelayMinutes !== null
                           ? ` · recomendação: acrescentar ${capacityAttention.capacity.recommendation.suggestedDelayMinutes} min à promessa`
-                          : " · revise bloqueios e distribuição da praça"}
+                          : " · revise bloqueios e distribuição da estação"}
                       </small>
                     </span>
                     {canManageUnitSettings && (
@@ -2354,7 +2491,7 @@ export function RealKdsPage({
                       activeTickets.length === 0 ? (
                         <EmptyState
                           icon="✓"
-                          title="Praça em dia"
+                          title="Estação em dia"
                           description="Nenhum ticket ativo nesta seleção."
                         />
                       ) : (
@@ -2449,7 +2586,7 @@ export function RealKdsPage({
                                         ? "No passe"
                                         : readyForPass
                                           ? "Pronto para o passe"
-                                          : "Aguardando praças"}
+                                          : "Aguardando estações"}
                                     </Badge>
                                   </span>
                                 </header>
@@ -2506,7 +2643,7 @@ export function RealKdsPage({
                                           ? "Confirmar entrega do pedido"
                                           : readyForPass
                                             ? "Receber pedido no passe"
-                                            : "Aguardando todas as praças"}
+                                            : "Aguardando todas as estações"}
                                     </Button>
                                   )}
                                 </div>
@@ -2661,7 +2798,7 @@ export function RealKdsPage({
                   ? "Bloquear item"
                   : itemOperation?.kind === "unblock"
                     ? "Desbloquear item"
-                    : "Mudar item de praça"
+                    : "Mudar item de estação"
               }
             >
               <form
@@ -2692,13 +2829,13 @@ export function RealKdsPage({
                 )}
                 {itemOperation?.kind === "reroute" && (
                   <label>
-                    Praça de destino
+                    Estação de destino
                     <NativeSelect
                       onChange={(event) => setItemOperationStationId(event.target.value)}
                       required
                       value={itemOperationStationId}
                     >
-                      <option value="">Escolha outra praça</option>
+                      <option value="">Escolha outra estação</option>
                       {data.stations
                         .filter((station) => station.id !== itemOperationTicket?.stationId)
                         .map((station) => (
@@ -2747,7 +2884,7 @@ export function RealKdsPage({
                       ? "Confirmar bloqueio"
                       : itemOperation?.kind === "unblock"
                         ? "Confirmar desbloqueio"
-                        : "Confirmar nova praça"}
+                        : "Confirmar nova estação"}
                   </Button>
                 </div>
               </form>
@@ -2809,6 +2946,59 @@ export function RealKdsPage({
                   </Button>
                   <Button type="submit" variant="danger">
                     Confirmar cancelamento
+                  </Button>
+                </div>
+              </form>
+            </Modal>
+
+            <Modal
+              isOpen={reprintRequest !== null}
+              onClose={() => {
+                if (printBusy) return;
+                setReprintRequest(null);
+                setReprintReason("");
+                setReprintError(null);
+              }}
+              size="sm"
+              title={`Reimprimir ticket ${reprintRequest?.reference ?? ""}`}
+            >
+              <form className="kds-item-operation-form" onSubmit={submitTicketReprint}>
+                <p>
+                  A primeira via nunca é disparada novamente por duplo clique. Informe o motivo
+                  desta nova saída física; a reimpressão ficará vinculada ao trabalho original.
+                </p>
+                <label>
+                  Motivo da reimpressão
+                  <Textarea
+                    autoFocus
+                    maxLength={500}
+                    minLength={3}
+                    onChange={(event) => setReprintReason(event.target.value)}
+                    required
+                    rows={3}
+                    value={reprintReason}
+                  />
+                </label>
+                {reprintError && (
+                  <p className="kds-action-error" role="alert">
+                    {reprintError}
+                  </p>
+                )}
+                <div className="kds-item-operation-form__actions">
+                  <Button
+                    disabled={printBusy}
+                    onClick={() => {
+                      setReprintRequest(null);
+                      setReprintReason("");
+                      setReprintError(null);
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Voltar
+                  </Button>
+                  <Button disabled={printBusy || reprintReason.trim().length < 3} type="submit">
+                    {printBusy ? "Enviando…" : "Confirmar reimpressão"}
                   </Button>
                 </div>
               </form>

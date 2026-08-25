@@ -17,10 +17,11 @@ import {
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { and, asc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, notInArray, or } from "drizzle-orm";
 import { ZodError } from "zod";
 import { DatabaseService } from "../database/database.module.js";
 import { FiscalService } from "../fiscal/fiscal.service.js";
+import { ProductionPrintingService } from "../pilot-operations/production-printing.service.js";
 import { OperationalSnapshotService } from "./operational-snapshot.service.js";
 import type { SyncBatchInput, SyncEventInput } from "./sync.schemas.js";
 import { SyncPilotService } from "./sync-pilot.service.js";
@@ -87,6 +88,7 @@ export class SyncService {
     private readonly pilot: SyncPilotService,
     private readonly snapshots: OperationalSnapshotService,
     private readonly fiscal: FiscalService,
+    private readonly productionPrinting?: ProductionPrintingService,
   ) {}
 
   async synchronize(syncKey: string | undefined, input: SyncBatchInput) {
@@ -120,7 +122,7 @@ export class SyncService {
           metadata: { ...input.metadata, protocolVersion: input.protocolVersion },
         })
         .onConflictDoUpdate({
-          target: hubHeartbeats.unitId,
+          target: [hubHeartbeats.unitId, hubHeartbeats.hubId],
           set: {
             organizationId: hub.organizationId,
             hubId: hub.id,
@@ -129,6 +131,14 @@ export class SyncService {
             metadata: { ...input.metadata, protocolVersion: input.protocolVersion },
           },
         });
+
+      for (const result of input.commandResults ?? []) {
+        if (!this.productionPrinting) {
+          throw new ConflictException({ code: "PRODUCTION_PRINTING_NOT_CONFIGURED" });
+        }
+        await this.productionPrinting.applyCommandResult(tx, hub, result, now);
+      }
+      await this.productionPrinting?.expireUnknownPrintCommands(tx, hub, now);
 
       if (input.acknowledgedCommandIds.length > 0) {
         await tx
@@ -140,6 +150,12 @@ export class SyncService {
               eq(hubCommands.unitId, hub.unitId),
               eq(hubCommands.hubId, hub.id),
               inArray(hubCommands.id, input.acknowledgedCommandIds),
+              notInArray(hubCommands.type, [
+                "print_job.execute",
+                "printer.configuration.upsert",
+                "printer.configuration.archive",
+                "printer.test",
+              ]),
               isNull(hubCommands.acknowledgedAt),
             ),
           );

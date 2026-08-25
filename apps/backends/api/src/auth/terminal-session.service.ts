@@ -24,7 +24,7 @@ import {
 import * as argon2 from "argon2";
 import { and, desc, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
-import type { AuthContext } from "./auth.service.js";
+import { type AuthContext, AuthService } from "./auth.service.js";
 
 export const TERMINAL_SESSION_TTL_MS = 12 * 60 * 60 * 1_000;
 export const TERMINAL_IDLE_TIMEOUT_MS = 5 * 60 * 1_000;
@@ -112,7 +112,10 @@ function terminalLocked(lockedUntil?: Date | null) {
 
 @Injectable()
 export class TerminalSessionService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly auth: AuthService,
+  ) {}
 
   async configurePin(
     identityId: string,
@@ -466,6 +469,12 @@ export class TerminalSessionService {
     const actor = terminal.activeActorMembershipId
       ? await this.identityForMembership(terminal.activeActorMembershipId, terminal.organizationId)
       : null;
+    if (reason === "switch" && actor) {
+      await this.auth.assertCanEndOperation(actor.identityId, {
+        organizationId: terminal.organizationId,
+        unitId: terminal.unitId,
+      });
+    }
     if (terminal.activeActorMembershipId) {
       await this.database.db.transaction(async (tx) => {
         await tx
@@ -508,6 +517,12 @@ export class TerminalSessionService {
     const actor = terminal.activeActorMembershipId
       ? await this.identityForMembership(terminal.activeActorMembershipId, terminal.organizationId)
       : null;
+    if (actor) {
+      await this.auth.assertCanEndOperation(actor.identityId, {
+        organizationId: terminal.organizationId,
+        unitId: terminal.unitId,
+      });
+    }
     await this.database.db.transaction(async (tx) => {
       await tx
         .update(terminalSessions)

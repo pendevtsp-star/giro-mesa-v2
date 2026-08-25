@@ -347,6 +347,10 @@ export function validateSupplyChain() {
   }
   const lockedReferences = [
     [
+      "clamav",
+      "clamav/clamav-debian@sha256:967334b92d1782e4d1314ddf903ae537d26792d21c9a39adecb8ac9757980514",
+    ],
+    [
       "buildkit",
       "moby/buildkit@sha256:28a898719c18a33f4e8000685287fa36fd0dd9560c6440227d3a732d79bb41d8",
     ],

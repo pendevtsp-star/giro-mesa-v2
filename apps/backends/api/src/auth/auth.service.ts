@@ -9,6 +9,7 @@ import {
   auditEvents,
   authSessions,
   identities,
+  managementCashShifts,
   memberships,
   mfaChallenges,
   mfaFactors,
@@ -589,6 +590,7 @@ export class AuthService {
   }
 
   async revoke(sessionId: string, identityId: string) {
+    await this.assertCanEndOperation(identityId);
     await this.database.db
       .update(authSessions)
       .set({ revokedAt: new Date() })
@@ -598,6 +600,37 @@ export class AuthService {
       action: "auth.logout",
       entityType: "session",
       entityId: sessionId,
+    });
+  }
+
+  async assertCanEndOperation(
+    identityId: string,
+    scope?: { organizationId: string; unitId: string },
+  ) {
+    const [openShift] = await this.database.db
+      .select({
+        id: managementCashShifts.id,
+        organizationId: managementCashShifts.organizationId,
+        unitId: managementCashShifts.unitId,
+      })
+      .from(managementCashShifts)
+      .where(
+        and(
+          eq(managementCashShifts.status, "open"),
+          eq(managementCashShifts.currentResponsibleIdentityId, identityId),
+          scope ? eq(managementCashShifts.organizationId, scope.organizationId) : undefined,
+          scope ? eq(managementCashShifts.unitId, scope.unitId) : undefined,
+        ),
+      )
+      .limit(1);
+    if (!openShift) return;
+    throw new ConflictException({
+      code: "CASH_SHIFT_OPEN",
+      message:
+        "Você ainda é responsável por um caixa aberto. Feche o caixa ou transfira a responsabilidade antes de encerrar a operação.",
+      cashShiftId: openShift.id,
+      organizationId: openShift.organizationId,
+      unitId: openShift.unitId,
     });
   }
 

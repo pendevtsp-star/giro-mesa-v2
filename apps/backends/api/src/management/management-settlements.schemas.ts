@@ -13,6 +13,9 @@ const date = z
 
 export const settlementConfigSchema = z
   .object({
+    serviceChargeEnabled: z.boolean().default(false),
+    defaultServiceChargeBasisPoints: z.number().int().min(0).max(10_000).default(0),
+    serviceChargeApplication: z.enum(["manual", "suggest_dine_in"]).default("manual"),
     attributionMode: z.enum(["final_responsible", "order_creator"]),
     transferMode: z.enum(["move_to_final", "preserve_origin"]),
     serviceBase: z.enum(["gross", "net_after_discounts"]),
@@ -28,7 +31,16 @@ export const settlementConfigSchema = z
     customPeriodStartDay: z.number().int().min(1).max(28),
     aggregateAcrossUnits: z.boolean(),
   })
-  .strict();
+  .strict()
+  .superRefine((configuration, context) => {
+    if (configuration.serviceChargeEnabled && configuration.defaultServiceChargeBasisPoints === 0) {
+      context.addIssue({
+        code: "custom",
+        path: ["defaultServiceChargeBasisPoints"],
+        message: "A taxa padrão deve ser maior que zero quando a taxa de serviço estiver ativa.",
+      });
+    }
+  });
 
 export const partnershipTierSchema = z
   .object({

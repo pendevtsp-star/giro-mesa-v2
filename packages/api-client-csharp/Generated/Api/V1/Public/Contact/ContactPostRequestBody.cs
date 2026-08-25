@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Contact
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The attribution property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Public.Contact.ContactPostRequestBody_attribution? Attribution { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Public.Contact.ContactPostRequestBody_attribution Attribution { get; set; }
+#endif
         /// <summary>The email property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -79,6 +87,7 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Contact
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "attribution", n => { Attribution = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Contact.ContactPostRequestBody_attribution>(global::GiroMesa.ApiClient.Api.V1.Public.Contact.ContactPostRequestBody_attribution.CreateFromDiscriminatorValue); } },
                 { "email", n => { Email = n.GetStringValue(); } },
                 { "message", n => { Message = n.GetStringValue(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
@@ -93,6 +102,7 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Contact
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Contact.ContactPostRequestBody_attribution>("attribution", Attribution);
             writer.WriteStringValue("email", Email);
             writer.WriteStringValue("message", Message);
             writer.WriteStringValue("name", Name);

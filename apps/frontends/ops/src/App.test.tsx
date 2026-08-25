@@ -33,27 +33,57 @@ describe("experiência operacional", () => {
     expect(html).not.toContain("dados operacionais");
   });
 
-  it("agrupa mesas e balcão na Central Operacional conforme as permissões", () => {
+  it("organiza a navegação por operação, atendimento, gestão, financeiro e administração", () => {
     const ownerHtml = renderToStaticMarkup(
       <OperationalApp onLogout={() => {}} session={operationalSession("owner")} />,
     );
-    expect(ownerHtml).toContain("Central Operacional");
+    const atendimentoStart = ownerHtml.indexOf(">Atendimento<");
+    const atendimentoEnd = ownerHtml.indexOf("</details>", atendimentoStart);
+    const atendimentoHtml = ownerHtml.slice(atendimentoStart, atendimentoEnd);
+    expect(atendimentoStart).toBeGreaterThan(-1);
+    expect(atendimentoEnd).toBeGreaterThan(atendimentoStart);
+    expect(ownerHtml).not.toContain("Central Operacional");
+    expect(atendimentoHtml).toContain('href="#/reservations"');
+    expect(atendimentoHtml).toContain("Recepção e espera");
     expect(ownerHtml).toContain('href="#/salon"');
-    expect(ownerHtml).toContain("Mesas e comandas");
-    expect(ownerHtml).toContain('href="#/counter"');
-    expect(ownerHtml).toContain("Balcão e retirada");
-    expect(ownerHtml).toContain('href="#/reservations"');
-    expect(ownerHtml).toContain("Recepção e espera");
-    expect(ownerHtml).toContain('href="#/cash"');
-    expect(ownerHtml).toContain("Contas e caixa");
+    expect(atendimentoHtml).toContain("Mesas e comandas");
+    expect(atendimentoHtml).toContain('href="#/counter"');
+    expect(atendimentoHtml).toContain("Balcão e retirada");
+    expect(atendimentoHtml).toContain('href="#/delivery"');
+    expect(atendimentoHtml).toContain("Delivery");
+    expect(atendimentoHtml).not.toContain('href="#/cash"');
+
+    const operacaoHtml = ownerHtml.slice(
+      ownerHtml.indexOf(">Operação<"),
+      ownerHtml.indexOf(">Gestão<"),
+    );
+    expect(operacaoHtml).toContain('href="#/cash"');
+    expect(operacaoHtml).toContain("Contas e caixa");
+    expect(ownerHtml).toContain('href="#/table-qrs"');
+    expect(ownerHtml).toContain("QR das mesas");
+
+    const financeiroStart = ownerHtml.indexOf(">Financeiro e fiscal<");
+    const administracaoStart = ownerHtml.indexOf(">Administração<");
+    const financeiroHtml = ownerHtml.slice(financeiroStart, administracaoStart);
+    const administracaoHtml = ownerHtml.slice(
+      administracaoStart,
+      ownerHtml.indexOf("</nav>", administracaoStart),
+    );
+    expect(financeiroStart).toBeGreaterThan(-1);
+    expect(administracaoStart).toBeGreaterThan(financeiroStart);
+    expect(financeiroHtml).toContain('href="#/finance"');
+    expect(financeiroHtml).not.toContain('href="#/billing"');
+    expect(administracaoHtml).toContain('href="#/billing"');
+    expect(administracaoHtml).toContain("Assinatura e cobrança");
 
     const cashierHtml = renderToStaticMarkup(
       <OperationalApp onLogout={() => {}} session={operationalSession("cashier")} />,
     );
-    expect(cashierHtml).not.toContain('href="#/salon"');
+    expect(cashierHtml).toContain('href="#/salon"');
     expect(cashierHtml).toContain('href="#/counter"');
     expect(cashierHtml).not.toContain('href="#/reservations"');
     expect(cashierHtml).toContain('href="#/cash"');
+    expect(cashierHtml).not.toContain('href="#/table-qrs"');
   });
 
   it("restaura somente a última rota permitida quando não há hash explícito", () => {
@@ -61,7 +91,7 @@ describe("experiência operacional", () => {
     const cashier = operationalSession("cashier");
 
     expect(resolveInitialOperationalRoute("", "cash", owner)).toBe("cash");
-    expect(resolveInitialOperationalRoute("", "salon", cashier)).toBe("dashboard");
+    expect(resolveInitialOperationalRoute("", "salon", cashier)).toBe("salon");
     expect(resolveInitialOperationalRoute("#/counter", "salon", cashier)).toBe("counter");
   });
 

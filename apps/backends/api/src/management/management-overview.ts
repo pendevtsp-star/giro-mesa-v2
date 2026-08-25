@@ -187,7 +187,7 @@ export const overviewRoutes: Record<OverviewProfileId, readonly OverviewRoute[]>
   waiter: ["dashboard", "salon", "counter", "catalog", "reservations"],
   receptionist: ["dashboard", "reservations", "salon"],
   busser: ["dashboard", "salon"],
-  cashier: ["dashboard", "counter", "catalog", "cash"],
+  cashier: ["dashboard", "salon", "counter", "catalog", "cash"],
   kitchen: ["dashboard", "catalog", "kds"],
   inventory: ["dashboard", "inventory", "purchases"],
   finance: ["dashboard", "cash", "purchases", "finance", "reports"],

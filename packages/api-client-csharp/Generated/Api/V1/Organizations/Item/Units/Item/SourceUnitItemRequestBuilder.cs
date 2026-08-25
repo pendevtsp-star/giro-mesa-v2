@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Devices;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Integrations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings;
@@ -34,6 +35,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The integrations property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Integrations.IntegrationsRequestBuilder Integrations
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Integrations.IntegrationsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The management property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.ManagementRequestBuilder Management

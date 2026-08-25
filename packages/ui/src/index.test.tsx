@@ -100,7 +100,12 @@ describe("componentes compartilhados", () => {
           label="Filtrar mesas"
           onChange={() => undefined}
         />
-        <Modal isOpen onClose={() => undefined} title="Editar mesa">
+        <Modal
+          contentClassName="custom-modal-content"
+          isOpen
+          onClose={() => undefined}
+          title="Editar mesa"
+        >
           Conteúdo
         </Modal>
         <Toast message="Mesa criada" onDismiss={() => undefined} title="Salão atualizado" />
@@ -118,6 +123,7 @@ describe("componentes compartilhados", () => {
     expect(html).toContain('role="switch"');
     expect(html).toContain('data-slot="alert"');
     expect(html).toContain('data-slot="card-header"');
+    expect(html).toContain("custom-modal-content");
     expect(html).toContain('data-slot="accordion-item"');
     expect(html).toContain('data-slot="table-head"');
     expect(html).toContain('role="progressbar"');

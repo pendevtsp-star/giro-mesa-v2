@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.
     public partial class WithShiftSectionPutRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The primaryIdentityId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -54,6 +56,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "primaryIdentityId", n => { PrimaryIdentityId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Sections.Item.WithShiftSectionPutRequestBody.WithShiftSectionPutRequestBody_primaryIdentityId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Sections.Item.WithShiftSectionPutRequestBody.WithShiftSectionPutRequestBody_primaryIdentityId.CreateFromDiscriminatorValue); } },
                 { "supportIdentityIds", n => { SupportIdentityIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "tableIds", n => { TableIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
@@ -66,6 +69,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Sections.Item.WithShiftSectionPutRequestBody.WithShiftSectionPutRequestBody_primaryIdentityId>("primaryIdentityId", PrimaryIdentityId);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("supportIdentityIds", SupportIdentityIds);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("tableIds", TableIds);

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   assertIncidentTransition,
   assessInventoryRisk,
+  classifyInventoryAbc,
   cycleCountPolicy,
   forecastInventoryDemand,
   NfeParseError,
@@ -97,7 +98,22 @@ describe("NF-e inventory rules", () => {
 
   it("prioritizes cycle counts and forecasts demand without hiding commitments", () => {
     assert.deepEqual(
+      [
+        ...classifyInventoryAbc([
+          { key: "alto", consumptionValueCents: 800 },
+          { key: "medio", consumptionValueCents: 150 },
+          { key: "baixo", consumptionValueCents: 50 },
+        ]),
+      ],
+      [
+        ["alto", "A"],
+        ["medio", "B"],
+        ["baixo", "C"],
+      ],
+    );
+    assert.deepEqual(
       cycleCountPolicy({
+        classification: "A",
         inventoryValueCents: 120_000,
         movementCount90Days: 100,
         divergencePercent: 12,

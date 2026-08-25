@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { mockCompatibleApi } from "./ops-release";
 
 test("login operacional mantém campos legíveis e associados", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A própria jornada cobre desktop e mobile.");
+  await mockCompatibleApi(page);
   await page.route(/\/v1\/auth\/terminal-session$/, (route) =>
     route.fulfill({ status: 401, json: { message: "Terminal ausente" } }),
   );

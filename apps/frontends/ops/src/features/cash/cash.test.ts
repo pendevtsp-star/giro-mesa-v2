@@ -23,11 +23,18 @@ describe("resumo do turno de caixa", () => {
     const summary = summarizeCashEntries([
       entry({ amountCents: 2_000 }),
       entry({ amountCents: 3_000, paymentMethod: "pix", affectsDrawer: false }),
+      entry({
+        amountCents: 1_000,
+        direction: "out",
+        entryType: "reversal",
+        paymentMethod: "pix",
+        affectsDrawer: false,
+      }),
       entry({ amountCents: 500, direction: "out", entryType: "withdrawal", paymentMethod: null }),
     ]);
 
     expect(summary.drawerInCents).toBe(2_000);
     expect(summary.drawerOutCents).toBe(500);
-    expect(Object.fromEntries(summary.byMethod)).toEqual({ cash: 2_000, pix: 3_000 });
+    expect(Object.fromEntries(summary.byMethod)).toEqual({ cash: 2_000, pix: 2_000 });
   });
 });

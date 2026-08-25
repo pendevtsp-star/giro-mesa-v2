@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ApprovalRequests;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Calls;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Installations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Items;
@@ -16,6 +17,10 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperation
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentReconciliation;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Payments;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrintJobs;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinters;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinting;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Push;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Rooms;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ServiceSections;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts;
@@ -51,6 +56,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.CatalogRequestBuilder Catalog
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog.CatalogRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The counterQueue property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue.CounterQueueRequestBuilder CounterQueue
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue.CounterQueueRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The floor property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.FloorRequestBuilder Floor
@@ -116,6 +126,26 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.PrintJobsRequestBuilder PrintJobs
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.PrintJobsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The productionPrinters property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinters.ProductionPrintersRequestBuilder ProductionPrinters
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinters.ProductionPrintersRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The productionPrinting property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinting.ProductionPrintingRequestBuilder ProductionPrinting
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinting.ProductionPrintingRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The productionPrintJobs property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrintJobs.ProductionPrintJobsRequestBuilder ProductionPrintJobs
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrintJobs.ProductionPrintJobsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The push property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Push.PushRequestBuilder Push
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Push.PushRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The rooms property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Rooms.RoomsRequestBuilder Rooms

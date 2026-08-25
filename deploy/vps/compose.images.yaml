@@ -1,6 +1,12 @@
 services:
+  clamav:
+    image: clamav/clamav-debian@sha256:967334b92d1782e4d1314ddf903ae537d26792d21c9a39adecb8ac9757980514
   postgres:
     image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+  evolution-db:
+    image: postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+  evolution-go:
+    image: evoapicloud/evolution-go:0.7.2@sha256:6fa601464bd76d3d19ece4c48d8bb5373d025d95d45b939ae4bf0c77b03f5aaa
   migrate:
     image: ${GIROMESA_API_IMAGE:?GIROMESA_API_IMAGE must be an OCI digest}
   api:

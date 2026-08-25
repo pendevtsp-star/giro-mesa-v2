@@ -5,6 +5,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Cha
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Claim;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Course;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Items;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.PrintJobs;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Recall;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.State;
@@ -46,6 +47,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Items.ItemsRequestBuilder Items
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Items.ItemsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The printJobs property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.PrintJobs.PrintJobsRequestBuilder PrintJobs
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.PrintJobs.PrintJobsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The priority property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Kds.Item.Priority.PriorityRequestBuilder Priority

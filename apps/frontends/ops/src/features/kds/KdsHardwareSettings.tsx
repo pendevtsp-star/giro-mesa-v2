@@ -10,7 +10,6 @@ import {
 } from "./kds.bumpbar";
 
 export interface KdsPrinterPreferences {
-  printerId: string;
   copies: number;
 }
 
@@ -27,14 +26,20 @@ export function KdsHardwareSettings({
   hardwarePrinting,
   onBumpMapChange,
   onPrinterPreferencesChange,
+  onReprint,
   onTestPrint,
+  printBusy,
+  printerLabel,
   printerPreferences,
 }: {
   bumpMap: KdsBumpBarMap;
   hardwarePrinting: boolean;
   onBumpMapChange: (map: KdsBumpBarMap) => void;
   onPrinterPreferencesChange: (preferences: KdsPrinterPreferences) => void;
+  onReprint: () => void;
   onTestPrint: () => void;
+  printBusy: boolean;
+  printerLabel: string;
   printerPreferences: KdsPrinterPreferences;
 }) {
   const [mappingError, setMappingError] = useState<string | null>(null);
@@ -60,30 +65,26 @@ export function KdsHardwareSettings({
             Somente este terminal
           </span>
           <h2>Hardware</h2>
-          <p>Configure a impressora térmica pareada ao Edge e as teclas do bump bar HID.</p>
+          <p>A impressora vem do perfil persistido do terminal ou do roteamento automático.</p>
         </div>
         <Badge tone={hardwarePrinting ? "success" : "warning"}>
-          {hardwarePrinting ? "Impressora pronta" : "Contingência do navegador"}
+          {hardwarePrinting ? "Roteamento disponível" : "Saúde não confirmada"}
         </Badge>
       </header>
 
       <fieldset className="gm-form-grid kds-printer-settings">
         <legend>Impressora térmica</legend>
-        <label className="gm-form-field">
-          <span>Identificador no Edge</span>
-          <Input
-            className="gm-form-control"
-            maxLength={80}
-            onChange={(event) =>
-              onPrinterPreferencesChange({
-                ...printerPreferences,
-                printerId: event.target.value || "default",
-              })
-            }
-            placeholder="Padrão"
-            value={printerPreferences.printerId === "default" ? "" : printerPreferences.printerId}
-          />
-        </label>
+        <div className="gm-form-field">
+          <span>Destino efetivo</span>
+          <strong>{printerLabel}</strong>
+          <small>
+            Sem vínculo no terminal, o sistema aplica a política persistida da estação e o tipo do
+            documento.
+          </small>
+          <a className="gm-button gm-button--ghost gm-button--sm" href="#/device">
+            Abrir Dispositivos
+          </a>
+        </div>
         <label className="gm-form-field">
           <span>Vias</span>
           <Input
@@ -100,8 +101,11 @@ export function KdsHardwareSettings({
             value={printerPreferences.copies}
           />
         </label>
-        <Button onClick={onTestPrint} size="sm" variant="secondary">
-          {hardwarePrinting ? "Imprimir ticket focado" : "Abrir impressão de contingência"}
+        <Button disabled={printBusy} onClick={onTestPrint} size="sm" variant="secondary">
+          Solicitar primeira via do ticket focado
+        </Button>
+        <Button disabled={printBusy} onClick={onReprint} size="sm" variant="ghost">
+          Reimprimir com motivo…
         </Button>
         <small>
           A largura de 58/80 mm, tabela de caracteres e guilhotina são calibradas no Edge.

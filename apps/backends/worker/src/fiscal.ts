@@ -16,7 +16,9 @@ import { and, eq, sql } from "drizzle-orm";
 import type { ClaimedOutboxEvent } from "./outbox.js";
 
 type Database = ReturnType<typeof createDatabase>["db"];
+type DatabaseTransaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type Environment = "homologation" | "production";
+type FiscalStatus = FocusResult["status"] | "pending";
 
 type FocusResult = {
   status: "processing" | "authorized" | "rejected" | "contingency" | "canceled";
@@ -82,6 +84,24 @@ function paymentCode(method: FiscalPayment["method"]) {
   return { cash: "01", credit_card: "03", debit_card: "04", pix: "17", other: "99" }[method];
 }
 
+export function assertFiscalRuntimeEnvironment(
+  environment: Environment,
+  releaseEnvironment = process.env.FISCAL_RELEASE_ENV,
+) {
+  if (environment === "production" && releaseEnvironment !== "production") {
+    throw new FiscalDeliveryError("FISCAL_PRODUCTION_RELEASE_BLOCKED", false);
+  }
+}
+
+export function nextFiscalStatus(
+  current: FiscalStatus,
+  incoming: FocusResult["status"],
+): FiscalStatus {
+  if (current === "canceled") return "canceled";
+  if (current === "authorized" && incoming !== "canceled") return "authorized";
+  return incoming;
+}
+
 export function buildNfcePayload(input: {
   issuerDocument: string;
   issuedAt: Date;
@@ -91,7 +111,7 @@ export function buildNfcePayload(input: {
   lines: FiscalLine[];
   payments: FiscalPayment[];
 }) {
-  if (!/^\d{14}$/.test(input.issuerDocument)) {
+  if (!/^[A-Z0-9]{12}\d{2}$/i.test(input.issuerDocument)) {
     throw new FiscalDeliveryError("FISCAL_ISSUER_DOCUMENT_INVALID", false);
   }
   if (input.lines.length === 0) throw new FiscalDeliveryError("FISCAL_SALE_WITHOUT_ITEMS", false);
@@ -106,6 +126,11 @@ export function buildNfcePayload(input: {
     const icms = text(classification.csosn) ?? text(classification.cstIcms);
     const pis = text(classification.cstPis);
     const cofins = text(classification.cstCofins);
+    const ibsCbs = text(classification.cstIbsCbs);
+    const cClassTrib = text(classification.cClassTrib);
+    if (Boolean(ibsCbs) !== Boolean(cClassTrib)) {
+      throw new FiscalDeliveryError("FISCAL_IBS_CBS_CLASSIFICATION_INCOMPLETE", false);
+    }
     if (
       !line.revisionId ||
       !ncm ||
@@ -136,6 +161,8 @@ export function buildNfcePayload(input: {
       icms_situacao_tributaria: icms,
       pis_situacao_tributaria: pis,
       cofins_situacao_tributaria: cofins,
+      ...(ibsCbs ? { ibs_cbs_situacao_tributaria: ibsCbs } : {}),
+      ...(cClassTrib ? { ibs_cbs_classificacao_tributaria: cClassTrib } : {}),
     };
   });
   const itemTotal = input.lines.reduce((sum, line) => sum + line.netCents, 0) + input.extraCents;
@@ -143,7 +170,7 @@ export function buildNfcePayload(input: {
     throw new FiscalDeliveryError("FISCAL_ITEM_TOTAL_MISMATCH", false);
   }
   return {
-    cnpj_emitente: input.issuerDocument,
+    cnpj_emitente: input.issuerDocument.toUpperCase(),
     natureza_operacao: "VENDA",
     data_emissao: input.issuedAt.toISOString(),
     tipo_documento: 1,
@@ -210,6 +237,7 @@ async function focusJson(input: {
   method?: "GET" | "POST";
   body?: unknown;
 }) {
+  assertFiscalRuntimeEnvironment(input.environment);
   const base =
     input.environment === "production"
       ? "https://api.focusnfe.com.br"
@@ -259,6 +287,7 @@ function decryptFocusToken(
   organizationId: string,
   unitId: string,
 ) {
+  assertFiscalRuntimeEnvironment(environment);
   const connection = record(record(settings).focus);
   const envelope = record(
     environment === "production" ? connection.tokenProduction : connection.tokenHomologation,
@@ -282,6 +311,28 @@ function decryptFocusToken(
   );
 }
 
+async function lockOpenFiscalPeriod(
+  tx: DatabaseTransaction,
+  organizationId: string,
+  unitId: string,
+  competence: string,
+) {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`fiscal-period:${organizationId}:${unitId}:${competence}`}, 0))`,
+  );
+  const [period] = await tx.execute<{ status: string }>(sql`
+    select status
+    from fiscal_periods
+    where organization_id = ${organizationId}
+      and unit_id = ${unitId}
+      and competence = ${competence}::date
+    limit 1
+  `);
+  if (period?.status === "closed") {
+    throw new FiscalDeliveryError("FISCAL_PERIOD_CLOSED", false);
+  }
+}
+
 async function rejectDocument(
   db: Database,
   documentId: string,
@@ -291,10 +342,25 @@ async function rejectDocument(
   message: string,
 ) {
   await db.transaction(async (tx) => {
+    const [current] = await tx.execute<{ competence: string }>(sql`
+      select to_char(date_trunc('month', documents.issued_at at time zone units.timezone), 'YYYY-MM-DD') as competence
+      from fiscal_documents documents
+      inner join units
+        on units.organization_id = documents.organization_id and units.id = documents.unit_id
+      where documents.id = ${documentId}
+      limit 1
+    `);
+    if (!current) throw new FiscalDeliveryError("FISCAL_DOCUMENT_NOT_FOUND", false);
+    await lockOpenFiscalPeriod(tx, organizationId, unitId, current.competence);
     await tx
       .update(fiscalDocuments)
       .set({ status: "rejected", updatedAt: new Date() })
-      .where(eq(fiscalDocuments.id, documentId));
+      .where(
+        and(
+          eq(fiscalDocuments.id, documentId),
+          sql`${fiscalDocuments.status} not in ('authorized', 'canceled')`,
+        ),
+      );
     await tx
       .insert(fiscalDocumentEvents)
       .values({
@@ -327,16 +393,52 @@ async function persistResult(
 ) {
   const now = new Date();
   await db.transaction(async (tx) => {
+    const [scope] = await tx.execute<{
+      competence: string;
+    }>(sql`
+      select to_char(date_trunc('month', documents.issued_at at time zone units.timezone), 'YYYY-MM-DD') as competence
+      from fiscal_documents documents
+      inner join units
+        on units.organization_id = documents.organization_id and units.id = documents.unit_id
+      where documents.id = ${document.id}
+      limit 1
+    `);
+    if (!scope) throw new FiscalDeliveryError("FISCAL_DOCUMENT_NOT_FOUND", false);
+    await lockOpenFiscalPeriod(tx, document.organizationId, document.unitId, scope.competence);
+    const [current] = await tx.execute<{
+      status: FiscalStatus;
+      access_key: string | null;
+      number: number | null;
+      series: string | null;
+      tax_cents: number;
+      authorized_at: Date | null;
+      canceled_at: Date | null;
+    }>(sql`
+      select documents.status,
+             documents.access_key, documents.number, documents.series, documents.tax_cents,
+             documents.authorized_at, documents.canceled_at
+      from fiscal_documents documents
+      where documents.id = ${document.id}
+      limit 1
+      for update
+    `);
+    if (!current) throw new FiscalDeliveryError("FISCAL_DOCUMENT_NOT_FOUND", false);
+    const appliedStatus = nextFiscalStatus(current.status, result.status);
+    const accepted = appliedStatus === result.status;
     await tx
       .update(fiscalDocuments)
       .set({
-        status: result.status,
-        accessKey: result.accessKey,
-        number: result.number,
-        series: result.series,
-        taxCents: result.taxCents ?? 0,
-        authorizedAt: result.status === "authorized" ? now : null,
-        canceledAt: result.status === "canceled" ? now : null,
+        status: appliedStatus,
+        accessKey: accepted ? (result.accessKey ?? current.access_key) : current.access_key,
+        number: accepted ? (result.number ?? current.number) : current.number,
+        series: accepted ? (result.series ?? current.series) : current.series,
+        taxCents: accepted ? (result.taxCents ?? current.tax_cents) : current.tax_cents,
+        authorizedAt:
+          appliedStatus === "authorized" || appliedStatus === "canceled"
+            ? (current.authorized_at ?? (result.status === "authorized" ? now : null))
+            : current.authorized_at,
+        canceledAt:
+          appliedStatus === "canceled" ? (current.canceled_at ?? now) : current.canceled_at,
         updatedAt: now,
       })
       .where(eq(fiscalDocuments.id, document.id));
@@ -352,14 +454,14 @@ async function persistResult(
         documentId: document.id,
         providerEventId: `focus:${document.id}:${fingerprint}`,
         type: "fiscal.document.provider_result",
-        status: result.status,
+        status: appliedStatus,
         code: result.code,
         message: result.message,
-        payload: {},
+        payload: { observedStatus: result.status, appliedStatus },
         occurredAt: now,
       })
       .onConflictDoNothing();
-    for (const [index, itemTaxCents] of result.itemTaxCents.entries()) {
+    for (const [index, itemTaxCents] of (accepted ? result.itemTaxCents : []).entries()) {
       await tx
         .update(fiscalDocumentItems)
         .set({ taxCents: itemTaxCents })
@@ -370,7 +472,7 @@ async function persistResult(
           ),
         );
     }
-    if (result.status === "processing" || result.status === "contingency") {
+    if (accepted && (result.status === "processing" || result.status === "contingency")) {
       await tx.insert(outboxEvents).values({
         topic: "fiscal.document.reconcile_requested",
         aggregateType: "fiscal_document",
@@ -379,7 +481,7 @@ async function persistResult(
         availableAt: new Date(now.valueOf() + 30_000),
       });
     }
-    if (result.status === "authorized" || result.status === "canceled") {
+    if (accepted && (result.status === "authorized" || result.status === "canceled")) {
       await tx.insert(outboxEvents).values({
         topic: "fiscal.document.artifacts_requested",
         aggregateType: "fiscal_document",
@@ -424,9 +526,11 @@ async function issueClosedTab(db: Database, event: ClaimedOutboxEvent) {
     where profiles.organization_id = ${organizationId} and profiles.unit_id = ${unitId}
     limit 1
   `);
-  if (profile?.provider !== "focus") return;
+  if (profile?.provider !== "focus") {
+    throw new FiscalDeliveryError("FOCUS_PROFILE_NOT_READY", true);
+  }
   const token = decryptFocusToken(profile.settings, profile.environment, organizationId, unitId);
-  if (!token) return;
+  if (!token) throw new FiscalDeliveryError("FOCUS_COMPANY_TOKEN_MISSING", true);
 
   const idempotencyKey = `nfce:tab:${tabId}`;
   let [document] = await db.execute<{
@@ -453,9 +557,14 @@ async function issueClosedTab(db: Database, event: ClaimedOutboxEvent) {
       tip_cents: number;
       fulfillment_type: string;
       closed_at: Date;
+      competence: string;
     }>(sql`
       select id, status, total_cents, subtotal_cents, discount_cents, service_charge_cents,
-             tip_cents, fulfillment_type, closed_at
+             tip_cents, fulfillment_type, closed_at,
+             to_char(date_trunc('month', closed_at at time zone (
+               select timezone from units
+               where organization_id = ${organizationId} and id = ${unitId}
+             )), 'YYYY-MM-DD') as competence
       from pos_tabs
       where organization_id = ${organizationId} and unit_id = ${unitId} and id = ${tabId}
       limit 1
@@ -555,27 +664,31 @@ async function issueClosedTab(db: Database, event: ClaimedOutboxEvent) {
       });
     } catch (error) {
       if (!(error instanceof FiscalDeliveryError)) throw error;
-      const [created] = await db
-        .insert(fiscalDocuments)
-        .values({
-          organizationId,
-          unitId,
-          tabId,
-          model: "nfce",
-          environment: profile.environment,
-          status: "rejected",
-          idempotencyKey,
-          totalCents: Number(tab.total_cents),
-          snapshot: { source: "pos.tab.closed", validationCode: error.code },
-          issuedAt: new Date(tab.closed_at),
-        })
-        .onConflictDoNothing()
-        .returning({ id: fiscalDocuments.id });
+      const [created] = await db.transaction(async (tx) => {
+        await lockOpenFiscalPeriod(tx, organizationId, unitId, tab.competence);
+        return tx
+          .insert(fiscalDocuments)
+          .values({
+            organizationId,
+            unitId,
+            tabId,
+            model: "nfce",
+            environment: profile.environment,
+            status: "rejected",
+            idempotencyKey,
+            totalCents: Number(tab.total_cents),
+            snapshot: { source: "pos.tab.closed", validationCode: error.code },
+            issuedAt: new Date(tab.closed_at),
+          })
+          .onConflictDoNothing()
+          .returning({ id: fiscalDocuments.id });
+      });
       if (created)
         await rejectDocument(db, created.id, organizationId, unitId, error.code, error.message);
       return;
     }
     document = await db.transaction(async (tx) => {
+      await lockOpenFiscalPeriod(tx, organizationId, unitId, tab.competence);
       const [created] = await tx
         .insert(fiscalDocuments)
         .values({

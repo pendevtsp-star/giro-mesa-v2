@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import {
+  deleteFiscalArtifact,
   readFiscalArtifact,
   validateFiscalArtifact,
   writeFiscalArtifact,
@@ -30,6 +31,8 @@ describe("private fiscal artifacts", () => {
         content,
       });
       assert.deepEqual(await readFiscalArtifact(root, stored.storageKey), content);
+      await deleteFiscalArtifact(root, stored.storageKey);
+      await assert.rejects(readFiscalArtifact(root, stored.storageKey));
       assert.throws(
         () =>
           validateFiscalArtifact(

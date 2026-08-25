@@ -16,6 +16,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The amountCents property</summary>
         public int? AmountCents { get; set; }
+        /// <summary>The approvalRequestId property</summary>
+        public Guid? ApprovalRequestId { get; set; }
         /// <summary>The cashRegisterId property</summary>
         public Guid? CashRegisterId { get; set; }
         /// <summary>The method property</summary>
@@ -56,6 +58,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
+                { "approvalRequestId", n => { ApprovalRequestId = n.GetGuidValue(); } },
                 { "cashRegisterId", n => { CashRegisterId = n.GetGuidValue(); } },
                 { "method", n => { Method = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item.Payments.PaymentsPostRequestBody_method>(); } },
                 { "occurredAt", n => { OccurredAt = n.GetDateTimeOffsetValue(); } },
@@ -70,6 +73,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
+            writer.WriteGuidValue("approvalRequestId", ApprovalRequestId);
             writer.WriteGuidValue("cashRegisterId", CashRegisterId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.Item.Payments.PaymentsPostRequestBody_method>("method", Method);
             writer.WriteDateTimeOffsetValue("occurredAt", OccurredAt);

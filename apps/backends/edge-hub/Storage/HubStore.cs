@@ -121,6 +121,42 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             );
             CREATE INDEX IF NOT EXISTS ix_print_jobs_created
                 ON print_jobs (created_at DESC);
+            CREATE TABLE IF NOT EXISTS printer_configurations (
+                id TEXT PRIMARY KEY COLLATE NOCASE,
+                host TEXT NOT NULL,
+                port INTEGER NOT NULL,
+                paper_width_mm INTEGER NOT NULL,
+                characters_per_line INTEGER NOT NULL,
+                code_table INTEGER NOT NULL,
+                cut INTEGER NOT NULL,
+                supports_raster_graphics INTEGER NOT NULL,
+                is_default INTEGER NOT NULL,
+                station_ids TEXT NOT NULL,
+                document_types TEXT NOT NULL,
+                legacy_station_names TEXT NOT NULL,
+                fallback_printer_id TEXT NULL,
+                timeout_seconds INTEGER NOT NULL,
+                revision INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                archived_at TEXT NULL,
+                updated_by TEXT NOT NULL,
+                source TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_printer_configurations_active
+                ON printer_configurations (archived_at, is_default, id);
+            CREATE TABLE IF NOT EXISTS printer_configuration_events (
+                id TEXT PRIMARY KEY,
+                printer_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                revision INTEGER NOT NULL,
+                snapshot TEXT NOT NULL,
+                actor_id TEXT NOT NULL,
+                source TEXT NOT NULL,
+                occurred_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS ix_printer_configuration_events_printer
+                ON printer_configuration_events (printer_id, occurred_at DESC);
             CREATE TABLE IF NOT EXISTS fiscal_operations (
                 id TEXT PRIMARY KEY,
                 organization_id TEXT NOT NULL,
@@ -163,6 +199,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         await EnsureColumnAsync(connection, "inbound_cloud_commands", "result", "TEXT NULL");
         await EnsureColumnAsync(connection, "inbound_cloud_commands", "error", "TEXT NULL");
         await EnsureColumnAsync(connection, "print_jobs", "request_fingerprint", "TEXT NULL");
+        await EnsureColumnAsync(connection, "print_jobs", "station_id", "TEXT NULL");
+        await EnsureColumnAsync(connection, "print_jobs", "station_name", "TEXT NULL");
         var backfill = connection.CreateCommand();
         backfill.CommandText = """
             UPDATE operational_events SET idempotency_key = id WHERE idempotency_key IS NULL;
@@ -174,7 +212,13 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             UPDATE print_jobs
             SET request_fingerprint = idempotency_key
             WHERE request_fingerprint IS NULL;
+            UPDATE print_jobs
+            SET status = 'confirmation_required',
+                error_code = 'PRINTER_RESULT_UNKNOWN',
+                completed_at = COALESCE(completed_at, $startupAt)
+            WHERE status = 'printing';
             """;
+        backfill.Parameters.AddWithValue("$startupAt", DateTimeOffset.UtcNow.ToString("O"));
         await backfill.ExecuteNonQueryAsync();
         var indexes = connection.CreateCommand();
         indexes.CommandText = """
@@ -215,18 +259,20 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             var insert = connection.CreateCommand();
             insert.CommandText = """
                 INSERT INTO print_jobs (
-                    id, idempotency_key, request_fingerprint, printer_id, station, content, copies,
-                    characters_per_line, status, created_at)
+                    id, idempotency_key, request_fingerprint, printer_id, station, station_id,
+                    station_name, content, copies, characters_per_line, status, created_at)
                 VALUES (
-                    $id, $idempotencyKey, $requestFingerprint, $printerId, $station, $content, $copies,
-                    NULL, 'printing', $createdAt)
+                    $id, $idempotencyKey, $requestFingerprint, $printerId, $station, $stationId,
+                    $stationName, $content, $copies, NULL, 'printing', $createdAt)
                 ON CONFLICT (idempotency_key) DO NOTHING;
                 """;
             insert.Parameters.AddWithValue("$id", id);
             insert.Parameters.AddWithValue("$idempotencyKey", request.IdempotencyKey);
             insert.Parameters.AddWithValue("$requestFingerprint", requestFingerprint);
             insert.Parameters.AddWithValue("$printerId", request.PrinterId ?? "default");
-            insert.Parameters.AddWithValue("$station", request.Station);
+            insert.Parameters.AddWithValue("$station", request.Station ?? "");
+            insert.Parameters.AddWithValue("$stationId", request.StationId is null ? DBNull.Value : request.StationId);
+            insert.Parameters.AddWithValue("$stationName", request.StationName is null ? DBNull.Value : request.StationName);
             insert.Parameters.AddWithValue("$content", request.DocumentType);
             insert.Parameters.AddWithValue("$copies", request.Copies);
             insert.Parameters.AddWithValue("$createdAt", DateTimeOffset.UtcNow.ToString("O"));
@@ -254,7 +300,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, idempotency_key, printer_id, station, copies, status, error_code,
-                   bytes_written, created_at, completed_at
+                   bytes_written, created_at, completed_at, station_id, station_name, content
             FROM print_jobs WHERE id = $id LIMIT 1;
             """;
         command.Parameters.AddWithValue("$id", id);
@@ -284,6 +330,56 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         return (await GetPrintJobAsync(id))!;
     }
 
+    public async Task<IReadOnlyList<StoredPrintJob>> ListPrintJobsAsync(string? status, int limit)
+    {
+        var allowed = new HashSet<string>(
+            ["printing", "accepted", "failed", "rejected", "confirmation_required"],
+            StringComparer.Ordinal);
+        if (status is not null && !allowed.Contains(status))
+            throw new ArgumentException("PRINT_JOB_STATUS_INVALID", nameof(status));
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = status is null
+            ? """
+                SELECT id, idempotency_key, printer_id, station, copies, status, error_code,
+                       bytes_written, created_at, completed_at, station_id, station_name, content
+                FROM print_jobs ORDER BY created_at DESC LIMIT $limit;
+                """
+            : """
+                SELECT id, idempotency_key, printer_id, station, copies, status, error_code,
+                       bytes_written, created_at, completed_at, station_id, station_name, content
+                FROM print_jobs WHERE status = $status ORDER BY created_at DESC LIMIT $limit;
+                """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 500));
+        if (status is not null) command.Parameters.AddWithValue("$status", status);
+        var jobs = new List<StoredPrintJob>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) jobs.Add(ReadPrintJob(reader));
+        return jobs;
+    }
+
+    public async Task<PrintQueueSummary> GetPrintQueueSummaryAsync()
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT COUNT(1),
+                   SUM(CASE WHEN status = 'printing' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN status = 'confirmation_required' THEN 1 ELSE 0 END),
+                   SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END)
+            FROM print_jobs;
+            """;
+        await using var reader = await command.ExecuteReaderAsync();
+        await reader.ReadAsync();
+        return new(
+            reader.GetInt32(0),
+            reader.IsDBNull(1) ? 0 : reader.GetInt32(1),
+            reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+            reader.IsDBNull(3) ? 0 : reader.GetInt32(3));
+    }
+
     private static async Task<StoredPrintJob> ReadPrintJobByIdempotencyAsync(
         SqliteConnection connection,
         string idempotencyKey)
@@ -291,7 +387,7 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         var command = connection.CreateCommand();
         command.CommandText = """
             SELECT id, idempotency_key, printer_id, station, copies, status, error_code,
-                   bytes_written, created_at, completed_at
+                   bytes_written, created_at, completed_at, station_id, station_name, content
             FROM print_jobs WHERE idempotency_key = $idempotencyKey LIMIT 1;
             """;
         command.Parameters.AddWithValue("$idempotencyKey", idempotencyKey);
@@ -304,7 +400,328 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         reader.GetString(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
         reader.GetInt32(4), reader.GetString(5), reader.IsDBNull(6) ? null : reader.GetString(6),
         reader.GetInt32(7), DateTimeOffset.Parse(reader.GetString(8)),
-        reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9)));
+        reader.IsDBNull(9) ? null : DateTimeOffset.Parse(reader.GetString(9)),
+        reader.IsDBNull(10) ? null : reader.GetString(10),
+        reader.IsDBNull(11) ? null : reader.GetString(11),
+        reader.GetString(12));
+
+    public async Task<IReadOnlyList<Adapters.StoredPrinterConfiguration>> GetPrinterConfigurationsAsync(
+        bool includeArchived)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = includeArchived
+            ? $"{PrinterConfigurationSelect} ORDER BY archived_at IS NOT NULL, is_default DESC, id"
+            : $"{PrinterConfigurationSelect} WHERE archived_at IS NULL ORDER BY is_default DESC, id";
+        var configurations = new List<Adapters.StoredPrinterConfiguration>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) configurations.Add(ReadPrinterConfiguration(reader));
+        return configurations;
+    }
+
+    public async Task SeedPrinterConfigurationsAsync(
+        IReadOnlyList<Adapters.StoredPrinterConfiguration> configurations)
+    {
+        if (configurations.Count == 0) return;
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var count = connection.CreateCommand();
+            count.Transaction = transaction;
+            count.CommandText = "SELECT COUNT(1) FROM printer_configurations";
+            if (Convert.ToInt32(await count.ExecuteScalarAsync()) != 0)
+            {
+                await transaction.CommitAsync();
+                return;
+            }
+            foreach (var configuration in configurations)
+            {
+                await WritePrinterConfigurationAsync(connection, transaction, configuration);
+                await AppendPrinterConfigurationEventAsync(
+                    connection,
+                    transaction,
+                    configuration,
+                    "bootstrap");
+            }
+            await transaction.CommitAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<Adapters.StoredPrinterConfiguration> UpsertPrinterConfigurationAsync(
+        Adapters.StoredPrinterConfiguration configuration,
+        int? expectedRevision,
+        IReadOnlyCollection<string> previousDefaultIds)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var currentRevision = await ReadPrinterRevisionAsync(connection, transaction, configuration.Id);
+            if (expectedRevision is not null && currentRevision != expectedRevision)
+                throw new Adapters.PrinterConfigurationException("PRINTER_CONFIGURATION_REVISION_CONFLICT");
+            if (configuration.IsDefault)
+            {
+                var clearDefault = connection.CreateCommand();
+                clearDefault.Transaction = transaction;
+                if (previousDefaultIds.Count > 0)
+                {
+                    var parameters = previousDefaultIds
+                        .Select((_, index) => $"$previousDefault{index}")
+                        .ToArray();
+                    clearDefault.CommandText = $"""
+                        UPDATE printer_configurations SET is_default = 0
+                        WHERE archived_at IS NULL AND is_default = 1
+                          AND id IN ({string.Join(", ", parameters)});
+                        """;
+                    var index = 0;
+                    foreach (var previousDefaultId in previousDefaultIds)
+                    {
+                        clearDefault.Parameters.AddWithValue($"$previousDefault{index}", previousDefaultId);
+                        index += 1;
+                    }
+                    await clearDefault.ExecuteNonQueryAsync();
+                }
+            }
+            await WritePrinterConfigurationAsync(connection, transaction, configuration);
+            var defaultInvariant = connection.CreateCommand();
+            defaultInvariant.Transaction = transaction;
+            defaultInvariant.CommandText = """
+                SELECT COUNT(1), SUM(CASE WHEN is_default = 1 THEN 1 ELSE 0 END)
+                FROM printer_configurations WHERE archived_at IS NULL;
+                """;
+            await using (var reader = await defaultInvariant.ExecuteReaderAsync())
+            {
+                await reader.ReadAsync();
+                var activeCount = reader.GetInt32(0);
+                var defaultCount = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
+                if (activeCount > 0 && defaultCount != 1)
+                    throw new Adapters.PrinterConfigurationException("PRINTER_DEFAULT_INVARIANT_VIOLATION");
+            }
+            await AppendPrinterConfigurationEventAsync(connection, transaction, configuration, "upsert");
+            await transaction.CommitAsync();
+            return (await GetPrinterConfigurationAsync(configuration.Id))!;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    public async Task<Adapters.StoredPrinterConfiguration> ArchivePrinterConfigurationAsync(
+        string printerId,
+        int? expectedRevision,
+        int newRevision,
+        string updatedBy,
+        string source)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+            var currentRevision = await ReadPrinterRevisionAsync(connection, transaction, printerId);
+            if (currentRevision is null)
+                throw new Adapters.PrinterConfigurationException("PRINTER_CONFIGURATION_NOT_FOUND");
+            if (expectedRevision is not null && currentRevision != expectedRevision)
+                throw new Adapters.PrinterConfigurationException("PRINTER_CONFIGURATION_REVISION_CONFLICT");
+            var now = DateTimeOffset.UtcNow;
+            var update = connection.CreateCommand();
+            update.Transaction = transaction;
+            update.CommandText = """
+                UPDATE printer_configurations
+                SET archived_at = COALESCE(archived_at, $archivedAt), updated_at = $updatedAt, updated_by = $updatedBy,
+                    source = $source, revision = $revision, is_default = 0
+                WHERE id = $id;
+                """;
+            update.Parameters.AddWithValue("$archivedAt", now.ToString("O"));
+            update.Parameters.AddWithValue("$updatedAt", now.ToString("O"));
+            update.Parameters.AddWithValue("$updatedBy", updatedBy);
+            update.Parameters.AddWithValue("$source", source);
+            update.Parameters.AddWithValue("$revision", newRevision);
+            update.Parameters.AddWithValue("$id", printerId);
+            if (await update.ExecuteNonQueryAsync() != 1)
+                throw new Adapters.PrinterConfigurationException("PRINTER_CONFIGURATION_NOT_FOUND");
+            var archived = await ReadPrinterConfigurationAsync(connection, transaction, printerId)
+                ?? throw new Adapters.PrinterConfigurationException("PRINTER_CONFIGURATION_NOT_FOUND");
+            await AppendPrinterConfigurationEventAsync(connection, transaction, archived, "archive");
+            await transaction.CommitAsync();
+            return archived;
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private async Task<Adapters.StoredPrinterConfiguration?> GetPrinterConfigurationAsync(string printerId)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        return await ReadPrinterConfigurationAsync(connection, null, printerId);
+    }
+
+    private static async Task<int?> ReadPrinterRevisionAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string printerId)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT revision FROM printer_configurations WHERE id = $id";
+        command.Parameters.AddWithValue("$id", printerId);
+        var value = await command.ExecuteScalarAsync();
+        return value is null || value is DBNull ? null : Convert.ToInt32(value);
+    }
+
+    private static async Task<Adapters.StoredPrinterConfiguration?> ReadPrinterConfigurationAsync(
+        SqliteConnection connection,
+        SqliteTransaction? transaction,
+        string printerId)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = $"{PrinterConfigurationSelect} WHERE id = $id LIMIT 1";
+        command.Parameters.AddWithValue("$id", printerId);
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? ReadPrinterConfiguration(reader) : null;
+    }
+
+    private static async Task WritePrinterConfigurationAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Adapters.StoredPrinterConfiguration configuration)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO printer_configurations
+                (id, host, port, paper_width_mm, characters_per_line, code_table, cut,
+                 supports_raster_graphics, is_default, station_ids, document_types,
+                 legacy_station_names, fallback_printer_id, timeout_seconds, revision,
+                 created_at, updated_at, archived_at, updated_by, source)
+            VALUES
+                ($id, $host, $port, $paperWidthMm, $charactersPerLine, $codeTable, $cut,
+                 $supportsRasterGraphics, $isDefault, $stationIds, $documentTypes,
+                 $legacyStationNames, $fallbackPrinterId, $timeoutSeconds, $revision,
+                 $createdAt, $updatedAt, $archivedAt, $updatedBy, $source)
+            ON CONFLICT (id) DO UPDATE SET
+                host = excluded.host,
+                port = excluded.port,
+                paper_width_mm = excluded.paper_width_mm,
+                characters_per_line = excluded.characters_per_line,
+                code_table = excluded.code_table,
+                cut = excluded.cut,
+                supports_raster_graphics = excluded.supports_raster_graphics,
+                is_default = excluded.is_default,
+                station_ids = excluded.station_ids,
+                document_types = excluded.document_types,
+                legacy_station_names = excluded.legacy_station_names,
+                fallback_printer_id = excluded.fallback_printer_id,
+                timeout_seconds = excluded.timeout_seconds,
+                revision = excluded.revision,
+                updated_at = excluded.updated_at,
+                archived_at = excluded.archived_at,
+                updated_by = excluded.updated_by,
+                source = excluded.source;
+            """;
+        AddPrinterConfigurationParameters(command, configuration);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task AppendPrinterConfigurationEventAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Adapters.StoredPrinterConfiguration configuration,
+        string action)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = """
+            INSERT INTO printer_configuration_events
+                (id, printer_id, action, revision, snapshot, actor_id, source, occurred_at)
+            VALUES ($id, $printerId, $action, $revision, $snapshot, $actorId, $source, $occurredAt);
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$printerId", configuration.Id);
+        command.Parameters.AddWithValue("$action", action);
+        command.Parameters.AddWithValue("$revision", configuration.Revision);
+        command.Parameters.AddWithValue("$snapshot", JsonSerializer.Serialize(configuration));
+        command.Parameters.AddWithValue("$actorId", configuration.UpdatedBy);
+        command.Parameters.AddWithValue("$source", configuration.Source);
+        command.Parameters.AddWithValue("$occurredAt", DateTimeOffset.UtcNow.ToString("O"));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static void AddPrinterConfigurationParameters(
+        SqliteCommand command,
+        Adapters.StoredPrinterConfiguration configuration)
+    {
+        command.Parameters.AddWithValue("$id", configuration.Id);
+        command.Parameters.AddWithValue("$host", configuration.Host);
+        command.Parameters.AddWithValue("$port", configuration.Port);
+        command.Parameters.AddWithValue("$paperWidthMm", configuration.PaperWidthMm);
+        command.Parameters.AddWithValue("$charactersPerLine", configuration.CharactersPerLine);
+        command.Parameters.AddWithValue("$codeTable", configuration.CodeTable);
+        command.Parameters.AddWithValue("$cut", configuration.Cut ? 1 : 0);
+        command.Parameters.AddWithValue("$supportsRasterGraphics", configuration.SupportsRasterGraphics ? 1 : 0);
+        command.Parameters.AddWithValue("$isDefault", configuration.IsDefault ? 1 : 0);
+        command.Parameters.AddWithValue("$stationIds", JsonSerializer.Serialize(configuration.StationIds));
+        command.Parameters.AddWithValue("$documentTypes", JsonSerializer.Serialize(configuration.DocumentTypes));
+        command.Parameters.AddWithValue("$legacyStationNames", JsonSerializer.Serialize(configuration.LegacyStationNames));
+        command.Parameters.AddWithValue(
+            "$fallbackPrinterId",
+            configuration.FallbackPrinterId is null ? DBNull.Value : configuration.FallbackPrinterId);
+        command.Parameters.AddWithValue("$timeoutSeconds", configuration.TimeoutSeconds);
+        command.Parameters.AddWithValue("$revision", configuration.Revision);
+        command.Parameters.AddWithValue("$createdAt", configuration.CreatedAt.ToString("O"));
+        command.Parameters.AddWithValue("$updatedAt", configuration.UpdatedAt.ToString("O"));
+        command.Parameters.AddWithValue(
+            "$archivedAt",
+            configuration.ArchivedAt is null ? DBNull.Value : configuration.ArchivedAt.Value.ToString("O"));
+        command.Parameters.AddWithValue("$updatedBy", configuration.UpdatedBy);
+        command.Parameters.AddWithValue("$source", configuration.Source);
+    }
+
+    private static Adapters.StoredPrinterConfiguration ReadPrinterConfiguration(SqliteDataReader reader) => new(
+        reader.GetString(0),
+        reader.GetString(1),
+        reader.GetInt32(2),
+        reader.GetInt32(3),
+        reader.GetInt32(4),
+        reader.GetInt32(5),
+        reader.GetInt32(6) == 1,
+        reader.GetInt32(7) == 1,
+        reader.GetInt32(8) == 1,
+        JsonSerializer.Deserialize<string[]>(reader.GetString(9)) ?? [],
+        JsonSerializer.Deserialize<string[]>(reader.GetString(10)) ?? [],
+        JsonSerializer.Deserialize<string[]>(reader.GetString(11)) ?? [],
+        reader.IsDBNull(12) ? null : reader.GetString(12),
+        reader.GetInt32(13),
+        reader.GetInt32(14),
+        DateTimeOffset.Parse(reader.GetString(15)),
+        DateTimeOffset.Parse(reader.GetString(16)),
+        reader.IsDBNull(17) ? null : DateTimeOffset.Parse(reader.GetString(17)),
+        reader.GetString(18),
+        reader.GetString(19));
+
+    private const string PrinterConfigurationSelect = """
+        SELECT id, host, port, paper_width_mm, characters_per_line, code_table, cut,
+               supports_raster_graphics, is_default, station_ids, document_types,
+               legacy_station_names, fallback_printer_id, timeout_seconds, revision,
+               created_at, updated_at, archived_at, updated_by, source
+        FROM printer_configurations
+        """;
 
     public async Task<AcceptedCommand> AcceptCommandAsync(OperationalCommand command)
     {
@@ -1007,6 +1424,83 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
         return ids;
     }
 
+    public async Task<IReadOnlyList<JsonElement>> GetPendingCloudCommandResultsAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT result FROM inbound_cloud_commands
+            WHERE processed_at IS NOT NULL AND result IS NOT NULL AND cloud_acknowledged_at IS NULL
+              AND type IN ('print_job.execute', 'printer.configuration.upsert',
+                           'printer.configuration.archive', 'printer.test')
+            ORDER BY received_at
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+        var results = new List<JsonElement>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync()) results.Add(ParseElement(reader.GetString(0)));
+        return results;
+    }
+
+    public async Task<IReadOnlyList<CloudCommand>> GetPendingPrinterCloudCommandsAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT id, type, payload, created_at, expires_at
+            FROM inbound_cloud_commands
+            WHERE processed_at IS NULL AND cloud_acknowledged_at IS NULL
+              AND type IN ('print_job.execute', 'printer.configuration.upsert',
+                           'printer.configuration.archive', 'printer.test')
+            ORDER BY received_at, id
+            LIMIT $limit;
+            """;
+        command.Parameters.AddWithValue("$limit", Math.Clamp(limit, 1, 100));
+        var commands = new List<CloudCommand>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            commands.Add(new(
+                reader.GetString(0),
+                reader.GetString(1),
+                ParseElement(reader.GetString(2)),
+                DateTimeOffset.Parse(reader.GetString(3)),
+                DateTimeOffset.Parse(reader.GetString(4))));
+        }
+        return commands;
+    }
+
+    public async Task CompleteCloudCommandAsync(
+        string commandId,
+        JsonElement result,
+        string? errorCode = null)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = """
+                UPDATE inbound_cloud_commands
+                SET processed_at = $processedAt, result = $result, error = $error
+                WHERE id = $id AND processed_at IS NULL;
+                """;
+            command.Parameters.AddWithValue("$processedAt", DateTimeOffset.UtcNow.ToString("O"));
+            command.Parameters.AddWithValue("$result", result.GetRawText());
+            command.Parameters.AddWithValue("$error", errorCode is null ? DBNull.Value : errorCode);
+            command.Parameters.AddWithValue("$id", commandId);
+            await command.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     public async Task MarkCloudAcknowledgementsAsync(IReadOnlyList<string> commandIds)
     {
         if (commandIds.Count == 0) return;
@@ -1069,6 +1563,11 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             var processed = 0;
             foreach (var cloudCommand in pending)
             {
+                if (cloudCommand.Type is "print_job.execute" or "printer.configuration.upsert" or
+                    "printer.configuration.archive" or "printer.test")
+                {
+                    continue;
+                }
                 string? error = "CLOUD_COMMAND_UNSUPPORTED";
                 JsonObject? result = null;
                 if (cloudCommand.ExpiresAt <= DateTimeOffset.UtcNow)
@@ -1595,7 +2094,16 @@ public sealed record StoredPrintJob(
     string? ErrorCode,
     int BytesWritten,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    string? StationId = null,
+    string? StationName = null,
+    string DocumentType = "");
+
+public sealed record PrintQueueSummary(
+    int Total,
+    int Printing,
+    int ConfirmationRequired,
+    int Failed);
 
 public sealed record StoredFiscalOperation(
     string Id,

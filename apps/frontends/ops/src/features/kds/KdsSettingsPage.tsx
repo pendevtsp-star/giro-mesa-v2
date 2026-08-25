@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import { Badge, Button, Card, Input, NativeSelect } from "@giromesa/ui";
-import type { KdsAllDayItem, KdsData } from "../../operations.shared";
+import { type KdsAllDayItem, type KdsData, serviceModeLabel } from "../../operations.shared";
 import type { RealtimeStatus } from "../../realtime";
 import { type KdsAvailabilityChange, KdsAvailabilityPanel } from "./KdsAvailabilityPanel";
 import { KdsHardwareSettings, type KdsPrinterPreferences } from "./KdsHardwareSettings";
@@ -9,13 +9,6 @@ import type { KdsBumpBarMap } from "./kds.bumpbar";
 import type { KdsAnalytics } from "./kds.model";
 
 export type KdsDensity = "compact" | "comfortable";
-
-const SERVICE_MODE_LABEL: Record<NonNullable<KdsData["operationServiceMode"]>, string> = {
-  bar: "Bar",
-  full_service: "Serviço completo",
-  hybrid: "Híbrido",
-  quick_service: "Serviço rápido",
-};
 
 function numberLabel(value: number | null, suffix: string): string | null {
   return value === null ? null : `${value} ${suffix}`;
@@ -49,6 +42,7 @@ export function KdsSettingsPage({
   onLoadAnalytics,
   onPrint,
   onPrinterPreferencesChange,
+  onReprint,
   onSelectStation,
   onTestSound,
   onToggleFullscreen,
@@ -59,6 +53,8 @@ export function KdsSettingsPage({
   onViewModeChange,
   operatingDay,
   printerPreferences,
+  printerLabel,
+  printBusy,
   realtimeStatus,
   soundEnabled,
   stationId,
@@ -98,6 +94,7 @@ export function KdsSettingsPage({
   onLoadAnalytics: () => void;
   onPrint: () => void;
   onPrinterPreferencesChange: (preferences: KdsPrinterPreferences) => void;
+  onReprint: () => void;
   onSelectStation: (stationId: string) => void;
   onTestSound: () => Promise<boolean>;
   onToggleFullscreen: () => void;
@@ -108,6 +105,8 @@ export function KdsSettingsPage({
   onViewModeChange: (mode: "station" | "pass") => void;
   operatingDay: string;
   printerPreferences: KdsPrinterPreferences;
+  printerLabel: string;
+  printBusy: boolean;
   realtimeStatus: RealtimeStatus;
   soundEnabled: boolean;
   stationId: string;
@@ -121,10 +120,10 @@ export function KdsSettingsPage({
   cloudUnavailable: boolean;
 }) {
   const selectedStation = data.stations.find((station) => station.id === stationId);
-  const stationName = selectedStation?.name ?? "Todas as praças";
+  const stationName = selectedStation?.name ?? "Todas as estações";
   const stationIsSpecific = stationId !== "all" && selectedStation !== undefined;
   const serviceMode = data.operationServiceMode
-    ? SERVICE_MODE_LABEL[data.operationServiceMode]
+    ? serviceModeLabel(data.operationServiceMode)
     : "Não informado pelo servidor";
 
   return (
@@ -148,7 +147,7 @@ export function KdsSettingsPage({
                 Somente este terminal
               </span>
               <h2>Terminal</h2>
-              <p>Defina a praça, confira conexão e prepare este equipamento para o turno.</p>
+              <p>Defina a estação, confira conexão e prepare este equipamento para o turno.</p>
             </div>
             <Badge tone={connectionReady ? "success" : "warning"}>
               {connectionReady ? "Conectado" : "Requer atenção"}
@@ -175,7 +174,7 @@ export function KdsSettingsPage({
                   onClick={() => onViewModeChange("station")}
                   type="button"
                 >
-                  Praça
+                  Estação
                 </Button>
                 <Button
                   aria-pressed={viewMode === "pass"}
@@ -187,7 +186,7 @@ export function KdsSettingsPage({
               </div>
             </fieldset>
             <label className="gm-form-field" htmlFor="kds-settings-station">
-              <span>Praça deste terminal</span>
+              <span>Estação deste terminal</span>
               <NativeSelect
                 className="gm-form-control"
                 data-kds-station
@@ -196,7 +195,7 @@ export function KdsSettingsPage({
                 onChange={(event) => onSelectStation(event.target.value)}
                 value={stationId}
               >
-                <option value="all">Todas as praças</option>
+                <option value="all">Todas as estações</option>
                 {data.stations.map((station) => (
                   <option key={station.id} value={station.id}>
                     {station.name}
@@ -213,10 +212,10 @@ export function KdsSettingsPage({
                 size="sm"
                 variant={stationLocked ? "secondary" : "primary"}
               >
-                {stationLocked ? "Liberar praça" : "Fixar praça neste terminal"}
+                {stationLocked ? "Liberar estação" : "Fixar estação neste terminal"}
               </Button>
               {!stationLocked && !stationIsSpecific && (
-                <small>Escolha uma praça específica para fixar o terminal.</small>
+                <small>Escolha uma estação específica para fixar o terminal.</small>
               )}
             </div>
             <div className="kds-terminal-profile-state" role="status">
@@ -270,13 +269,13 @@ export function KdsSettingsPage({
           <header className="kds-settings-card__header">
             <div>
               <span className="gm-pill">Configuração da unidade</span>
-              <h2>Praças e roteamento</h2>
-              <p>Leitura das praças publicadas para esta unidade e da capacidade informada.</p>
+              <h2>Estações e roteamento</h2>
+              <p>Leitura das estações publicadas para esta unidade e da capacidade informada.</p>
             </div>
           </header>
 
           {data.stations.length === 0 ? (
-            <p className="kds-settings-empty">Nenhuma praça foi publicada pelo servidor.</p>
+            <p className="kds-settings-empty">Nenhuma estação foi publicada pelo servidor.</p>
           ) : (
             <ul className="kds-settings-stations">
               {data.stations.map((station) => {
@@ -322,13 +321,13 @@ export function KdsSettingsPage({
                   Configurar produtos no Cardápio
                 </a>
                 <small>
-                  Em “Praças de produção”, cada praça selecionada recebe o item e precisa
+                  Em “Estações de produção”, cada estação selecionada recebe o item e precisa
                   concluí-lo.
                 </small>
               </>
             ) : (
               <small>
-                Você pode consultar estas praças. Alterações de roteamento exigem permissão de
+                Você pode consultar estas estações. Alterações de roteamento exigem permissão de
                 gestão do Cardápio.
               </small>
             )}
@@ -340,7 +339,10 @@ export function KdsSettingsPage({
           hardwarePrinting={data.capabilities.hardwarePrinting}
           onBumpMapChange={onBumpMapChange}
           onPrinterPreferencesChange={onPrinterPreferencesChange}
+          onReprint={onReprint}
           onTestPrint={onPrint}
+          printBusy={printBusy}
+          printerLabel={printerLabel}
           printerPreferences={printerPreferences}
         />
 

@@ -16,6 +16,7 @@ import {
   outboxEvents,
   posOrderItems,
   posOrders,
+  posTabs,
 } from "@giromesa/db";
 import { and, eq, gt, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 
@@ -89,11 +90,15 @@ interface LockedBalance extends Record<string, unknown> {
   locationCode: string;
   locationId: string;
   quantity: string;
+  blockedQuantity: string;
+  reservedOtherQuantity: string;
   version: number;
 }
 
 interface BalanceState extends LockedBalance {
   originalMilli: bigint;
+  blockedMilli: bigint;
+  reservedOtherMilli: bigint;
   virtualMilli: bigint;
 }
 
@@ -201,7 +206,7 @@ export function parseItemCanceledPayload(payload: unknown): ItemCanceledPayload 
   return { approvalId, itemId, organizationId, reason, tabId, unitId };
 }
 
-function deterministicUuid(value: string) {
+export function deterministicUuid(value: string) {
   const bytes = createHash("sha256").update(value).digest().subarray(0, 16);
   bytes[6] = (bytes[6] ?? 0) & 0x0f;
   bytes[6] = (bytes[6] ?? 0) | 0x50;
@@ -332,8 +337,19 @@ export async function consumeOrderSentInventory(
         sentAt: posOrders.sentAt,
         status: posOrders.status,
         tabId: posOrders.tabId,
+        responsibleIdentityId: posTabs.responsibleIdentityId,
+        counterpartyName: posTabs.customerName,
+        promisedAt: posTabs.promisedAt,
       })
       .from(posOrders)
+      .innerJoin(
+        posTabs,
+        and(
+          eq(posTabs.organizationId, posOrders.organizationId),
+          eq(posTabs.unitId, posOrders.unitId),
+          eq(posTabs.id, posOrders.tabId),
+        ),
+      )
       .where(
         and(
           eq(posOrders.organizationId, request.organizationId),
@@ -583,6 +599,34 @@ export async function consumeOrderSentInventory(
                  location.code as "locationCode",
                  balance.quantity,
                  balance.average_cost_cents as "averageCostCents",
+                 coalesce((
+                   select sum(lot.quantity)
+                   from management_inventory_lots as lot
+                   inner join management_inventory_lot_holds as hold
+                     on hold.organization_id = lot.organization_id
+                    and hold.unit_id = lot.unit_id
+                    and hold.lot_id = lot.id
+                    and hold.status = 'active'
+                   where lot.organization_id = balance.organization_id
+                     and lot.unit_id = balance.unit_id
+                     and lot.location_id = balance.location_id
+                     and lot.inventory_item_id = balance.inventory_item_id
+                     and lot.active = true
+                 ), 0) as "blockedQuantity",
+                 coalesce((
+                   select sum(reservation.quantity)
+                   from management_inventory_reservations as reservation
+                   where reservation.organization_id = balance.organization_id
+                     and reservation.unit_id = balance.unit_id
+                     and reservation.location_id = balance.location_id
+                     and reservation.inventory_item_id = balance.inventory_item_id
+                     and reservation.status = 'active'
+                     and (reservation.expires_at is null or reservation.expires_at > now())
+                     and not (
+                       reservation.source_type = 'order'
+                       and reservation.source_id = ${request.orderId}
+                     )
+                 ), 0) as "reservedOtherQuantity",
                  balance.version
           from management_stock_balances as balance
           inner join management_stock_locations as location
@@ -602,7 +646,9 @@ export async function consumeOrderSentInventory(
           if (existing) return existing;
           const state = {
             ...row,
+            blockedMilli: quantityToMilli(row.blockedQuantity),
             originalMilli: quantityToMilli(row.quantity),
+            reservedOtherMilli: quantityToMilli(row.reservedOtherQuantity),
             virtualMilli: quantityToMilli(row.quantity),
           };
           balancesById.set(row.id, state);
@@ -634,10 +680,10 @@ export async function consumeOrderSentInventory(
         continue;
       }
 
-      const availableMilli = balances.reduce(
-        (total, balance) => total + (balance.virtualMilli > 0n ? balance.virtualMilli : 0n),
-        0n,
-      );
+      const availableMilli = balances.reduce((total, balance) => {
+        const available = balance.virtualMilli - balance.reservedOtherMilli - balance.blockedMilli;
+        return total + (available > 0n ? available : 0n);
+      }, 0n);
       if (!task.inventoryItem.allowNegative && availableMilli < task.requiredMilli) {
         blockingIssues.push({
           code: "INVENTORY_STOCK_INSUFFICIENT",
@@ -655,7 +701,8 @@ export async function consumeOrderSentInventory(
       let remainingMilli = task.requiredMilli;
       const allocations: Allocation[] = [];
       for (const balance of balances) {
-        const available = balance.virtualMilli > 0n ? balance.virtualMilli : 0n;
+        const spendable = balance.virtualMilli - balance.reservedOtherMilli - balance.blockedMilli;
+        const available = spendable > 0n ? spendable : 0n;
         const allocated = available < remainingMilli ? available : remainingMilli;
         addAllocation(allocations, balance, allocated);
         balance.virtualMilli -= allocated;
@@ -708,6 +755,14 @@ export async function consumeOrderSentInventory(
             and inventory_item_id = ${plan.task.inventoryItem.id}::uuid
             and active = true
             and quantity > 0
+            and not exists (
+              select 1
+              from management_inventory_lot_holds hold
+              where hold.organization_id = management_inventory_lots.organization_id
+                and hold.unit_id = management_inventory_lots.unit_id
+                and hold.lot_id = management_inventory_lots.id
+                and hold.status = 'active'
+            )
           order by expires_at asc nulls last, created_at, id
           for update
         `);
@@ -728,6 +783,22 @@ export async function consumeOrderSentInventory(
             .where(eq(managementInventoryLots.id, lot.id));
           consumedLotIds.push(lot.id);
           remainingLotMilli -= consumedMilli;
+        }
+        if (remainingLotMilli > 0n) {
+          const held = await tx.execute<{ id: string }>(sql`
+            select hold.id
+            from management_inventory_lot_holds hold
+            join management_inventory_lots lot on lot.organization_id = hold.organization_id
+              and lot.unit_id = hold.unit_id
+              and lot.id = hold.lot_id
+            where hold.organization_id = ${request.organizationId}::uuid
+              and hold.unit_id = ${request.unitId}::uuid
+              and hold.status = 'active'
+              and lot.location_id = ${allocation.balance.locationId}::uuid
+              and lot.inventory_item_id = ${plan.task.inventoryItem.id}::uuid
+            limit 1
+          `);
+          if (held.length) throw new InventoryConsumptionError("INVENTORY_STOCK_INSUFFICIENT");
         }
         const [movement] = await tx
           .insert(managementInventoryMovements)
@@ -911,6 +982,9 @@ export async function consumeOrderSentInventory(
               locationId: source.locationId,
               orderId: request.orderId,
               orderItemId: orderItem.id,
+              responsibleIdentityId: order.responsibleIdentityId,
+              counterpartyName: order.counterpartyName,
+              dueAt: order.promisedAt ?? new Date(order.sentAt.getTime() + 24 * 60 * 60_000),
               organizationId: request.organizationId,
               quantityDelta: milliToQuantity(
                 (quantityToMilli(mapping.quantityPerUnit) * source.soldQuantityMilli) / 1_000n,
@@ -1162,7 +1236,7 @@ export async function reverseCanceledOrderItemInventory(
     }
 
     const issuedReturnables = await tx
-      .select()
+      .select({ id: managementReturnableCustodyMovements.id })
       .from(managementReturnableCustodyMovements)
       .where(
         and(
@@ -1172,7 +1246,38 @@ export async function reverseCanceledOrderItemInventory(
           eq(managementReturnableCustodyMovements.sourceType, RETURNABLE_ISSUE_SOURCE_TYPE),
         ),
       );
-    for (const issued of issuedReturnables) {
+    for (const { id: issuedId } of issuedReturnables) {
+      await tx.execute(
+        sql`select id from management_returnable_custody_movements where organization_id=${request.organizationId}::uuid and unit_id=${request.unitId}::uuid and id=${issuedId}::uuid for update`,
+      );
+      const [issued] = await tx
+        .select()
+        .from(managementReturnableCustodyMovements)
+        .where(
+          and(
+            eq(managementReturnableCustodyMovements.organizationId, request.organizationId),
+            eq(managementReturnableCustodyMovements.unitId, request.unitId),
+            eq(managementReturnableCustodyMovements.id, issuedId),
+            eq(managementReturnableCustodyMovements.type, "issue"),
+          ),
+        )
+        .limit(1);
+      if (!issued) continue;
+      const [children] = await tx
+        .select({
+          quantityDelta: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
+        })
+        .from(managementReturnableCustodyMovements)
+        .where(
+          and(
+            eq(managementReturnableCustodyMovements.organizationId, request.organizationId),
+            eq(managementReturnableCustodyMovements.unitId, request.unitId),
+            eq(managementReturnableCustodyMovements.parentMovementId, issued.id),
+          ),
+        );
+      const openMilli =
+        quantityToMilli(issued.quantityDelta) + quantityToMilli(children?.quantityDelta ?? "0");
+      if (openMilli <= 0n) continue;
       const sourceId = deterministicUuid(`returnable-cancel:${issued.id}`);
       await tx
         .insert(managementReturnableCustodyMovements)
@@ -1190,8 +1295,12 @@ export async function reverseCanceledOrderItemInventory(
           locationId: issued.locationId,
           orderId: item.orderId,
           orderItemId: item.id,
+          parentMovementId: issued.id,
+          responsibleIdentityId: issued.responsibleIdentityId,
+          counterpartyName: issued.counterpartyName,
+          dueAt: issued.dueAt,
           organizationId: request.organizationId,
-          quantityDelta: milliToQuantity(-quantityToMilli(issued.quantityDelta)),
+          quantityDelta: milliToQuantity(-openMilli),
           sourceId,
           sourceType: RETURNABLE_CANCEL_SOURCE_TYPE,
           type: "correction",

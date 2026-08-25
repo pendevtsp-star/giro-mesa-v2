@@ -1,4 +1,14 @@
 import {
+  type CreateTableQrPrintBatchInput,
+  createTableQrPrintBatchSchema,
+  idempotencyKeySchema,
+  markTableQrPrintBatchPrintedSchema,
+  type TestTableQrUrlInput,
+  testTableQrUrlSchema,
+  type UpdateTableQrSettingsInput,
+  updateTableQrSettingsSchema,
+} from "@giromesa/contracts";
+import {
   type ArgumentsHost,
   Body,
   Catch,
@@ -17,6 +27,7 @@ import {
   UseFilters,
   UseGuards,
 } from "@nestjs/common";
+import { ApiHeader } from "@nestjs/swagger";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { PilotCatalogService } from "./pilot-catalog.service.js";
@@ -633,6 +644,16 @@ export class PilotCatalogController {
     return this.catalog.uploadMedia(request.auth.identityId, organizationId, unitId, body);
   }
 
+  @Delete("media/:key")
+  deleteMedia(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("key") key: string,
+  ) {
+    return this.catalog.deleteMedia(request.auth.identityId, organizationId, unitId, key);
+  }
+
   @Put("products/:productId/daily-stock")
   setDailyStock(
     @Req() request: AuthenticatedRequest,
@@ -659,13 +680,108 @@ export class PilotCatalogController {
     return this.catalog.listTableQr(request.auth.identityId, organizationId, unitId);
   }
 
+  @Get("tables/qr/settings")
+  tableQrSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.catalog.getTableQrSettings(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Put("tables/qr/settings")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  updateTableQrSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(updateTableQrSettingsSchema)) body: UpdateTableQrSettingsInput,
+  ) {
+    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
+    return this.catalog.updateTableQrSettings(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("tables/qr/lifecycle")
+  tableQrLifecycle(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.catalog.tableQrLifecycle(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("tables/qr/print-batches")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  createTableQrPrintBatch(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(createTableQrPrintBatchSchema)) body: CreateTableQrPrintBatchInput,
+  ) {
+    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
+    return this.catalog.createTableQrPrintBatch(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("tables/qr/print-batches/:batchId/printed")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  markTableQrPrintBatchPrinted(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("batchId", ParseUUIDPipe) batchId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(markTableQrPrintBatchPrintedSchema)) _body: Record<string, never>,
+  ) {
+    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
+    return this.catalog.markTableQrPrintBatchPrinted(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      batchId,
+      idempotencyKey,
+    );
+  }
+
+  @Post("tables/qr/test")
+  testTableQrUrl(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(testTableQrUrlSchema)) body: TestTableQrUrlInput,
+  ) {
+    return this.catalog.testTableQrUrl(request.auth.identityId, organizationId, unitId, body);
+  }
+
   @Post("tables/:tableId/qr/rotate")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
   rotateTableQr(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Param("unitId", ParseUUIDPipe) unitId: string,
     @Param("tableId", ParseUUIDPipe) tableId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
   ) {
-    return this.catalog.rotateTableQr(request.auth.identityId, organizationId, unitId, tableId);
+    const idempotencyKey = new ZodPipe(idempotencyKeySchema).transform(rawIdempotencyKey) as string;
+    return this.catalog.rotateTableQr(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      tableId,
+      idempotencyKey,
+    );
   }
 }

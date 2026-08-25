@@ -9,15 +9,23 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGro
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class TableGroupsPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class TableGroupsPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The anchorTableId property</summary>
         public Guid? AnchorTableId { get; set; }
         /// <summary>The mode property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_mode? Mode { get; set; }
+        /// <summary>The reasonCode property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_reasonCode? ReasonCode { get; set; }
+        /// <summary>The reasonNote property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ReasonNote { get; set; }
+#nullable restore
+#else
+        public string ReasonNote { get; set; }
+#endif
         /// <summary>The responsibleIdentityId property</summary>
         public Guid? ResponsibleIdentityId { get; set; }
         /// <summary>The tableIds property</summary>
@@ -30,13 +38,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGro
 #endif
         /// <summary>The targetTabId property</summary>
         public Guid? TargetTabId { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody"/> and sets the default values.
-        /// </summary>
-        public TableGroupsPostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -57,6 +58,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGro
             {
                 { "anchorTableId", n => { AnchorTableId = n.GetGuidValue(); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_mode>(); } },
+                { "reasonCode", n => { ReasonCode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_reasonCode>(); } },
+                { "reasonNote", n => { ReasonNote = n.GetStringValue(); } },
                 { "responsibleIdentityId", n => { ResponsibleIdentityId = n.GetGuidValue(); } },
                 { "tableIds", n => { TableIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "targetTabId", n => { TargetTabId = n.GetGuidValue(); } },
@@ -71,10 +74,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGro
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteGuidValue("anchorTableId", AnchorTableId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_mode>("mode", Mode);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.TableGroups.TableGroupsPostRequestBody_reasonCode>("reasonCode", ReasonCode);
+            writer.WriteStringValue("reasonNote", ReasonNote);
             writer.WriteGuidValue("responsibleIdentityId", ResponsibleIdentityId);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("tableIds", TableIds);
             writer.WriteGuidValue("targetTabId", TargetTabId);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

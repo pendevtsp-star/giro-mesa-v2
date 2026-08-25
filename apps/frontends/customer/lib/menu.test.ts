@@ -78,6 +78,7 @@ test("aceita branding e versão opcionais sem confiar em metadata desconhecida",
           displayName: "  Casa Giro  ",
           slogan: "  Feito na hora ",
           logoUrl: "javascript:alert(1)",
+          coverImageUrl: "https://cdn.example.test/cover.webp",
           primaryColor: "#123abc",
           accentColor: "#fedcba",
           timezone: "America/Sao_Paulo",
@@ -96,6 +97,7 @@ test("aceita branding e versão opcionais sem confiar em metadata desconhecida",
       branding: {
         displayName: "Casa Giro",
         slogan: "Feito na hora",
+        coverImageUrl: "https://cdn.example.test/cover.webp",
         primaryColor: "#123abc",
         accentColor: "#fedcba",
         timezone: "America/Sao_Paulo",
@@ -110,6 +112,16 @@ test("aceita branding e versão opcionais sem confiar em metadata desconhecida",
 
 test("só confirma comando após aceite explícito da operação", () => {
   assert.equal(isCommandAccepted({ acknowledged: true }), true);
+  assert.equal(
+    isCommandAccepted({
+      acknowledged: true,
+      callId: "00000000-0000-4000-8000-000000000001",
+      kind: "assistance",
+      status: "open",
+      duplicate: false,
+    }),
+    true,
+  );
   assert.equal(isCommandAccepted({ acknowledged: false }), false);
   assert.equal(isCommandAccepted({ accepted: true }), false);
 });
@@ -122,6 +134,10 @@ test("aceita somente o token opaco do QR no parâmetro mesa", () => {
   assert.equal(readTableAccessToken("?mesa=../segredo"), null);
   assert.equal(readTableAccessToken("?table=id&token=payload.signature"), "payload.signature");
   assert.equal(readTableAccessToken(`?mesa=${"a".repeat(1025)}.b`), null);
+  assert.equal(
+    readTableAccessToken("?mesa=legado.assinatura", "#mesa=novo.assinatura"),
+    "novo.assinatura",
+  );
 });
 
 test("aceita somente token público de opt-out dentro do contrato", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseImport } from "./InvoiceImportModal";
+import type { PurchaseInvoice, PurchaseOrder, PurchaseOrderItem } from "../../management.shared";
+import { compatiblePurchaseOrders, parseImport } from "./InvoiceImportModal";
 
 describe("revisão de NF-e", () => {
   it("preserva status de correspondência e valores retornados pelo backend", () => {
@@ -38,5 +39,50 @@ describe("revisão de NF-e", () => {
       totalCents: 2_000,
       factor: "12",
     });
+  });
+
+  it("oferece somente pedido aprovado com o saldo integral da NF-e", () => {
+    const draft = parseImport(
+      {
+        import: { id: "import-1", supplierId: "supplier-1" },
+        lines: [
+          {
+            id: "line-1",
+            status: "matched",
+            inventoryItemId: "item-1",
+            quantity: "2",
+            unitCostCents: 100,
+            totalCents: 200,
+          },
+        ],
+      },
+      "",
+    );
+    const orders = [
+      { id: "exact", status: "approved", supplierId: "supplier-1" },
+      { id: "partial", status: "approved", supplierId: "supplier-1" },
+    ] as PurchaseOrder[];
+    const items = [
+      {
+        id: "line-exact",
+        purchaseOrderId: "exact",
+        inventoryItemId: "item-1",
+        quantity: "2",
+        receivedQuantity: "0",
+      },
+      {
+        id: "line-partial",
+        purchaseOrderId: "partial",
+        inventoryItemId: "item-1",
+        quantity: "2",
+        receivedQuantity: "1",
+      },
+    ] as PurchaseOrderItem[];
+
+    expect(
+      compatiblePurchaseOrders(draft, "supplier-1", orders, items, [] as PurchaseInvoice[]).map(
+        (order) => order.id,
+      ),
+    ).toEqual(["exact"]);
   });
 });

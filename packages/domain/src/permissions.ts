@@ -23,6 +23,11 @@ export const OPERATIONAL_CAPABILITIES = [
   "operations:reception:manage",
   "operations:reception:seat",
   "operations:tables:turnover",
+  "operations:floor:manage",
+  "operations:shift:manage",
+  "operations:tables:reorganize",
+  "operations:printing:request",
+  "operations:printing:manage",
 ] as const;
 export type OperationalCapability = (typeof OPERATIONAL_CAPABILITIES)[number];
 
@@ -60,6 +65,7 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "fiscal:dashboard:read",
     "fiscal:documents:read",
     "fiscal:periods:read",
+    "accounting:exports:read",
     "accounting:requests:read",
     "accounting:requests:write",
   ],
@@ -72,6 +78,8 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "operations:exceptions:request",
     "operations:reception:manage",
     "operations:reception:seat",
+    "operations:tables:reorganize",
+    "operations:printing:request",
   ],
   cashier: [
     "cashier:write",
@@ -80,6 +88,9 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "fiscal:documents:read",
     "fiscal:documents:write",
     "operations:exceptions:request",
+    "operations:tables:reorganize",
+    "operations:printing:request",
+    "operations:printing:manage",
   ],
   receptionist: [
     "reservations:write",
@@ -88,7 +99,7 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "operations:reception:seat",
   ],
   busser: ["tables:read", "customer_calls:write", "operations:tables:turnover"],
-  kds: ["kds:write", "orders:read", "availability:write"],
+  kds: ["kds:write", "orders:read", "availability:write", "operations:printing:request"],
   delivery: ["orders:read", "orders:write"],
   inventory: [
     "inventory:write",

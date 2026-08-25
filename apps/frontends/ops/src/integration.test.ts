@@ -22,6 +22,107 @@ vi.stubGlobal("crypto", { randomUUID: () => "11111111-1111-4111-8111-11111111111
 beforeEach(() => storage.clear());
 
 describe("integração operacional", () => {
+  it("envia metadados e elementos da planta no payload atômico versionado", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ revision: 8 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await api.pilot.updateFloorLayout("org-1", "unit-1", {
+      expectedRevision: 7,
+      tables: [
+        {
+          tableId: "table-1",
+          roomId: "room-1",
+          label: "Mesa 1",
+          seats: 4,
+          x: 120,
+          y: 90,
+          width: 122,
+          height: 76,
+          rotation: 15,
+          shape: "rectangle",
+        },
+      ],
+      rooms: [{ roomId: "room-1", points: [{ x: 0, y: 0 }] }],
+      layoutElements: [
+        {
+          id: "barrier-1",
+          roomId: "room-1",
+          kind: "barrier",
+          x: 220,
+          y: 90,
+          width: 20,
+          height: 160,
+          rotation: 0,
+        },
+      ],
+    });
+
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toMatchObject({ expectedRevision: 7 });
+    expect(body).toHaveProperty("layoutElements");
+    expect(body).not.toHaveProperty("elements");
+    expect((body.tables as Array<Record<string, unknown>>)[0]).toMatchObject({
+      roomId: "room-1",
+      label: "Mesa 1",
+      seats: 4,
+    });
+  });
+
+  it("mantém a revisão otimista nas mutações de ambientes e mesas", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ floorRevision: 12, tables: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.pilot.createRoom("org-1", "unit-1", {
+      name: "Varanda",
+      sortOrder: 2,
+      expectedRevision: 9,
+    });
+    await api.pilot.createTables("org-1", "unit-1", "room-1", {
+      expectedRevision: 10,
+      tables: [
+        {
+          label: "Mesa 12",
+          seats: 4,
+          width: 122,
+          height: 76,
+          rotation: 0,
+          shape: "rectangle",
+        },
+      ],
+    });
+    await api.pilot.archiveTable("org-1", "unit-1", "table-1", 11);
+
+    const roomBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    const tablesBody = JSON.parse(String((fetchMock.mock.calls[1]?.[1] as RequestInit).body));
+    expect(roomBody).toEqual({ name: "Varanda", sortOrder: 2, expectedRevision: 9 });
+    expect(tablesBody).toEqual({
+      expectedRevision: 10,
+      tables: [
+        {
+          label: "Mesa 12",
+          seats: 4,
+          width: 122,
+          height: 76,
+          rotation: 0,
+          shape: "rectangle",
+        },
+      ],
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("expectedRevision=11");
+  });
+
   it("aceita apenas URL web para a segurança da conta", () => {
     expect(resolveSecurityUrl("https://conta.giromesa.com.br/app?return=unsafe#x")).toBe(
       "https://conta.giromesa.com.br/app/seguranca",
@@ -930,6 +1031,149 @@ describe("integração operacional", () => {
       expect.objectContaining({ credentials: "include" }),
     );
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("Authorization");
+  });
+
+  it("consulta tenants, detalhe, PII auditada e incidentes com filtros seguros", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ items: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.platform.tenants({
+      search: "Casa & Café",
+      status: "active",
+      cursor: "2",
+      limit: 25,
+    });
+    await api.platform.tenant("org/1");
+    await api.platform.revealTenantPii("org/1", "Suporte solicitado no chamado GM-42");
+    await api.platform.incidents({
+      search: "falha fiscal",
+      status: "open",
+      severity: "critical",
+      assignee: "22222222-2222-4222-8222-222222222222",
+      cursor: "3",
+      limit: 20,
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      "/v1/platform/tenants?search=Casa+%26+Caf%C3%A9&status=active&cursor=2&limit=25",
+    );
+    expect(fetchMock.mock.calls[1]?.[0]).toContain("/v1/platform/tenants/org%2F1");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining("/v1/platform/tenants/org%2F1/pii-access"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ reason: "Suporte solicitado no chamado GM-42" }),
+      }),
+    );
+    expect(fetchMock.mock.calls[3]?.[0]).toContain(
+      "/v1/platform/incidents?search=falha+fiscal&status=open&severity=critical&assignee=22222222-2222-4222-8222-222222222222&cursor=3&limit=20",
+    );
+  });
+
+  it("envia ações administrativas com motivo e chave idempotente", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.platform.updateIncident(
+      "outbox:event-1:3",
+      {
+        action: "snooze",
+        reason: "Aguardando retorno do provedor",
+        snoozedUntil: "2026-08-26T12:00:00.000Z",
+      },
+      "incident-action-1",
+    );
+    await api.platform.retryOutbox(
+      "33333333-3333-4333-8333-333333333333",
+      { reason: "Provedor recuperado e incidente conferido" },
+      "outbox-retry-1",
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining("/v1/platform/incidents/outbox%3Aevent-1%3A3"),
+      expect.objectContaining({
+        method: "PATCH",
+        headers: expect.objectContaining({ "idempotency-key": "incident-action-1" }),
+        body: JSON.stringify({
+          action: "snooze",
+          reason: "Aguardando retorno do provedor",
+          snoozedUntil: "2026-08-26T12:00:00.000Z",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("/v1/platform/outbox/33333333-3333-4333-8333-333333333333/retry"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "idempotency-key": "outbox-retry-1" }),
+        body: JSON.stringify({ reason: "Provedor recuperado e incidente conferido" }),
+      }),
+    );
+  });
+
+  it("usa contratos auditáveis do Comercial & Site", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await api.platform.commercialOverview();
+    await api.platform.commercialLeads({
+      search: "Casa Centro",
+      type: "trial",
+      stage: "qualified",
+      campaignSlug: "agosto-2026",
+      cursor: "2",
+      limit: 25,
+    });
+    await api.platform.updateCommercialLead("trial", "lead/1", {
+      reason: "Conversão validada pelo time comercial",
+      stage: "converted",
+      organizationId: "33333333-3333-4333-8333-333333333333",
+    });
+    await api.platform.uploadCommercialMedia({
+      fileName: "hero.webp",
+      mimeType: "image/webp",
+      base64: "UklGRg==",
+      alt: "Equipe atendendo no salão",
+      reason: "Atualização da imagem principal do site",
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/v1/platform/commercial/overview");
+    expect(fetchMock.mock.calls[1]?.[0]).toContain(
+      "/v1/platform/commercial/leads?search=Casa+Centro&type=trial&stage=qualified&campaignSlug=agosto-2026&cursor=2&limit=25",
+    );
+    expect(fetchMock.mock.calls[2]?.[0]).toContain("/v1/platform/commercial/leads/trial/lead%2F1");
+    expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({ method: "PATCH" }));
+    expect(fetchMock.mock.calls[3]?.[0]).toContain("/v1/platform/commercial/media");
+    expect(fetchMock.mock.calls[3]?.[1]).toEqual(
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"alt":"Equipe atendendo no salão"'),
+      }),
+    );
   });
 
   it("parses schedules and commissions returned by people", () => {

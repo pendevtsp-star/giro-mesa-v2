@@ -14,12 +14,21 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
     {
         /// <summary>The roomId property</summary>
         public Guid? RoomId { get; set; }
+        /// <summary>The rotation property</summary>
+        public int? Rotation { get; set; }
         /// <summary>The tableId property</summary>
         public Guid? TableId { get; set; }
         /// <summary>The x property</summary>
         public int? X { get; set; }
         /// <summary>The y property</summary>
         public int? Y { get; set; }
+        /// <summary>
+        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Layout.LayoutPutRequestBody_tables"/> and sets the default values.
+        /// </summary>
+        public LayoutPutRequestBody_tables()
+        {
+            Rotation = 0;
+        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -39,6 +48,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "roomId", n => { RoomId = n.GetGuidValue(); } },
+                { "rotation", n => { Rotation = n.GetIntValue(); } },
                 { "tableId", n => { TableId = n.GetGuidValue(); } },
                 { "x", n => { X = n.GetIntValue(); } },
                 { "y", n => { Y = n.GetIntValue(); } },
@@ -52,6 +62,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteGuidValue("roomId", RoomId);
+            writer.WriteIntValue("rotation", Rotation);
             writer.WriteGuidValue("tableId", TableId);
             writer.WriteIntValue("x", X);
             writer.WriteIntValue("y", Y);

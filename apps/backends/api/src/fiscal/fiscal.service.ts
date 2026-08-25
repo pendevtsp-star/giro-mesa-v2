@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   accountantRequests,
   accountingExports,
@@ -12,6 +12,7 @@ import {
   fiscalPeriods,
   fiscalProfiles,
   fiscalWebhookReceipts,
+  identities,
   legalEntities,
   outboxEvents,
   posOrderItems,
@@ -41,10 +42,15 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import {
+  accountantAttachmentRetentionUntil,
+  scanAccountantAttachment,
+} from "./accountant-attachment-security.js";
 import type {
+  AccountantAttachmentUploadInput,
   AccountantRequestInput,
   AccountantRequestListQuery,
   CancelFiscalDocumentInput,
@@ -102,6 +108,159 @@ export function competenceBounds(competence: string) {
   const from = new Date(Date.UTC(year as number, (month as number) - 1, 1));
   const to = new Date(Date.UTC(year as number, month as number, 1));
   return { competenceDate: from.toISOString().slice(0, 10), from, to };
+}
+
+type FiscalDocumentStatus = typeof fiscalDocuments.$inferSelect.status;
+
+export function nextFiscalDocumentStatus(
+  current: FiscalDocumentStatus,
+  incoming: FiscalDocumentStatus,
+  action?: "reconciled" | "cancel_result",
+): FiscalDocumentStatus {
+  if (current === "canceled") return current;
+  if (current === "authorized") return incoming === "canceled" ? incoming : current;
+  if (action === "cancel_result" && incoming === "rejected") return current;
+  return incoming;
+}
+
+export function competenceDateAt(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-01`;
+}
+
+const fiscalPeriodLockKey = (organizationId: string, unitId: string, competenceDate: string) =>
+  `fiscal-period:${organizationId}:${unitId}:${competenceDate}`;
+
+export function assertFiscalRuntimeEnvironment(
+  environment: "homologation" | "production",
+  releaseEnvironment = process.env.FISCAL_RELEASE_ENV,
+) {
+  if (environment === "production" && releaseEnvironment !== "production") {
+    throw new ServiceUnavailableException({
+      code: "FISCAL_PRODUCTION_RELEASE_BLOCKED",
+      message: "A emissão em produção ainda não foi liberada pelo GiroMesa.",
+    });
+  }
+}
+
+function publicAccountantRequest(
+  row: typeof accountantRequests.$inferSelect,
+  names: ReadonlyMap<string, string> = new Map(),
+) {
+  const attachments = Array.isArray(row.attachments)
+    ? row.attachments.filter(
+        (attachment) =>
+          attachment &&
+          !attachment.deletedAt &&
+          typeof attachment.id === "string" &&
+          typeof attachment.fileName === "string" &&
+          typeof attachment.contentType === "string" &&
+          typeof attachment.sizeBytes === "number" &&
+          typeof attachment.sha256 === "string" &&
+          typeof attachment.storageKey === "string" &&
+          typeof attachment.createdAt === "string",
+      )
+    : [];
+  return {
+    id: row.id,
+    competence: row.competence,
+    title: row.title,
+    description: row.description,
+    status: row.status,
+    targetAudience: row.targetAudience,
+    dueDate: row.dueDate,
+    resolution: row.resolution,
+    createdByName: names.get(row.createdByIdentityId) ?? "Equipe da empresa",
+    resolvedByName: row.resolvedByIdentityId
+      ? (names.get(row.resolvedByIdentityId) ?? "Equipe da empresa")
+      : null,
+    createdAt: row.createdAt,
+    resolvedAt: row.resolvedAt,
+    updatedAt: row.updatedAt,
+    attachments: attachments.map((attachment) => ({
+      id: attachment.id,
+      fileName: attachment.fileName,
+      contentType: attachment.contentType,
+      sizeBytes: attachment.sizeBytes,
+      sha256: attachment.sha256,
+      createdAt: attachment.createdAt,
+    })),
+  };
+}
+
+export function localDateAt(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${value.year}-${value.month}-${value.day}`;
+}
+
+export function accountantActorAudience(
+  bindings: readonly { role: string; unitId: string | null }[],
+  unitId: string,
+): "accountant" | "establishment" {
+  return bindings.some(
+    (binding) =>
+      binding.role === "accountant" && (binding.unitId === null || binding.unitId === unitId),
+  )
+    ? "accountant"
+    : "establishment";
+}
+
+const accountantAttachmentContentTypes = {
+  "application/pdf": [".pdf", "pdf"],
+  "application/xml": [".xml", "xml"],
+  "text/xml": [".xml", "xml"],
+  "text/csv": [".csv", "zip"],
+  "image/jpeg": [".jpg", "zip"],
+  "image/png": [".png", "zip"],
+} as const;
+
+export function decodeAccountantAttachment(input: AccountantAttachmentUploadInput) {
+  const content = Buffer.from(input.contentBase64, "base64");
+  if (content.length === 0 || content.length > 3 * 1024 * 1024) {
+    throw new ConflictException({
+      code: "ACCOUNTANT_ATTACHMENT_SIZE_INVALID",
+      message: "O anexo deve ter no máximo 3 MiB.",
+    });
+  }
+  const [requiredExtension, storageExtension] = accountantAttachmentContentTypes[input.contentType];
+  const lowerName = input.fileName.toLowerCase();
+  const validJpegName = input.contentType === "image/jpeg" && lowerName.endsWith(".jpeg");
+  if (!lowerName.endsWith(requiredExtension) && !validJpegName) {
+    throw new ConflictException({
+      code: "ACCOUNTANT_ATTACHMENT_EXTENSION_INVALID",
+      message: "A extensão do arquivo não corresponde ao tipo informado.",
+    });
+  }
+  if (input.contentType === "application/pdf") validateFiscalArtifact("danfe_pdf", content);
+  if (input.contentType === "application/xml" || input.contentType === "text/xml")
+    validateFiscalArtifact("authorization_xml", content);
+  if (input.contentType === "text/csv") {
+    const csv = content.toString("utf8");
+    if (csv.includes("\0") || csv.includes("\ufffd"))
+      throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_SIGNATURE_INVALID" });
+  }
+  if (
+    input.contentType === "image/jpeg" &&
+    !(content[0] === 0xff && content[1] === 0xd8 && content[2] === 0xff)
+  )
+    throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_SIGNATURE_INVALID" });
+  if (
+    input.contentType === "image/png" &&
+    !content.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  )
+    throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_SIGNATURE_INVALID" });
+  return { content, storageExtension };
 }
 
 export function buildAccountingPackage(
@@ -372,6 +531,7 @@ export class FiscalService {
         message: "Ação fiscal não autorizada nesta unidade.",
       });
     }
+    return bindings;
   }
 
   async profile(identityId: string, organizationId: string, unitId: string) {
@@ -420,6 +580,7 @@ export class FiscalService {
     input: FiscalProfileInput,
   ) {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
+    assertFiscalRuntimeEnvironment(input.environment);
     return this.database.db.transaction(async (tx) => {
       const [legalEntity] = await tx
         .select({ id: legalEntities.id })
@@ -808,11 +969,11 @@ export class FiscalService {
     setup: Awaited<ReturnType<FiscalService["focusSetup"]>>,
     input: FocusCompanyOnboardingInput,
   ) {
-    if (!/^\d{14}$/.test(setup.legalEntity.document)) {
+    assertFiscalRuntimeEnvironment(setup.profile.environment);
+    if (!/^[A-Z\d]{12}\d{2}$/i.test(setup.legalEntity.document)) {
       throw new ConflictException({
-        code: "FOCUS_CNPJ_UNSUPPORTED",
-        message:
-          "A API de empresas da Focus NFe exige, neste momento, CNPJ numérico com 14 dígitos.",
+        code: "FISCAL_CNPJ_INVALID",
+        message: "Informe um CNPJ válido com 14 caracteres.",
       });
     }
     if (input.enableNfce) {
@@ -857,6 +1018,9 @@ export class FiscalService {
   ) {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:configuration:write");
     return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`tax:${organizationId}:${unitId}:${input.productId}`}, 0))`,
+      );
       const [product] = await tx
         .select({ id: posProducts.id })
         .from(posProducts)
@@ -891,6 +1055,23 @@ export class FiscalService {
               eq(productTaxRevisions.unitId, unitId),
               eq(productTaxRevisions.productId, product.id),
               eq(productTaxRevisions.status, "active"),
+              sql`${productTaxRevisions.effectiveFrom} >= ${input.effectiveFrom}::date`,
+            ),
+          );
+        await tx
+          .update(productTaxRevisions)
+          .set({
+            effectiveUntil: sql`(${input.effectiveFrom}::date - interval '1 day')::date`,
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(productTaxRevisions.organizationId, organizationId),
+              eq(productTaxRevisions.unitId, unitId),
+              eq(productTaxRevisions.productId, product.id),
+              eq(productTaxRevisions.status, "active"),
+              sql`${productTaxRevisions.effectiveFrom} < ${input.effectiveFrom}::date`,
+              sql`(${productTaxRevisions.effectiveUntil} is null or ${productTaxRevisions.effectiveUntil} >= ${input.effectiveFrom}::date)`,
             ),
           );
       }
@@ -1014,6 +1195,23 @@ export class FiscalService {
                 eq(productTaxRevisions.unitId, unitId),
                 eq(productTaxRevisions.productId, productId),
                 eq(productTaxRevisions.status, "active"),
+                sql`${productTaxRevisions.effectiveFrom} >= ${row.effectiveFrom}::date`,
+              ),
+            );
+          await tx
+            .update(productTaxRevisions)
+            .set({
+              effectiveUntil: sql`(${row.effectiveFrom}::date - interval '1 day')::date`,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(productTaxRevisions.organizationId, organizationId),
+                eq(productTaxRevisions.unitId, unitId),
+                eq(productTaxRevisions.productId, productId),
+                eq(productTaxRevisions.status, "active"),
+                sql`${productTaxRevisions.effectiveFrom} < ${row.effectiveFrom}::date`,
+                sql`(${productTaxRevisions.effectiveUntil} is null or ${productTaxRevisions.effectiveUntil} >= ${row.effectiveFrom}::date)`,
               ),
             );
         }
@@ -1068,8 +1266,19 @@ export class FiscalService {
     const { organizationId, unitId } = hub;
     return this.database.db.transaction(async (tx) => {
       const [profile] = await tx
-        .select({ environment: fiscalProfiles.environment, provider: fiscalProfiles.provider })
+        .select({
+          environment: fiscalProfiles.environment,
+          provider: fiscalProfiles.provider,
+          timezone: units.timezone,
+        })
         .from(fiscalProfiles)
+        .innerJoin(
+          units,
+          and(
+            eq(units.organizationId, fiscalProfiles.organizationId),
+            eq(units.id, fiscalProfiles.unitId),
+          ),
+        )
         .where(
           and(eq(fiscalProfiles.organizationId, organizationId), eq(fiscalProfiles.unitId, unitId)),
         )
@@ -1141,6 +1350,29 @@ export class FiscalService {
         .orderBy(desc(fiscalDocuments.createdAt))
         .limit(1);
 
+      const competenceDate = competenceDateAt(existing?.issuedAt ?? occurredAt, profile.timezone);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${fiscalPeriodLockKey(organizationId, unitId, competenceDate)}, 0))`,
+      );
+      const [closedPeriod] = await tx
+        .select({ id: fiscalPeriods.id })
+        .from(fiscalPeriods)
+        .where(
+          and(
+            eq(fiscalPeriods.organizationId, organizationId),
+            eq(fiscalPeriods.unitId, unitId),
+            eq(fiscalPeriods.competence, competenceDate),
+            eq(fiscalPeriods.status, "closed"),
+          ),
+        )
+        .limit(1);
+      if (closedPeriod) {
+        throw new ConflictException({
+          code: "FISCAL_PERIOD_CLOSED",
+          message: "Reabra a competência antes de alterar documentos fiscais.",
+        });
+      }
+
       let document = existing;
       const accessKey = /^\d{44}$/.test(parsed.payload.providerReference ?? "")
         ? parsed.payload.providerReference
@@ -1153,7 +1385,7 @@ export class FiscalService {
           });
         }
         const [order] = await tx
-          .select({ id: posOrders.id })
+          .select({ id: posOrders.id, tabId: posOrders.tabId })
           .from(posOrders)
           .where(
             and(
@@ -1220,6 +1452,7 @@ export class FiscalService {
           .values({
             organizationId,
             unitId,
+            tabId: order.tabId,
             orderId: order.id,
             model: "nfce",
             environment: profile.environment,
@@ -1268,24 +1501,32 @@ export class FiscalService {
         const cancelRejected =
           parsed.payload.kind === "fiscal.document.cancel_result" &&
           parsed.payload.status === "rejected";
-        const nextStatus = cancelAccepted
+        const reportedStatus = cancelAccepted
           ? "canceled"
           : cancelRejected
             ? document.status
             : parsed.payload.status;
+        const nextStatus = nextFiscalDocumentStatus(
+          document.status,
+          reportedStatus,
+          parsed.payload.kind === "fiscal.document.cancel_result" ? "cancel_result" : "reconciled",
+        );
+        const accepted = nextStatus === reportedStatus;
         const [updated] = await tx
           .update(fiscalDocuments)
           .set({
             status: nextStatus,
-            providerReference: parsed.payload.providerReference ?? document.providerReference,
-            accessKey: accessKey ?? document.accessKey,
+            providerReference: accepted
+              ? (parsed.payload.providerReference ?? document.providerReference)
+              : document.providerReference,
+            accessKey: accepted ? (accessKey ?? document.accessKey) : document.accessKey,
             authorizedAt:
               nextStatus === "authorized"
                 ? (document.authorizedAt ?? occurredAt)
                 : document.authorizedAt,
             canceledAt:
               nextStatus === "canceled" ? (document.canceledAt ?? occurredAt) : document.canceledAt,
-            updatedAt: occurredAt,
+            updatedAt: new Date(),
           })
           .where(eq(fiscalDocuments.id, document.id))
           .returning();
@@ -1327,7 +1568,13 @@ export class FiscalService {
   }
 
   async dashboard(identityId: string, organizationId: string, unitId: string) {
-    await this.requirePermission(identityId, organizationId, unitId, "fiscal:dashboard:read");
+    const bindings = await this.requirePermission(
+      identityId,
+      organizationId,
+      unitId,
+      "fiscal:dashboard:read",
+    );
+    const requestAudience = accountantActorAudience(bindings, unitId);
     const scope = and(
       eq(fiscalDocuments.organizationId, organizationId),
       eq(fiscalDocuments.unitId, unitId),
@@ -1377,6 +1624,7 @@ export class FiscalService {
               eq(accountantRequests.organizationId, organizationId),
               eq(accountantRequests.unitId, unitId),
               eq(accountantRequests.status, "open"),
+              eq(accountantRequests.targetAudience, requestAudience),
             ),
           ),
         this.database.db
@@ -1617,6 +1865,7 @@ export class FiscalService {
   ) {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:documents:read");
     const context = await this.focusDocumentContext(organizationId, unitId, documentId);
+    await this.assertFiscalDocumentPeriodOpen(organizationId, unitId, context.document.issuedAt);
     try {
       const result = await this.focus.document(
         context.document.model,
@@ -1657,6 +1906,7 @@ export class FiscalService {
         message: "Somente um documento autorizado pode ser cancelado.",
       });
     }
+    await this.assertFiscalDocumentPeriodOpen(organizationId, unitId, context.document.issuedAt);
     try {
       const result = await this.focus.cancelDocument(
         context.document.model,
@@ -1948,6 +2198,7 @@ export class FiscalService {
     organizationId: string,
     unitId: string,
   ) {
+    assertFiscalRuntimeEnvironment(environment);
     const connection = settingsOf(value).focus;
     const envelope =
       environment === "production" ? connection?.tokenProduction : connection?.tokenHomologation;
@@ -1964,6 +2215,43 @@ export class FiscalService {
     return decryptSecret(envelope, key, `focus:${organizationId}:${unitId}:${environment}`);
   }
 
+  private async assertFiscalDocumentPeriodOpen(
+    organizationId: string,
+    unitId: string,
+    issuedAt: Date,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      const [unit] = await tx
+        .select({ timezone: units.timezone })
+        .from(units)
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1);
+      if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+      const competenceDate = competenceDateAt(issuedAt, unit.timezone);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${fiscalPeriodLockKey(organizationId, unitId, competenceDate)}, 0))`,
+      );
+      const [closed] = await tx
+        .select({ id: fiscalPeriods.id })
+        .from(fiscalPeriods)
+        .where(
+          and(
+            eq(fiscalPeriods.organizationId, organizationId),
+            eq(fiscalPeriods.unitId, unitId),
+            eq(fiscalPeriods.competence, competenceDate),
+            eq(fiscalPeriods.status, "closed"),
+          ),
+        )
+        .limit(1);
+      if (closed) {
+        throw new ConflictException({
+          code: "FISCAL_PERIOD_CLOSED",
+          message: "Reabra a competência antes de alterar documentos fiscais.",
+        });
+      }
+    });
+  }
+
   private async persistFocusDocumentResult(
     identityId: string,
     document: typeof fiscalDocuments.$inferSelect,
@@ -1973,18 +2261,55 @@ export class FiscalService {
   ) {
     const now = new Date();
     return this.database.db.transaction(async (tx) => {
+      const [unit] = await tx
+        .select({ timezone: units.timezone })
+        .from(units)
+        .where(
+          and(eq(units.organizationId, document.organizationId), eq(units.id, document.unitId)),
+        )
+        .limit(1);
+      if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+      const competenceDate = competenceDateAt(document.issuedAt, unit.timezone);
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${fiscalPeriodLockKey(document.organizationId, document.unitId, competenceDate)}, 0))`,
+      );
+      const [closed] = await tx
+        .select({ id: fiscalPeriods.id })
+        .from(fiscalPeriods)
+        .where(
+          and(
+            eq(fiscalPeriods.organizationId, document.organizationId),
+            eq(fiscalPeriods.unitId, document.unitId),
+            eq(fiscalPeriods.competence, competenceDate),
+            eq(fiscalPeriods.status, "closed"),
+          ),
+        )
+        .limit(1);
+      if (closed) {
+        throw new ConflictException({
+          code: "FISCAL_PERIOD_CLOSED",
+          message: "Reabra a competência antes de alterar documentos fiscais.",
+        });
+      }
+      const [current] = await tx
+        .select()
+        .from(fiscalDocuments)
+        .where(eq(fiscalDocuments.id, document.id))
+        .limit(1)
+        .for("update");
+      if (!current) throw new NotFoundException({ code: "FISCAL_DOCUMENT_NOT_FOUND" });
+      const nextStatus = nextFiscalDocumentStatus(current.status, result.status, action);
       const [updated] = await tx
         .update(fiscalDocuments)
         .set({
-          status: result.status,
-          accessKey: result.accessKey ?? document.accessKey,
-          number: result.number ?? document.number,
-          series: result.series ?? document.series,
-          taxCents: result.taxCents ?? document.taxCents,
+          status: nextStatus,
+          accessKey: result.accessKey ?? current.accessKey,
+          number: result.number ?? current.number,
+          series: result.series ?? current.series,
+          taxCents: result.taxCents ?? current.taxCents,
           authorizedAt:
-            result.status === "authorized" ? (document.authorizedAt ?? now) : document.authorizedAt,
-          canceledAt:
-            result.status === "canceled" ? (document.canceledAt ?? now) : document.canceledAt,
+            nextStatus === "authorized" ? (current.authorizedAt ?? now) : current.authorizedAt,
+          canceledAt: nextStatus === "canceled" ? (current.canceledAt ?? now) : current.canceledAt,
           updatedAt: now,
         })
         .where(eq(fiscalDocuments.id, document.id))
@@ -2010,7 +2335,7 @@ export class FiscalService {
           documentId: document.id,
           providerEventId: `focus:${document.id}:${eventFingerprint}`,
           type: `fiscal.document.${action}`,
-          status: result.status,
+          status: nextStatus,
           code: result.code,
           message: result.message,
           payload: {
@@ -2023,7 +2348,10 @@ export class FiscalService {
           occurredAt: now,
         })
         .onConflictDoNothing();
-      for (const [index, taxCents] of result.itemTaxCents.entries()) {
+      for (const [index, taxCents] of (nextStatus === result.status
+        ? result.itemTaxCents
+        : []
+      ).entries()) {
         await tx
           .update(fiscalDocumentItems)
           .set({ taxCents })
@@ -2034,7 +2362,7 @@ export class FiscalService {
             ),
           );
       }
-      if ((result.status === "authorized" || result.status === "canceled") && result.xmlUrl) {
+      if ((nextStatus === "authorized" || nextStatus === "canceled") && result.xmlUrl) {
         await tx.insert(outboxEvents).values({
           topic: "fiscal.document.artifacts_requested",
           aggregateType: "fiscal_document",
@@ -2042,7 +2370,7 @@ export class FiscalService {
           payload: {
             organizationId: document.organizationId,
             unitId: document.unitId,
-            status: result.status,
+            status: nextStatus,
             xmlUrl: result.xmlUrl,
             pdfUrl: result.pdfUrl,
           },
@@ -2055,7 +2383,7 @@ export class FiscalService {
         action: `fiscal.document.${action}`,
         entityType: "fiscal_document",
         entityId: document.id,
-        metadata: { status: result.status, ...auditMetadata },
+        metadata: { status: nextStatus, reportedStatus: result.status, ...auditMetadata },
       });
       return {
         document: updated,
@@ -2146,6 +2474,9 @@ export class FiscalService {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:periods:write");
     const { competenceDate } = competenceBounds(competence);
     return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${fiscalPeriodLockKey(organizationId, unitId, competenceDate)}, 0))`,
+      );
       await tx
         .insert(fiscalPeriods)
         .values({ organizationId, unitId, competence: competenceDate })
@@ -2341,6 +2672,9 @@ export class FiscalService {
     await this.requirePermission(identityId, organizationId, unitId, "fiscal:periods:reopen");
     const { competenceDate } = competenceBounds(competence);
     return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${fiscalPeriodLockKey(organizationId, unitId, competenceDate)}, 0))`,
+      );
       const [period] = await tx
         .select()
         .from(fiscalPeriods)
@@ -2380,6 +2714,10 @@ export class FiscalService {
           .limit(1);
         return { period: current, replayed: true };
       }
+      await tx
+        .update(accountingExports)
+        .set({ status: "pending", error: null, updatedAt: reopenedAt })
+        .where(eq(accountingExports.periodId, period.id));
       await tx.insert(auditEvents).values({
         organizationId,
         unitId,
@@ -2408,7 +2746,12 @@ export class FiscalService {
     await this.requirePermission(identityId, organizationId, unitId, "accounting:exports:read");
     const { competenceDate } = competenceBounds(competence);
     const [result] = await this.database.db
-      .select({ period: fiscalPeriods, accountingPackage: accountingExports })
+      .select({
+        closedAt: fiscalPeriods.closedAt,
+        generatedAt: accountingExports.generatedAt,
+        sha256: accountingExports.sha256,
+        payload: accountingExports.payload,
+      })
       .from(fiscalPeriods)
       .innerJoin(accountingExports, eq(accountingExports.periodId, fiscalPeriods.id))
       .where(
@@ -2429,7 +2772,23 @@ export class FiscalService {
         reason: "period_not_closed" as const,
       };
     }
-    return { status: "available" as const, competence, ...result };
+    const totals =
+      result.payload && typeof result.payload.totals === "object" && result.payload.totals
+        ? result.payload.totals
+        : {};
+    return {
+      status: "available" as const,
+      competence,
+      closedAt: result.closedAt,
+      generatedAt: result.generatedAt,
+      sha256: result.sha256,
+      summary: {
+        documents: Number("documents" in totals ? totals.documents : 0),
+        totalCents: Number("totalCents" in totals ? totals.totalCents : 0),
+        taxCents: Number("taxCents" in totals ? totals.taxCents : 0),
+      },
+      files: ["manifesto.json", "documentos.csv", "XMLs e DANFEs disponíveis"],
+    };
   }
 
   async accountantPackageContent(
@@ -2477,9 +2836,46 @@ export class FiscalService {
         message: "Feche a competência antes de baixar o pacote contábil.",
       });
     }
+    const [existingZip] = await this.database.db
+      .select({ storageKey: accountingExports.storageKey, sha256: accountingExports.sha256 })
+      .from(accountingExports)
+      .where(
+        and(
+          eq(accountingExports.periodId, context.period.id),
+          eq(accountingExports.format, "zip"),
+          eq(accountingExports.status, "ready"),
+        ),
+      )
+      .limit(1);
+    if (existingZip?.storageKey) {
+      const content = await readFiscalArtifact(
+        process.env.MEDIA_ROOT,
+        existingZip.storageKey,
+      ).catch(() => {
+        throw new ConflictException({
+          code: "ACCOUNTING_PACKAGE_ARTIFACT_MISSING",
+          message: "O pacote armazenado não está disponível. Solicite suporte do GiroMesa.",
+        });
+      });
+      const sha256 = createHash("sha256").update(content).digest("hex");
+      if (existingZip.sha256 !== sha256) {
+        throw new ConflictException({
+          code: "ACCOUNTING_PACKAGE_INTEGRITY_FAILED",
+          message: "A integridade do pacote armazenado não pôde ser confirmada.",
+        });
+      }
+      return {
+        filename: `pacote-contabil-${competence}.zip`,
+        content: content.toString("base64"),
+        contentEncoding: "base64" as const,
+        mimeType: "application/zip",
+        sha256,
+      };
+    }
     const documents = await this.database.db
       .select({
         id: fiscalDocuments.id,
+        model: fiscalDocuments.model,
         status: fiscalDocuments.status,
         accessKey: fiscalDocuments.accessKey,
         series: fiscalDocuments.series,
@@ -2487,6 +2883,7 @@ export class FiscalService {
         totalCents: fiscalDocuments.totalCents,
         taxCents: fiscalDocuments.taxCents,
         issuedAt: fiscalDocuments.issuedAt,
+        xmlSha256: fiscalDocuments.xmlSha256,
       })
       .from(fiscalDocuments)
       .where(
@@ -2498,6 +2895,25 @@ export class FiscalService {
         ),
       )
       .orderBy(asc(fiscalDocuments.issuedAt), asc(fiscalDocuments.id));
+    if (!context.period.closedAt || !context.period.snapshotSha256) {
+      throw new ConflictException({ code: "ACCOUNTING_PACKAGE_SNAPSHOT_MISSING" });
+    }
+    const currentSnapshot = buildAccountingPackage(
+      organizationId,
+      unitId,
+      competence,
+      context.period.closedAt,
+      documents,
+    );
+    const currentSha256 = createHash("sha256")
+      .update(JSON.stringify(currentSnapshot))
+      .digest("hex");
+    if (currentSha256 !== context.period.snapshotSha256) {
+      throw new ConflictException({
+        code: "ACCOUNTING_PACKAGE_SNAPSHOT_MISMATCH",
+        message: "A competência mudou após o fechamento. Reabra e feche novamente.",
+      });
+    }
     const artifacts =
       documents.length === 0
         ? []
@@ -2601,17 +3017,64 @@ export class FiscalService {
       eq(accountantRequests.organizationId, organizationId),
       eq(accountantRequests.unitId, unitId),
     ];
-    if (query.status) conditions.push(eq(accountantRequests.status, query.status));
+    if (query.overdue) {
+      const [unit] = await this.database.db
+        .select({ timezone: units.timezone })
+        .from(units)
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1);
+      if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+      conditions.push(
+        eq(accountantRequests.status, "open"),
+        isNotNull(accountantRequests.dueDate),
+        lt(accountantRequests.dueDate, localDateAt(new Date(), unit.timezone)),
+      );
+    } else if (query.status) conditions.push(eq(accountantRequests.status, query.status));
+    if (query.targetAudience)
+      conditions.push(eq(accountantRequests.targetAudience, query.targetAudience));
     if (query.competence) {
       conditions.push(
         eq(accountantRequests.competence, competenceBounds(query.competence).competenceDate),
       );
     }
-    return this.database.db
-      .select()
-      .from(accountantRequests)
-      .where(and(...conditions))
-      .orderBy(desc(accountantRequests.createdAt));
+    const where = and(...conditions);
+    const [rows, countRows] = await Promise.all([
+      this.database.db
+        .select()
+        .from(accountantRequests)
+        .where(where)
+        .orderBy(desc(accountantRequests.createdAt))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      this.database.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(accountantRequests)
+        .where(where),
+    ]);
+    const identityIds = [
+      ...new Set(
+        rows.flatMap((row) =>
+          row.resolvedByIdentityId
+            ? [row.createdByIdentityId, row.resolvedByIdentityId]
+            : [row.createdByIdentityId],
+        ),
+      ),
+    ];
+    const identityRows = identityIds.length
+      ? await this.database.db
+          .select({ id: identities.id, displayName: identities.displayName })
+          .from(identities)
+          .where(inArray(identities.id, identityIds))
+      : [];
+    const names = new Map(identityRows.map((row) => [row.id, row.displayName] as const));
+    return {
+      items: rows.map((row) => publicAccountantRequest(row, names)),
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total: Number(countRows[0]?.count ?? 0),
+      },
+    };
   }
 
   async createAccountantRequest(
@@ -2621,7 +3084,14 @@ export class FiscalService {
     idempotencyKey: string,
     input: AccountantRequestInput,
   ) {
-    await this.requirePermission(identityId, organizationId, unitId, "accounting:requests:write");
+    const bindings = await this.requirePermission(
+      identityId,
+      organizationId,
+      unitId,
+      "accounting:requests:write",
+    );
+    const targetAudience =
+      accountantActorAudience(bindings, unitId) === "accountant" ? "establishment" : "accountant";
     const parsedIdempotencyKey = idempotencyKeySchema.parse(idempotencyKey);
     return this.database.db.transaction(async (tx) => {
       const [existing] = await tx
@@ -2635,7 +3105,7 @@ export class FiscalService {
           ),
         )
         .limit(1);
-      if (existing) return { request: existing, replayed: true };
+      if (existing) return { request: publicAccountantRequest(existing), replayed: true };
       const [created] = await tx
         .insert(accountantRequests)
         .values({
@@ -2646,8 +3116,9 @@ export class FiscalService {
           competence: competenceBounds(input.competence).competenceDate,
           title: input.title,
           description: input.description,
+          targetAudience,
           dueDate: input.dueDate,
-          attachments: input.attachments,
+          attachments: [],
         })
         .returning();
       if (!created) throw new ConflictException({ code: "ACCOUNTANT_REQUEST_CREATE_FAILED" });
@@ -2658,16 +3129,210 @@ export class FiscalService {
         action: "accounting.request.created",
         entityType: "accountant_request",
         entityId: created.id,
-        metadata: { dueDate: created.dueDate },
+        metadata: { dueDate: created.dueDate, targetAudience: created.targetAudience },
       });
       await tx.insert(outboxEvents).values({
         topic: "accounting.request.created",
         aggregateType: "accountant_request",
         aggregateId: created.id,
-        payload: { organizationId, unitId, requestId: created.id },
+        payload: {
+          organizationId,
+          unitId,
+          requestId: created.id,
+          targetAudience: created.targetAudience,
+        },
       });
-      return { request: created, replayed: false };
+      return { request: publicAccountantRequest(created), replayed: false };
     });
+  }
+
+  async createAccountantAttachment(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    requestId: string,
+    input: AccountantAttachmentUploadInput,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "accounting:requests:write");
+    let decoded: ReturnType<typeof decodeAccountantAttachment>;
+    try {
+      decoded = decodeAccountantAttachment(input);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new ConflictException({
+        code: "ACCOUNTANT_ATTACHMENT_SIGNATURE_INVALID",
+        message: "O conteúdo do anexo não corresponde ao tipo informado.",
+      });
+    }
+    await scanAccountantAttachment(decoded.content);
+    const retentionUntil = accountantAttachmentRetentionUntil();
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`accountant-request:${organizationId}:${unitId}:${requestId}`}, 0))`,
+      );
+      const [request] = await tx
+        .select()
+        .from(accountantRequests)
+        .where(
+          and(
+            eq(accountantRequests.organizationId, organizationId),
+            eq(accountantRequests.unitId, unitId),
+            eq(accountantRequests.id, requestId),
+          ),
+        )
+        .limit(1);
+      if (!request) throw new NotFoundException({ code: "ACCOUNTANT_REQUEST_NOT_FOUND" });
+      if (request.status !== "open")
+        throw new ConflictException({
+          code: "ACCOUNTANT_REQUEST_ALREADY_RESOLVED",
+          message: "Não é possível anexar arquivos a uma solicitação resolvida.",
+        });
+      const attachments = Array.isArray(request.attachments)
+        ? request.attachments.filter(
+            (attachment) => attachment && typeof attachment.id === "string",
+          )
+        : [];
+      const activeAttachments = attachments.filter((attachment) => !attachment.deletedAt);
+      const sha256 = createHash("sha256").update(decoded.content).digest("hex");
+      const replay = activeAttachments.find(
+        (attachment) => attachment.sha256 === sha256 && attachment.fileName === input.fileName,
+      );
+      if (replay) {
+        return {
+          attachment: {
+            id: replay.id,
+            fileName: replay.fileName,
+            contentType: replay.contentType,
+            sizeBytes: replay.sizeBytes,
+            sha256: replay.sha256,
+            createdAt: replay.createdAt,
+          },
+          replayed: true,
+        };
+      }
+      if (activeAttachments.length >= 10)
+        throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_LIMIT_EXCEEDED" });
+      if (
+        activeAttachments.reduce((total, attachment) => total + attachment.sizeBytes, 0) +
+          decoded.content.length >
+        20 * 1024 * 1024
+      )
+        throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_TOTAL_SIZE_EXCEEDED" });
+      const stored = await writeFiscalArtifact({
+        root: process.env.MEDIA_ROOT,
+        organizationId,
+        unitId,
+        namespace: "packages",
+        entityId: requestId,
+        name: "request_attachment",
+        extension: decoded.storageExtension,
+        content: decoded.content,
+      });
+      const attachment = {
+        id: randomUUID(),
+        fileName: input.fileName,
+        contentType: input.contentType,
+        sizeBytes: stored.bytes,
+        sha256: stored.sha256,
+        storageKey: stored.storageKey,
+        createdAt: new Date().toISOString(),
+        uploadedByIdentityId: identityId,
+        retentionUntil,
+        legalHold: false,
+        deletedAt: null,
+        purgedAt: null,
+      };
+      await tx
+        .update(accountantRequests)
+        .set({ attachments: [...attachments, attachment], updatedAt: new Date() })
+        .where(
+          and(
+            eq(accountantRequests.organizationId, organizationId),
+            eq(accountantRequests.unitId, unitId),
+            eq(accountantRequests.id, requestId),
+            eq(accountantRequests.status, "open"),
+          ),
+        );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "accounting.request.attachment.created",
+        entityType: "accountant_request",
+        entityId: requestId,
+        metadata: {
+          attachmentId: attachment.id,
+          fileName: attachment.fileName,
+          contentType: attachment.contentType,
+          sizeBytes: attachment.sizeBytes,
+          sha256: attachment.sha256,
+        },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "accounting.request.attachment.created",
+        aggregateType: "accountant_request",
+        aggregateId: requestId,
+        payload: {
+          organizationId,
+          unitId,
+          requestId,
+          attachmentId: attachment.id,
+          targetAudience: request.targetAudience,
+        },
+      });
+      const {
+        storageKey: _storageKey,
+        uploadedByIdentityId: _uploader,
+        ...publicAttachment
+      } = attachment;
+      return { attachment: publicAttachment, replayed: false };
+    });
+  }
+
+  async accountantAttachmentContent(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    requestId: string,
+    attachmentId: string,
+  ) {
+    await this.requirePermission(identityId, organizationId, unitId, "accounting:requests:read");
+    const [request] = await this.database.db
+      .select({ attachments: accountantRequests.attachments })
+      .from(accountantRequests)
+      .where(
+        and(
+          eq(accountantRequests.organizationId, organizationId),
+          eq(accountantRequests.unitId, unitId),
+          eq(accountantRequests.id, requestId),
+        ),
+      )
+      .limit(1);
+    const attachment = request?.attachments.find(
+      (candidate) => candidate.id === attachmentId && !candidate.deletedAt,
+    );
+    if (!attachment) throw new NotFoundException({ code: "ACCOUNTANT_ATTACHMENT_NOT_FOUND" });
+    if (
+      attachment.retentionUntil &&
+      !attachment.legalHold &&
+      new Date(attachment.retentionUntil) <= new Date()
+    )
+      throw new NotFoundException({ code: "ACCOUNTANT_ATTACHMENT_NOT_FOUND" });
+    const content = await readFiscalArtifact(process.env.MEDIA_ROOT, attachment.storageKey).catch(
+      () => {
+        throw new NotFoundException({ code: "ACCOUNTANT_ATTACHMENT_NOT_FOUND" });
+      },
+    );
+    const sha256 = createHash("sha256").update(content).digest("hex");
+    if (sha256 !== attachment.sha256)
+      throw new ConflictException({ code: "ACCOUNTANT_ATTACHMENT_INTEGRITY_FAILED" });
+    return {
+      filename: attachment.fileName,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      mimeType: attachment.contentType,
+      sha256,
+    };
   }
 
   async resolveAccountantRequest(
@@ -2677,8 +3342,17 @@ export class FiscalService {
     requestId: string,
     input: ResolveAccountantRequestInput,
   ) {
-    await this.requirePermission(identityId, organizationId, unitId, "accounting:requests:write");
+    const bindings = await this.requirePermission(
+      identityId,
+      organizationId,
+      unitId,
+      "accounting:requests:write",
+    );
+    const actorAudience = accountantActorAudience(bindings, unitId);
     return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`accountant-request:${organizationId}:${unitId}:${requestId}`}, 0))`,
+      );
       const [existing] = await tx
         .select()
         .from(accountantRequests)
@@ -2696,7 +3370,21 @@ export class FiscalService {
           message: "Solicitação do contador não encontrada.",
         });
       }
-      if (existing.status === "resolved") return { request: existing, replayed: true };
+      if (existing.createdByIdentityId === identityId) {
+        throw new ForbiddenException({
+          code: "ACCOUNTANT_REQUEST_SELF_RESOLUTION_DENIED",
+          message: "O autor não pode resolver a própria solicitação.",
+        });
+      }
+      if (existing.targetAudience !== actorAudience) {
+        throw new ForbiddenException({
+          code: "ACCOUNTANT_REQUEST_AUDIENCE_DENIED",
+          message: "Somente o destinatário pode resolver esta solicitação.",
+        });
+      }
+      if (existing.status === "resolved") {
+        return { request: publicAccountantRequest(existing), replayed: true };
+      }
       const resolvedAt = new Date();
       const [resolved] = await tx
         .update(accountantRequests)
@@ -2707,8 +3395,16 @@ export class FiscalService {
           resolution: input.resolution,
           updatedAt: resolvedAt,
         })
-        .where(eq(accountantRequests.id, requestId))
+        .where(
+          and(
+            eq(accountantRequests.organizationId, organizationId),
+            eq(accountantRequests.unitId, unitId),
+            eq(accountantRequests.id, requestId),
+            eq(accountantRequests.status, "open"),
+          ),
+        )
         .returning();
+      if (!resolved) throw new ConflictException({ code: "ACCOUNTANT_REQUEST_RESOLVE_FAILED" });
       await tx.insert(auditEvents).values({
         organizationId,
         unitId,
@@ -2716,14 +3412,15 @@ export class FiscalService {
         action: "accounting.request.resolved",
         entityType: "accountant_request",
         entityId: requestId,
+        metadata: { targetAudience: existing.targetAudience },
       });
       await tx.insert(outboxEvents).values({
         topic: "accounting.request.resolved",
         aggregateType: "accountant_request",
         aggregateId: requestId,
-        payload: { organizationId, unitId, requestId },
+        payload: { organizationId, unitId, requestId, targetAudience: existing.targetAudience },
       });
-      return { request: resolved, replayed: false };
+      return { request: publicAccountantRequest(resolved), replayed: false };
     });
   }
 }

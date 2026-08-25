@@ -366,10 +366,34 @@ export const accountantRequests = pgTable(
     competence: date("competence").notNull(),
     title: varchar("title", { length: 160 }).notNull(),
     description: text("description").notNull(),
+    targetAudience: varchar("target_audience", { length: 20 })
+      .$type<"accountant" | "establishment">()
+      .notNull(),
     status: accountantRequestStatus("status").notNull().default("open"),
     dueDate: date("due_date"),
     attachments: jsonb("attachments")
-      .$type<{ name: string; storageKey: string; sha256?: string }[]>()
+      .$type<
+        {
+          id: string;
+          fileName: string;
+          contentType:
+            | "application/pdf"
+            | "application/xml"
+            | "text/xml"
+            | "text/csv"
+            | "image/jpeg"
+            | "image/png";
+          sizeBytes: number;
+          sha256: string;
+          storageKey: string;
+          createdAt: string;
+          uploadedByIdentityId: string;
+          retentionUntil?: string;
+          legalHold?: boolean;
+          deletedAt?: string | null;
+          purgedAt?: string | null;
+        }[]
+      >()
       .notNull()
       .default([]),
     resolvedByIdentityId: uuid("resolved_by_identity_id").references(() => identities.id, {
@@ -394,6 +418,10 @@ export const accountantRequests = pgTable(
       table.organizationId,
       table.unitId,
       table.competence,
+    ),
+    check(
+      "accountant_requests_target_audience_check",
+      sql`${table.targetAudience} IN ('accountant', 'establishment')`,
     ),
     foreignKey({
       name: "accountant_requests_unit_fk",

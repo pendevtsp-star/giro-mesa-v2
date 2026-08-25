@@ -251,7 +251,17 @@ public sealed class NativeBridge
             var station = source.TryGetProperty("station", out var stationValue) &&
                 stationValue.ValueKind == JsonValueKind.String
                 ? stationValue.GetString()
-                : "counter";
+                : null;
+            var stationId = source.TryGetProperty("stationId", out var stationIdValue) &&
+                stationIdValue.ValueKind == JsonValueKind.String
+                ? stationIdValue.GetString()
+                : null;
+            var stationName = source.TryGetProperty("stationName", out var stationNameValue) &&
+                stationNameValue.ValueKind == JsonValueKind.String
+                ? stationNameValue.GetString()
+                : null;
+            if (string.IsNullOrWhiteSpace(stationId) && string.IsNullOrWhiteSpace(station))
+                station = "counter";
             using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(endpoint, "/v1/print-jobs"))
             {
                 Content = JsonContent.Create(new
@@ -259,6 +269,8 @@ public sealed class NativeBridge
                     idempotencyKey,
                     printerId,
                     station,
+                    stationId,
+                    stationName,
                     documentType = documentType.GetString(),
                     payload = payload.Clone(),
                     copies = copyCount,
@@ -266,17 +278,7 @@ public sealed class NativeBridge
             };
             request.Headers.Add("X-GiroMesa-Device-Token", token);
             using var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-                return new(false, "failed", await ReadErrorCodeAsync(response), printerId, false);
-            var result = await response.Content.ReadFromJsonAsync<PrintGatewayResult>();
-            return result is null
-                ? new(false, "failed", "PRINT_RESULT_MISSING", printerId, false)
-                : new(
-                    result.Success,
-                    result.Status,
-                    result.ErrorCode,
-                    result.PrinterId ?? printerId,
-                    result.Duplicate);
+            return await ReadPrintResultAsync(response, printerId);
         }
         catch (JsonException)
         {
@@ -284,30 +286,40 @@ public sealed class NativeBridge
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
-            return new(false, "failed", "HUB_PRINT_UNREACHABLE", null, false);
+            return new(
+                false,
+                "confirmation_required",
+                "HUB_PRINT_RESULT_UNKNOWN",
+                null,
+                false);
         }
     }
 
     public async Task<OperationalStateResult> GetPrintersAsync()
+        => await GetAuthenticatedHubJsonAsync("/v1/printers", "HUB_PRINTERS_UNREACHABLE");
+
+    public async Task<OperationalStateResult> GetPrinterConfigurationsAsync(bool includeArchived = false)
+        => await GetAuthenticatedHubJsonAsync(
+            $"/v1/printer-configurations?includeArchived={includeArchived.ToString().ToLowerInvariant()}",
+            "HUB_PRINTER_CONFIGURATIONS_UNREACHABLE");
+
+    public async Task<OperationalStateResult> GetPrinterDiagnosticsAsync()
+        => await GetAuthenticatedHubJsonAsync(
+            "/v1/printers/diagnostics",
+            "HUB_PRINTER_DIAGNOSTICS_UNREACHABLE");
+
+    public async Task<OperationalStateResult> GetLocalPrintQueueAsync(
+        string? status = null,
+        int limit = 100)
     {
-        var endpoint = NormalizeHubUrl(Preferences.Default.Get(HubUrlPreference, string.Empty));
-        var token = await SecureStorage.Default.GetAsync(DeviceTokenKey);
-        if (endpoint is null || string.IsNullOrWhiteSpace(token))
-            return new(false, null, "HUB_NOT_PAIRED");
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, "/v1/printers"));
-            request.Headers.Add("X-GiroMesa-Device-Token", token);
-            using var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-                return new(false, null, await ReadErrorCodeAsync(response));
-            using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            return new(true, payload.RootElement.Clone(), null);
-        }
-        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
-        {
-            return new(false, null, "HUB_PRINTERS_UNREACHABLE");
-        }
+        if (limit is < 1 or > 500)
+            return new(false, null, "INVALID_PRINT_QUEUE_LIMIT");
+        var query = $"?limit={limit}" + (string.IsNullOrWhiteSpace(status)
+            ? ""
+            : $"&status={Uri.EscapeDataString(status)}");
+        return await GetAuthenticatedHubJsonAsync(
+            $"/v1/print-jobs{query}",
+            "HUB_PRINT_QUEUE_UNREACHABLE");
     }
 
     public async Task<PrintBridgeResult> TestPrinterAsync(string printerId)
@@ -325,16 +337,16 @@ public sealed class NativeBridge
                 new Uri(endpoint, $"/v1/printers/{Uri.EscapeDataString(printerId)}/test"));
             request.Headers.Add("X-GiroMesa-Device-Token", token);
             using var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-                return new(false, "failed", await ReadErrorCodeAsync(response), printerId, false);
-            var result = await response.Content.ReadFromJsonAsync<PrintGatewayResult>();
-            return result is null
-                ? new(false, "failed", "PRINT_RESULT_MISSING", printerId, false)
-                : new(result.Success, result.Status, result.ErrorCode, result.PrinterId ?? printerId, result.Duplicate);
+            return await ReadPrintResultAsync(response, printerId);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
         {
-            return new(false, "failed", "HUB_PRINT_UNREACHABLE", printerId, false);
+            return new(
+                false,
+                "confirmation_required",
+                "HUB_PRINT_RESULT_UNKNOWN",
+                printerId,
+                false);
         }
     }
 
@@ -405,6 +417,83 @@ public sealed class NativeBridge
     }
 
     public Task ClearPaymentPairingAsync() => _smartPosCredentialStore.ClearAsync();
+
+    private async Task<OperationalStateResult> GetAuthenticatedHubJsonAsync(
+        string path,
+        string unreachableErrorCode)
+    {
+        var endpoint = NormalizeHubUrl(Preferences.Default.Get(HubUrlPreference, string.Empty));
+        var token = await SecureStorage.Default.GetAsync(DeviceTokenKey);
+        if (endpoint is null || string.IsNullOrWhiteSpace(token))
+            return new(false, null, "HUB_NOT_PAIRED");
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint, path));
+            request.Headers.Add("X-GiroMesa-Device-Token", token);
+            using var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+                return new(false, null, await ReadErrorCodeAsync(response));
+            using var payload = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            return new(true, payload.RootElement.Clone(), null);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return new(false, null, unreachableErrorCode);
+        }
+    }
+
+    private static async Task<PrintBridgeResult> ReadPrintResultAsync(
+        HttpResponseMessage response,
+        string? requestedPrinterId)
+    {
+        var content = await response.Content.ReadAsStringAsync();
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            try
+            {
+                var result = JsonSerializer.Deserialize<PrintGatewayResult>(
+                    content,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (!string.IsNullOrWhiteSpace(result?.Status))
+                {
+                    return new(
+                        result.Success,
+                        result.Status,
+                        result.ErrorCode,
+                        result.PrinterId ?? requestedPrinterId,
+                        result.Duplicate);
+                }
+
+                var error = JsonSerializer.Deserialize<HubError>(
+                    content,
+                    new JsonSerializerOptions(JsonSerializerDefaults.Web));
+                if (!string.IsNullOrWhiteSpace(error?.Code))
+                {
+                    var confirmationRequired =
+                        error.Code is "PRINT_ATTEMPT_IN_PROGRESS_OR_UNKNOWN" or "PRINTER_RESULT_UNKNOWN";
+                    return new(
+                        false,
+                        confirmationRequired ? "confirmation_required" : "failed",
+                        error.Code,
+                        requestedPrinterId,
+                        false);
+                }
+            }
+            catch (JsonException)
+            {
+                // A resposta sem contrato não prova que o papel deixou de ser impresso.
+            }
+        }
+
+        return response.IsSuccessStatusCode
+            ? new(false, "confirmation_required", "PRINT_RESULT_MISSING", requestedPrinterId, false)
+            : new(
+                false,
+                "failed",
+                $"HUB_HTTP_{(int)response.StatusCode}",
+                requestedPrinterId,
+                false);
+    }
 
     private static async Task<string> ReadErrorCodeAsync(HttpResponseMessage response)
     {

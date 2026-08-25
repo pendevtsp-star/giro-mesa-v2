@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { BadRequestException, ConflictException } from "@nestjs/common";
 import {
+  allocatePrintSplitAmounts,
   approvalExpiresAt,
   assertKdsOrderHandoff,
   assertKdsTransition,
@@ -22,6 +23,7 @@ import {
   replayResult,
   requestHash,
   shouldAlertKdsCancellation,
+  suggestedServiceChargeBasisPoints,
   summarizeKdsDurations,
   tabTotals,
 } from "./pilot-rules.js";
@@ -45,6 +47,8 @@ import {
   shiftLayoutSchema,
   shiftSectionAssignmentSchema,
   shiftSectionCoverageSchema,
+  shiftSectionsBatchAssignmentSchema,
+  tableGroupSchema,
   temporaryTableTransferSchema,
   terminalProfileSchema,
 } from "./pilot-schemas.js";
@@ -89,6 +93,15 @@ describe("pilot POS rules", () => {
     assert.throws(() => assertTabCanClose(4_000, 3_999), ConflictException);
     assert.equal(closeTabSchema.safeParse({ printRequested: true }).success, true);
     assert.equal(
+      closeTabSchema.safeParse({ printRequested: false, returnableDecision: "acknowledge" })
+        .success,
+      true,
+    );
+    assert.equal(
+      closeTabSchema.safeParse({ printRequested: false, returnableDecision: "ignore" }).success,
+      false,
+    );
+    assert.equal(
       approvalRequestSchema.safeParse({
         itemId: "00000000-0000-4000-8000-000000000001",
         action: "discount",
@@ -109,7 +122,7 @@ describe("pilot POS rules", () => {
       true,
     );
     assert.equal(
-      printJobSchema.safeParse({ documentType: "partial_statement", copies: 11 }).success,
+      printJobSchema.safeParse({ documentType: "partial_statement", copies: 6 }).success,
       false,
     );
     assert.equal(
@@ -117,10 +130,48 @@ describe("pilot POS rules", () => {
       true,
     );
     assert.equal(printJobStatusSchema.safeParse({ status: "failed" }).success, false);
+    assert.equal(
+      printJobStatusSchema.safeParse({
+        status: "confirmation_required",
+        error: "PRINTER_RESULT_UNKNOWN",
+      }).success,
+      true,
+    );
     assert.doesNotThrow(() => assertPrintJobTransition("queued", "printing"));
+    assert.doesNotThrow(() => assertPrintJobTransition("printing", "confirmation_required"));
+    assert.doesNotThrow(() => assertPrintJobTransition("confirmation_required", "printed"));
     assert.doesNotThrow(() => assertPrintJobTransition("printing", "printed"));
     assert.throws(() => assertPrintJobTransition("printed", "printing"), ConflictException);
     assert.throws(() => assertPrintJobTransition("failed", "queued"), ConflictException);
+  });
+
+  it("allocates deterministic print splits without creating payment residue", () => {
+    assert.deepEqual(allocatePrintSplitAmounts(1_001, "equal_people", 3), [334, 334, 333]);
+    assert.deepEqual(
+      allocatePrintSplitAmounts(1_000, "fixed_amount", 4, 250),
+      [250, 250, 250, 250],
+    );
+    assert.throws(
+      () => allocatePrintSplitAmounts(1_000, "fixed_amount", 3, 250),
+      BadRequestException,
+    );
+  });
+
+  it("snapshots a configured service-charge suggestion only for new dine-in tabs", () => {
+    const configuration = {
+      serviceChargeEnabled: true,
+      defaultServiceChargeBasisPoints: 1_000,
+      serviceChargeApplication: "suggest_dine_in",
+    };
+    assert.equal(suggestedServiceChargeBasisPoints("dine_in", configuration), 1_000);
+    assert.equal(suggestedServiceChargeBasisPoints("pickup", configuration), 0);
+    assert.equal(
+      suggestedServiceChargeBasisPoints("dine_in", {
+        ...configuration,
+        serviceChargeEnabled: false,
+      }),
+      0,
+    );
   });
 
   it("expires manager approvals after the operational window", () => {
@@ -132,30 +183,42 @@ describe("pilot POS rules", () => {
 
   it("accepts only unique bounded coordinates for the floor layout", () => {
     const tableId = "00000000-0000-4000-8000-000000000001";
+    const table = { tableId, roomId: tableId, label: "01", seats: 4 };
     assert.equal(
-      floorLayoutSchema.safeParse({ tables: [{ tableId, x: 240, y: 180 }] }).success,
+      floorLayoutSchema.safeParse({
+        expectedRevision: 1,
+        tables: [{ ...table, x: 240, y: 180 }],
+      }).success,
       true,
     );
     assert.equal(
       floorLayoutSchema.safeParse({
+        expectedRevision: 1,
         tables: [
-          { tableId, x: 240, y: 180 },
-          { tableId, x: 260, y: 180 },
+          { ...table, x: 240, y: 180 },
+          { ...table, x: 260, y: 180 },
         ],
       }).success,
       false,
     );
     assert.equal(
-      floorLayoutSchema.safeParse({ tables: [{ tableId, x: -10_001, y: 12_800 }] }).success,
+      floorLayoutSchema.safeParse({
+        expectedRevision: 1,
+        tables: [{ ...table, x: -10_001, y: 12_800 }],
+      }).success,
       true,
     );
     assert.equal(
-      floorLayoutSchema.safeParse({ tables: [{ tableId, x: 1_000_001, y: 180 }] }).success,
+      floorLayoutSchema.safeParse({
+        expectedRevision: 1,
+        tables: [{ ...table, x: 1_000_001, y: 180 }],
+      }).success,
       false,
     );
     const roomId = "00000000-0000-4000-8000-000000000002";
     assert.equal(
       floorLayoutSchema.safeParse({
+        expectedRevision: 1,
         rooms: [
           {
             roomId,
@@ -172,6 +235,7 @@ describe("pilot POS rules", () => {
     );
     assert.equal(
       floorLayoutSchema.safeParse({
+        expectedRevision: 1,
         rooms: [
           {
             roomId,
@@ -302,6 +366,7 @@ describe("pilot POS rules", () => {
     );
     assert.equal(
       shiftSectionAssignmentSchema.safeParse({
+        expectedRevision: 1,
         tableIds: [tableId],
         primaryIdentityId: identityId,
         supportIdentityIds: [identityId],
@@ -310,6 +375,7 @@ describe("pilot POS rules", () => {
     );
     assert.equal(
       shiftLayoutSchema.safeParse({
+        expectedRevision: 1,
         tables: [{ tableId, roomId: tableId, x: 640, y: 420 }],
       }).success,
       true,
@@ -317,11 +383,35 @@ describe("pilot POS rules", () => {
     assert.equal(shiftSectionCoverageSchema.safeParse({ active: true }).success, true);
     assert.equal(shiftSectionCoverageSchema.safeParse({ active: true, identityId }).success, false);
     assert.equal(
+      shiftSectionsBatchAssignmentSchema.safeParse({
+        expectedRevision: 1,
+        assignments: [
+          {
+            shiftSectionId: tableId,
+            tableIds: [],
+            primaryIdentityId: null,
+            supportIdentityIds: [],
+          },
+        ],
+      }).success,
+      true,
+    );
+    assert.equal(
+      tableGroupSchema.safeParse({
+        tableIds: [tableId, identityId],
+        anchorTableId: tableId,
+        mode: "physical_only",
+        reasonCode: "other",
+      }).success,
+      false,
+    );
+    assert.equal(
       temporaryTableTransferSchema.safeParse({
         targetShiftSectionId: tableId,
         durationMinutes: 60,
         transferOpenTab: true,
-        reason: "Cobertura da varanda",
+        reasonCode: "staff_coverage",
+        reasonNote: "Cobertura da varanda",
       }).success,
       true,
     );
@@ -329,7 +419,8 @@ describe("pilot POS rules", () => {
       temporaryTableTransferSchema.safeParse({
         targetShiftSectionId: tableId,
         durationMinutes: 721,
-        reason: "Prazo inválido",
+        reasonCode: "other",
+        reasonNote: "Prazo inválido",
       }).success,
       false,
     );
@@ -342,6 +433,7 @@ describe("pilot POS rules", () => {
             targetResponsibleIdentityId: identityId,
           },
         ],
+        returnableDecision: "acknowledge",
         reason: "Passagem para equipe noturna",
       }).success,
       true,

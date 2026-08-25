@@ -2,11 +2,22 @@
 
 import { Button, Input, Label, NativeSelect, Textarea } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
+import { type CommercialAttribution, isPersistedLeadReceipt } from "../lib/commercial";
 
 type PlanSlug = "operacao" | "crescimento" | "rede";
-type LeadFormProps = { kind: "trial" | "contact"; initialPlan?: PlanSlug; initialMessage?: string };
+type LeadFormProps = {
+  kind: "trial" | "contact";
+  initialPlan?: PlanSlug;
+  initialMessage?: string;
+  attribution: CommercialAttribution;
+};
 
-export function LeadForm({ kind, initialPlan = "operacao", initialMessage = "" }: LeadFormProps) {
+export function LeadForm({
+  kind,
+  initialPlan = "operacao",
+  initialMessage = "",
+  attribution,
+}: LeadFormProps) {
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -33,6 +44,7 @@ export function LeadForm({ kind, initialPlan = "operacao", initialMessage = "" }
               segment: form.get("segment"),
               planSlug: form.get("planSlug"),
               consent: form.has("consent"),
+              attribution,
             }
           : {
               name: form.get("name"),
@@ -40,14 +52,16 @@ export function LeadForm({ kind, initialPlan = "operacao", initialMessage = "" }
               phone: form.get("phone"),
               message: form.get("message"),
               privacyAccepted: form.has("consent"),
+              attribution,
             };
       const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      setStatus(response.ok ? "success" : "error");
-      if (response.ok) formElement.reset();
+      const persisted = response.ok && isPersistedLeadReceipt(await response.json());
+      setStatus(persisted ? "success" : "error");
+      if (persisted) formElement.reset();
     } catch {
       setStatus("error");
     }
@@ -109,7 +123,8 @@ export function LeadForm({ kind, initialPlan = "operacao", initialMessage = "" }
       <Label className="check-label">
         <Input type="checkbox" name="consent" required />
         <span>
-          Li a <a href="/privacidade">Política de Privacidade</a> e autorizo contato sobre esta
+          Li os <a href="/termos">Termos de Uso</a> e a{" "}
+          <a href="/privacidade">Política de Privacidade</a> vigentes e autorizo contato sobre esta
           solicitação.
         </span>
       </Label>

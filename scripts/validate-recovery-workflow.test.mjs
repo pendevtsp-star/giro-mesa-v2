@@ -42,7 +42,8 @@ test("shared validator proves the full database and runtime compatibility matrix
   const script = readFileSync(validatorPath, "utf8");
   assert.match(script, /postgres16/);
   assert.match(script, /postgres17/);
-  assert.match(script, /for level in 45 53/);
+  assert.match(script, /for level in "\$recovery_level" "\$target_level"/);
+  assert.match(script, /target_tag="\$\{target_identity\[0\]/);
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
   assert.match(script, /APP=api/);
   assert.match(script, /APP=worker/);
@@ -50,6 +51,7 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /run_legacy_upgrade_matrix 16/);
   assert.match(script, /run_legacy_upgrade_matrix 17/);
   assert.match(script, /entry\.get\("when", 0\) > 1786493658116/);
+  assert.equal(script.match(/when="\$\{when%\$'\\r'\}"/g)?.length, 2);
   assert.match(script, /psql -1/);
   assert.match(script, /"runtime":\s*\{[\s\S]*"apiHealth":\s*"passed"/);
   assert.match(script, /"apiHealthByLevel"/);
@@ -72,10 +74,14 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0053_petite_trauma");
-  assert.equal(matrix.transitions.length, 3);
-  const [transition, previousProductionTransition, currentProductionTransition] =
-    matrix.transitions;
+  assert.equal(matrix.targetMigration, "0074_crm_operational_inbox");
+  assert.equal(matrix.transitions.length, 4);
+  const [
+    transition,
+    previousProductionTransition,
+    currentProductionTransition,
+    latestProductionTransition,
+  ] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
@@ -106,6 +112,13 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(currentProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(currentProductionTransition.testedUpgrade, true);
   assert.deepEqual(currentProductionTransition.evidence, transition.evidence);
+  assert.equal(latestProductionTransition.appliedBefore, "0053_petite_trauma");
+  assert.equal(latestProductionTransition.appliedBeforeWhen, "1787373316439");
+  assert.equal(latestProductionTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(latestProductionTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(latestProductionTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(latestProductionTransition.testedUpgrade, true);
+  assert.deepEqual(latestProductionTransition.evidence, transition.evidence);
   const evidence = JSON.parse(
     readFileSync(join(root, "docs", "evidence", "recovery", "5421ce-validation.json"), "utf8"),
   );
@@ -114,8 +127,8 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(evidence.runtime.schemaLevel, 45);
   for (const scriptPath of [entrypointPath, provenancePath]) {
     const script = readFileSync(scriptPath, "utf8");
-    assert.match(script, /evidence\.get\("schemaLevels"\) == \[45, 53\]/);
-    assert.match(script, /"schemaLevel":53/);
+    assert.match(script, /evidence\.get\("schemaLevels"\) == expected_levels/);
+    assert.match(script, /"schemaLevel":(?:target_identity\[1\]|expected_levels\[1\])/);
   }
   assert.match(publish, /docs\/evidence\/recovery\//);
   assert.match(publish, /recovery evidence hash mismatch/);

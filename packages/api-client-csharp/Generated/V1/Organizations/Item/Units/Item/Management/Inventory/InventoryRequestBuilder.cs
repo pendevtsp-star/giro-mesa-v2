@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Assets;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Closings;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Controls;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.CycleCountPlan;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Events;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.InterunitTransfers;
@@ -40,6 +41,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Closings.ClosingsRequestBuilder Closings
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Closings.ClosingsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The controls property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Controls.ControlsRequestBuilder Controls
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Controls.ControlsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The cycleCountPlan property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.CycleCountPlan.CycleCountPlanRequestBuilder CycleCountPlan

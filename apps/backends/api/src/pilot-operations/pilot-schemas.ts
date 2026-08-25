@@ -44,6 +44,10 @@ const optionalPhone = z
   .regex(/^\+?[0-9 ()-]{8,30}$/)
   .optional();
 const optionalDateTime = z.string().datetime({ offset: true }).optional();
+const futureDateTime = z
+  .string()
+  .datetime({ offset: true })
+  .refine((value) => new Date(value).getTime() >= Date.now() - 60_000, "Informe um prazo futuro.");
 export const availabilityScheduleSchema = z.object({
   windows: z
     .array(
@@ -370,6 +374,7 @@ export const brandingSchema = z.object({
   displayName: z.string().trim().min(1).max(160),
   slogan: z.string().trim().max(300).nullable().optional(),
   logoUrl: httpUrl.nullable().optional(),
+  coverImageUrl: httpUrl.nullable().optional(),
   primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   notice: z.string().trim().max(1_000).nullable().optional(),
@@ -414,33 +419,90 @@ export const dailyStockSchema = z.object({
   autoDeductStock: z.boolean().optional(),
 });
 
-export const roomSchema = z.object({
-  name: shortName.max(120),
-  sortOrder: z.number().int().min(0).max(10_000).default(0),
-});
+const expectedFloorRevision = z.number().int().min(1);
 
-export const tableSchema = z.object({
+export const floorRevisionQuerySchema = z
+  .object({ expectedRevision: z.coerce.number().int().min(1) })
+  .strict();
+
+export const roomSchema = z
+  .object({
+    name: shortName.max(120),
+    sortOrder: z.number().int().min(0).max(10_000).default(0),
+    expectedRevision: expectedFloorRevision,
+  })
+  .strict();
+
+const tableFields = {
   label: shortName.max(60),
   seats: z.number().int().min(1).max(100).default(4),
-});
+  width: z.number().int().min(24).max(2_000).default(122),
+  height: z.number().int().min(24).max(2_000).default(76),
+  rotation: z.number().int().min(0).max(359).default(0),
+  shape: z.enum(["round", "square", "rectangle"]).default("rectangle"),
+};
+
+function validateSquareGeometry(
+  value: { shape: "round" | "square" | "rectangle"; width: number; height: number },
+  context: z.RefinementCtx,
+) {
+  if (value.shape === "square" && value.width !== value.height) {
+    context.addIssue({
+      code: "custom",
+      path: ["height"],
+      message: "Mesa quadrada precisa ter largura e altura iguais.",
+    });
+  }
+}
+
+const tableDataSchema = z.object(tableFields).strict().superRefine(validateSquareGeometry);
+
+export const tableSchema = z
+  .object({ ...tableFields, expectedRevision: expectedFloorRevision })
+  .strict()
+  .superRefine(validateSquareGeometry);
+
+export const tableEditSchema = z
+  .object({ ...tableFields, roomId: id, expectedRevision: expectedFloorRevision })
+  .strict()
+  .superRefine(validateSquareGeometry);
 
 export const tableTurnoverSchema = z.object({
   status: z.enum(["cleaning", "available"]),
 });
 
-export const tableBatchSchema = z.object({
-  tables: z.array(tableSchema).min(1).max(30),
-});
+export const tableBatchSchema = z
+  .object({
+    expectedRevision: expectedFloorRevision,
+    tables: z.array(tableDataSchema).min(1).max(30),
+  })
+  .strict();
 
 const tableLayoutSchema = z
   .object({
     tableId: id,
+    roomId: id,
+    label: shortName.max(60),
+    seats: z.number().int().min(1).max(100),
     x: floorCoordinate,
     y: floorCoordinate,
+    width: z.number().int().min(24).max(2_000).default(122),
+    height: z.number().int().min(24).max(2_000).default(76),
+    rotation: z.number().int().min(0).max(359).default(0),
+    shape: z.enum(["round", "square", "rectangle"]).default("rectangle"),
+  })
+  .strict()
+  .superRefine(validateSquareGeometry);
+
+const shiftTableLayoutSchema = z
+  .object({
+    tableId: id,
+    roomId: id,
+    x: floorCoordinate,
+    y: floorCoordinate,
+    rotation: z.number().int().min(0).max(359).default(0),
   })
   .strict();
-
-const shiftTableLayoutSchema = tableLayoutSchema.extend({ roomId: id });
 
 const floorPointSchema = z
   .object({
@@ -528,13 +590,33 @@ const roomLayoutSchema = z
   .refine(({ points }) => polygonArea(points) >= 100, "O ambiente precisa ter área útil.")
   .refine(({ points }) => polygonIsSimple(points), "As paredes do ambiente não podem se cruzar.");
 
+const floorElementSchema = z
+  .object({
+    id: id.optional(),
+    roomId: id,
+    kind: z.enum(["label", "barrier"]),
+    label: z.string().trim().min(1).max(120).optional(),
+    x: floorCoordinate,
+    y: floorCoordinate,
+    width: z.number().int().min(1).max(1_000_000),
+    height: z.number().int().min(1).max(1_000_000),
+    rotation: z.number().int().min(0).max(359).default(0),
+  })
+  .strict();
+
 export const floorLayoutSchema = z
   .object({
+    expectedRevision: expectedFloorRevision,
     tables: z.array(tableLayoutSchema).max(500).default([]),
     rooms: z.array(roomLayoutSchema).max(100).default([]),
+    layoutElements: z.array(floorElementSchema).max(1_000).optional(),
   })
   .strict()
-  .refine(({ tables, rooms }) => tables.length + rooms.length > 0, "Informe mesas ou ambientes.")
+  .refine(
+    ({ tables, rooms, layoutElements }) =>
+      tables.length + rooms.length + (layoutElements?.length ?? 0) > 0,
+    "Informe mesas, ambientes ou elementos.",
+  )
   .refine(
     ({ tables }) => new Set(tables.map((table) => table.tableId)).size === tables.length,
     "Cada mesa pode aparecer somente uma vez na planta.",
@@ -545,7 +627,10 @@ export const floorLayoutSchema = z
   );
 
 export const shiftLayoutSchema = z
-  .object({ tables: z.array(shiftTableLayoutSchema).min(1).max(500) })
+  .object({
+    expectedRevision: z.number().int().min(1),
+    tables: z.array(shiftTableLayoutSchema).min(1).max(500),
+  })
   .strict()
   .refine(
     ({ tables }) => new Set(tables.map((table) => table.tableId)).size === tables.length,
@@ -557,12 +642,13 @@ export const openTabSchema = z
     tableId: id.optional(),
     label: z.string().trim().max(120).optional(),
     fulfillmentType: fulfillmentType.optional(),
+    customerId: id.optional(),
     customerName: z.string().trim().max(120).optional(),
     customerPhone: optionalPhone,
     readyNotificationConsent: z.boolean().optional(),
     serviceNotes: z.string().trim().max(500).optional(),
     deliveryAddress: z.string().trim().max(1_000).optional(),
-    promisedAt: optionalDateTime,
+    promisedAt: futureDateTime.optional(),
     responsibleIdentityId: id.optional(),
     reservationId: id.optional(),
     waitlistEntryId: id.optional(),
@@ -608,6 +694,16 @@ export const updateTabSchema = z
   })
   .refine((value) => Object.keys(value).length > 1, "Informe ao menos uma alteração.");
 
+export const counterQueueQuerySchema = z.object({
+  stage: z
+    .enum(["all", "new", "production", "ready", "waiting", "delivered", "late"])
+    .default("all"),
+  channel: z.enum(["all", "pickup", "dine_in", "delivery"]).default("all"),
+  query: z.string().trim().max(120).default(""),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 export const serviceSectionSchema = z
   .object({
     name: shortName.max(120),
@@ -630,12 +726,15 @@ export const openOperationalShiftSchema = z
   })
   .strict();
 
+const shiftSectionAssignmentFields = {
+  expectedRevision: z.number().int().min(1),
+  tableIds: z.array(id).min(1).max(500),
+  primaryIdentityId: id.nullable(),
+  supportIdentityIds: z.array(id).max(20).default([]),
+};
+
 export const shiftSectionAssignmentSchema = z
-  .object({
-    tableIds: z.array(id).min(1).max(500),
-    primaryIdentityId: id.nullable(),
-    supportIdentityIds: z.array(id).max(20).default([]),
-  })
+  .object(shiftSectionAssignmentFields)
   .strict()
   .superRefine((value, context) => {
     if (new Set(value.tableIds).size !== value.tableIds.length) {
@@ -657,16 +756,79 @@ export const shiftSectionAssignmentSchema = z
     }
   });
 
+export const shiftSectionsBatchAssignmentSchema = z
+  .object({
+    expectedRevision: z.number().int().min(1),
+    assignments: z
+      .array(
+        z
+          .object({
+            tableIds: z.array(id).max(500),
+            primaryIdentityId: id.nullable(),
+            supportIdentityIds: z.array(id).max(20).default([]),
+            shiftSectionId: id,
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100),
+  })
+  .strict()
+  .superRefine(({ assignments }, context) => {
+    if (
+      new Set(assignments.map(({ shiftSectionId }) => shiftSectionId)).size !== assignments.length
+    ) {
+      context.addIssue({ code: "custom", path: ["assignments"], message: "Praça repetida." });
+    }
+    const tableIds = assignments.flatMap(({ tableIds }) => tableIds);
+    if (new Set(tableIds).size !== tableIds.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["assignments"],
+        message: "Uma mesa não pode pertencer a duas praças no mesmo turno.",
+      });
+    }
+  });
+
 export const shiftSectionCoverageSchema = z.object({ active: z.boolean() }).strict();
+
+export const shiftTransferReasonCodeSchema = z.enum([
+  "service_rebalance",
+  "staff_coverage",
+  "operational_reorganization",
+  "other",
+]);
+
+const shiftTransferReasonFields = {
+  reasonCode: shiftTransferReasonCodeSchema,
+  reasonNote: z.string().trim().min(3).max(500).optional(),
+};
+
+export const tableReorganizationReasonCodeSchema = z.enum([
+  "large_party",
+  "sit_together",
+  "accessibility",
+  "operational_reorganization",
+  "other",
+]);
+
+const tableReorganizationReasonFields = {
+  reasonCode: tableReorganizationReasonCodeSchema,
+  reasonNote: z.string().trim().min(3).max(500).optional(),
+};
 
 export const temporaryTableTransferSchema = z
   .object({
     targetShiftSectionId: id,
     durationMinutes: z.number().int().min(5).max(720),
     transferOpenTab: z.boolean().default(true),
-    reason: z.string().trim().min(3).max(500),
+    ...shiftTransferReasonFields,
   })
-  .strict();
+  .strict()
+  .refine((value) => value.reasonCode !== "other" || Boolean(value.reasonNote), {
+    path: ["reasonNote"],
+    message: "Descreva o motivo quando selecionar outro.",
+  });
 
 export const closeOperationalShiftSchema = z
   .object({
@@ -683,6 +845,7 @@ export const closeOperationalShiftSchema = z
       )
       .max(200)
       .optional(),
+    returnableDecision: z.literal("acknowledge").optional(),
     reason: z.string().trim().min(3).max(500).optional(),
   })
   .strict()
@@ -713,11 +876,36 @@ export const claimTabSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 
-export const serviceCallSchema = z.object({
-  kind: z.enum(["assistance", "bill", "water", "other"]).default("assistance"),
-  tabId: id.optional(),
-  slaMinutes: z.number().int().min(1).max(120).default(3),
-});
+export const serviceCallSchema = z
+  .object({
+    kind: z.enum(["assistance", "bill", "water", "other"]).default("assistance"),
+    tabId: id.optional(),
+    slaMinutes: z.number().int().min(1).max(120).default(3),
+    installationId: id.optional(),
+    terminalId: z.string().trim().min(1).max(120).optional(),
+    printerId: z.string().trim().min(1).max(120).optional(),
+    copies: z.number().int().min(1).max(5).default(1),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (
+      input.kind !== "bill" &&
+      (input.installationId || input.terminalId || input.printerId || input.copies !== 1)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["kind"],
+        message: "Destino de impressão só pode ser informado no pedido de conta.",
+      });
+    }
+    if (input.kind === "bill" && input.installationId && !input.tabId) {
+      context.addIssue({
+        code: "custom",
+        path: ["tabId"],
+        message: "Informe a comanda para imprimir o pedido de conta.",
+      });
+    }
+  });
 
 export const paymentSchema = z.object({
   method: z.enum(["cash", "credit_card", "debit_card", "pix", "other"]),
@@ -728,19 +916,49 @@ export const paymentSchema = z.object({
 });
 
 const printTargetSchema = z.object({
+  installationId: id.optional(),
   terminalId: z.string().trim().min(1).max(120).optional(),
   printerId: z.string().trim().min(1).max(120).optional(),
 });
 
 export const printJobSchema = printTargetSchema.extend({
   documentType: z.enum(["partial_statement", "payment_statement", "final_receipt"]),
-  copies: z.number().int().min(1).max(10).default(1),
+  serviceCallId: id.optional(),
+  copies: z.number().int().min(1).max(5).default(1),
   reason: z.string().trim().min(3).max(500).optional(),
 });
 
+export const printSplitSchema = printTargetSchema
+  .extend({
+    method: z.enum(["equal_people", "fixed_amount"]),
+    partCount: z.number().int().min(2).max(50),
+    fixedAmountCents: cents.positive().optional(),
+    documentType: z.enum(["partial_statement", "payment_statement"]).default("partial_statement"),
+    copies: z.number().int().min(1).max(5).default(1),
+    serviceCallId: id.optional(),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (input.method === "fixed_amount" && input.fixedAmountCents === undefined) {
+      context.addIssue({ code: "custom", path: ["fixedAmountCents"], message: "Informe o valor." });
+    }
+    if (input.method === "equal_people" && input.fixedAmountCents !== undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["fixedAmountCents"],
+        message: "Divisão igual não recebe valor fixo.",
+      });
+    }
+  });
+
 export const printJobQuerySchema = z.object({
   tabId: id.optional(),
-  status: z.enum(["queued", "printing", "printed", "failed"]).optional(),
+  stationId: id.optional(),
+  kdsTicketId: id.optional(),
+  documentType: z
+    .enum(["partial_statement", "payment_statement", "final_receipt", "kds_ticket"])
+    .optional(),
+  status: z.enum(["queued", "printing", "confirmation_required", "printed", "failed"]).optional(),
   terminalId: z.string().trim().min(1).max(120).optional(),
   printerId: z.string().trim().min(1).max(120).optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
@@ -748,7 +966,7 @@ export const printJobQuerySchema = z.object({
 
 export const printJobStatusSchema = printTargetSchema
   .extend({
-    status: z.enum(["printing", "printed", "failed"]),
+    status: z.enum(["printing", "confirmation_required", "printed", "failed"]),
     error: z.string().trim().min(3).max(2_000).optional(),
   })
   .superRefine((input, context) => {
@@ -760,10 +978,20 @@ export const printJobStatusSchema = printTargetSchema
       });
     }
     if (input.status !== "failed" && input.error) {
+      if (input.status === "confirmation_required" && input.error === "PRINTER_RESULT_UNKNOWN") {
+        return;
+      }
       context.addIssue({
         code: "custom",
         path: ["error"],
         message: "Somente uma falha de impressão recebe erro.",
+      });
+    }
+    if (input.status === "confirmation_required" && input.error !== "PRINTER_RESULT_UNKNOWN") {
+      context.addIssue({
+        code: "custom",
+        path: ["error"],
+        message: "Resultado desconhecido exige PRINTER_RESULT_UNKNOWN.",
       });
     }
   });
@@ -771,14 +999,15 @@ export const printJobStatusSchema = printTargetSchema
 export const retryPrintJobSchema = printTargetSchema.default({});
 
 export const reprintJobSchema = printTargetSchema.extend({
-  copies: z.number().int().min(1).max(10).optional(),
+  copies: z.number().int().min(1).max(5).optional(),
   reason: z.string().trim().min(3).max(500),
 });
 
 export const closeTabSchema = z.object({
   printRequested: z.boolean().default(false),
+  returnableDecision: z.literal("acknowledge").optional(),
   printOptions: printTargetSchema
-    .extend({ copies: z.number().int().min(1).max(10).default(1) })
+    .extend({ copies: z.number().int().min(1).max(5).default(1) })
     .optional(),
 });
 
@@ -832,6 +1061,12 @@ export const orderSchema = z.object({
         seatNumber: z.number().int().min(1).max(500).optional(),
         course: orderCourse.optional(),
         allergyNote: z.string().trim().max(500).optional(),
+        doseClub: z
+          .object({
+            externalClubId: id,
+          })
+          .strict()
+          .optional(),
       }),
     )
     .min(1)
@@ -843,29 +1078,46 @@ export const transferTabSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 
-export const mergeTabsSchema = z.object({
-  targetTabId: id,
-  sourceTabIds: z.array(id).min(1).max(50),
-});
+export const mergeTabsSchema = z
+  .object({
+    targetTabId: id,
+    sourceTabIds: z.array(id).min(1).max(50),
+    ...tableReorganizationReasonFields,
+  })
+  .strict()
+  .refine((value) => value.reasonCode !== "other" || Boolean(value.reasonNote), {
+    path: ["reasonNote"],
+    message: "Descreva o motivo quando selecionar outro.",
+  });
 
-export const tableGroupSchema = z.object({
-  tableIds: z.array(id).min(2).max(50),
-  anchorTableId: id,
-  mode: z.enum(["physical_only", "single_tab"]),
-  targetTabId: id.optional(),
-  responsibleIdentityId: id.optional(),
-});
+export const tableGroupSchema = z
+  .object({
+    tableIds: z.array(id).min(2).max(50),
+    anchorTableId: id,
+    mode: z.enum(["physical_only", "single_tab"]),
+    targetTabId: id.optional(),
+    responsibleIdentityId: id.optional(),
+    ...tableReorganizationReasonFields,
+  })
+  .strict()
+  .refine((value) => value.reasonCode !== "other" || Boolean(value.reasonNote), {
+    path: ["reasonNote"],
+    message: "Descreva o motivo quando selecionar outro.",
+  });
 
 export const detachTableGroupSchema = z.object({ tableId: id });
 
-export const splitTabSchema = z.object({
-  tableId: id.optional(),
-  label: z.string().trim().max(120).optional(),
-  items: z
-    .array(z.object({ orderItemId: id, quantity: z.number().int().min(1).max(500) }))
-    .min(1)
-    .max(500),
-});
+export const splitTabSchema = printTargetSchema
+  .extend({
+    tableId: id.optional(),
+    label: z.string().trim().max(120).optional(),
+    items: z
+      .array(z.object({ orderItemId: id, quantity: z.number().int().min(1).max(500) }))
+      .min(1)
+      .max(500),
+    copies: z.number().int().min(1).max(5).optional(),
+  })
+  .strict();
 
 export const serviceChargeSchema = z.object({ basisPoints: z.number().int().min(0).max(10_000) });
 export const tipSchema = z.object({ tipCents: cents });
@@ -993,6 +1245,7 @@ export const terminalProfileSchema = z
     quickActions: z
       .array(z.enum(["open_tab", "new_order", "receive", "waitlist", "print", "search"]))
       .max(8),
+    paymentMode: z.enum(["disabled", "cashier", "homologated_pos"]).optional(),
   })
   .strict();
 export const kdsBlockCodeSchema = z.enum([
@@ -1841,16 +2094,20 @@ export type AnalyticsQueryInput = z.infer<typeof analyticsQuerySchema>;
 export type MediaUploadInput = z.infer<typeof mediaUploadSchema>;
 export type DailyStockInput = z.infer<typeof dailyStockSchema>;
 export type RoomInput = z.infer<typeof roomSchema>;
+export type FloorRevisionQueryInput = z.infer<typeof floorRevisionQuerySchema>;
 export type TableInput = z.infer<typeof tableSchema>;
+export type TableEditInput = z.infer<typeof tableEditSchema>;
 export type TableTurnoverInput = z.infer<typeof tableTurnoverSchema>;
 export type TableBatchInput = z.infer<typeof tableBatchSchema>;
 export type FloorLayoutInput = z.infer<typeof floorLayoutSchema>;
 export type ShiftLayoutInput = z.infer<typeof shiftLayoutSchema>;
 export type OpenTabInput = z.infer<typeof openTabSchema>;
 export type UpdateTabInput = z.infer<typeof updateTabSchema>;
+export type CounterQueueQueryInput = z.infer<typeof counterQueueQuerySchema>;
 export type ServiceSectionInput = z.infer<typeof serviceSectionSchema>;
 export type OpenOperationalShiftInput = z.infer<typeof openOperationalShiftSchema>;
 export type ShiftSectionAssignmentInput = z.infer<typeof shiftSectionAssignmentSchema>;
+export type ShiftSectionsBatchAssignmentInput = z.infer<typeof shiftSectionsBatchAssignmentSchema>;
 export type ShiftSectionCoverageInput = z.infer<typeof shiftSectionCoverageSchema>;
 export type TemporaryTableTransferInput = z.infer<typeof temporaryTableTransferSchema>;
 export type CloseOperationalShiftInput = z.infer<typeof closeOperationalShiftSchema>;
@@ -1872,6 +2129,7 @@ export type PaymentReversalCreateInput = z.infer<typeof paymentReversalCreateSch
 export type PaymentTerminalCertificationInput = z.infer<typeof paymentTerminalCertificationSchema>;
 export type PaymentTerminalConfigurationInput = z.infer<typeof paymentTerminalConfigurationSchema>;
 export type PrintJobInput = z.infer<typeof printJobSchema>;
+export type PrintSplitInput = z.infer<typeof printSplitSchema>;
 export type PrintJobQueryInput = z.infer<typeof printJobQuerySchema>;
 export type PrintJobStatusInput = z.infer<typeof printJobStatusSchema>;
 export type RetryPrintJobInput = z.infer<typeof retryPrintJobSchema>;

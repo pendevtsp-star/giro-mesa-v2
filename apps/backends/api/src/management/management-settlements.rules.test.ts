@@ -2,12 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   allocateCents,
+  defaultSettlementConfig,
+  normalizeSettlementConfig,
   partnershipRewardCents,
   settlementPayableCents,
   teamServiceShareCents,
   validatePartnershipTiers,
 } from "./management-settlements.rules.js";
-import { settlementPeriodSchema } from "./management-settlements.schemas.js";
+import {
+  settlementConfigSchema,
+  settlementPeriodSchema,
+} from "./management-settlements.schemas.js";
 
 const tiers = [
   { minimumCents: 0, maximumCents: 2_999_999, rewardType: "percentage" as const, rewardValue: 0 },
@@ -62,6 +67,37 @@ describe("waiter settlement rules", () => {
     assert.equal(
       settlementPeriodSchema.safeParse({ from: "2026-02-30", to: "2026-03-01" }).success,
       false,
+    );
+  });
+
+  it("applies safe service-charge defaults to legacy configurations", () => {
+    const {
+      serviceChargeEnabled: _enabled,
+      defaultServiceChargeBasisPoints: _rate,
+      serviceChargeApplication: _application,
+      ...legacy
+    } = defaultSettlementConfig;
+    const normalized = normalizeSettlementConfig(legacy);
+
+    assert.equal(normalized.serviceChargeEnabled, false);
+    assert.equal(normalized.defaultServiceChargeBasisPoints, 0);
+    assert.equal(normalized.serviceChargeApplication, "manual");
+    assert.equal(normalized.attributionMode, legacy.attributionMode);
+  });
+
+  it("requires a positive default rate when service charge is enabled", () => {
+    assert.equal(
+      settlementConfigSchema.safeParse({ ...defaultSettlementConfig, serviceChargeEnabled: true })
+        .success,
+      false,
+    );
+    assert.equal(
+      settlementConfigSchema.safeParse({
+        ...defaultSettlementConfig,
+        serviceChargeEnabled: true,
+        defaultServiceChargeBasisPoints: 1_000,
+      }).success,
+      true,
     );
   });
 });

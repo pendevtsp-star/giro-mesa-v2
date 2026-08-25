@@ -109,6 +109,10 @@ privacy_export_key=$(openssl rand -base64 32)
 table_session_key=$(openssl rand -base64 32)
 backup_manifest_key=$(openssl rand -base64 32)
 backup_config_key=$(openssl rand -base64 32)
+evolution_global_key=$(openssl rand -hex 32)
+evolution_token_secret=$(openssl rand -hex 32)
+evolution_postgres_password=$(openssl rand -hex 24)
+doseclub_credential_secret=$(openssl rand -hex 32)
 
 mkdir -p "$(dirname "$target")"
 umask 077
@@ -147,6 +151,11 @@ write_key FISCAL_RELEASE_ENV homologation
 write_key FOCUS_NFE_PRIMARY_TOKEN ""
 write_key FISCAL_CREDENTIALS_ENCRYPTION_KEY "$fiscal_credentials_key"
 write_key FOCUS_NFE_TIMEOUT_MS 15000
+write_key ACCOUNTANT_ATTACHMENT_SCAN_MODE clamd
+write_key ACCOUNTANT_ATTACHMENT_CLAMD_HOST clamav
+write_key ACCOUNTANT_ATTACHMENT_CLAMD_PORT 3310
+write_key ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS 10000
+write_key ACCOUNTANT_ATTACHMENT_RETENTION_DAYS 1827
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"
 if [[ -n "$platform_admin_grants" ]]; then write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"; fi
 write_key INTERNAL_API_KEY "$internal_key"
@@ -161,6 +170,15 @@ write_key EMAIL_PROVIDER_CREDENTIAL_REFERENCE resend
 write_key RESEND_API_KEY "$resend_api_key"
 write_key RESEND_FROM "$resend_from"
 write_key RESEND_REPLY_TO "$resend_reply_to"
+write_key WHATSAPP_PROVIDER_ENABLED false
+write_key WHATSAPP_PROVIDER_CREDENTIAL_REFERENCE evolution-go
+write_key WHATSAPP_EVOLUTION_API_URL http://evolution-go:4000
+write_key WHATSAPP_EVOLUTION_GLOBAL_API_KEY "$evolution_global_key"
+write_key WHATSAPP_EVOLUTION_TOKEN_SECRET "$evolution_token_secret"
+write_key WHATSAPP_EVOLUTION_WEBHOOK_URL http://api:3200/v1/growth/evolution-go/webhook
+write_key EVOLUTION_POSTGRES_USER evolution
+write_key EVOLUTION_POSTGRES_PASSWORD "$evolution_postgres_password"
+write_key EVOLUTION_OPERATOR_EMAIL ""
 write_key PUBLIC_HUB_ACK_TIMEOUT_MS 5000
 write_key WEBHOOK_SIGNING_MASTER_KEY "$webhook_key"
 write_key COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION v1
@@ -170,6 +188,10 @@ write_key PUBLIC_TABLE_SESSION_SIGNING_KEY "$table_session_key"
 write_key GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64 "$backup_manifest_key"
 write_key GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64 "$backup_config_key"
 write_key DOSECLUB_PROVIDER_ENABLED false
+write_key DOSECLUB_API_BASE_URL https://doseclube.giromesa.com.br
+write_key DOSECLUB_PROVISIONING_KEY ""
+write_key DOSECLUB_CREDENTIAL_SECRET "$doseclub_credential_secret"
+write_key GIROMESA_API_BASE_URL https://api.giromesa.com.br
 write_key ASAAS_API_URL https://api-sandbox.asaas.com/v3
 write_key ASAAS_API_KEY ""
 write_key ASAAS_WEBHOOK_SECRET ""

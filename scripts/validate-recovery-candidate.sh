@@ -62,11 +62,39 @@ fi
 postgres16="${postgres_images[0]%$'\r'}"
 postgres17="${postgres_images[1]%$'\r'}"
 
-required_migration="$candidate_directory/packages/db/drizzle/0045_strong_pride.sql"
-required_target_migration="$trust_root/packages/db/drizzle/0053_petite_trauma.sql"
+readarray -t recovery_identity < <(python3 -I - "$candidate_directory/packages/db/drizzle/meta/_journal.json" <<'PY'
+import json, pathlib, re, sys
+entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
+if not entries: raise SystemExit("RECOVERY_CANDIDATE_JOURNAL_INVALID")
+entry=entries[-1]; tag=entry.get("tag",""); when=str(entry.get("when",""))
+match=re.fullmatch(r"([0-9]{4})_[A-Za-z0-9_.-]+",tag)
+if not match or not re.fullmatch(r"[0-9]{13}",when): raise SystemExit("RECOVERY_CANDIDATE_JOURNAL_INVALID")
+print(tag); print(int(match.group(1))); print(when)
+PY
+)
+readarray -t target_identity < <(python3 -I - "$trust_root/packages/db/drizzle/meta/_journal.json" <<'PY'
+import json, pathlib, re, sys
+entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
+if not entries: raise SystemExit("RECOVERY_TARGET_JOURNAL_INVALID")
+entry=entries[-1]; tag=entry.get("tag",""); when=str(entry.get("when",""))
+match=re.fullmatch(r"([0-9]{4})_[A-Za-z0-9_.-]+",tag)
+if not match or not re.fullmatch(r"[0-9]{13}",when): raise SystemExit("RECOVERY_TARGET_JOURNAL_INVALID")
+print(tag); print(int(match.group(1))); print(when)
+PY
+)
+recovery_tag="${recovery_identity[0]%$'\r'}"
+recovery_level="${recovery_identity[1]%$'\r'}"
+recovery_when="${recovery_identity[2]%$'\r'}"
+target_tag="${target_identity[0]%$'\r'}"
+target_level="${target_identity[1]%$'\r'}"
+target_when="${target_identity[2]%$'\r'}"
+((target_level >= recovery_level)) || { printf 'RECOVERY_TARGET_PRECEDES_CANDIDATE\n' >&2; exit 65; }
+
+required_migration="$candidate_directory/packages/db/drizzle/${recovery_tag}.sql"
+required_target_migration="$trust_root/packages/db/drizzle/${target_tag}.sql"
 required_matrix_test="$candidate_directory/packages/db/src/schema.test.ts"
 [[ -f "$required_migration" && -f "$required_target_migration" && -f "$required_matrix_test" ]] || {
-  printf 'RECOVERY_0045_PROOF_MISSING\n' >&2
+  printf 'RECOVERY_MIGRATION_PROOF_MISSING\n' >&2
   exit 65
 }
 
@@ -152,6 +180,8 @@ run_legacy_upgrade_matrix() {
   docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c 'CREATE SCHEMA drizzle; CREATE TABLE drizzle.__drizzle_migrations (id serial PRIMARY KEY, hash text NOT NULL, created_at bigint);' >/dev/null
   while IFS=$'\t' read -r tag when; do
+    tag="${tag%$'\r'}"
+    when="${when%$'\r'}"
     file="$legacy_directory/packages/db/drizzle/${tag}.sql"
     [[ -f "$file" ]] || { printf 'RECOVERY_LEGACY_MIGRATION_MISSING:%s\n' "$tag" >&2; return 1; }
     docker exec -i "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file" >/dev/null
@@ -167,6 +197,8 @@ for entry in entries: print(f'{entry["tag"]}\t{entry["when"]}')
 PY
   )
   while IFS=$'\t' read -r tag when; do
+    tag="${tag%$'\r'}"
+    when="${when%$'\r'}"
     file="$candidate_directory/packages/db/drizzle/${tag}.sql"
     [[ -f "$file" ]] || { printf 'RECOVERY_CANDIDATE_MIGRATION_MISSING:%s\n' "$tag" >&2; return 1; }
     docker exec -i "$container" psql -1 -U postgres -d postgres -v ON_ERROR_STOP=1 < "$file" >/dev/null
@@ -174,10 +206,10 @@ PY
     [[ "$hash" =~ ^[0-9a-f]{64}$ && "$when" =~ ^[0-9]{13}$ ]] || { printf 'RECOVERY_CANDIDATE_JOURNAL_INVALID\n' >&2; return 1; }
     docker exec "$container" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
       -c "INSERT INTO drizzle.__drizzle_migrations(hash, created_at) VALUES ('$hash', $when)" >/dev/null
-  done < <(python3 -I - "$candidate_directory/packages/db/drizzle/meta/_journal.json" <<'PY'
+  done < <(python3 -I - "$candidate_directory/packages/db/drizzle/meta/_journal.json" "$recovery_tag" <<'PY'
 import json, pathlib, sys
 entries=json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")).get("entries",[])
-if not entries or entries[-1].get("tag") != "0045_strong_pride": raise SystemExit("RECOVERY_CANDIDATE_JOURNAL_INVALID")
+if not entries or entries[-1].get("tag") != sys.argv[2]: raise SystemExit("RECOVERY_CANDIDATE_JOURNAL_INVALID")
 for entry in entries:
     if entry.get("when", 0) > 1786493658116: print(f'{entry["tag"]}\t{entry["when"]}')
 PY
@@ -186,7 +218,7 @@ PY
   port="${binding##*:}"
   (cd -- "$candidate_directory" && DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:${port}/postgres" pnpm db:migrate)
   latest="$(docker exec "$container" psql -U postgres -d postgres -Atqc 'SELECT created_at FROM drizzle.__drizzle_migrations ORDER BY id DESC LIMIT 1')"
-  [[ "$latest" == "1787256690924" ]] || { printf 'RECOVERY_LEGACY_UPGRADE_TARGET_MISMATCH\n' >&2; return 1; }
+  [[ "$latest" == "$recovery_when" ]] || { printf 'RECOVERY_LEGACY_UPGRADE_TARGET_MISMATCH\n' >&2; return 1; }
   docker rm -f "$container" >/dev/null
 }
 
@@ -246,7 +278,7 @@ chmod 600 "$runtime_environment"
 
 apply_schema_level() {
   local database="$1" level="$2" migration_root="$candidate_directory" file prefix number
-  if ((level > 45)); then migration_root="$trust_root"; fi
+  if ((level > recovery_level)); then migration_root="$trust_root"; fi
   docker exec "$runtime_postgres" psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
     -c "CREATE DATABASE \"${database}\"" >/dev/null
   while IFS= read -r file; do
@@ -271,7 +303,7 @@ PY
   mv -f -- "$temporary" "$runtime_environment"
 }
 
-for level in 45 53; do
+for level in "$recovery_level" "$target_level"; do
   database="recovery_level_${level}"
   api="gm-recovery-api-${level}-${suffix}"
   worker="gm-recovery-worker-${level}-${suffix}"
@@ -318,19 +350,22 @@ done
 
 mkdir -p -- "$output_directory"
 [[ ! -L "$output_directory" ]] || { printf 'RECOVERY_EVIDENCE_SYMLINK_FORBIDDEN\n' >&2; exit 65; }
-python3 -I - "$output_directory" "$recovery_sha" "$doseclub_present" <<'PY'
+python3 -I - "$output_directory" "$recovery_sha" "$doseclub_present" "$recovery_level" "$target_level" "$target_tag" <<'PY'
 import hashlib, json, os, pathlib, sys, tempfile
 directory=pathlib.Path(sys.argv[1])
 recovery_sha=sys.argv[2]
 doseclub_present=sys.argv[3]=="true"
-levels=[45,53]
+recovery_level=int(sys.argv[4])
+target_level=int(sys.argv[5])
+target_migration=sys.argv[6]
+levels=[recovery_level,target_level]
 value={
     "schemaVersion":1,
     "role":"recovery",
     "recoveryArtifact":"git:"+recovery_sha,
     "postgresMajors":[16,17],
     "schemaLevels":levels,
-    "targetMigration":"0053_petite_trauma",
+    "targetMigration":target_migration,
     "testedUpgrade":True,
     "doseClubReconciliation":"legacy-source-upgraded",
     "legacyUpgrade":{
@@ -342,7 +377,7 @@ value={
     },
     "runtime":{
         "postgresMajor":17,
-        "schemaLevel":53,
+        "schemaLevel":target_level,
         "apiHealth":"passed",
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
@@ -350,8 +385,8 @@ value={
     "runtimeMatrix":{
         "postgresMajor":17,
         "schemaLevels":levels,
-        "apiHealthByLevel":{"45":"passed","53":"passed"},
-        "workerByLevel":{"45":"passed","53":"passed"},
+        "apiHealthByLevel":{str(level):"passed" for level in levels},
+        "workerByLevel":{str(level):"passed" for level in levels},
         "workerStabilitySeconds":15,
         "outboxProbe":"passed",
         "doseClub":{"present":doseclub_present,"probe":"passed" if doseclub_present else "not-present"},

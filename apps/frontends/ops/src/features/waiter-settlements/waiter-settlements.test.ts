@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   defaultSettlementPeriod,
   parseSettlement,
+  parseSettlementConfiguration,
   parseWaiterSettlementsOverview,
   type SettlementConfiguration,
 } from "./waiter-settlements";
 
 const configuration: SettlementConfiguration = {
+  serviceChargeEnabled: false,
+  defaultServiceChargeBasisPoints: 0,
+  serviceChargeApplication: "manual",
   attributionMode: "final_responsible",
   transferMode: "move_to_final",
   serviceBase: "net_after_discounts",
@@ -24,6 +28,21 @@ const configuration: SettlementConfiguration = {
 };
 
 describe("waiter settlements payload", () => {
+  it("mantém a taxa desabilitada ao ler uma configuração legada", () => {
+    const {
+      serviceChargeEnabled: _enabled,
+      defaultServiceChargeBasisPoints: _basisPoints,
+      serviceChargeApplication: _application,
+      ...legacy
+    } = configuration;
+
+    expect(parseSettlementConfiguration(legacy)).toMatchObject({
+      serviceChargeEnabled: false,
+      defaultServiceChargeBasisPoints: 0,
+      serviceChargeApplication: "manual",
+    });
+  });
+
   it("mantém perdas apenas informativas no total apurado", () => {
     const settlement = parseSettlement(
       {

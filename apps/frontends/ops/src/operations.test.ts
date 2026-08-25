@@ -5,6 +5,8 @@ import {
   parsePilotCatalog,
   parsePilotFloor,
   parseTabDetail,
+  SERVICE_MODE_PRESENTATION,
+  serviceModeLabel,
   summarizeOperationalLoad,
   summarizeTabPayments,
   usesQuickServiceMode,
@@ -16,6 +18,14 @@ describe("contratos operacionais reais", () => {
     expect(usesQuickServiceMode("bar")).toBe(true);
     expect(usesQuickServiceMode("full_service")).toBe(false);
     expect(usesQuickServiceMode("hybrid")).toBe(false);
+  });
+
+  it("explica os perfis de atendimento sem expor nomes técnicos", () => {
+    expect(serviceModeLabel("full_service")).toBe("Atendimento à mesa");
+    expect(serviceModeLabel("quick_service")).toBe("Atendimento rápido");
+    expect(serviceModeLabel("bar")).toBe("Bar por comanda");
+    expect(serviceModeLabel("hybrid")).toBe("Misto por praça");
+    expect(SERVICE_MODE_PRESENTATION.hybrid.description).toContain("praças");
   });
 
   it("normaliza pagamentos legados e calcula o recebido pelo valor líquido", () => {
@@ -211,6 +221,20 @@ describe("contratos operacionais reais", () => {
         },
       ],
       openTabs: [],
+      serviceCalls: [
+        {
+          id: "call-1",
+          tableId: "table-1",
+          tabId: "tab-1",
+          kind: "bill",
+          status: "open",
+          slaMinutes: 5,
+          printStatus: "confirmation_required",
+          acknowledgedByIdentityId: null,
+          acknowledgedAt: null,
+          createdAt: "2026-08-15T20:19:00.000Z",
+        },
+      ],
       tablePhases: [
         {
           tableId: "table-1",
@@ -272,6 +296,10 @@ describe("contratos operacionais reais", () => {
     expect(floor.rooms[0]?.layoutPolygon).toHaveLength(4);
     expect(floor.shiftTableLayouts[0]).toMatchObject({ tableId: "table-1", x: 220, y: 140 });
     expect(floor.tablePhases[0]).toMatchObject({ tableId: "table-1", phase: "ready" });
+    expect(floor.serviceCalls[0]).toMatchObject({
+      tableId: "table-1",
+      printStatus: "confirmation_required",
+    });
     expect(summarizeOperationalLoad(floor)).toMatchObject({
       sections: [
         { id: "section-1", tables: 0 },

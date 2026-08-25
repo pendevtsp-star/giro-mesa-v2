@@ -209,6 +209,7 @@ it("posts one trusted payment from the enrolled SmartPOS result", async (context
       installationId: device.id,
       label: "Rede Smart",
       mode: "waiter_mobile",
+      paymentMode: "homologated_pos",
       defaultRoute: "counter",
       createdByIdentityId: identity.id,
       updatedByIdentityId: identity.id,
@@ -337,6 +338,7 @@ it("posts one trusted payment from the enrolled SmartPOS result", async (context
     const terminalProfileInput: TerminalProfileInput = {
       label: "Rede Smart atualizada",
       mode: "waiter_mobile",
+      paymentMode: "homologated_pos",
       defaultRoute: "counter",
       printerId: null,
       stationId: null,
@@ -529,6 +531,7 @@ it("posts one trusted payment from the enrolled SmartPOS result", async (context
         service.mergeTabs(identity.id, organization.id, unit.id, `merge-reserved-${runId}`, {
           targetTabId: mergeTarget.id,
           sourceTabIds: [tab.id],
+          reasonCode: "operational_reorganization",
         }),
       (error: unknown) => {
         assert.equal(
@@ -1412,6 +1415,7 @@ it("posts one trusted payment from the enrolled SmartPOS result", async (context
       installationId: otherDevice.id,
       label: "Outro terminal",
       mode: "waiter_mobile",
+      paymentMode: "homologated_pos",
       defaultRoute: "counter",
       createdByIdentityId: identity.id,
       updatedByIdentityId: identity.id,

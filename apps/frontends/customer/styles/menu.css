@@ -52,7 +52,7 @@
 }
 .category-list button {
   flex: 0 0 auto;
-  min-height: 37px;
+  min-height: 44px;
   padding: 7px 15px;
   border: 1px solid var(--gm-border);
   border-radius: 20px;
@@ -220,16 +220,31 @@
   color: var(--ink);
 }
 .table-actions {
-  margin: 0 18px;
-  padding: 25px;
+  margin: 14px 18px 0;
+  padding: 16px;
   border-radius: 18px;
   background: var(--cream);
 }
-.table-actions > div:first-child p,
+.table-actions-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 35;
+  box-shadow: var(--gm-shadow-md);
+}
+.has-table-session .menu-toolbar {
+  position: static;
+}
+.table-actions-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.table-actions-heading > div > p,
 .table-actions h2 {
   margin: 0;
 }
-.table-actions > div:first-child p {
+.table-actions-heading > div > p {
   color: var(--orange);
   font-size: 10px;
   text-transform: uppercase;
@@ -241,14 +256,14 @@
     26px Georgia,
     serif;
 }
-.table-actions > div:last-child {
-  margin-top: 18px;
+.table-action-grid {
+  margin-top: 12px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 9px;
 }
 .table-actions button {
-  min-height: 55px;
+  min-height: 58px;
   border: 1px solid var(--gm-border);
   border-radius: 12px;
   background: var(--gm-surface);
@@ -256,6 +271,110 @@
   font-size: 12px;
   font-weight: 750;
   cursor: pointer;
+}
+.table-actions-state {
+  margin: 12px 0 0;
+  color: var(--gm-muted);
+  font-size: 12px;
+}
+.table-presence-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 12px;
+}
+.table-presence-form .table-actions-state {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.table-presence-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.table-presence-form input {
+  letter-spacing: 0.2em;
+}
+.table-consumption {
+  margin: 10px 18px 0;
+  padding: 18px;
+  border: 1px solid var(--gm-border);
+  border-radius: 16px;
+  background: var(--gm-surface);
+}
+.table-consumption > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.table-consumption > header p,
+.table-consumption > header h2 {
+  margin: 0;
+}
+.table-consumption > header p {
+  color: var(--restaurant-accent, var(--gm-accent));
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.table-consumption > header h2 {
+  font:
+    24px Georgia,
+    serif;
+}
+.table-consumption > header button {
+  min-height: 44px;
+}
+.consumption-state {
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--gm-surface-soft);
+  color: var(--gm-muted);
+  font-size: 12px;
+}
+.consumption-error {
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger-on-soft);
+}
+.consumption-lines {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.consumption-lines li,
+.consumption-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gm-border);
+  font-size: 13px;
+}
+.consumption-lines b {
+  color: var(--gm-muted);
+}
+.consumption-totals {
+  margin: 8px 0 0;
+}
+.consumption-totals dt {
+  color: var(--gm-muted);
+}
+.consumption-totals dd {
+  margin: 0;
+  font-weight: 800;
+}
+.consumption-totals > div:last-child {
+  color: var(--restaurant-brand, var(--gm-brand-strong));
+  font-size: 15px;
+}
+.consumption-note {
+  margin: 12px 0 0;
+  color: var(--gm-muted);
+  font-size: 11px;
 }
 .table-actions button span {
   display: block;
@@ -332,7 +451,7 @@
 .service-card-copy {
   margin: 0;
   color: var(--legacy-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .service-card-action {
   display: inline-block;

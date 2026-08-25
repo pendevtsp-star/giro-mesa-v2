@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockCompatibleApi } from "./ops-release";
 
 const organizationId = "a1111111-1111-4111-8111-111111111111";
 const unitId = "b1111111-1111-4111-8111-111111111111";
@@ -11,6 +12,7 @@ const barShiftId = "d2222222-2222-4222-8222-222222222222";
 test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
   test.skip(testInfo.project.name !== "desktop", "A própria jornada cobre desktop e 375 px.");
+  await mockCompatibleApi(page);
   await page.addInitScript(
     ({ identityId, organizationId, unitId }) => {
       localStorage.setItem(
@@ -26,6 +28,15 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     const json = (body: unknown) => route.fulfill({ status: 200, json: body });
     if (path.endsWith("/auth/terminal-session") && request.method() === "GET")
       return route.fulfill({ status: 401, json: { message: "Terminal sem sessão" } });
+    if (path.endsWith("/auth/logout") && request.method() === "POST")
+      return route.fulfill({
+        status: 409,
+        json: {
+          code: "CASH_SHIFT_OPEN",
+          message:
+            "Você ainda é responsável por um caixa aberto. Feche o caixa ou transfira a responsabilidade antes de encerrar a operação.",
+        },
+      });
     if (path.endsWith("/auth/me"))
       return json({
         identity: { id: identityId, email: "caixa@giromesa.test", displayName: "Operador" },
@@ -91,6 +102,7 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
         alerts: [],
         operators: [{ identityId, name: "Operador" }],
         approvals: [],
+        pendingTransfers: [],
         adjustments: [],
         capabilities: {
           canOpen: true,
@@ -186,8 +198,14 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await page.goto("http://127.0.0.1:3112/#/cash");
     await expect(page.getByRole("heading", { name: "Contas e caixa" })).toBeVisible();
     await expect(page.getByText("Contagem cega", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Caixa principal · aberto" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Bar · aberto" })).toBeVisible();
+    const mainRegister = page.getByRole("button", {
+      name: "Selecionar Caixa principal, aberto",
+    });
+    const barRegister = page.getByRole("button", { name: "Selecionar Bar, aberto" });
+    await expect(mainRegister).toBeVisible();
+    await expect(mainRegister).toHaveAttribute("aria-pressed", "true");
+    await expect(barRegister).toBeVisible();
+    await expect(page.getByText("Responsável: Operador").first()).toBeVisible();
     await expect(page.getByText("2 gavetas em operação", { exact: true })).toBeVisible();
     await expect(page.getByText("1 comanda(s) com saldo pendente")).toBeVisible();
 
@@ -195,6 +213,12 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     if (!(await countedInput.isVisible()))
       await page.getByText("Fechar caixa", { exact: true }).click();
     await countedInput.fill("149,00");
+    await barRegister.click();
+    await expect(barRegister).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByLabel("Dinheiro contado")).toHaveValue("");
+    await mainRegister.click();
+    await expect(page.getByLabel("Dinheiro contado")).toHaveValue("");
+    await page.getByLabel("Dinheiro contado").fill("149,00");
     await page.getByRole("button", { name: "Revisar contagem" }).click();
     await expect(
       page.getByText("Após fechar, o esperado e a diferença serão revelados."),
@@ -206,4 +230,10 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
       true,
     );
   }
+
+  await page.getByLabel(/Abrir menu do perfil/).click();
+  await page.getByRole("button", { name: "Encerrar sessão" }).click();
+  await expect(page.getByText("Feche o caixa antes de sair", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Conferir e fechar caixa" }).click();
+  await expect(page.getByRole("heading", { name: "Contas e caixa" })).toBeVisible();
 });

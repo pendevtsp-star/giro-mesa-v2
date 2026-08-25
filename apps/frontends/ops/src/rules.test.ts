@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CartItem, Profile } from "./domain";
+import { profiles } from "./profiles";
 import { calculateCartTotal, canAccess, isValidTerminalPin, nextTicketStatus } from "./rules";
 
 const waiter: Profile = {
@@ -23,6 +24,14 @@ describe("regras operacionais", () => {
       canAccess({ ...waiter, id: "accountant", permissions: ["accounting.view"] }, "accountant"),
     ).toBe(true);
     expect(canAccess(waiter, "fiscal")).toBe(false);
+    expect(canAccess(waiter, "billing")).toBe(false);
+    expect(canAccess(waiter, "table-qrs")).toBe(false);
+    const owner = profiles.find((profile) => profile.id === "owner");
+    const manager = profiles.find((profile) => profile.id === "manager");
+    expect(owner && canAccess(owner, "billing")).toBe(true);
+    expect(manager && canAccess(manager, "billing")).toBe(false);
+    expect(owner && canAccess(owner, "table-qrs")).toBe(true);
+    expect(manager && canAccess(manager, "table-qrs")).toBe(true);
   });
 
   it("calcula quantidade, produto e modificador em centavos", () => {

@@ -150,6 +150,8 @@ export const nfeImportReviewSchema = z.object({
 export const nfeImportConfirmSchema = z
   .object({
     locationId: id,
+    purchaseOrderId: id.optional(),
+    dueDate: date,
     receivedAt: instant.optional(),
     acceptTotalDivergence: z.boolean().default(false),
     divergenceReason: z.string().trim().min(5).max(500).optional(),
@@ -168,11 +170,56 @@ export const productReturnableSchema = z.object({
 });
 
 export const returnableCustodyConfirmSchema = z.object({
+  issueMovementId: id,
   containerInventoryItemId: id,
   locationId: id,
   quantity: positiveQuantity,
-  orderId: id.optional(),
   note: z.string().trim().min(3).max(1_000).optional(),
+});
+
+export const returnableCustodyConfirmBulkSchema = z
+  .object({
+    lines: z
+      .array(
+        z.object({
+          issueMovementId: id,
+          locationId: id,
+          quantity: positiveQuantity,
+          note: z.string().trim().min(3).max(1_000).optional(),
+        }),
+      )
+      .min(1)
+      .max(100),
+  })
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    value.lines.forEach((line, index) => {
+      if (seen.has(line.issueMovementId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["lines", index, "issueMovementId"],
+          message: "Cada custódia deve aparecer uma única vez por confirmação.",
+        });
+      }
+      seen.add(line.issueMovementId);
+    });
+  });
+
+export const returnableCustodyHandoffSchema = z.object({
+  issueMovementIds: z
+    .array(id)
+    .min(1)
+    .max(100)
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Cada custódia deve aparecer uma única vez.",
+    }),
+  toIdentityId: id,
+  toShiftReference: z.string().trim().min(1).max(80).optional(),
+  note: z.string().trim().min(3).max(1_000),
+});
+
+export const productReturnableClassificationSchema = z.object({
+  status: z.enum(["returnable", "non_returnable"]),
 });
 
 export const returnableIncidentSchema = z
@@ -624,12 +671,32 @@ export const purchaseInvoiceConfirmSchema = z
     path: ["reason"],
   });
 
-export const payableSchema = z.object({
+const financialAttachmentSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  url: z.string().trim().url().max(2_000),
+  mimeType: z.string().trim().min(1).max(120).optional(),
+});
+
+const financialClassificationSchema = z.object({
+  category: z.string().trim().min(1).max(80).optional(),
+  costCenter: z.string().trim().min(1).max(80).optional(),
+  documentNumber: z.string().trim().min(1).max(80).optional(),
+  notes: z.string().trim().min(1).max(2_000).optional(),
+  attachments: z.array(financialAttachmentSchema).max(10).default([]),
+});
+
+const financialRecurrenceSchema = z.object({
+  installments: z.number().int().min(1).max(60).default(1),
+  intervalMonths: z.number().int().min(1).max(12).default(1),
+});
+
+export const payableSchema = financialClassificationSchema.extend({
   supplierId: id.optional(),
   description: z.string().trim().min(3).max(240),
   amountCents: positiveCents,
   competenceDate: date,
   dueDate: date,
+  recurrence: financialRecurrenceSchema.optional(),
 });
 
 export const cashPaymentMethodSchema = z.enum([
@@ -647,14 +714,16 @@ export const financialPaymentSchema = z.object({
   cashRegisterId: id.optional(),
   reference: z.string().trim().min(1).max(160).optional(),
   occurredAt: instant.optional(),
+  approvalRequestId: id.optional(),
 });
 
-export const receivableSchema = z.object({
+export const receivableSchema = financialClassificationSchema.extend({
   sourceOrderId: id.optional(),
   description: z.string().trim().min(3).max(240),
   amountCents: positiveCents,
   competenceDate: date,
   dueDate: date,
+  recurrence: financialRecurrenceSchema.optional(),
   lines: z
     .array(
       z.object({
@@ -671,6 +740,78 @@ export const receivableSchema = z.object({
 export const receivablePaymentSchema = financialPaymentSchema.extend({
   cashShiftId: id.optional(),
 });
+
+export const financeListQuerySchema = z.object({
+  direction: z.enum(["all", "payable", "receivable"]).default("all"),
+  status: z
+    .enum(["all", "open", "partial", "settled", "canceled", "overdue", "due_soon"])
+    .default("all"),
+  search: z.string().trim().max(160).default(""),
+  from: date.optional(),
+  to: date.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(10).max(100).default(25),
+});
+
+export const financeEntryUpdateSchema = financialClassificationSchema
+  .partial()
+  .extend({
+    description: z.string().trim().min(3).max(240).optional(),
+    amountCents: positiveCents.optional(),
+    competenceDate: date.optional(),
+    dueDate: date.optional(),
+    supplierId: id.nullable().optional(),
+    version: z.number().int().positive(),
+  })
+  .refine((value) => Object.keys(value).some((key) => key !== "version"), {
+    message: "Informe ao menos uma alteração.",
+  });
+
+export const financeEntryCancelSchema = z.object({
+  reason: z.string().trim().min(3).max(1_000),
+  version: z.number().int().positive(),
+});
+
+export const financePaymentReversalSchema = z.object({
+  reason: z.string().trim().min(3).max(1_000),
+  cashRegisterId: id.optional(),
+});
+
+export const financeSettingsSchema = z.object({
+  paymentApprovalThresholdCents: positiveCents.nullable().default(null),
+  requireDistinctApprover: z.boolean().default(true),
+  dueSoonDays: z.number().int().min(1).max(90).default(7),
+});
+
+export const financeApprovalRequestSchema = financialPaymentSchema
+  .omit({ approvalRequestId: true })
+  .extend({
+    direction: z.enum(["payable", "receivable"]),
+    entryId: id,
+  });
+
+export const financeApprovalDecisionSchema = z
+  .object({
+    decision: z.enum(["approve", "reject"]),
+    note: z.string().trim().min(3).max(1_000).optional(),
+  })
+  .refine((value) => value.decision !== "reject" || value.note, {
+    message: "Informe o motivo da rejeição.",
+    path: ["note"],
+  });
+
+export const financeReconciliationResolutionSchema = z.object({
+  paymentDirection: z.enum(["payable", "receivable"]),
+  paymentId: id,
+  note: z.string().trim().min(3).max(1_000),
+  version: z.number().int().positive(),
+});
+
+export const financeExportQuerySchema = financeListQuerySchema
+  .omit({ page: true, pageSize: true })
+  .extend({
+    format: z.enum(["csv", "pdf"]).default("csv"),
+  });
 
 export const openCashShiftSchema = z.object({
   openingCents: cents,
@@ -697,6 +838,15 @@ export const cashTransferSchema = z
   .refine((value) => value.fromCashShiftId !== value.toCashShiftId, {
     message: "Origem e destino devem ser caixas diferentes.",
     path: ["toCashShiftId"],
+  });
+export const cashTransferDecisionSchema = z
+  .object({
+    decision: z.enum(["accept", "reject"]),
+    note: z.string().trim().min(3).max(1_000).optional(),
+  })
+  .refine((value) => value.decision !== "reject" || value.note !== undefined, {
+    message: "Informe o motivo da rejeição.",
+    path: ["note"],
   });
 export const cashMovementSchema = z.object({
   type: z.enum(["supply", "withdrawal"]),
@@ -1252,6 +1402,11 @@ export type NfeImportReviewInput = z.infer<typeof nfeImportReviewSchema>;
 export type NfeImportConfirmInput = z.infer<typeof nfeImportConfirmSchema>;
 export type ProductReturnableInput = z.infer<typeof productReturnableSchema>;
 export type ReturnableCustodyConfirmInput = z.infer<typeof returnableCustodyConfirmSchema>;
+export type ReturnableCustodyConfirmBulkInput = z.infer<typeof returnableCustodyConfirmBulkSchema>;
+export type ReturnableCustodyHandoffInput = z.infer<typeof returnableCustodyHandoffSchema>;
+export type ProductReturnableClassificationInput = z.infer<
+  typeof productReturnableClassificationSchema
+>;
 export type ReturnableIncidentInput = z.infer<typeof returnableIncidentSchema>;
 export type ReturnableIncidentReviewInput = z.infer<typeof returnableIncidentReviewSchema>;
 export type ReturnableSupplierExchangeInput = z.infer<typeof returnableSupplierExchangeSchema>;
@@ -1300,10 +1455,22 @@ export type PayableInput = z.infer<typeof payableSchema>;
 export type FinancialPaymentInput = z.infer<typeof financialPaymentSchema>;
 export type ReceivableInput = z.infer<typeof receivableSchema>;
 export type ReceivablePaymentInput = z.infer<typeof receivablePaymentSchema>;
+export type FinanceListQuery = z.infer<typeof financeListQuerySchema>;
+export type FinanceEntryUpdateInput = z.infer<typeof financeEntryUpdateSchema>;
+export type FinanceEntryCancelInput = z.infer<typeof financeEntryCancelSchema>;
+export type FinancePaymentReversalInput = z.infer<typeof financePaymentReversalSchema>;
+export type FinanceSettingsInput = z.infer<typeof financeSettingsSchema>;
+export type FinanceApprovalRequestInput = z.infer<typeof financeApprovalRequestSchema>;
+export type FinanceApprovalDecisionInput = z.infer<typeof financeApprovalDecisionSchema>;
+export type FinanceReconciliationResolutionInput = z.infer<
+  typeof financeReconciliationResolutionSchema
+>;
+export type FinanceExportQuery = z.infer<typeof financeExportQuerySchema>;
 export type OpenCashShiftInput = z.infer<typeof openCashShiftSchema>;
 export type CashRegisterCreateInput = z.infer<typeof cashRegisterCreateSchema>;
 export type CashRegisterUpdateInput = z.infer<typeof cashRegisterUpdateSchema>;
 export type CashTransferInput = z.infer<typeof cashTransferSchema>;
+export type CashTransferDecisionInput = z.infer<typeof cashTransferDecisionSchema>;
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
 export type CloseCashShiftInput = z.infer<typeof closeCashShiftSchema>;
 export type CashShiftReviewInput = z.infer<typeof cashShiftReviewSchema>;

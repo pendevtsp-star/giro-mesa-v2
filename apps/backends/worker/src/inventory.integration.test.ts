@@ -349,6 +349,26 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
       .where(eq(managementReturnableCustodyMovements.orderItemId, orderItem.id));
     assert.equal(custodyAfterSend.length, 1);
     assert.equal(custodyAfterSend[0]?.quantityDelta, "2.000");
+    const issuedCustody = custodyAfterSend[0];
+    assert.ok(issuedCustody);
+    await database.db.insert(managementReturnableCustodyMovements).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      containerInventoryItemId: issuedCustody.containerInventoryItemId,
+      locationId: issuedCustody.locationId,
+      type: "return",
+      quantityDelta: "-0.750",
+      orderId: issuedCustody.orderId,
+      orderItemId: issuedCustody.orderItemId,
+      parentMovementId: issuedCustody.id,
+      responsibleIdentityId: issuedCustody.responsibleIdentityId,
+      counterpartyName: issuedCustody.counterpartyName,
+      dueAt: issuedCustody.dueAt,
+      sourceType: "worker_integration_return",
+      sourceId: randomUUID(),
+      idempotencyKey: `worker-return:${randomUUID()}`,
+      actorIdentityId: identityA.id,
+    });
 
     await database.db
       .update(outboxEvents)
@@ -431,16 +451,24 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
             ),
           ),
         database.db
-          .select({ quantityDelta: managementReturnableCustodyMovements.quantityDelta })
+          .select()
           .from(managementReturnableCustodyMovements)
           .where(eq(managementReturnableCustodyMovements.orderItemId, orderItem.id)),
       ]);
     assert.equal(balanceAfterCancellation[0]?.quantity, "10.000");
     assert.equal(reversalMovements.length, 1);
     assert.deepEqual(custodyAfterCancellation.map(({ quantityDelta }) => quantityDelta).sort(), [
-      "-2.000",
+      "-0.750",
+      "-1.250",
       "2.000",
     ]);
+    const cancellationCustody = custodyAfterCancellation.find(
+      (movement) => movement.sourceType === "pos_order_item_returnable_cancellation",
+    );
+    assert.equal(cancellationCustody?.parentMovementId, issuedCustody.id);
+    assert.equal(cancellationCustody?.responsibleIdentityId, issuedCustody.responsibleIdentityId);
+    assert.equal(cancellationCustody?.counterpartyName, issuedCustody.counterpartyName);
+    assert.deepEqual(cancellationCustody?.dueAt, issuedCustody.dueAt);
 
     await database.db
       .update(managementStockBalances)

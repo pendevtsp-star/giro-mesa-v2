@@ -105,7 +105,11 @@ describe("offline pilot replay", () => {
         body: { tableId: secondId, reason: "Troca solicitada" },
       }),
       event("pos.tabs.merge_requested", "merge-tabs", {
-        body: { targetTabId: entityId, sourceTabIds: [secondId] },
+        body: {
+          targetTabId: entityId,
+          sourceTabIds: [secondId],
+          reason: "Reorganização solicitada offline",
+        },
       }),
       event("pos.tab.split_requested", "split-tab", {
         tabId: entityId,

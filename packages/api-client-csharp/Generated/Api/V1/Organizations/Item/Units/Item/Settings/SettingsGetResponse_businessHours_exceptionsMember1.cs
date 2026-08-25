@@ -15,6 +15,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
     {
         /// <summary>The date property</summary>
         public Date? Date { get; set; }
+        /// <summary>The label property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Label { get; set; }
+#nullable restore
+#else
+        public string Label { get; set; }
+#endif
         /// <summary>The mode property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_businessHours_exceptionsMember1_mode? Mode { get; set; }
         /// <summary>
@@ -36,6 +44,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "date", n => { Date = n.GetDateValue(); } },
+                { "label", n => { Label = n.GetStringValue(); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_businessHours_exceptionsMember1_mode>(); } },
             };
         }
@@ -47,6 +56,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteDateValue("date", Date);
+            writer.WriteStringValue("label", Label);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_businessHours_exceptionsMember1_mode>("mode", Mode);
         }
     }

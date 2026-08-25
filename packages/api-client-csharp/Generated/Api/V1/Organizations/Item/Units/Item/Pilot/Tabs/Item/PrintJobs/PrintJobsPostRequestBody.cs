@@ -18,6 +18,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public int? Copies { get; set; }
         /// <summary>The documentType property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs.PrintJobsPostRequestBody_documentType? DocumentType { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -34,6 +36,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
 #else
         public string Reason { get; set; }
 #endif
+        /// <summary>The serviceCallId property</summary>
+        public Guid? ServiceCallId { get; set; }
         /// <summary>The terminalId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -70,8 +74,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             {
                 { "copies", n => { Copies = n.GetIntValue(); } },
                 { "documentType", n => { DocumentType = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs.PrintJobsPostRequestBody_documentType>(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
+                { "serviceCallId", n => { ServiceCallId = n.GetGuidValue(); } },
                 { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
         }
@@ -84,8 +90,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("copies", Copies);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.PrintJobs.PrintJobsPostRequestBody_documentType>("documentType", DocumentType);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteStringValue("printerId", PrinterId);
             writer.WriteStringValue("reason", Reason);
+            writer.WriteGuidValue("serviceCallId", ServiceCallId);
             writer.WriteStringValue("terminalId", TerminalId);
             writer.WriteAdditionalData(AdditionalData);
         }

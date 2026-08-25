@@ -34,7 +34,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public RequestsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/requests", pathParameters)
+        public RequestsRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/requests{?competence*,overdue*,page*,pageSize*,status*,targetAudience*}", pathParameters)
         {
         }
         /// <summary>
@@ -42,53 +42,89 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public RequestsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/requests", rawUrl)
+        public RequestsRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/requests{?competence*,overdue*,page*,pageSize*,status*,targetAudience*}", rawUrl)
         {
         }
-        /// <returns>A <see cref="Stream"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsGetResponse"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsGetResponse?> GetAsRequestsGetResponseAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsGetResponse> GetAsRequestsGetResponseAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
-            return await RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsGetResponse>(requestInfo, global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsGetResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse"/></returns>
+        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
+        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
+        [Obsolete("This method is obsolete. Use GetAsRequestsGetResponseAsync instead.")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse?> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#nullable restore
+#else
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#endif
+            var requestInfo = ToGetRequestInformation(requestConfiguration);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse>(requestInfo, global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
+        }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostResponse"/></returns>
         /// <param name="body">The request body</param>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostResponse?> PostAsRequestsPostResponseAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostResponse> PostAsRequestsPostResponseAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = ToPostRequestInformation(body, requestConfiguration);
-            await RequestAdapter.SendNoContentAsync(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostResponse>(requestInfo, global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
+        }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse"/></returns>
+        /// <param name="body">The request body</param>
+        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
+        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
+        [Obsolete("This method is obsolete. Use PostAsRequestsPostResponseAsync instead.")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse?> PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#nullable restore
+#else
+        public async Task<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse> PostAsync(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#endif
+            if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
+            var requestInfo = ToPostRequestInformation(body, requestConfiguration);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse>(requestInfo, global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>>? requestConfiguration = default)
         {
 #nullable restore
 #else
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>> requestConfiguration = default)
         {
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             return requestInfo;
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
@@ -106,6 +142,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
             var requestInfo = new RequestInformation(Method.POST, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             requestInfo.SetContentFromParsable(RequestAdapter, "application/json", body);
             return requestInfo;
         }
@@ -118,12 +155,57 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Account
         {
             return new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder(rawUrl, RequestAdapter);
         }
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        #pragma warning disable CS1591
+        public partial class RequestsRequestBuilderGetQueryParameters
+        #pragma warning restore CS1591
+        {
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("competence")]
+            public string? Competence { get; set; }
+#nullable restore
+#else
+            [QueryParameter("competence")]
+            public string Competence { get; set; }
+#endif
+            [QueryParameter("overdue")]
+            public bool? Overdue { get; set; }
+            [QueryParameter("page")]
+            public double? Page { get; set; }
+            [QueryParameter("pageSize")]
+            public double? PageSize { get; set; }
+            [Obsolete("This property is deprecated, use StatusAsGetStatusQueryParameterType instead")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("status")]
+            public string? Status { get; set; }
+#nullable restore
+#else
+            [QueryParameter("status")]
+            public string Status { get; set; }
+#endif
+            [QueryParameter("status")]
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.GetStatusQueryParameterType? StatusAsGetStatusQueryParameterType { get; set; }
+            [Obsolete("This property is deprecated, use TargetAudienceAsGetTargetAudienceQueryParameterType instead")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("targetAudience")]
+            public string? TargetAudience { get; set; }
+#nullable restore
+#else
+            [QueryParameter("targetAudience")]
+            public string TargetAudience { get; set; }
+#endif
+            [QueryParameter("targetAudience")]
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.GetTargetAudienceQueryParameterType? TargetAudienceAsGetTargetAudienceQueryParameterType { get; set; }
+        }
         /// <summary>
         /// Configuration for the request such as headers, query parameters, and middleware options.
         /// </summary>
         [Obsolete("This class is deprecated. Please use the generic RequestConfiguration class generated by the generator.")]
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class RequestsRequestBuilderGetRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
+        public partial class RequestsRequestBuilderGetRequestConfiguration : RequestConfiguration<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Requests.RequestsRequestBuilder.RequestsRequestBuilderGetQueryParameters>
         {
         }
         /// <summary>

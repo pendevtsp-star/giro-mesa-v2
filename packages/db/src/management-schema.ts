@@ -111,6 +111,17 @@ export const managementReceivableStatus = pgEnum("management_receivable_status",
   "received",
   "canceled",
 ]);
+export const managementFinancialPaymentStatus = pgEnum("management_financial_payment_status", [
+  "posted",
+  "reversed",
+]);
+export const managementFinanceApprovalStatus = pgEnum("management_finance_approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+  "executed",
+  "canceled",
+]);
 export const managementCashShiftStatus = pgEnum("management_cash_shift_status", [
   "open",
   "closed",
@@ -208,6 +219,22 @@ export const managementInterunitTransferStatus = pgEnum("management_interunit_tr
   "received",
   "canceled",
 ]);
+export const managementInventoryCountSessionStatus = pgEnum(
+  "management_inventory_count_session_status",
+  ["open", "submitted", "approved", "rejected"],
+);
+export const managementInventoryTemperatureStatus = pgEnum(
+  "management_inventory_temperature_status",
+  ["normal", "warning", "critical"],
+);
+export const managementInventoryLotHoldStatus = pgEnum("management_inventory_lot_hold_status", [
+  "active",
+  "released",
+]);
+export const managementReturnableDepositChargeStatus = pgEnum(
+  "management_returnable_deposit_charge_status",
+  ["charged", "canceled"],
+);
 
 export const managementSuppliers = pgTable(
   "management_suppliers",
@@ -409,6 +436,100 @@ export const managementStockLocationItemSettings = pgTable(
   ],
 );
 
+export const managementInventorySectorPolicies = pgTable(
+  "management_inventory_sector_policies",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    blindCountRequired: boolean("blind_count_required").notNull().default(true),
+    requireDistinctCountReviewer: boolean("require_distinct_count_reviewer")
+      .notNull()
+      .default(true),
+    scanRequired: boolean("scan_required").notNull().default(true),
+    offlineAllowed: boolean("offline_allowed").notNull().default(true),
+    temperatureMinMilli: integer("temperature_min_milli"),
+    temperatureMaxMilli: integer("temperature_max_milli"),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.locationId] }),
+    foreignKey({
+      name: "management_inventory_sector_policies_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("cascade"),
+    check(
+      "management_inventory_sector_policies_temperature_check",
+      sql`(${table.temperatureMinMilli} is null and ${table.temperatureMaxMilli} is null) or (${table.temperatureMinMilli} is not null and ${table.temperatureMaxMilli} is not null and ${table.temperatureMinMilli} < ${table.temperatureMaxMilli})`,
+    ),
+  ],
+);
+
+export const managementInventoryTemperatureReadings = pgTable(
+  "management_inventory_temperature_readings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    celsiusMilli: integer("celsius_milli").notNull(),
+    minimumMilliAtCapture: integer("minimum_milli_at_capture").notNull(),
+    maximumMilliAtCapture: integer("maximum_milli_at_capture").notNull(),
+    status: managementInventoryTemperatureStatus("status").notNull(),
+    source: varchar("source", { length: 16 }).$type<"manual" | "sensor" | "import">().notNull(),
+    note: text("note"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    recordedByIdentityId: uuid("recorded_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_inventory_temperature_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_temperature_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_inventory_temperature_timeline_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.locationId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_inventory_temperature_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_inventory_temperature_values_check",
+      sql`${table.celsiusMilli} between -100000 and 100000 and ${table.minimumMilliAtCapture} < ${table.maximumMilliAtCapture}`,
+    ),
+    check(
+      "management_inventory_temperature_source_check",
+      sql`${table.source} in ('manual','sensor','import')`,
+    ),
+  ],
+);
+
 export const managementProductReturnables = pgTable(
   "management_product_returnables",
   {
@@ -457,6 +578,78 @@ export const managementProductReturnables = pgTable(
     }).onDelete("restrict"),
     check("management_product_returnables_quantity_check", sql`${table.quantityPerUnit} > 0`),
     check("management_product_returnables_deposit_check", sql`${table.depositCents} >= 0`),
+  ],
+);
+
+export const managementReturnablePolicies = pgTable(
+  "management_returnable_policies",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    depositMode: varchar("deposit_mode", { length: 16 })
+      .$type<"disabled" | "manual">()
+      .notNull()
+      .default("disabled"),
+    defaultDueDays: integer("default_due_days").notNull().default(7),
+    returnableClosePolicy: varchar("returnable_close_policy", { length: 16 })
+      .$type<"ignore" | "warn" | "block">()
+      .notNull()
+      .default("warn"),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId] }),
+    foreignKey({
+      name: "management_returnable_policies_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "management_returnable_policies_deposit_mode_check",
+      sql`${table.depositMode} in ('disabled','manual')`,
+    ),
+    check(
+      "management_returnable_policies_close_policy_check",
+      sql`${table.returnableClosePolicy} in ('ignore','warn','block')`,
+    ),
+    check(
+      "management_returnable_policies_due_days_check",
+      sql`${table.defaultDueDays} between 1 and 365`,
+    ),
+  ],
+);
+
+export const managementProductReturnableClassifications = pgTable(
+  "management_product_returnable_classifications",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    productId: uuid("product_id").notNull(),
+    status: varchar("status", { length: 24 }).$type<"returnable" | "non_returnable">().notNull(),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId, table.productId] }),
+    foreignKey({
+      name: "management_product_returnable_classifications_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_product_returnable_classifications_product_fk",
+      columns: [table.organizationId, table.productId],
+      foreignColumns: [posProducts.organizationId, posProducts.id],
+    }).onDelete("cascade"),
+    check(
+      "management_product_returnable_classifications_status_check",
+      sql`${table.status} in ('returnable','non_returnable')`,
+    ),
   ],
 );
 
@@ -780,6 +973,61 @@ export const managementInventoryLots = pgTable(
   ],
 );
 
+export const managementInventoryLotHolds = pgTable(
+  "management_inventory_lot_holds",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    lotId: uuid("lot_id").notNull(),
+    status: managementInventoryLotHoldStatus("status").notNull().default("active"),
+    reason: text("reason").notNull(),
+    evidence: jsonb("evidence").$type<string[]>().notNull().default([]),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    createdByIdentityId: uuid("created_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    releasedByIdentityId: uuid("released_by_identity_id").references(() => identities.id),
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    releaseReason: text("release_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_inventory_lot_holds_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_lot_holds_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("management_inventory_lot_holds_active_unique")
+      .on(table.organizationId, table.unitId, table.lotId)
+      .where(sql`${table.status} = 'active'`),
+    index("management_inventory_lot_holds_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "management_inventory_lot_holds_lot_fk",
+      columns: [table.organizationId, table.unitId, table.lotId],
+      foreignColumns: [
+        managementInventoryLots.organizationId,
+        managementInventoryLots.unitId,
+        managementInventoryLots.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_inventory_lot_holds_resolution_check",
+      sql`(${table.status} = 'active' and ${table.releasedByIdentityId} is null and ${table.releasedAt} is null and ${table.releaseReason} is null) or (${table.status} = 'released' and ${table.releasedByIdentityId} is not null and ${table.releasedAt} is not null and nullif(btrim(${table.releaseReason}), '') is not null)`,
+    ),
+  ],
+);
+
 export const managementInventoryAssets = pgTable(
   "management_inventory_assets",
   {
@@ -1069,6 +1317,7 @@ export const managementInventoryTransfers = pgTable(
     quantityDivergent: numeric("quantity_divergent", { precision: 16, scale: 3 })
       .notNull()
       .default("0"),
+    unitCostCents: integer("unit_cost_cents"),
     reason: text("reason").notNull(),
     status: managementInventoryTransferStatus("status").notNull().default("in_transit"),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
@@ -1165,6 +1414,10 @@ export const managementInventoryTransfers = pgTable(
     check(
       "management_inventory_transfers_quantity_check",
       sql`${table.quantity} > 0 and ${table.quantityReceived} >= 0 and ${table.quantityDivergent} >= 0 and ${table.quantityReceived} + ${table.quantityDivergent} <= ${table.quantity}`,
+    ),
+    check(
+      "management_inventory_transfers_cost_check",
+      sql`${table.unitCostCents} is null or ${table.unitCostCents} >= 0`,
     ),
     check("management_inventory_transfers_line_number_check", sql`${table.lineNumber} > 0`),
     check(
@@ -1360,6 +1613,124 @@ export const managementInventoryCountSchedules = pgTable(
     check(
       "management_inventory_count_schedules_values_check",
       sql`${table.riskScore} between 0 and 100 and ${table.frequencyDays} > 0`,
+    ),
+  ],
+);
+
+export const managementInventoryCountSessions = pgTable(
+  "management_inventory_count_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    locationId: uuid("location_id").notNull(),
+    status: managementInventoryCountSessionStatus("status").notNull().default("open"),
+    shiftReference: varchar("shift_reference", { length: 80 }),
+    reason: text("reason").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    startedByIdentityId: uuid("started_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }),
+    reviewedByIdentityId: uuid("reviewed_by_identity_id").references(() => identities.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_inventory_count_sessions_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_count_sessions_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("management_inventory_count_sessions_active_location_unique")
+      .on(table.organizationId, table.unitId, table.locationId)
+      .where(sql`${table.status} in ('open', 'submitted')`),
+    index("management_inventory_count_sessions_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "management_inventory_count_sessions_location_fk",
+      columns: [table.organizationId, table.unitId, table.locationId],
+      foreignColumns: [
+        managementStockLocations.organizationId,
+        managementStockLocations.unitId,
+        managementStockLocations.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_inventory_count_sessions_state_check",
+      sql`(${table.status} = 'open' and ${table.submittedAt} is null and ${table.reviewedAt} is null) or (${table.status} = 'submitted' and ${table.submittedAt} is not null and ${table.reviewedAt} is null) or (${table.status} in ('approved','rejected') and ${table.submittedAt} is not null and ${table.reviewedAt} is not null and ${table.reviewedByIdentityId} is not null and nullif(btrim(${table.reviewNote}), '') is not null)`,
+    ),
+  ],
+);
+
+export const managementInventoryCountSessionLines = pgTable(
+  "management_inventory_count_session_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    inventoryItemId: uuid("inventory_item_id").notNull(),
+    lotId: uuid("lot_id"),
+    expectedQuantity: numeric("expected_quantity", { precision: 16, scale: 3 }).notNull(),
+    expectedBalanceVersion: integer("expected_balance_version").notNull(),
+    countedQuantity: numeric("counted_quantity", { precision: 16, scale: 3 }),
+    differenceQuantity: numeric("difference_quantity", { precision: 16, scale: 3 }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_inventory_count_session_lines_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_inventory_count_session_lines_item_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.sessionId,
+      table.inventoryItemId,
+      sql`coalesce(${table.lotId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+    ),
+    foreignKey({
+      name: "management_inventory_count_session_lines_session_fk",
+      columns: [table.organizationId, table.unitId, table.sessionId],
+      foreignColumns: [
+        managementInventoryCountSessions.organizationId,
+        managementInventoryCountSessions.unitId,
+        managementInventoryCountSessions.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_inventory_count_session_lines_item_fk",
+      columns: [table.organizationId, table.unitId, table.inventoryItemId],
+      foreignColumns: [
+        managementInventoryItems.organizationId,
+        managementInventoryItems.unitId,
+        managementInventoryItems.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_inventory_count_session_lines_lot_fk",
+      columns: [table.organizationId, table.unitId, table.lotId],
+      foreignColumns: [
+        managementInventoryLots.organizationId,
+        managementInventoryLots.unitId,
+        managementInventoryLots.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_inventory_count_session_lines_values_check",
+      sql`${table.expectedQuantity} >= 0 and ${table.expectedBalanceVersion} > 0 and (${table.countedQuantity} is null or ${table.countedQuantity} >= 0) and ((${table.countedQuantity} is null and ${table.differenceQuantity} is null) or (${table.countedQuantity} is not null and ${table.differenceQuantity} = ${table.countedQuantity} - ${table.expectedQuantity}))`,
     ),
   ],
 );
@@ -1705,6 +2076,7 @@ export const managementInventoryClosings = pgTable(
     period: date("period", { mode: "string" }).notNull(),
     totalValueCents: integer("total_value_cents").notNull(),
     totalReservedValueCents: integer("total_reserved_value_cents").notNull(),
+    totalInTransitValueCents: integer("total_in_transit_value_cents").notNull().default(0),
     lineCount: integer("line_count").notNull(),
     notes: text("notes"),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
@@ -1748,7 +2120,7 @@ export const managementInventoryClosings = pgTable(
     }).onDelete("restrict"),
     check(
       "management_inventory_closings_values_check",
-      sql`${table.totalReservedValueCents} >= 0 and ${table.lineCount} >= 0`,
+      sql`${table.totalReservedValueCents} >= 0 and ${table.totalInTransitValueCents} >= 0 and ${table.lineCount} >= 0`,
     ),
   ],
 );
@@ -1767,6 +2139,10 @@ export const managementInventoryClosingLines = pgTable(
       .notNull()
       .default("0"),
     averageCostCents: integer("average_cost_cents"),
+    inTransitQuantity: numeric("in_transit_quantity", { precision: 16, scale: 3 })
+      .notNull()
+      .default("0"),
+    inTransitValueCents: integer("in_transit_value_cents").notNull().default(0),
     valueCents: integer("value_cents").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -1787,7 +2163,7 @@ export const managementInventoryClosingLines = pgTable(
     }).onDelete("restrict"),
     check(
       "management_inventory_closing_lines_values_check",
-      sql`${table.reservedQuantity} >= 0 and (${table.averageCostCents} is null or ${table.averageCostCents} >= 0)`,
+      sql`${table.reservedQuantity} >= 0 and ${table.inTransitQuantity} >= 0 and ${table.inTransitValueCents} >= 0 and (${table.averageCostCents} is null or ${table.averageCostCents} >= 0)`,
     ),
   ],
 );
@@ -1804,6 +2180,10 @@ export const managementReturnableCustodyMovements = pgTable(
     quantityDelta: numeric("quantity_delta", { precision: 16, scale: 3 }).notNull(),
     orderId: uuid("order_id"),
     orderItemId: uuid("order_item_id"),
+    parentMovementId: uuid("parent_movement_id"),
+    responsibleIdentityId: uuid("responsible_identity_id").references(() => identities.id),
+    counterpartyName: varchar("counterparty_name", { length: 160 }),
+    dueAt: timestamp("due_at", { withTimezone: true }),
     sourceType: varchar("source_type", { length: 48 }).notNull(),
     sourceId: uuid("source_id").notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
@@ -1838,6 +2218,17 @@ export const managementReturnableCustodyMovements = pgTable(
       table.containerInventoryItemId,
       table.occurredAt,
     ),
+    index("management_returnable_custody_parent_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.parentMovementId,
+    ),
+    index("management_returnable_custody_due_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.type,
+      table.dueAt,
+    ),
     foreignKey({
       name: "management_returnable_custody_container_fk",
       columns: [table.organizationId, table.unitId, table.containerInventoryItemId],
@@ -1870,6 +2261,64 @@ export const managementReturnableCustodyMovements = pgTable(
     check(
       "management_returnable_custody_direction_check",
       sql`(${table.type} = 'issue' and ${table.quantityDelta} > 0) or (${table.type} in ('return', 'incident', 'supplier_exchange') and ${table.quantityDelta} < 0) or (${table.type} = 'correction' and ${table.quantityDelta} <> 0)`,
+    ),
+  ],
+);
+
+export const managementReturnableCustodyHandoffs = pgTable(
+  "management_returnable_custody_handoffs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    issueMovementId: uuid("issue_movement_id").notNull(),
+    fromIdentityId: uuid("from_identity_id").references(() => identities.id),
+    toIdentityId: uuid("to_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    fromShiftReference: varchar("from_shift_reference", { length: 80 }),
+    toShiftReference: varchar("to_shift_reference", { length: 80 }),
+    note: text("note").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_returnable_custody_handoffs_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_returnable_custody_handoffs_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_returnable_custody_handoffs_issue_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.issueMovementId,
+      table.occurredAt,
+    ),
+    foreignKey({
+      name: "management_returnable_custody_handoffs_issue_fk",
+      columns: [table.organizationId, table.unitId, table.issueMovementId],
+      foreignColumns: [
+        managementReturnableCustodyMovements.organizationId,
+        managementReturnableCustodyMovements.unitId,
+        managementReturnableCustodyMovements.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_returnable_custody_handoffs_people_check",
+      sql`${table.fromIdentityId} is null or ${table.fromIdentityId} <> ${table.toIdentityId}`,
+    ),
+    check(
+      "management_returnable_custody_handoffs_note_check",
+      sql`nullif(btrim(${table.note}), '') is not null`,
     ),
   ],
 );
@@ -2478,11 +2927,7 @@ export const managementNfeImports = pgTable(
       table.unitId,
       table.id,
     ),
-    uniqueIndex("management_nfe_imports_access_key_unique").on(
-      table.organizationId,
-      table.unitId,
-      table.accessKey,
-    ),
+    uniqueIndex("management_nfe_imports_access_key_unique").on(table.accessKey),
     uniqueIndex("management_nfe_imports_idempotency_unique").on(
       table.organizationId,
       table.unitId,
@@ -2608,6 +3053,17 @@ export const managementAccountsPayable = pgTable(
     purchaseReceiptId: uuid("purchase_receipt_id"),
     supplierInvoiceId: uuid("supplier_invoice_id"),
     description: varchar("description", { length: 240 }).notNull(),
+    category: varchar("category", { length: 80 }),
+    costCenter: varchar("cost_center", { length: 80 }),
+    documentNumber: varchar("document_number", { length: 80 }),
+    notes: text("notes"),
+    attachments: jsonb("attachments")
+      .$type<Array<{ name: string; url: string; mimeType?: string }>>()
+      .notNull()
+      .default([]),
+    recurrenceGroupId: uuid("recurrence_group_id"),
+    installmentNumber: integer("installment_number").notNull().default(1),
+    installmentCount: integer("installment_count").notNull().default(1),
     status: managementPayableStatus("status").notNull().default("open"),
     amountCents: integer("amount_cents").notNull(),
     paidCents: integer("paid_cents").notNull().default(0),
@@ -2615,6 +3071,10 @@ export const managementAccountsPayable = pgTable(
     dueDate: date("due_date").notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     version: integer("version").notNull().default(1),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    cancellationReason: text("cancellation_reason"),
     ...timestamps,
   },
   (table) => [
@@ -2670,6 +3130,14 @@ export const managementAccountsPayable = pgTable(
       "management_payables_paid_check",
       sql`${table.paidCents} >= 0 and ${table.paidCents} <= ${table.amountCents}`,
     ),
+    check(
+      "management_payables_installment_check",
+      sql`${table.installmentNumber} > 0 and ${table.installmentCount} > 0 and ${table.installmentNumber} <= ${table.installmentCount}`,
+    ),
+    check(
+      "management_payables_cancellation_check",
+      sql`(${table.status} <> 'canceled' and ${table.canceledAt} is null and ${table.canceledByIdentityId} is null and ${table.cancellationReason} is null) or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and nullif(btrim(${table.cancellationReason}), '') is not null)`,
+    ),
   ],
 );
 
@@ -2688,6 +3156,10 @@ export const managementPayablePayments = pgTable(
       .notNull()
       .references(() => identities.id),
     paidAt: timestamp("paid_at", { withTimezone: true }).notNull().defaultNow(),
+    status: managementFinancialPaymentStatus("status").notNull().default("posted"),
+    reversedByIdentityId: uuid("reversed_by_identity_id").references(() => identities.id),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversalReason: text("reversal_reason"),
     ...timestamps,
   },
   (table) => [
@@ -2706,6 +3178,10 @@ export const managementPayablePayments = pgTable(
       ],
     }).onDelete("restrict"),
     check("management_payable_payments_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_payable_payments_reversal_check",
+      sql`(${table.status} = 'posted' and ${table.reversedByIdentityId} is null and ${table.reversedAt} is null and ${table.reversalReason} is null) or (${table.status} = 'reversed' and ${table.reversedByIdentityId} is not null and ${table.reversedAt} is not null and nullif(btrim(${table.reversalReason}), '') is not null)`,
+    ),
   ],
 );
 
@@ -2717,6 +3193,17 @@ export const managementAccountsReceivable = pgTable(
     unitId: uuid("unit_id").notNull(),
     sourceOrderId: uuid("source_order_id"),
     description: varchar("description", { length: 240 }).notNull(),
+    category: varchar("category", { length: 80 }),
+    costCenter: varchar("cost_center", { length: 80 }),
+    documentNumber: varchar("document_number", { length: 80 }),
+    notes: text("notes"),
+    attachments: jsonb("attachments")
+      .$type<Array<{ name: string; url: string; mimeType?: string }>>()
+      .notNull()
+      .default([]),
+    recurrenceGroupId: uuid("recurrence_group_id"),
+    installmentNumber: integer("installment_number").notNull().default(1),
+    installmentCount: integer("installment_count").notNull().default(1),
     status: managementReceivableStatus("status").notNull().default("open"),
     amountCents: integer("amount_cents").notNull(),
     receivedCents: integer("received_cents").notNull().default(0),
@@ -2724,6 +3211,10 @@ export const managementAccountsReceivable = pgTable(
     dueDate: date("due_date").notNull(),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     version: integer("version").notNull().default(1),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id),
+    canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    cancellationReason: text("cancellation_reason"),
     ...timestamps,
   },
   (table) => [
@@ -2746,6 +3237,14 @@ export const managementAccountsReceivable = pgTable(
     check(
       "management_receivables_received_check",
       sql`${table.receivedCents} >= 0 and ${table.receivedCents} <= ${table.amountCents}`,
+    ),
+    check(
+      "management_receivables_installment_check",
+      sql`${table.installmentNumber} > 0 and ${table.installmentCount} > 0 and ${table.installmentNumber} <= ${table.installmentCount}`,
+    ),
+    check(
+      "management_receivables_cancellation_check",
+      sql`(${table.status} <> 'canceled' and ${table.canceledAt} is null and ${table.canceledByIdentityId} is null and ${table.cancellationReason} is null) or (${table.status} = 'canceled' and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and nullif(btrim(${table.cancellationReason}), '') is not null)`,
     ),
   ],
 );
@@ -2781,6 +3280,183 @@ export const managementReceivableLines = pgTable(
     check(
       "management_receivable_lines_cost_check",
       sql`${table.costCents} is null or ${table.costCents} >= 0`,
+    ),
+  ],
+);
+
+export const managementReturnableDepositCharges = pgTable(
+  "management_returnable_deposit_charges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    orderId: uuid("order_id").notNull(),
+    receivableId: uuid("receivable_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    status: managementReturnableDepositChargeStatus("status").notNull().default("charged"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    chargedByIdentityId: uuid("charged_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+    cancellationReason: text("cancellation_reason"),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_returnable_deposit_charges_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_returnable_deposit_charges_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("management_returnable_deposit_charges_active_order_unique")
+      .on(table.organizationId, table.unitId, table.orderId)
+      .where(sql`${table.status} = 'charged'`),
+    foreignKey({
+      name: "management_returnable_deposit_charges_order_fk",
+      columns: [table.organizationId, table.unitId, table.orderId],
+      foreignColumns: [posOrders.organizationId, posOrders.unitId, posOrders.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_deposit_charges_receivable_fk",
+      columns: [table.organizationId, table.unitId, table.receivableId],
+      foreignColumns: [
+        managementAccountsReceivable.organizationId,
+        managementAccountsReceivable.unitId,
+        managementAccountsReceivable.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_returnable_deposit_charges_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_returnable_deposit_charges_state_check",
+      sql`(${table.status} = 'charged' and ${table.canceledByIdentityId} is null and ${table.canceledAt} is null and ${table.cancellationReason} is null) or (${table.status} = 'canceled' and ${table.canceledByIdentityId} is not null and ${table.canceledAt} is not null and nullif(btrim(${table.cancellationReason}), '') is not null)`,
+    ),
+  ],
+);
+
+export const managementReturnableDepositChargeLines = pgTable(
+  "management_returnable_deposit_charge_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    chargeId: uuid("charge_id").notNull(),
+    issueMovementId: uuid("issue_movement_id").notNull(),
+    containerInventoryItemId: uuid("container_inventory_item_id").notNull(),
+    outstandingQuantityAtCharge: numeric("outstanding_quantity_at_charge", {
+      precision: 16,
+      scale: 3,
+    }).notNull(),
+    depositCentsSnapshot: integer("deposit_cents_snapshot").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_returnable_deposit_charge_lines_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("management_returnable_deposit_charge_lines_issue_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.chargeId,
+      table.issueMovementId,
+    ),
+    foreignKey({
+      name: "management_returnable_deposit_charge_lines_charge_fk",
+      columns: [table.organizationId, table.unitId, table.chargeId],
+      foreignColumns: [
+        managementReturnableDepositCharges.organizationId,
+        managementReturnableDepositCharges.unitId,
+        managementReturnableDepositCharges.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_deposit_charge_lines_issue_fk",
+      columns: [table.organizationId, table.unitId, table.issueMovementId],
+      foreignColumns: [
+        managementReturnableCustodyMovements.organizationId,
+        managementReturnableCustodyMovements.unitId,
+        managementReturnableCustodyMovements.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_returnable_deposit_charge_lines_container_fk",
+      columns: [table.organizationId, table.unitId, table.containerInventoryItemId],
+      foreignColumns: [
+        managementInventoryItems.organizationId,
+        managementInventoryItems.unitId,
+        managementInventoryItems.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_returnable_deposit_charge_lines_values_check",
+      sql`${table.outstandingQuantityAtCharge} > 0 and ${table.depositCentsSnapshot} > 0 and ${table.amountCents} > 0`,
+    ),
+  ],
+);
+
+export const managementReturnableDepositReconciliations = pgTable(
+  "management_returnable_deposit_reconciliations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    chargeId: uuid("charge_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    status: varchar("status", { length: 32 })
+      .$type<"applied" | "formal_reversal_required">()
+      .notNull(),
+    reason: text("reason").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    actorIdentityId: uuid("actor_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("management_returnable_deposit_reconciliations_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_returnable_deposit_reconciliations_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_returnable_deposit_reconciliations_charge_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.chargeId,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "management_returnable_deposit_reconciliations_charge_fk",
+      columns: [table.organizationId, table.unitId, table.chargeId],
+      foreignColumns: [
+        managementReturnableDepositCharges.organizationId,
+        managementReturnableDepositCharges.unitId,
+        managementReturnableDepositCharges.id,
+      ],
+    }).onDelete("restrict"),
+    check(
+      "management_returnable_deposit_reconciliations_amount_check",
+      sql`${table.amountCents} > 0`,
+    ),
+    check(
+      "management_returnable_deposit_reconciliations_status_check",
+      sql`${table.status} in ('applied','formal_reversal_required')`,
+    ),
+    check(
+      "management_returnable_deposit_reconciliations_reason_check",
+      sql`nullif(btrim(${table.reason}), '') is not null`,
     ),
   ],
 );
@@ -3207,6 +3883,13 @@ export const managementCashTransfers = pgTable(
     transferredByIdentityId: uuid("transferred_by_identity_id")
       .notNull()
       .references(() => identities.id),
+    status: varchar("status", { length: 16 })
+      .$type<"pending" | "accepted" | "rejected">()
+      .notNull()
+      .default("pending"),
+    decidedByIdentityId: uuid("decided_by_identity_id").references(() => identities.id),
+    decisionNote: text("decision_note"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
     occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
     idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
     ...timestamps,
@@ -3225,6 +3908,12 @@ export const managementCashTransfers = pgTable(
     index("management_cash_transfers_occurred_idx").on(
       table.organizationId,
       table.unitId,
+      table.occurredAt,
+    ),
+    index("management_cash_transfers_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
       table.occurredAt,
     ),
     foreignKey({
@@ -3249,6 +3938,14 @@ export const managementCashTransfers = pgTable(
     check(
       "management_cash_transfers_distinct_shifts_check",
       sql`${table.fromCashShiftId} <> ${table.toCashShiftId}`,
+    ),
+    check(
+      "management_cash_transfers_status_check",
+      sql`${table.status} in ('pending','accepted','rejected')`,
+    ),
+    check(
+      "management_cash_transfers_decision_check",
+      sql`(${table.status} = 'pending' and ${table.decidedByIdentityId} is null and ${table.decidedAt} is null and ${table.decisionNote} is null) or (${table.status} = 'accepted' and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null) or (${table.status} = 'rejected' and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null and nullif(btrim(${table.decisionNote}), '') is not null)`,
     ),
   ],
 );
@@ -3409,6 +4106,10 @@ export const managementReceivablePayments = pgTable(
       .notNull()
       .references(() => identities.id),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+    status: managementFinancialPaymentStatus("status").notNull().default("posted"),
+    reversedByIdentityId: uuid("reversed_by_identity_id").references(() => identities.id),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversalReason: text("reversal_reason"),
     ...timestamps,
   },
   (table) => [
@@ -3436,6 +4137,10 @@ export const managementReceivablePayments = pgTable(
       ],
     }).onDelete("restrict"),
     check("management_receivable_payments_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_receivable_payments_reversal_check",
+      sql`(${table.status} = 'posted' and ${table.reversedByIdentityId} is null and ${table.reversedAt} is null and ${table.reversalReason} is null) or (${table.status} = 'reversed' and ${table.reversedByIdentityId} is not null and ${table.reversedAt} is not null and nullif(btrim(${table.reversalReason}), '') is not null)`,
+    ),
   ],
 );
 
@@ -3495,6 +4200,7 @@ export const managementReconciliationEntries = pgTable(
     status: varchar("status", { length: 20 })
       .$type<"matched" | "unmatched" | "divergent" | "resolved">()
       .notNull(),
+    version: integer("version").notNull().default(1),
     resolutionNote: text("resolution_note"),
     resolvedByIdentityId: uuid("resolved_by_identity_id").references(() => identities.id),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
@@ -3523,6 +4229,121 @@ export const managementReconciliationEntries = pgTable(
     check(
       "management_reconciliation_entry_amount_check",
       sql`${table.grossCents} > 0 and ${table.feeCents} >= 0 and ${table.netCents} >= 0`,
+    ),
+  ],
+);
+
+export const managementFinanceSettings = pgTable(
+  "management_finance_settings",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    paymentApprovalThresholdCents: integer("payment_approval_threshold_cents"),
+    requireDistinctApprover: boolean("require_distinct_approver").notNull().default(true),
+    dueSoonDays: integer("due_soon_days").notNull().default(7),
+    updatedByIdentityId: uuid("updated_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.organizationId, table.unitId] }),
+    foreignKey({
+      name: "management_finance_settings_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check(
+      "management_finance_settings_threshold_check",
+      sql`${table.paymentApprovalThresholdCents} is null or ${table.paymentApprovalThresholdCents} > 0`,
+    ),
+    check("management_finance_settings_due_soon_check", sql`${table.dueSoonDays} between 1 and 90`),
+  ],
+);
+
+export const managementFinanceApprovalRequests = pgTable(
+  "management_finance_approval_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    direction: varchar("direction", { length: 16 }).$type<"payable" | "receivable">().notNull(),
+    payableId: uuid("payable_id"),
+    receivableId: uuid("receivable_id"),
+    amountCents: integer("amount_cents").notNull(),
+    method: varchar("method", { length: 32 }).notNull(),
+    reference: varchar("reference", { length: 160 }),
+    cashRegisterId: uuid("cash_register_id"),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
+    status: managementFinanceApprovalStatus("status").notNull().default("pending"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    requestedByIdentityId: uuid("requested_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    decidedByIdentityId: uuid("decided_by_identity_id").references(() => identities.id),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    decisionNote: text("decision_note"),
+    executedPaymentId: uuid("executed_payment_id"),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_finance_approvals_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_finance_approvals_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    index("management_finance_approvals_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.createdAt,
+    ),
+    foreignKey({
+      name: "management_finance_approvals_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_finance_approvals_payable_fk",
+      columns: [table.organizationId, table.unitId, table.payableId],
+      foreignColumns: [
+        managementAccountsPayable.organizationId,
+        managementAccountsPayable.unitId,
+        managementAccountsPayable.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_finance_approvals_receivable_fk",
+      columns: [table.organizationId, table.unitId, table.receivableId],
+      foreignColumns: [
+        managementAccountsReceivable.organizationId,
+        managementAccountsReceivable.unitId,
+        managementAccountsReceivable.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_finance_approvals_cash_register_fk",
+      columns: [table.organizationId, table.unitId, table.cashRegisterId],
+      foreignColumns: [
+        managementCashRegisters.organizationId,
+        managementCashRegisters.unitId,
+        managementCashRegisters.id,
+      ],
+    }).onDelete("restrict"),
+    check("management_finance_approvals_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "management_finance_approvals_target_check",
+      sql`(${table.direction} = 'payable' and ${table.payableId} is not null and ${table.receivableId} is null) or (${table.direction} = 'receivable' and ${table.receivableId} is not null and ${table.payableId} is null)`,
+    ),
+    check(
+      "management_finance_approvals_state_check",
+      sql`(${table.status} = 'pending' and ${table.decidedByIdentityId} is null and ${table.decidedAt} is null and ${table.executedPaymentId} is null and ${table.executedAt} is null) or (${table.status} in ('approved','rejected') and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null and ${table.executedPaymentId} is null and ${table.executedAt} is null) or (${table.status} = 'executed' and ${table.decidedByIdentityId} is not null and ${table.decidedAt} is not null and ${table.executedPaymentId} is not null and ${table.executedAt} is not null) or (${table.status} = 'canceled' and ${table.executedPaymentId} is null and ${table.executedAt} is null)`,
     ),
   ],
 );

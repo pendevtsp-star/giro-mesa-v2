@@ -12,6 +12,9 @@ export type SettlementStatus = "closed" | "approved" | "paid" | "canceled";
 export type LossStatus = "pending" | "approved" | "rejected" | "reversed";
 
 export interface SettlementConfiguration {
+  serviceChargeEnabled: boolean;
+  defaultServiceChargeBasisPoints: number;
+  serviceChargeApplication: "manual" | "suggest_dine_in";
   attributionMode: "final_responsible" | "order_creator";
   transferMode: "move_to_final" | "preserve_origin";
   serviceBase: "gross" | "net_after_discounts";
@@ -151,6 +154,16 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T {
 export function parseSettlementConfiguration(value: unknown): SettlementConfiguration {
   const item = record(value);
   return {
+    serviceChargeEnabled:
+      item.serviceChargeEnabled === undefined ? false : boolean(item.serviceChargeEnabled),
+    defaultServiceChargeBasisPoints:
+      item.defaultServiceChargeBasisPoints === undefined
+        ? 0
+        : integer(item.defaultServiceChargeBasisPoints),
+    serviceChargeApplication:
+      item.serviceChargeApplication === undefined
+        ? "manual"
+        : oneOf(item.serviceChargeApplication, ["manual", "suggest_dine_in"]),
     attributionMode: oneOf(item.attributionMode, ["final_responsible", "order_creator"]),
     transferMode: oneOf(item.transferMode, ["move_to_final", "preserve_origin"]),
     serviceBase: oneOf(item.serviceBase, ["gross", "net_after_discounts"]),

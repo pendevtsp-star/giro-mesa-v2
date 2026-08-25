@@ -11,14 +11,16 @@ import {
   StatusDot,
   Toast,
 } from "@giromesa/ui";
-import { type FormEvent, useEffect, useState } from "react";
-import { api } from "../../api";
+import { type FormEvent, useEffect, useRef, useState } from "react";
+import { ApiClientError, api } from "../../api";
 import { pilotMutation, QueuedOperationalMutationError } from "../../operational-dispatch";
 import {
   type PilotScope,
   parsePilotFloor,
   RemoteGate,
   type ServiceMode,
+  serviceModeLabel,
+  summarizeOperationalLoad,
   useRemote,
   usesQuickServiceMode,
 } from "../../operations.shared";
@@ -27,11 +29,23 @@ import { TabWorkspace } from "../counter/CounterWorkspace";
 import {
   buildJoinedShiftLayout,
   FloorPlan,
+  type FloorPlanElement,
   type FloorPlanPosition,
+  type FloorPlanTableDetails,
   type FloorPlanZonePosition,
+  resolveFloorPlanFullscreenTarget,
 } from "./FloorPlan";
 import { MoveTableDialog } from "./MoveTableDialog";
 import { SalonSearch } from "./SalonSearch";
+import { ServiceModePicker } from "./ServiceModePicker";
+import {
+  buildSalonPreflight,
+  buildTableTimeline,
+  DEFAULT_SALON_ROLE_CONFIG,
+  resolveShiftServiceMode,
+  SALON_ROLE_CONFIG,
+  tableNextAction,
+} from "./salon-operations";
 import { buildSequentialTableNames, MAX_TABLE_BATCH } from "./tableNames";
 
 type FloorFilter =
@@ -47,12 +61,160 @@ type OperationalTableStatus =
   | "needs_cleaning"
   | "cleaning";
 
+type SalonTableAccessLevel =
+  | "summary"
+  | "full"
+  | "overview"
+  | "operate"
+  | "financial"
+  | "manage"
+  | null;
+
+type SalonViewContext = {
+  view: "map" | "floor" | "list";
+  selectedTableId: string | null;
+  filterStatus: FloorFilter;
+  roomFilter: string;
+  sectionFilter: string;
+  query: string;
+};
+
+const floorFilters: FloorFilter[] = [
+  "all",
+  "available",
+  "occupied",
+  "attention",
+  "closing",
+  "reserved",
+  "turnover",
+];
+
+export function parseSalonViewContext(
+  raw: string | null,
+  fallbackView: SalonViewContext["view"],
+  fallbackSectionFilter: string,
+): SalonViewContext {
+  const fallback: SalonViewContext = {
+    view: fallbackView,
+    selectedTableId: null,
+    filterStatus: "all",
+    roomFilter: "all",
+    sectionFilter: fallbackSectionFilter,
+    query: "",
+  };
+  if (!raw) return fallback;
+  if (raw === "map" || raw === "floor" || raw === "list") return { ...fallback, view: raw };
+  try {
+    const saved = JSON.parse(raw) as Partial<SalonViewContext>;
+    return {
+      view: ["map", "floor", "list"].includes(saved.view ?? "")
+        ? (saved.view as SalonViewContext["view"])
+        : fallback.view,
+      selectedTableId: typeof saved.selectedTableId === "string" ? saved.selectedTableId : null,
+      filterStatus: floorFilters.includes(saved.filterStatus ?? "all")
+        ? (saved.filterStatus ?? "all")
+        : "all",
+      roomFilter: typeof saved.roomFilter === "string" ? saved.roomFilter : "all",
+      sectionFilter:
+        typeof saved.sectionFilter === "string" ? saved.sectionFilter : fallback.sectionFilter,
+      query: typeof saved.query === "string" ? saved.query : "",
+    };
+  } catch {
+    return fallback;
+  }
+}
+
+export function requiredOperationalRevision(value: number | null, resource: "planta" | "turno") {
+  if (value === null || !Number.isSafeInteger(value) || value < 1) {
+    const resourceLabel = resource === "planta" ? "da planta" : "do turno";
+    throw new Error(
+      `A revisão ${resourceLabel} não foi carregada. Atualize o salão antes de salvar.`,
+    );
+  }
+  return value;
+}
+
+export async function runFloorRevisionMutation<T>(
+  currentRevision: number | null,
+  loadLatestRevision: () => Promise<number | null>,
+  mutate: (expectedRevision: number) => Promise<T>,
+) {
+  const expectedRevision = requiredOperationalRevision(currentRevision, "planta");
+  try {
+    return await mutate(expectedRevision);
+  } catch (error) {
+    if (
+      !(error instanceof ApiClientError) ||
+      error.status !== 409 ||
+      error.code !== "FLOOR_LAYOUT_VERSION_CONFLICT"
+    ) {
+      throw error;
+    }
+    const latestRevision = requiredOperationalRevision(await loadLatestRevision(), "planta");
+    return mutate(latestRevision);
+  }
+}
+
+export function canOpenTableWorkspace(accessLevel: SalonTableAccessLevel, tabId?: string | null) {
+  return Boolean(tabId) && !["summary", "overview", null].includes(accessLevel);
+}
+
+export function buildTableGroupReason(
+  reasonCode:
+    | "large_party"
+    | "sit_together"
+    | "accessibility"
+    | "operational_reorganization"
+    | "other",
+  reasonNote: string,
+) {
+  return {
+    reasonCode,
+    ...(reasonNote.trim() ? { reasonNote: reasonNote.trim() } : {}),
+  };
+}
+
 export function findPriorityServiceCall<T extends { kind: string; tableId: string }>(
   calls: readonly T[],
   tableIds: readonly string[],
 ) {
   const relevant = calls.filter((call) => tableIds.includes(call.tableId));
   return relevant.find((call) => call.kind === "bill") ?? relevant[0];
+}
+
+export function summarizeSalonAttention<
+  T extends {
+    createdAt: string;
+    slaMinutes: number;
+    printStatus?: "failed" | "confirmation_required" | string | null;
+  },
+>(calls: readonly T[], now = Date.now()) {
+  return calls.reduce(
+    (summary, call) => {
+      const createdAt = new Date(call.createdAt).getTime();
+      if (Number.isFinite(createdAt) && now >= createdAt + call.slaMinutes * 60_000) {
+        summary.overdue += 1;
+      }
+      if (call.printStatus === "failed") summary.failedPrints += 1;
+      if (call.printStatus === "confirmation_required") {
+        summary.printConfirmations += 1;
+      }
+      return summary;
+    },
+    { overdue: 0, failedPrints: 0, printConfirmations: 0 },
+  );
+}
+
+export function structuralMergePolicy<
+  T extends { structuralMergeAllowed?: boolean | null; structuralMergeReason?: string | null },
+>(tabs: readonly T[]) {
+  const blocked = tabs.find((tab) => tab.structuralMergeAllowed === false);
+  return {
+    allowed: !blocked,
+    reason:
+      blocked?.structuralMergeReason ??
+      "Esta comanda já possui movimentação financeira e deve permanecer separada.",
+  };
 }
 
 export function tableStatusPresentation(status: OperationalTableStatus) {
@@ -106,7 +268,30 @@ export function buildTableTransferCommand(tabId: string, targetTableId: string) 
   return { body, payload: pilotMutation("transfer-tab", { tabId, body }) };
 }
 
+function closeFloatingMenus(root: ParentNode | null, target?: Node) {
+  root
+    ?.querySelectorAll<HTMLDetailsElement>("details[data-salon-floating-menu][open]")
+    .forEach((menu) => {
+      if (!target || !menu.contains(target)) menu.open = false;
+    });
+}
+
 export function RealSalonPage({ scope }: { scope: PilotScope }) {
+  const salonShellRef = useRef<HTMLDivElement>(null);
+  const viewStorageKey = `giromesa:salon-view:${scope.organizationId}:${scope.unitId}:${scope.profileId}`;
+  const defaultView = scope.profileId === "cashier" ? "floor" : "map";
+  const defaultSectionFilter = scope.profileId === "waiter" ? "mine" : "all";
+  const [restoredViewContext] = useState(() => {
+    try {
+      return parseSalonViewContext(
+        typeof window === "undefined" ? null : window.localStorage.getItem(viewStorageKey),
+        defaultView,
+        defaultSectionFilter,
+      );
+    } catch {
+      return parseSalonViewContext(null, defaultView, defaultSectionFilter);
+    }
+  });
   const floor = useRemote(
     scope,
     () => scope.load("floor", undefined, () => api.pilot.floor(scope.organizationId, scope.unitId)),
@@ -130,20 +315,87 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
     );
     return () => globalThis.clearTimeout(timer);
   }, [nextTransferBoundary, floor.retry]);
-  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<FloorFilter>("all");
-  const [roomFilter, setRoomFilter] = useState("all");
-  const [sectionFilter, setSectionFilter] = useState(scope.profileId === "waiter" ? "mine" : "all");
-  const [query, setQuery] = useState("");
-  const [view, setView] = useState<"map" | "floor" | "list">("map");
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(
+    restoredViewContext.selectedTableId,
+  );
+  const [filterStatus, setFilterStatus] = useState<FloorFilter>(restoredViewContext.filterStatus);
+  const [roomFilter, setRoomFilter] = useState(restoredViewContext.roomFilter);
+  const [sectionFilter, setSectionFilter] = useState(restoredViewContext.sectionFilter);
+  const [query, setQuery] = useState(restoredViewContext.query);
+  const [view, setView] = useState<"map" | "floor" | "list">(restoredViewContext.view);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
+  const [workspaceMode, setWorkspaceMode] = useState<"operate" | "space" | "shift" | "template">(
+    "operate",
+  );
+  const [shiftEditorTool, setShiftEditorTool] = useState<"assign" | "move">("assign");
   const [showMetricsCockpit, setShowMetricsCockpit] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
   const [moveTableOpen, setMoveTableOpen] = useState(false);
-  const canConfigure = scope.profileId === "owner" || scope.profileId === "manager";
   const canReorganizeTurn = ["owner", "manager", "waiter"].includes(scope.profileId);
 
   useEffect(() => {
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(
+        viewStorageKey,
+        JSON.stringify({
+          view,
+          selectedTableId,
+          filterStatus,
+          roomFilter,
+          sectionFilter,
+          query,
+        } satisfies SalonViewContext),
+      );
+    } catch {
+      // This device simply does not retain the operational context.
+    }
+  }, [filterStatus, query, roomFilter, sectionFilter, selectedTableId, view, viewStorageKey]);
+
+  useEffect(() => {
+    const updateConnection = () => {
+      const connected = navigator.onLine;
+      setOnline(connected);
+      if (connected) floor.retry();
+    };
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    return () => {
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+    };
+  }, [floor.retry]);
+
+  useEffect(() => {
+    if (
+      floor.state.status === "ready" &&
+      selectedTableId &&
+      !floor.state.data.tables.some((item) => item.id === selectedTableId)
+    ) {
+      setSelectedTableId(null);
+      setSelectedTabId(null);
+    }
+  }, [floor.state, selectedTableId]);
+
+  useEffect(() => {
+    function closeOutside(event: PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      closeFloatingMenus(salonShellRef.current, target);
+    }
+
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, []);
+
+  useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeFloatingMenus(salonShellRef.current);
+      }
+
       if (
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLTextAreaElement ||
@@ -213,11 +465,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [priorityQueueOpen, setPriorityQueueOpen] = useState(true);
   const [guests, setGuests] = useState(2);
   const [busy, setBusy] = useState(false);
+  const [undoAction, setUndoAction] = useState<{
+    message: string;
+    successMessage?: string;
+    run: () => Promise<unknown>;
+  } | null>(null);
   const [feedback, setFeedbackState] = useState<{
     message: string;
     tone: "success" | "danger" | "info";
+    persistent?: boolean;
   } | null>(null);
   const [roomName, setRoomName] = useState("");
+  const [managedRoomId, setManagedRoomId] = useState("");
   const [roomId, setRoomId] = useState("");
   const [tableMode, setTableMode] = useState<"single" | "batch">("single");
   const [tableLabel, setTableLabel] = useState("");
@@ -234,19 +493,28 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   >("single_tab");
   const [joinAnchorId, setJoinAnchorId] = useState("");
   const [joinResponsibleIdentityId, setJoinResponsibleIdentityId] = useState("");
+  const [joinReasonCode, setJoinReasonCode] = useState<
+    "large_party" | "sit_together" | "accessibility" | "operational_reorganization" | "other"
+  >("large_party");
+  const [joinReasonNote, setJoinReasonNote] = useState("");
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
 
   const [detachTableId, setDetachTableId] = useState("");
   const [floorFocusId, setFloorFocusId] = useState<string | null>(null);
   const [floorEditRequestKey, setFloorEditRequestKey] = useState(0);
+  const [floorOperateRequestKey, setFloorOperateRequestKey] = useState(0);
   const [setupSection, setSetupSection] = useState<"space" | "shift">("space");
+  const [shiftSetupStep, setShiftSetupStep] = useState<"sections" | "team" | "open">("sections");
+  const [serviceSectionEditorOpen, setServiceSectionEditorOpen] = useState(false);
+  const [managedServiceSectionId, setManagedServiceSectionId] = useState("");
   const [serviceSectionName, setServiceSectionName] = useState("");
   const [serviceSectionColor, setServiceSectionColor] = useState("#176B4D");
   const [serviceSectionMode, setServiceSectionMode] = useState<ServiceMode>("hybrid");
   const [serviceSectionTableIds, setServiceSectionTableIds] = useState<string[]>([]);
   const [serviceSectionDefaultResponsibleId, setServiceSectionDefaultResponsibleId] = useState("");
+  const [serviceSectionTableQuery, setServiceSectionTableQuery] = useState("");
+  const [serviceSectionRoomFilter, setServiceSectionRoomFilter] = useState("all");
   const [shiftLabel, setShiftLabel] = useState("");
-  const [shiftMode, setShiftMode] = useState<ServiceMode>("hybrid");
   const [copyPreviousAssignments, setCopyPreviousAssignments] = useState(true);
   const [assignmentSectionId, setAssignmentSectionId] = useState("");
   const [assignmentPrimaryId, setAssignmentPrimaryId] = useState("");
@@ -256,19 +524,92 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [transferTargetSectionId, setTransferTargetSectionId] = useState("");
   const [transferDurationMinutes, setTransferDurationMinutes] = useState(60);
   const [transferOpenTab, setTransferOpenTab] = useState(true);
+  const [transferReasonCode, setTransferReasonCode] = useState<
+    "service_rebalance" | "staff_coverage" | "operational_reorganization" | "other"
+  >("operational_reorganization");
   const [transferReason, setTransferReason] = useState("Remanejamento durante a operação");
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverAssignments, setHandoverAssignments] = useState<Record<string, string>>({});
   const [handoverReason, setHandoverReason] = useState("Passagem para a próxima equipe");
-  function setFeedback(message: string, tone: "success" | "danger" | "info" = "success") {
-    setFeedbackState(message ? { message, tone } : null);
+  function setFeedback(
+    message: string,
+    tone: "success" | "danger" | "info" = "success",
+    persistent = false,
+  ) {
+    setUndoAction(null);
+    setFeedbackState(message ? { message, tone, persistent } : null);
+  }
+
+  function setCriticalFeedback(message: string) {
+    setFeedback(message, "success", true);
   }
 
   function setErrorFeedback(error: unknown, fallback: string) {
+    if (
+      error instanceof ApiClientError &&
+      error.status === 409 &&
+      ["FLOOR_LAYOUT_VERSION_CONFLICT", "SHIFT_LAYOUT_VERSION_CONFLICT"].includes(error.code)
+    ) {
+      const resource = error.code === "FLOOR_LAYOUT_VERSION_CONFLICT" ? "planta" : "turno";
+      setFeedback(
+        `A configuração do ${resource} mudou em outro terminal. Atualize, revise e salve novamente.`,
+        "info",
+        true,
+      );
+      setUndoAction({
+        message: `Atualizar ${resource}`,
+        successMessage: `${resource === "planta" ? "Planta" : "Turno"} atualizado. Revise antes de salvar novamente.`,
+        run: async () => {
+          if (!(await floor.refresh()))
+            throw new Error(`Não foi possível atualizar o ${resource}.`);
+        },
+      });
+      return;
+    }
+    const queued = error instanceof QueuedOperationalMutationError;
     setFeedback(
       error instanceof Error ? error.message : fallback,
-      error instanceof QueuedOperationalMutationError ? "info" : "danger",
+      queued ? "info" : "danger",
+      true,
     );
+    if (queued || (error instanceof ApiClientError && error.retryable)) {
+      setUndoAction({
+        message: online ? "Atualizar estado" : "Aguardar conexão",
+        successMessage: "Estado operacional atualizado.",
+        run: async () => {
+          if (!navigator.onLine) throw new Error("O terminal continua sem conexão.");
+          if (!(await floor.refresh())) throw new Error("A operação ainda não respondeu.");
+        },
+      });
+    }
+  }
+
+  async function runUndoAction() {
+    const action = undoAction;
+    if (!action || busy) return;
+    setUndoAction(null);
+    setBusy(true);
+    try {
+      await action.run();
+      setFeedback(action.successMessage ?? "Ação desfeita com segurança.");
+      floor.retry();
+    } catch (error) {
+      setErrorFeedback(error, "Não foi possível desfazer a ação.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openOperationalFloorFullscreen() {
+    setView("floor");
+    setWorkspaceMode("operate");
+    setJoinMode(false);
+    setJoinSelection([]);
+    setPriorityQueueOpen(false);
+    setFloorOperateRequestKey((current) => current + 1);
+    if (!document.fullscreenElement) {
+      await resolveFloorPlanFullscreenTarget(salonShellRef.current)?.requestFullscreen();
+    }
   }
 
   async function handleMoveEntireTable(targetTableId: string, currentTableId: string) {
@@ -286,7 +627,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         api.pilot.transferTab(scope.organizationId, scope.unitId, currentTab.id, body, key),
       );
       setSelectedTableId(targetTableId);
-      setFeedback("Comanda e pedidos transferidos com sucesso para a nova mesa.");
+      setCriticalFeedback("Comanda e pedidos transferidos com sucesso para a nova mesa.");
       floor.retry();
     } catch (error) {
       setErrorFeedback(error, "Não foi possível mudar de mesa.");
@@ -302,6 +643,32 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
     <RemoteGate remote={floor}>
       {(data) => {
         const table = data.tables.find((item) => item.id === selectedTableId) ?? null;
+        const legacyAccessLevel =
+          scope.profileId === "owner" || scope.profileId === "manager"
+            ? "manage"
+            : scope.profileId === "cashier"
+              ? "financial"
+              : scope.profileId === "waiter"
+                ? "operate"
+                : "overview";
+        const accessForTable = (target: (typeof data.tables)[number]) =>
+          target.accessLevel ?? data.accessLevel ?? legacyAccessLevel;
+        const canOperateTable = (target: (typeof data.tables)[number]) =>
+          !["summary", "overview"].includes(accessForTable(target));
+        const canSeeTableFinancials = (target: (typeof data.tables)[number]) =>
+          ["full", "financial", "manage"].includes(accessForTable(target));
+        const canEditSpace =
+          data.capabilities?.canManageFloor ??
+          (scope.profileId === "owner" || scope.profileId === "manager");
+        const canManageShift =
+          data.capabilities?.canManageShift ??
+          (scope.profileId === "owner" || scope.profileId === "manager");
+        const canConfigure = canEditSpace || canManageShift;
+        const canReorganizeTurn =
+          data.capabilities?.canReorganizeTables ??
+          ["owner", "manager", "waiter"].includes(scope.profileId);
+        const selectedCanOperate = table ? canOperateTable(table) : false;
+        const selectedCanSeeFinancials = table ? canSeeTableFinancials(table) : false;
         const groupMembers = (groupId: string) =>
           data.tableGroupMembers
             .filter((member) => member.groupId === groupId)
@@ -450,6 +817,25 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           ? (operationalAssignmentForTable(table.id)?.section.serviceMode ?? data.serviceMode)
           : data.serviceMode;
         const selectedUsesQuickFlow = usesQuickServiceMode(selectedServiceMode);
+        const selectedPhase = table ? servicePhaseForTable(table.id) : undefined;
+        const selectedTimeline = table
+          ? buildTableTimeline({
+              table,
+              tab,
+              phase: selectedPhase,
+              call: selectedCall,
+              transfer: selectedTransfer,
+            })
+          : [];
+        const selectedNextAction = table
+          ? tableNextAction({
+              status: displayStatus(table),
+              hasTab: Boolean(tab),
+              canOperate: selectedCanOperate,
+              phase: selectedPhase?.phase,
+              callKind: selectedCall?.kind,
+            })
+          : "";
         const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
         const filteredTables = activeTables.filter((item) => {
           const status = displayStatus(item);
@@ -536,72 +922,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         );
         const activeUserName = currentStaffMember?.displayName ?? "Operador";
 
-        const roleConfigMap: Record<
-          string,
-          { title: string; badge: string; tone: string; description: string }
-        > = {
-          owner: {
-            title: "Proprietário",
-            badge: "Acesso Total",
-            tone: "brand",
-            description: "Visão gerencial completa, métricas ao vivo e controle de turnos/layout.",
-          },
-          manager: {
-            title: "Gerente de Operação",
-            badge: "Gestão do Salão",
-            tone: "brand",
-            description: "Supervisão do turno, liberação de descontos/estornos e gestão de praças.",
-          },
-          cashier: {
-            title: "Operador de Caixa",
-            badge: "Fechamento & PDV",
-            tone: "warning",
-            description:
-              "Foco em mesas em fechamento, divisão de contas e recebimento de pagamentos.",
-          },
-          waiter: {
-            title: "Garçom / Atendente",
-            badge: "Atendimento de Pista",
-            tone: "info",
-            description: "Lançamento ágil de pedidos, atendimento de chamados e apoio às praças.",
-          },
-          kitchen: {
-            title: "Cozinha / KDS",
-            badge: "Produção",
-            tone: "danger",
-            description: "Visualização de status de preparo e despacho de pedidos prontos.",
-          },
-          inventory: {
-            title: "Estoque / Compras",
-            badge: "Suprimentos",
-            tone: "neutral",
-            description: "Acompanhamento de consumo e suprimentos do salão.",
-          },
-          finance: {
-            title: "Financeiro",
-            badge: "Auditoria",
-            tone: "brand",
-            description: "Auditoria de vendas, faturamento e recebimentos.",
-          },
-          delivery: {
-            title: "Expedição Delivery",
-            badge: "Entregas",
-            tone: "info",
-            description: "Despacho de pedidos de entrega e balcão.",
-          },
-          platform: {
-            title: "Administrador da Plataforma",
-            badge: "Master",
-            tone: "brand",
-            description: "Acesso irrestrito a todas as rotas e funções.",
-          },
-        };
-        const roleConfig = roleConfigMap[scope.profileId] ?? {
-          title: "Operador",
-          badge: "Salão",
-          tone: "neutral",
-          description: "Operação e acompanhamento das mesas do salão.",
-        };
+        const roleConfig = SALON_ROLE_CONFIG[scope.profileId] ?? DEFAULT_SALON_ROLE_CONFIG;
         const joinTableIds = [
           ...new Set(
             joinSelection.flatMap((id) => {
@@ -617,6 +938,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         const joinTabs = data.openTabs.filter(
           (open) => open.tableId && joinTableIds.includes(open.tableId),
         );
+        const joiningFreeTables = joinTabs.length === 0;
+        const mergePolicy = structuralMergePolicy(joinTabs);
+        const effectiveJoinAccountMode =
+          joinAccountMode === "single_tab" && !mergePolicy.allowed
+            ? "physical_only"
+            : joinAccountMode;
         const joinAnchorOptions = joinTabs.length
           ? joinTabs.flatMap((open) => (open.tableId ? [open.tableId] : []))
           : joinTableIds;
@@ -654,7 +981,22 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           const shiftTransfer = transferForTable(item.id);
           const serviceCall = serviceCallForTable(item.id);
           const servicePhase = servicePhaseForTable(item.id);
-          const effectiveRoomId = shiftLayout?.roomId ?? item.roomId;
+          const activeLayout =
+            workspaceMode === "space" || workspaceMode === "template" ? undefined : shiftLayout;
+          const effectiveRoomId = activeLayout?.roomId ?? item.roomId;
+          const previewSection = data.shiftSections.find(
+            (section) => section.id === assignmentSectionId,
+          );
+          const paintingSection = workspaceMode === "shift" && previewSection;
+          const previewIncludesTable = assignmentTableIds.includes(item.id);
+          const templateMembership = data.serviceSectionTables.find(
+            (row) => row.tableId === item.id && row.sectionId !== managedServiceSectionId,
+          );
+          const templateSection = data.serviceSections.find(
+            (section) => section.id === templateMembership?.sectionId,
+          );
+          const templateIncludesTable = serviceSectionTableIds.includes(item.id);
+          const templatePainting = workspaceMode === "template";
           return {
             id: item.id,
             operationId: rootId,
@@ -665,8 +1007,34 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               data.rooms.find((candidate) => candidate.id === effectiveRoomId)?.name ??
               "Sem ambiente",
             status,
-            layoutX: shiftLayout?.x ?? item.layoutX,
-            layoutY: shiftLayout?.y ?? item.layoutY,
+            layoutX: activeLayout?.x ?? item.layoutX,
+            layoutY: activeLayout?.y ?? item.layoutY,
+            width: item.width,
+            height: item.height,
+            rotation: activeLayout?.rotation ?? item.rotation,
+            shape: item.shape,
+            sectionColor: templatePainting
+              ? templateIncludesTable
+                ? serviceSectionColor
+                : templateSection?.color
+              : paintingSection
+                ? previewIncludesTable
+                  ? previewSection.color
+                  : assignment?.section.id === previewSection.id
+                    ? undefined
+                    : assignment?.section.color
+                : assignment?.section.color,
+            sectionLabel: templatePainting
+              ? templateIncludesTable
+                ? serviceSectionName
+                : templateSection?.name
+              : paintingSection
+                ? previewIncludesTable
+                  ? previewSection.name
+                  : assignment?.section.id === previewSection.id
+                    ? undefined
+                    : assignment?.section.name
+                : assignment?.section.name,
             responsible: effectiveResponsible?.displayName,
             valueLabel:
               status === "attention" && serviceCall
@@ -687,9 +1055,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       ? "Integrada ao grupo"
                       : servicePhase
                         ? `${servicePhasePresentation[servicePhase.phase]} · ${elapsedLabel(servicePhase.since)}`
-                        : formatMoney(
-                            groupTabs.reduce((sum, groupTab) => sum + groupTab.totalCents, 0),
-                          )
+                        : canSeeTableFinancials(item)
+                          ? formatMoney(
+                              groupTabs.reduce((sum, groupTab) => sum + groupTab.totalCents, 0),
+                            )
+                          : `${groupTabs.reduce((sum, groupTab) => sum + groupTab.guestCount, 0)} pessoas`
                     : effectiveResponsible
                       ? `${item.seats} lug. · ${effectiveResponsible.displayName}`
                       : `${item.seats} ${item.seats === 1 ? "lugar" : "lugares"}`,
@@ -700,17 +1070,24 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             accountCount: itemGroup ? groupTabs.length : undefined,
             hidden: !visibleRootIds.has(rootId),
             disabledReason:
-              joinMode && item.status === "reserved"
-                ? "Confirme ou libere a reserva antes da junção."
-                : undefined,
+              templatePainting && templateSection
+                ? `Já pertence à praça ${templateSection.name}.`
+                : joinMode && item.status === "reserved"
+                  ? "Confirme ou libere a reserva antes da junção."
+                  : undefined,
           };
         });
         const floorPlanZones = data.rooms.flatMap((room) =>
           room.layoutPolygon ? [{ id: room.id, label: room.name, points: room.layoutPolygon }] : [],
         );
+        const floorPlanElements: FloorPlanElement[] = data.layoutElements.map((element) => ({
+          ...element,
+          label: element.label ?? undefined,
+        }));
         const activeCalls = [...data.serviceCalls].sort(
           (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
         );
+        const attentionSummary = summarizeSalonAttention(activeCalls);
         const turnoverTables = activeTables.filter((item) =>
           ["needs_cleaning", "cleaning"].includes(item.status),
         );
@@ -736,6 +1113,106 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           expiringTransfers.length +
           turnoverTables.length +
           readyTables.length;
+        const preflight = buildSalonPreflight(data);
+        const preflightReady = preflight.filter((item) => item.ready).length;
+        const preflightBlocked = preflight.some((item) => item.blocking && !item.ready);
+        const nextPreflightItem = preflight.find((item) => !item.ready);
+        const operationalLoad = summarizeOperationalLoad(data);
+        const shiftSectionAssignments = data.shiftSections.map((section) => ({
+          section,
+          tableCount: data.shiftSectionTables.filter((row) => row.shiftSectionId === section.id)
+            .length,
+          primary: data.staff.find(
+            (person) =>
+              person.identityId ===
+              data.shiftSectionStaff.find(
+                (row) => row.shiftSectionId === section.id && row.role === "primary",
+              )?.identityId,
+          ),
+        }));
+        const serviceSectionSummaries = data.serviceSections.map((section) => {
+          const tableIds = data.serviceSectionTables
+            .filter((row) => row.sectionId === section.id)
+            .map((row) => row.tableId);
+          return {
+            section,
+            tableIds,
+            defaultResponsible: data.staff.find(
+              (person) => person.identityId === section.defaultResponsibleIdentityId,
+            ),
+          };
+        });
+        const serviceSectionAssignedTableIds = new Set(
+          data.serviceSectionTables.map((row) => row.tableId),
+        );
+        const serviceSectionOtherTableIds = new Set(
+          data.serviceSectionTables
+            .filter((row) => row.sectionId !== managedServiceSectionId)
+            .map((row) => row.tableId),
+        );
+        const normalizedServiceSectionQuery = serviceSectionTableQuery
+          .trim()
+          .toLocaleLowerCase("pt-BR");
+        const selectableServiceSectionTables = activeTables.filter(
+          (item) => !serviceSectionOtherTableIds.has(item.id),
+        );
+        const visibleServiceSectionTables = selectableServiceSectionTables.filter((item) => {
+          if (serviceSectionRoomFilter !== "all" && item.roomId !== serviceSectionRoomFilter) {
+            return false;
+          }
+          if (!normalizedServiceSectionQuery) return true;
+          const room = data.rooms.find((candidate) => candidate.id === item.roomId)?.name ?? "";
+          return `${item.label} ${room}`
+            .toLocaleLowerCase("pt-BR")
+            .includes(normalizedServiceSectionQuery);
+        });
+        const effectiveShiftMode = resolveShiftServiceMode(data.serviceSections);
+        const reusableSectionsWithResponsible = data.serviceSections.filter(
+          (section) => section.defaultResponsibleIdentityId,
+        ).length;
+        const reusableUnassignedTables = activeTables.filter(
+          (item) => !serviceSectionAssignedTableIds.has(item.id),
+        ).length;
+        const selectedShiftSection = shiftSectionAssignments.find(
+          ({ section }) => section.id === assignmentSectionId,
+        );
+        const ownSectionIds = new Set(
+          data.shiftSectionStaff
+            .filter((row) => row.identityId === scope.identityId)
+            .map((row) => row.shiftSectionId),
+        );
+        const ownTableIds = new Set(
+          data.shiftSectionTables
+            .filter((row) => ownSectionIds.has(row.shiftSectionId))
+            .map((row) => row.tableId),
+        );
+        const ownCalls = activeCalls.filter((call) => ownTableIds.has(call.tableId)).length;
+        const ownReady = readyTables.filter((item) => ownTableIds.has(item.id)).length;
+        const roleFocus =
+          scope.profileId === "cashier"
+            ? {
+                label: "Fila do caixa",
+                detail: `${counts.closing} conta(s) · ${attentionSummary.failedPrints + attentionSummary.printConfirmations} impressão(ões)`,
+              }
+            : scope.profileId === "waiter"
+              ? {
+                  label: "Minha operação",
+                  detail: `${ownTableIds.size} mesa(s) · ${ownReady} pronta(s) · ${ownCalls} chamado(s)`,
+                }
+              : scope.profileId === "receptionist"
+                ? {
+                    label: "Recepção",
+                    detail: `${counts.available} livre(s) · ${counts.reserved} reservada(s)`,
+                  }
+                : scope.profileId === "busser"
+                  ? {
+                      label: "Giro do salão",
+                      detail: `${counts.turnover} mesa(s) aguardando liberação`,
+                    }
+                  : {
+                      label: "Operação geral",
+                      detail: `${priorityCount} prioridade(s) · ${tableOccupancyRate}% ocupado`,
+                    };
         const handoverGroups = [
           ...data.openTabs
             .reduce(
@@ -765,6 +1242,124 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             .values(),
         ];
         const filterStorageKey = `giromesa:salon-filter:${scope.organizationId}:${scope.unitId}`;
+
+        function loadAssignmentSection(sectionId: string) {
+          setAssignmentSectionId(sectionId);
+          setAssignmentTableIds(
+            data.shiftSectionTables
+              .filter((row) => row.shiftSectionId === sectionId)
+              .map((row) => row.tableId),
+          );
+          setAssignmentPrimaryId(
+            data.shiftSectionStaff.find(
+              (row) => row.shiftSectionId === sectionId && row.role === "primary",
+            )?.identityId ?? "",
+          );
+          setAssignmentSupportIds(
+            data.shiftSectionStaff
+              .filter((row) => row.shiftSectionId === sectionId && row.role === "support")
+              .map((row) => row.identityId),
+          );
+        }
+
+        function openShiftSetup() {
+          setSetupSection("shift");
+          setShiftSetupStep(data.activeShift ? "team" : "sections");
+          setSetupOpen(true);
+          if (!assignmentSectionId) {
+            loadAssignmentSection(data.shiftSections[0]?.id ?? "");
+          }
+        }
+
+        function goToPreflightItem(itemId?: string) {
+          if (!itemId) {
+            if (data.activeShift) {
+              setSetupOpen(false);
+              setView("floor");
+              setWorkspaceMode("operate");
+            } else {
+              setSetupSection("shift");
+              setShiftSetupStep("open");
+            }
+            return;
+          }
+          if (itemId === "space") {
+            setSetupSection("space");
+            return;
+          }
+          setSetupSection("shift");
+          setShiftSetupStep(itemId === "staff" ? "team" : "sections");
+        }
+
+        function resetServiceSectionEditor() {
+          setManagedServiceSectionId("");
+          setServiceSectionName("");
+          setServiceSectionColor("#176B4D");
+          setServiceSectionMode("hybrid");
+          setServiceSectionTableIds([]);
+          setServiceSectionDefaultResponsibleId("");
+          setServiceSectionTableQuery("");
+          setServiceSectionRoomFilter("all");
+        }
+
+        function startNewServiceSection() {
+          resetServiceSectionEditor();
+          setServiceSectionEditorOpen(true);
+        }
+
+        function editServiceSection(serviceSectionId: string) {
+          const section = data.serviceSections.find(
+            (candidate) => candidate.id === serviceSectionId,
+          );
+          if (!section) return;
+          setManagedServiceSectionId(section.id);
+          setServiceSectionName(section.name);
+          setServiceSectionColor(section.color);
+          setServiceSectionMode(section.serviceMode);
+          setServiceSectionTableIds(
+            data.serviceSectionTables
+              .filter((row) => row.sectionId === section.id)
+              .map((row) => row.tableId),
+          );
+          setServiceSectionDefaultResponsibleId(section.defaultResponsibleIdentityId ?? "");
+          setServiceSectionTableQuery("");
+          setServiceSectionRoomFilter("all");
+          setServiceSectionEditorOpen(true);
+        }
+
+        function openServiceSectionFloorSelection() {
+          if (serviceSectionName.trim().length < 2) {
+            setFeedback("Informe o nome da praça antes de selecionar mesas na planta.", "info");
+            return;
+          }
+          setFilterStatus("all");
+          setRoomFilter("all");
+          setSectionFilter("all");
+          setSetupOpen(false);
+          setView("floor");
+          setWorkspaceMode("template");
+          setFloorEditRequestKey((current) => current + 1);
+        }
+
+        function switchWorkspaceMode(mode: "operate" | "space" | "shift") {
+          if (mode === "space" && !canEditSpace) return;
+          if (mode === "shift" && (!canReorganizeTurn || !data.activeShift)) return;
+          setView("floor");
+          setWorkspaceMode(mode);
+          setJoinMode(false);
+          setJoinSelection([]);
+          if (mode === "operate") {
+            setFloorOperateRequestKey((current) => current + 1);
+          } else {
+            if (mode === "shift") {
+              setShiftEditorTool(canManageShift ? "assign" : "move");
+              if (canManageShift) {
+                loadAssignmentSection(assignmentSectionId || data.shiftSections[0]?.id || "");
+              }
+            }
+            setFloorEditRequestKey((current) => current + 1);
+          }
+        }
 
         function saveCurrentFilter() {
           localStorage.setItem(
@@ -823,7 +1418,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               pilotMutation("open-tab", { body }),
               (key) => api.pilot.openTab(scope.organizationId, scope.unitId, body, key),
             );
-            setFeedback(
+            setCriticalFeedback(
               targetTable.status === "reserved"
                 ? "Chegada confirmada. Uma comanda vazia foi aberta para a reserva."
                 : usesQuickFlow
@@ -831,7 +1426,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   : "Atendimento aberto. O cardápio já está disponível.",
             );
             setSelectedTableId(targetTable.id);
-            floor.retry();
+            await floor.refresh();
           } catch (error) {
             setErrorFeedback(error, "Não foi possível abrir a comanda.");
           } finally {
@@ -883,7 +1478,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setSelectedTabId(open?.id ?? null);
           const mode =
             operationalAssignmentForTable(targetTable.id)?.section.serviceMode ?? data.serviceMode;
-          if (!open && displayStatus(targetTable) === "available" && usesQuickServiceMode(mode)) {
+          if (
+            canOperateTable(targetTable) &&
+            !open &&
+            displayStatus(targetTable) === "available" &&
+            usesQuickServiceMode(mode)
+          ) {
             void openTab(targetTable);
           }
         }
@@ -894,13 +1494,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           active: boolean,
         ) {
           if (!data.activeShift || busy) return;
+          const shiftId = data.activeShift.id;
           setBusy(true);
           setFeedback("");
           try {
             await api.pilot.updateShiftSectionCoverage(
               scope.organizationId,
               scope.unitId,
-              data.activeShift.id,
+              shiftId,
               shiftSectionId,
               active,
             );
@@ -909,6 +1510,17 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 ? `Você agora apoia a praça ${sectionName}.`
                 : `Cobertura da praça ${sectionName} encerrada.`,
             );
+            setUndoAction(() => ({
+              message: active ? "Desfazer entrada no apoio" : "Restaurar apoio da praça",
+              run: () =>
+                api.pilot.updateShiftSectionCoverage(
+                  scope.organizationId,
+                  scope.unitId,
+                  shiftId,
+                  shiftSectionId,
+                  !active,
+                ),
+            }));
             floor.retry();
           } catch (error) {
             setErrorFeedback(error, "Não foi possível atualizar a cobertura.");
@@ -944,13 +1556,26 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 targetShiftSectionId: transferTargetSectionId,
                 durationMinutes: transferDurationMinutes,
                 transferOpenTab,
-                reason: transferReason.trim(),
+                reasonCode: transferReasonCode,
+                ...(transferReason.trim() ? { reasonNote: transferReason.trim() } : {}),
               },
             );
             setTransferDialogOpen(false);
-            setFeedback(
+            setCriticalFeedback(
               `${selectedGroup ? `Grupo com ${selectedGroupTableIds.length} mesas` : table.label} remanejado até ${new Date(Date.now() + transferDurationMinutes * 60_000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`,
             );
+            const shiftId = data.activeShift.id;
+            const transferredTableId = table.id;
+            setUndoAction(() => ({
+              message: "Desfazer remanejamento",
+              run: () =>
+                api.pilot.endShiftTableTransfer(
+                  scope.organizationId,
+                  scope.unitId,
+                  shiftId,
+                  transferredTableId,
+                ),
+            }));
             floor.retry();
           } catch (error) {
             setErrorFeedback(error, "Não foi possível remanejar a mesa.");
@@ -986,15 +1611,58 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         async function saveFloorLayout(
           positions: FloorPlanPosition[],
           zones: FloorPlanZonePosition[],
+          elements: FloorPlanElement[],
+          tableDetails: FloorPlanTableDetails[],
         ) {
           setBusy(true);
           setFeedback("");
           try {
+            if (
+              tableDetails.some(
+                (details) =>
+                  details.label.trim().length === 0 ||
+                  !Number.isInteger(details.seats) ||
+                  details.seats < 1 ||
+                  details.seats > 100,
+              )
+            ) {
+              throw new Error("Informe nome e quantidade de lugares vÃ¡lidos para cada mesa.");
+            }
+            const detailsByTableId = new Map(
+              tableDetails.map((details) => [details.tableId, details] as const),
+            );
             await api.pilot.updateFloorLayout(scope.organizationId, scope.unitId, {
-              tables: positions.map(({ tableId, x, y }) => ({ tableId, x, y })),
+              expectedRevision: requiredOperationalRevision(data.floorRevision, "planta"),
+              tables: positions.map(({ tableId, x, y, width, height, rotation, shape }) => {
+                const details = detailsByTableId.get(tableId);
+                if (!details) throw new Error("Preencha os dados de cada mesa antes de salvar.");
+                return {
+                  tableId,
+                  roomId: details.roomId,
+                  label: details.label.trim(),
+                  seats: details.seats,
+                  x,
+                  y,
+                  width,
+                  height,
+                  rotation,
+                  shape,
+                };
+              }),
               rooms: zones.filter((zone) =>
                 data.rooms.some((room) => room.id === zone.roomId && room.active),
               ),
+              layoutElements: elements.map((element) => ({
+                id: element.id,
+                roomId: element.roomId,
+                kind: element.kind,
+                ...(element.label?.trim() ? { label: element.label.trim() } : {}),
+                x: element.x,
+                y: element.y,
+                width: element.width,
+                height: element.height,
+                rotation: element.rotation,
+              })),
             });
             setFeedback("Planta publicada para toda a equipe desta unidade.");
             floor.retry();
@@ -1017,8 +1685,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               scope.unitId,
               data.activeShift.id,
               {
-                tables: positions.flatMap(({ tableId, roomId, x, y }) =>
-                  roomId ? [{ tableId, roomId, x, y }] : [],
+                expectedRevision: requiredOperationalRevision(data.shiftRevision, "turno"),
+                tables: positions.flatMap(({ tableId, roomId, x, y, rotation }) =>
+                  roomId ? [{ tableId, roomId, x, y, rotation }] : [],
                 ),
               },
             );
@@ -1029,6 +1698,30 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             return true;
           } catch (error) {
             setErrorFeedback(error, "Não foi possível reorganizar as mesas deste turno.");
+            return false;
+          } finally {
+            setBusy(false);
+          }
+        }
+
+        async function archiveTable(tableId: string) {
+          setBusy(true);
+          setFeedback("");
+          try {
+            await api.pilot.archiveTable(
+              scope.organizationId,
+              scope.unitId,
+              tableId,
+              requiredOperationalRevision(data.floorRevision, "planta"),
+            );
+            setFeedback("Mesa arquivada. O histórico operacional foi preservado.");
+            floor.retry();
+            return true;
+          } catch (error) {
+            setErrorFeedback(
+              error,
+              "Não foi possível arquivar. Mesas ocupadas, reservadas, agrupadas ou atribuídas ao turno precisam ser liberadas antes.",
+            );
             return false;
           } finally {
             setBusy(false);
@@ -1069,26 +1762,70 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
-        async function createServiceSection(event: FormEvent<HTMLFormElement>) {
-          event.preventDefault();
-          if (!serviceSectionName.trim() || !serviceSectionTableIds.length) return;
+        async function saveServiceSection(event?: FormEvent<HTMLFormElement>) {
+          event?.preventDefault();
+          if (!serviceSectionName.trim() || !serviceSectionTableIds.length) return false;
           setBusy(true);
           setFeedback("");
           try {
-            await api.pilot.createServiceSection(scope.organizationId, scope.unitId, {
+            const body = {
               name: serviceSectionName.trim(),
               color: serviceSectionColor,
               serviceMode: serviceSectionMode,
               tableIds: serviceSectionTableIds,
               defaultResponsibleIdentityId: serviceSectionDefaultResponsibleId || null,
-            });
-            setServiceSectionName("");
-            setServiceSectionTableIds([]);
-            setServiceSectionDefaultResponsibleId("");
-            setFeedback("Modelo de praça salvo. Ele será reaproveitado nos próximos turnos.");
+            };
+            if (managedServiceSectionId) {
+              await api.pilot.updateServiceSection(
+                scope.organizationId,
+                scope.unitId,
+                managedServiceSectionId,
+                body,
+              );
+            } else {
+              await api.pilot.createServiceSection(scope.organizationId, scope.unitId, body);
+            }
+            setFeedback(
+              managedServiceSectionId
+                ? "Modelo de praça atualizado. O turno atual preserva a configuração iniciada."
+                : "Modelo de praça salvo para os próximos turnos.",
+            );
+            resetServiceSectionEditor();
+            setServiceSectionEditorOpen(false);
+            floor.retry();
+            return true;
+          } catch (error) {
+            setErrorFeedback(error, "Não foi possível salvar o modelo de praça.");
+            return false;
+          } finally {
+            setBusy(false);
+          }
+        }
+
+        async function archiveServiceSection(serviceSectionId: string, name: string) {
+          if (
+            !window.confirm(
+              `Arquivar a praça ${name}? O turno atual não será alterado e as mesas ficarão disponíveis para outros modelos futuros.`,
+            )
+          ) {
+            return;
+          }
+          setBusy(true);
+          setFeedback("");
+          try {
+            await api.pilot.archiveServiceSection(
+              scope.organizationId,
+              scope.unitId,
+              serviceSectionId,
+            );
+            if (managedServiceSectionId === serviceSectionId) {
+              resetServiceSectionEditor();
+              setServiceSectionEditorOpen(false);
+            }
+            setFeedback("Modelo de praça arquivado. O turno atual permanece inalterado.");
             floor.retry();
           } catch (error) {
-            setErrorFeedback(error, "Não foi possível criar o modelo de praça.");
+            setErrorFeedback(error, "Não foi possível arquivar o modelo de praça.");
           } finally {
             setBusy(false);
           }
@@ -1096,12 +1833,19 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
         async function openShift(event: FormEvent<HTMLFormElement>) {
           event.preventDefault();
+          if (preflightBlocked) {
+            setFeedback(
+              "Conclua os itens obrigatórios da prontidão antes de abrir o turno.",
+              "info",
+            );
+            return;
+          }
           setBusy(true);
           setFeedback("");
           try {
             await api.pilot.openOperationalShift(scope.organizationId, scope.unitId, {
               label: shiftLabel.trim() || undefined,
-              serviceMode: shiftMode,
+              serviceMode: effectiveShiftMode,
               copyPreviousAssignments,
             });
             setShiftLabel("");
@@ -1114,24 +1858,60 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
-        async function updateShiftAssignment(event: FormEvent<HTMLFormElement>) {
-          event.preventDefault();
-          if (!data.activeShift || !assignmentSectionId || !assignmentTableIds.length) return;
+        async function updateShiftAssignment(event?: FormEvent<HTMLFormElement>) {
+          event?.preventDefault();
+          if (!data.activeShift || !assignmentSectionId) return;
+          if (
+            assignmentTableIds.length === 0 &&
+            (data.shiftSectionTables.some((row) => row.shiftSectionId === assignmentSectionId) ||
+              assignmentPrimaryId ||
+              assignmentSupportIds.length > 0) &&
+            !window.confirm(
+              "Esvaziar esta praÃ§a no turno? As mesas serÃ£o removidas da praÃ§a e a equipe continuarÃ¡ configurada.",
+            )
+          ) {
+            return;
+          }
           setBusy(true);
           setFeedback("");
           try {
-            await api.pilot.updateShiftSectionAssignment(
+            const movedTableIds = new Set(assignmentTableIds);
+            await api.pilot.updateShiftSections(
               scope.organizationId,
               scope.unitId,
               data.activeShift.id,
-              assignmentSectionId,
               {
-                tableIds: assignmentTableIds,
-                primaryIdentityId: assignmentPrimaryId || null,
-                supportIdentityIds: assignmentSupportIds,
+                expectedRevision: requiredOperationalRevision(data.shiftRevision, "turno"),
+                assignments: data.shiftSections.map((section) => {
+                  const currentTableIds = data.shiftSectionTables
+                    .filter((row) => row.shiftSectionId === section.id)
+                    .map((row) => row.tableId);
+                  const currentStaff = data.shiftSectionStaff.filter(
+                    (row) => row.shiftSectionId === section.id,
+                  );
+                  if (section.id === assignmentSectionId) {
+                    return {
+                      shiftSectionId: section.id,
+                      tableIds: assignmentTableIds,
+                      primaryIdentityId: assignmentPrimaryId || null,
+                      supportIdentityIds: assignmentSupportIds,
+                    };
+                  }
+                  return {
+                    shiftSectionId: section.id,
+                    tableIds: currentTableIds.filter((tableId) => !movedTableIds.has(tableId)),
+                    primaryIdentityId:
+                      currentStaff.find((row) => row.role === "primary")?.identityId ?? null,
+                    supportIdentityIds: currentStaff
+                      .filter((row) => row.role === "support")
+                      .map((row) => row.identityId),
+                  };
+                }),
               },
             );
-            setFeedback("Praça do turno atualizada sem alterar os ambientes físicos.");
+            setFeedback(
+              "Praças do turno atualizadas em conjunto, sem alterar os ambientes físicos.",
+            );
             floor.retry();
           } catch (error) {
             setErrorFeedback(error, "Não foi possível atualizar a praça do turno.");
@@ -1142,11 +1922,13 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
         async function closeShift({
           acknowledgeOpenTabs,
+          returnableDecision,
           handoverIdentityId: nextResponsibleIdentityId,
           handoverAssignments: nextAssignments,
           reason,
         }: {
           acknowledgeOpenTabs: boolean;
+          returnableDecision?: "acknowledge";
           handoverIdentityId?: string | null;
           handoverAssignments?: Array<{
             sourceResponsibleIdentityId: string | null;
@@ -1164,6 +1946,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               data.activeShift.id,
               {
                 acknowledgeOpenTabs,
+                returnableDecision,
                 handoverIdentityId: nextResponsibleIdentityId,
                 handoverAssignments: nextAssignments,
                 reason,
@@ -1178,6 +1961,39 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             );
             floor.retry();
           } catch (error) {
+            if (
+              error instanceof ApiClientError &&
+              error.code === "SHIFT_HAS_OPEN_RETURNABLE_CUSTODY"
+            ) {
+              if (error.details?.policy === "block") {
+                setFeedback(
+                  "Transfira ou confirme a devolução em Estoque > Vasilhames antes de encerrar o turno.",
+                  "danger",
+                  true,
+                );
+                return;
+              }
+              if (returnableDecision === "acknowledge") {
+                setErrorFeedback(error, "Não foi possível encerrar o turno após a confirmação.");
+                return;
+              }
+              if (
+                window.confirm(
+                  "Há custódias de vasilhames sem destinatário. Deseja encerrar o turno e mantê-las pendentes em Estoque > Vasilhames?",
+                )
+              ) {
+                await closeShift({
+                  acknowledgeOpenTabs,
+                  returnableDecision: "acknowledge",
+                  handoverIdentityId: nextResponsibleIdentityId,
+                  handoverAssignments: nextAssignments,
+                  reason,
+                });
+                return;
+              }
+              setFeedback("Encerramento cancelado. As custódias continuam pendentes.", "info");
+              return;
+            }
             setErrorFeedback(error, "Não foi possível encerrar o turno.");
           } finally {
             setBusy(false);
@@ -1189,14 +2005,72 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setBusy(true);
           setFeedback("");
           try {
-            await api.pilot.createRoom(scope.organizationId, scope.unitId, {
-              name: roomName.trim(),
-            });
+            const mutateRoom = (expectedRevision: number) =>
+              managedRoomId
+                ? api.pilot.updateRoom(scope.organizationId, scope.unitId, managedRoomId, {
+                    name: roomName.trim(),
+                    sortOrder: Math.max(
+                      0,
+                      data.rooms.findIndex((candidate) => candidate.id === managedRoomId),
+                    ),
+                    expectedRevision,
+                  })
+                : api.pilot.createRoom(scope.organizationId, scope.unitId, {
+                    name: roomName.trim(),
+                    sortOrder: data.rooms.length,
+                    expectedRevision,
+                  });
+            await runFloorRevisionMutation(
+              data.floorRevision,
+              async () =>
+                parsePilotFloor(await api.pilot.floor(scope.organizationId, scope.unitId))
+                  .floorRevision,
+              mutateRoom,
+            );
             setRoomName("");
-            setFeedback("Ambiente criado. Agora adicione as mesas.");
-            floor.retry();
+            setManagedRoomId("");
+            setFeedback(
+              managedRoomId
+                ? "Ambiente renomeado para toda a equipe."
+                : "Ambiente criado. Agora adicione as mesas.",
+            );
+            await floor.refresh();
           } catch (error) {
             setErrorFeedback(error, "Não foi possível criar o ambiente.");
+          } finally {
+            setBusy(false);
+          }
+        }
+
+        async function archiveRoom() {
+          if (!managedRoomId || busy) return;
+          const selectedRoom = data.rooms.find((candidate) => candidate.id === managedRoomId);
+          if (
+            !selectedRoom ||
+            !window.confirm(
+              `Arquivar ${selectedRoom.name}? O ambiente só pode ser arquivado depois que todas as mesas dele forem movidas ou arquivadas.`,
+            )
+          ) {
+            return;
+          }
+          setBusy(true);
+          setFeedback("");
+          try {
+            await api.pilot.archiveRoom(
+              scope.organizationId,
+              scope.unitId,
+              managedRoomId,
+              requiredOperationalRevision(data.floorRevision, "planta"),
+            );
+            setManagedRoomId("");
+            setRoomName("");
+            setFeedback("Ambiente arquivado. O histórico da operação foi preservado.");
+            floor.retry();
+          } catch (error) {
+            setErrorFeedback(
+              error,
+              "Não foi possível arquivar. Mova ou arquive primeiro as mesas ativas deste ambiente.",
+            );
           } finally {
             setBusy(false);
           }
@@ -1213,7 +2087,15 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setFeedback("");
           try {
             await api.pilot.createTables(scope.organizationId, scope.unitId, selectedRoom, {
-              tables: tableNames.map((label) => ({ label, seats: tableSeats })),
+              expectedRevision: requiredOperationalRevision(data.floorRevision, "planta"),
+              tables: tableNames.map((label) => ({
+                label,
+                seats: tableSeats,
+                width: 122,
+                height: 76,
+                rotation: 0,
+                shape: "rectangle" as const,
+              })),
             });
             if (tableMode === "single") setTableLabel("");
             else setTableStart((current) => current + tableQuantity);
@@ -1232,6 +2114,13 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
         function openJoinDialog() {
           if (joinSelection.length < 2) return;
+          if (joinTables.some((item) => !canOperateTable(item))) {
+            setFeedback(
+              "A seleção inclui uma mesa fora do seu atendimento. Peça ao coordenador da operação para concluir a junção.",
+              "info",
+            );
+            return;
+          }
           if (joinTables.some((item) => item.status === "reserved")) {
             setFeedback("Resolva a reserva antes de juntar essa mesa ao atendimento.", "info");
             return;
@@ -1241,6 +2130,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             joinTabs.find((open) => open.responsibleIdentityId)?.responsibleIdentityId ??
               scope.identityId,
           );
+          setJoinReasonCode(joinTabs.length > 1 ? "sit_together" : "large_party");
+          setJoinReasonNote("");
+          setFeedback("");
           setJoinAccountMode(
             data.activeShift
               ? joinTabs.length
@@ -1253,7 +2145,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
         async function confirmJoin() {
           if (!joinAnchorId || joinTableIds.length < 2) return;
-          if (joinAccountMode === "layout_only") {
+          if (joinReasonCode === "other" && joinReasonNote.trim().length < 3) {
+            setFeedback("Descreva o motivo da junção quando selecionar Outro.", "info");
+            return;
+          }
+          if (effectiveJoinAccountMode === "layout_only") {
             if (!data.activeShift) {
               setFeedback(
                 "Abra um turno para mover mesas sem alterar a planta permanente.",
@@ -1267,6 +2163,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               joinAnchorId,
               [],
               floorPlanZones,
+              floorPlanElements,
             );
             if (joinedLayout.unplacedIds.length) {
               setFeedback(
@@ -1282,6 +2179,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 scope.unitId,
                 data.activeShift.id,
                 {
+                  expectedRevision: requiredOperationalRevision(data.shiftRevision, "turno"),
                   tables: joinedLayout.positions.map((p) => ({
                     tableId: p.tableId,
                     roomId:
@@ -1291,10 +2189,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       "",
                     x: p.x,
                     y: p.y,
+                    rotation: p.rotation,
                   })),
                 },
               );
-              setFeedback(
+              setCriticalFeedback(
                 "Mesas aproximadas somente neste turno. Comandas, responsáveis e praças não mudaram.",
               );
               setJoinDialogOpen(false);
@@ -1311,14 +2210,15 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             return;
           }
           const targetTabId = joinTabs.find((open) => open.tableId === joinAnchorId)?.id;
-          if (joinAccountMode === "single_tab" && joinTabs.length > 0 && !targetTabId) {
+          if (effectiveJoinAccountMode === "single_tab" && joinTabs.length > 0 && !targetTabId) {
             setFeedback("Escolha como principal uma mesa com comanda aberta.", "info");
             return;
           }
           const body = {
             tableIds: joinTableIds,
             anchorTableId: joinAnchorId,
-            mode: joinAccountMode,
+            mode: effectiveJoinAccountMode,
+            ...buildTableGroupReason(joinReasonCode, joinReasonNote),
             ...(targetTabId ? { targetTabId } : {}),
             ...(joinResponsibleIdentityId
               ? { responsibleIdentityId: joinResponsibleIdentityId }
@@ -1331,9 +2231,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               pilotMutation("group-tables", { body }),
               (key) => api.pilot.groupTables(scope.organizationId, scope.unitId, body, key),
             );
-            setFeedback(
-              joinAccountMode === "single_tab"
-                ? "Mesas agrupadas com uma única comanda."
+            setCriticalFeedback(
+              effectiveJoinAccountMode === "single_tab"
+                ? joiningFreeTables
+                  ? "Mesas agrupadas. Ao abrir qualquer uma, a comanda será única para o grupo."
+                  : "Mesas agrupadas com uma única comanda."
                 : "Mesas agrupadas fisicamente com comandas separadas.",
             );
             setJoinDialogOpen(false);
@@ -1406,465 +2308,619 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         }
 
         return (
-          <div className="salon-shell" data-salon-operation-shell>
+          <div className="salon-shell" data-salon-operation-shell ref={salonShellRef}>
             <div className="salon-fullscreen-bar">
               <span>
                 <i aria-hidden="true" />
                 <strong>Modo operação</strong>
-                <small>Todo o atendimento permanece sobre a planta.</small>
-              </span>
-              <Button onClick={() => void document.exitFullscreen()} size="sm" variant="ghost">
-                Sair da operação
-              </Button>
-            </div>
-            <div
-              aria-live="polite"
-              className="gm-observability-row"
-              role={floor.refreshError ? "alert" : "status"}
-            >
-              <span>
-                <StatusDot
-                  pulse={floor.refreshing}
-                  tone={floor.refreshError ? "danger" : floor.refreshing ? "warning" : "success"}
-                />
                 <small>
-                  {floor.refreshError
-                    ? "Falha ao atualizar; exibindo a última confirmação."
-                    : floor.refreshing
-                      ? "Sincronizando o salão…"
-                      : floor.lastSuccessfulAt
-                        ? `Confirmado às ${new Date(floor.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-                        : "Aguardando confirmação…"}
+                  {floor.refreshing
+                    ? "Sincronizando…"
+                    : floor.lastSuccessfulAt
+                      ? `Confirmado às ${new Date(floor.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                      : "Operação sobre a planta"}
                 </small>
               </span>
-              {floor.refreshError && (
-                <Button onClick={floor.retry} size="sm" variant="ghost">
-                  Atualizar novamente
+              <div className="salon-fullscreen-bar__actions">
+                {priorityCount > 0 && (
+                  <Button
+                    aria-controls="salon-priority-queue"
+                    aria-expanded={priorityQueueOpen}
+                    onClick={() => setPriorityQueueOpen((current) => !current)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    Prioridades {priorityCount}
+                  </Button>
+                )}
+                <Button onClick={() => void document.exitFullscreen()} size="sm" variant="ghost">
+                  Sair da operação
                 </Button>
-              )}
+              </div>
             </div>
-            {priorityCount > 0 && (
-              <details
-                className="service-priority-queue"
-                onToggle={(event) => setPriorityQueueOpen(event.currentTarget.open)}
-                open={priorityQueueOpen}
+            <section aria-label="Central da operação" className="salon-command-center">
+              <header
+                aria-live="polite"
+                className="salon-command-center__header"
+                role={floor.refreshError ? "alert" : "status"}
               >
-                <summary>
+                <div className="salon-command-center__identity">
+                  <span className="salon-role-indicator__avatar" aria-hidden="true">
+                    <Icon name="user" size={16} />
+                  </span>
                   <span>
-                    <small>Fazer agora</small>
-                    <strong>Prioridades da operação</strong>
+                    <small>
+                      {activeUserName} · {roleConfig.title}
+                    </small>
+                    <strong>{roleFocus.label}</strong>
+                    <small>{roleFocus.detail}</small>
                   </span>
-                  <span className="service-priority-queue__count">
-                    <strong>{priorityCount}</strong>
-                    <small>{priorityCount === 1 ? "pendência" : "pendências"}</small>
+                </div>
+                <div className="salon-command-center__health">
+                  <span>
+                    <StatusDot
+                      pulse={floor.refreshing}
+                      tone={
+                        !online || floor.refreshError
+                          ? "danger"
+                          : floor.refreshing
+                            ? "warning"
+                            : "success"
+                      }
+                    />
+                    <small>
+                      {!online
+                        ? "Sem conexão · dados preservados"
+                        : floor.refreshError
+                          ? "Dados anteriores"
+                          : floor.refreshing
+                            ? "Sincronizando…"
+                            : floor.lastSuccessfulAt
+                              ? `Confirmado ${new Date(floor.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                              : "Aguardando…"}
+                    </small>
                   </span>
-                </summary>
-                <div className="service-priority-queue__items">
-                  {readyTables.map((readyTable) => {
-                    const phase = servicePhaseForTable(readyTable.id);
-                    return (
-                      <Button
-                        className="priority-task priority-task--warning"
-                        key={`ready-${readyTable.id}`}
-                        onClick={() => selectTable(readyTable)}
-                        type="button"
-                      >
-                        <span>
-                          <strong>{readyTable.label} · pedido pronto</strong>
-                          <small>
-                            {phase
-                              ? `Aguardando para servir ${elapsedLabel(phase.since)}`
-                              : "Abrir mesa"}
-                          </small>
-                        </span>
-                        <strong>Abrir mesa</strong>
-                      </Button>
-                    );
-                  })}
-                  {turnoverTables.map((turnoverTable) => (
-                    <article
-                      className="priority-task priority-task--warning"
-                      key={turnoverTable.id}
-                    >
-                      <span>
-                        <strong>
-                          {turnoverTable.label} ·{" "}
-                          {turnoverTable.status === "cleaning"
-                            ? "em limpeza"
-                            : "aguardando limpeza"}
-                        </strong>
-                        <small>A mesa permanece indisponível até a confirmação.</small>
-                      </span>
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          void updateTurnover(
-                            turnoverTable.status === "needs_cleaning" ? "cleaning" : "available",
-                            turnoverTable,
-                          )
+                  {attentionSummary.overdue > 0 && (
+                    <Badge tone="danger">{attentionSummary.overdue} SLA vencido</Badge>
+                  )}
+                  {attentionSummary.failedPrints > 0 && (
+                    <Badge tone="danger">{attentionSummary.failedPrints} falha de impressão</Badge>
+                  )}
+                  {attentionSummary.printConfirmations > 0 && (
+                    <Badge tone="warning">
+                      {attentionSummary.printConfirmations} saída a confirmar
+                    </Badge>
+                  )}
+                  {canConfigure && (
+                    <Button
+                      onClick={() => {
+                        if (data.activeShift || preflight[0]?.ready) openShiftSetup();
+                        else {
+                          setSetupSection("space");
+                          setSetupOpen(true);
                         }
-                        size="sm"
-                        variant="secondary"
-                      >
-                        {turnoverTable.status === "needs_cleaning" ? "Assumir" : "Liberar mesa"}
-                      </Button>
-                    </article>
-                  ))}
-                  {expiringTransfers.map((transfer) => {
-                    const group = groupForTable(transfer.tableId);
-                    const targetTableId = group?.anchorTableId ?? transfer.tableId;
-                    const targetTable = data.tables.find(
-                      (candidate) => candidate.id === targetTableId,
-                    );
-                    const minutes = Math.max(
-                      1,
-                      Math.ceil((new Date(transfer.expiresAt).getTime() - Date.now()) / 60_000),
-                    );
-                    return (
-                      <Button
-                        className="priority-task priority-task--warning"
-                        key={group?.id ?? transfer.id}
-                        onClick={() => {
-                          setSelectedTableId(targetTableId);
-                          setView("floor");
-                          setFloorFocusId(targetTableId);
-                        }}
-                        type="button"
-                      >
-                        <span>
-                          <strong>
-                            {group
-                              ? `Grupo com ${groupMembers(group.id).length} mesas`
-                              : (targetTable?.label ?? "Mesa")}{" "}
-                            · remanejamento vence
-                          </strong>
-                          <small>
-                            Em {minutes} min · abrir para devolver ou renovar a cobertura
-                          </small>
-                        </span>
-                        <strong>Abrir na planta</strong>
-                      </Button>
-                    );
-                  })}
-                  {activeCalls.map((call) => {
-                    const tableLabel =
-                      data.tables.find((candidate) => candidate.id === call.tableId)?.label ??
-                      "Mesa";
-                    const elapsedMinutes = Math.max(
-                      0,
-                      Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 60_000),
-                    );
-                    const overdue = elapsedMinutes >= call.slaMinutes;
-                    const acknowledgedBy = callOwner(call.acknowledgedByIdentityId);
-                    return (
+                      }}
+                      size="sm"
+                      variant={preflightReady === preflight.length ? "ghost" : "secondary"}
+                    >
+                      Prontidão {preflightReady}/{preflight.length}
+                    </Button>
+                  )}
+                  {canConfigure && (
+                    <Button
+                      onClick={() => setShowMetricsCockpit((current) => !current)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      <Icon name="dashboard" size={14} />
+                      {showMetricsCockpit ? "Ocultar indicadores" : "Indicadores"}
+                    </Button>
+                  )}
+                  {(floor.refreshError || !online) && (
+                    <Button onClick={floor.retry} size="sm" variant="ghost">
+                      Atualizar planta
+                    </Button>
+                  )}
+                </div>
+              </header>
+              {(!online || floor.refreshError) && (
+                <div className="salon-recovery-banner" role="alert">
+                  <Icon name={online ? "refresh" : "alert-circle"} size={16} />
+                  <span>
+                    <strong>
+                      {online ? "A planta precisa ser atualizada" : "Operação sem conexão"}
+                    </strong>
+                    <small>
+                      {online
+                        ? floor.refreshError
+                        : "A última visão confirmada continua disponível. Comandos compatíveis ficam na fila idempotente do terminal."}
+                    </small>
+                  </span>
+                  <Button disabled={!online || floor.refreshing} onClick={floor.retry} size="sm">
+                    {floor.refreshing ? "Atualizando…" : "Atualizar planta"}
+                  </Button>
+                </div>
+              )}
+              {priorityCount > 0 && (
+                <details
+                  className="service-priority-queue"
+                  id="salon-priority-queue"
+                  onToggle={(event) => setPriorityQueueOpen(event.currentTarget.open)}
+                  open={priorityQueueOpen}
+                >
+                  <summary>
+                    <span>
+                      <small>Fazer agora</small>
+                      <strong>Prioridades da operação</strong>
+                    </span>
+                    <span className="service-priority-queue__count">
+                      <strong>{priorityCount}</strong>
+                      <small>{priorityCount === 1 ? "pendência" : "pendências"}</small>
+                    </span>
+                  </summary>
+                  <div className="service-priority-queue__items">
+                    {readyTables.map((readyTable) => {
+                      const phase = servicePhaseForTable(readyTable.id);
+                      return (
+                        <Button
+                          className="priority-task priority-task--warning"
+                          key={`ready-${readyTable.id}`}
+                          onClick={() => selectTable(readyTable)}
+                          type="button"
+                        >
+                          <span>
+                            <strong>{readyTable.label} · pedido pronto</strong>
+                            <small>
+                              {phase
+                                ? `Aguardando para servir ${elapsedLabel(phase.since)}`
+                                : "Abrir mesa"}
+                            </small>
+                          </span>
+                          <strong>Abrir mesa</strong>
+                        </Button>
+                      );
+                    })}
+                    {turnoverTables.map((turnoverTable) => (
                       <article
-                        className={overdue ? "priority-task priority-task--late" : "priority-task"}
-                        key={call.id}
+                        className="priority-task priority-task--warning"
+                        key={turnoverTable.id}
                       >
                         <span>
                           <strong>
-                            {tableLabel} · {callKindLabel[call.kind]}
+                            {turnoverTable.label} ·{" "}
+                            {turnoverTable.status === "cleaning"
+                              ? "em limpeza"
+                              : "aguardando limpeza"}
                           </strong>
-                          <small>
-                            {call.status === "acknowledged" && call.acknowledgedAt
-                              ? "Assumido por " +
-                                acknowledgedBy +
-                                " " +
-                                elapsedLabel(call.acknowledgedAt)
-                              : `Aguardando há ${elapsedMinutes} min`}{" "}
-                            · SLA {call.slaMinutes} min
-                          </small>
+                          <small>A mesa permanece indisponível até a confirmação.</small>
                         </span>
                         <Button
                           disabled={busy}
-                          onClick={() => {
-                            const next = call.status === "open" ? "acknowledged" : "resolved";
-                            void transitionCall(call.id, next).then((confirmed) => {
-                              if (!confirmed || next !== "acknowledged") return;
-                              setSelectedTableId(call.tableId);
-                              setSelectedTabId(
-                                call.tabId ??
-                                  data.openTabs.find((open) => open.tableId === call.tableId)?.id ??
-                                  null,
-                              );
-                            });
-                          }}
-                          size="sm"
-                          title={
-                            call.status === "open"
-                              ? "Assumir chamado e abrir atendimento"
-                              : "Marcar chamado como resolvido"
+                          onClick={() =>
+                            void updateTurnover(
+                              turnoverTable.status === "needs_cleaning" ? "cleaning" : "available",
+                              turnoverTable,
+                            )
                           }
-                          variant={overdue ? "danger" : "secondary"}
+                          size="sm"
+                          variant="secondary"
                         >
-                          {call.status === "open" ? "Assumir e abrir" : "Resolver"}
+                          {turnoverTable.status === "needs_cleaning" ? "Assumir" : "Liberar mesa"}
                         </Button>
                       </article>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
-
-            {/* Cockpit gerencial fica fora do caminho padrão do atendimento. */}
-            {canConfigure && (
-              <div className="salon-cockpit-bar">
-                <div className="salon-role-indicator">
-                  <div className="salon-role-indicator__avatar">
-                    <Icon name="user" size={16} />
-                  </div>
-                  <div className="salon-role-indicator__info">
-                    <div className="salon-role-indicator__header">
-                      <strong>{activeUserName}</strong>
-                      <span className={`salon-role-tag salon-role-tag--${roleConfig.tone}`}>
-                        {roleConfig.title} · {roleConfig.badge}
-                      </span>
-                    </div>
-                    <small>{roleConfig.description}</small>
-                  </div>
-                </div>
-                <Button
-                  className="salon-cockpit-toggle"
-                  onClick={() => setShowMetricsCockpit((curr) => !curr)}
-                  type="button"
-                >
-                  <Icon name="dashboard" size={14} />
-                  <span>
-                    {showMetricsCockpit ? "Ocultar métricas do salão" : "Métricas em tempo real"}
-                  </span>
-                </Button>
-              </div>
-            )}
-
-            {canConfigure && showMetricsCockpit && (
-              <div className="salon-metrics-cockpit">
-                <Card className="salon-metric-card">
-                  <div className="salon-metric-card__header">
-                    <span>Faturamento em aberto</span>
-                    <Icon name="cash" size={16} />
-                  </div>
-                  <strong>{formatMoney(totalActiveSalonCents)}</strong>
-                  <small>{activeOpenTabs.length} comanda(s) ativas no salão</small>
-                </Card>
-
-                <Card className="salon-metric-card">
-                  <div className="salon-metric-card__header">
-                    <span>Ocupação do salão</span>
-                    <Icon name="salon" size={16} />
-                  </div>
-                  <div className="salon-metric-card__row">
-                    <strong>{tableOccupancyRate}%</strong>
-                    <span className="salon-metric-card__subval">
-                      {occupiedTablesList.length}/{counts.all} mesas
-                    </span>
-                  </div>
-                  <div className="salon-occupancy-bar">
-                    <div
-                      className="salon-occupancy-bar__fill"
-                      style={{ width: `${tableOccupancyRate}%` }}
-                    />
-                  </div>
-                  <small>
-                    {occupiedSeats}/{totalSeats} lugares ocupados ({seatOccupancyRate}%)
-                  </small>
-                </Card>
-
-                <Card className="salon-metric-card">
-                  <div className="salon-metric-card__header">
-                    <span>Ticket médio / mesa</span>
-                    <Icon name="catalog" size={16} />
-                  </div>
-                  <strong>{formatMoney(avgTicketPerTableCents)}</strong>
-                  <small>Por mesa ocupada no turno</small>
-                </Card>
-
-                <Card className="salon-metric-card salon-metric-card--alert">
-                  <div className="salon-metric-card__header">
-                    <span>Atenção imediata</span>
-                    <Icon name="clock" size={16} />
-                  </div>
-                  <div className="salon-metric-card__alerts">
-                    {counts.closing > 0 && (
-                      <span className="salon-metric-pill salon-metric-pill--warning">
-                        <strong>{counts.closing}</strong> pedindo conta
-                      </span>
-                    )}
-                    {counts.attention > 0 && (
-                      <span className="salon-metric-pill salon-metric-pill--danger">
-                        <strong>{counts.attention}</strong> chamando garçom
-                      </span>
-                    )}
-                    {counts.closing === 0 && counts.attention === 0 && counts.turnover === 0 && (
-                      <span className="salon-metric-pill salon-metric-pill--success">
-                        Operação em dia (sem pendências)
-                      </span>
-                    )}
-                  </div>
-                </Card>
-              </div>
-            )}
-
-            <div className="salon-command-bar salon-command-bar--real">
-              <SalonSearch
-                onChange={setQuery}
-                onSelect={(option) => {
-                  const selected = activeTables.find((item) => item.id === option.id);
-                  setQuery("");
-                  setFloorFocusId(option.id);
-                  if (selected) selectTable(selected);
-                }}
-                options={activeTables.map((item) => {
-                  const room = data.rooms.find((candidate) => candidate.id === item.roomId)?.name;
-                  const assignment = operationalAssignmentForTable(item.id);
-                  const group = groupForTable(item.id);
-                  const memberLabels = group
-                    ? groupMembers(group.id)
-                        .flatMap(
-                          (id) => data.tables.find((candidate) => candidate.id === id)?.label ?? [],
-                        )
-                        .join(" ")
-                    : "";
-                  return {
-                    id: item.id,
-                    label: item.label,
-                    meta: `${room ?? "Sem ambiente"} · ${assignment?.section.name ?? "Sem praça"} · ${item.seats} ${item.seats === 1 ? "lugar" : "lugares"}`,
-                    keywords: `${memberLabels} ${room ?? ""} ${assignment?.section.name ?? ""} ${assignment?.primary?.displayName ?? ""}`,
-                  };
-                })}
-                placeholder="Buscar mesa, ambiente ou praça"
-                value={query}
-              />
-              <details className="salon-filter-menu">
-                <summary>
-                  <Icon name="list" size={15} />
-                  <span>Filtros</span>
-                  {advancedFilterCount > 0 && <b>{advancedFilterCount}</b>}
-                </summary>
-                <div className="salon-filter-menu__panel">
-                  <Label className="salon-select">
-                    <span>Ambiente</span>
-                    <NativeSelect
-                      onChange={(event) => setRoomFilter(event.target.value)}
-                      value={roomFilter}
-                    >
-                      <option value="all">Todos os ambientes</option>
-                      {data.rooms
-                        .filter((item) => item.active)
-                        .map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                    </NativeSelect>
-                  </Label>
-                  <Label className="salon-select">
-                    <span>Praça do turno</span>
-                    <NativeSelect
-                      onChange={(event) => setSectionFilter(event.target.value)}
-                      value={sectionFilter}
-                    >
-                      <option value="all">Todas as praças</option>
-                      {data.activeShift && <option value="mine">Minhas praças e coberturas</option>}
-                      {data.shiftSections.map((section) => (
-                        <option key={section.id} value={section.id}>
-                          {section.name}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                  </Label>
-                  <div className="salon-filter-menu__actions">
-                    <Button onClick={saveCurrentFilter} size="sm" variant="ghost">
-                      Salvar visão
-                    </Button>
-                    <Button onClick={applySavedFilter} size="sm" variant="ghost">
-                      Aplicar salva
-                    </Button>
-                    {advancedFilterCount > 0 && (
-                      <Button
-                        onClick={() => {
-                          setRoomFilter("all");
-                          setSectionFilter("all");
-                        }}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        Limpar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </details>
-              <fieldset className="salon-view-toggle">
-                <legend className="gm-sr-only">Visualização</legend>
-                <Button
-                  aria-pressed={view === "map"}
-                  onClick={() => setView("map")}
-                  type="button"
-                  title="Visão em cartões"
-                >
-                  <Icon name="grid" size={14} />
-                  <span>Painel</span>
-                </Button>
-                <Button
-                  aria-pressed={view === "floor"}
-                  onClick={() => setView("floor")}
-                  type="button"
-                  title="Planta baixa 2D"
-                >
-                  <Icon name="salon" size={14} />
-                  <span>Planta</span>
-                </Button>
-                <Button
-                  aria-pressed={view === "list"}
-                  onClick={() => setView("list")}
-                  type="button"
-                  title="Lista rápida de alto giro"
-                >
-                  <Icon name="list" size={14} />
-                  <span>Lista</span>
-                </Button>
-              </fieldset>
-              <Button
-                aria-label="Atalhos de teclado"
-                onClick={() => setShortcutsModalOpen(true)}
-                size="sm"
-                title="Atalhos de teclado [?]"
-                variant="ghost"
-              >
-                <Icon name="clock" size={14} />
-                <span>Atalhos [?]</span>
-              </Button>
-              {(canConfigure || canReorganizeTurn) && (
-                <details className="salon-more-menu">
-                  <summary aria-label="Mais ações do salão">•••</summary>
-                  <div>
-                    {canConfigure && (
-                      <Button
-                        aria-controls="salon-configuration"
-                        aria-expanded={setupOpen}
-                        onClick={() => setSetupOpen(true)}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        <Icon name="settings" size={16} />
-                        Organizar salão
-                      </Button>
-                    )}
-                    <Button
-                      aria-pressed={joinMode}
-                      onClick={() => {
-                        setJoinMode((current) => !current);
-                        setJoinSelection([]);
-                      }}
-                      size="sm"
-                      variant={joinMode ? "secondary" : "ghost"}
-                    >
-                      {joinMode ? "Cancelar junção" : "Juntar mesas"}
-                    </Button>
+                    ))}
+                    {expiringTransfers.map((transfer) => {
+                      const group = groupForTable(transfer.tableId);
+                      const targetTableId = group?.anchorTableId ?? transfer.tableId;
+                      const targetTable = data.tables.find(
+                        (candidate) => candidate.id === targetTableId,
+                      );
+                      const minutes = Math.max(
+                        1,
+                        Math.ceil((new Date(transfer.expiresAt).getTime() - Date.now()) / 60_000),
+                      );
+                      return (
+                        <Button
+                          className="priority-task priority-task--warning"
+                          key={group?.id ?? transfer.id}
+                          onClick={() => {
+                            setSelectedTableId(targetTableId);
+                            setView("floor");
+                            setFloorFocusId(targetTableId);
+                          }}
+                          type="button"
+                        >
+                          <span>
+                            <strong>
+                              {group
+                                ? `Grupo com ${groupMembers(group.id).length} mesas`
+                                : (targetTable?.label ?? "Mesa")}{" "}
+                              · remanejamento vence
+                            </strong>
+                            <small>
+                              Em {minutes} min · abrir para devolver ou renovar a cobertura
+                            </small>
+                          </span>
+                          <strong>Abrir na planta</strong>
+                        </Button>
+                      );
+                    })}
+                    {activeCalls.map((call) => {
+                      const tableLabel =
+                        data.tables.find((candidate) => candidate.id === call.tableId)?.label ??
+                        "Mesa";
+                      const elapsedMinutes = Math.max(
+                        0,
+                        Math.floor((Date.now() - new Date(call.createdAt).getTime()) / 60_000),
+                      );
+                      const overdue = elapsedMinutes >= call.slaMinutes;
+                      const acknowledgedBy = callOwner(call.acknowledgedByIdentityId);
+                      return (
+                        <article
+                          className={
+                            overdue ? "priority-task priority-task--late" : "priority-task"
+                          }
+                          key={call.id}
+                        >
+                          <span>
+                            <strong>
+                              {tableLabel} · {callKindLabel[call.kind]}
+                            </strong>
+                            <small>
+                              {overdue ? "SLA vencido · " : ""}
+                              {call.status === "acknowledged" && call.acknowledgedAt
+                                ? "Assumido por " +
+                                  acknowledgedBy +
+                                  " " +
+                                  elapsedLabel(call.acknowledgedAt)
+                                : `Aguardando há ${elapsedMinutes} min`}{" "}
+                              · SLA {call.slaMinutes} min
+                            </small>
+                          </span>
+                          <Button
+                            disabled={busy}
+                            onClick={() => {
+                              const next = call.status === "open" ? "acknowledged" : "resolved";
+                              void transitionCall(call.id, next).then((confirmed) => {
+                                if (!confirmed || next !== "acknowledged") return;
+                                setSelectedTableId(call.tableId);
+                                setSelectedTabId(
+                                  call.tabId ??
+                                    data.openTabs.find((open) => open.tableId === call.tableId)
+                                      ?.id ??
+                                    null,
+                                );
+                              });
+                            }}
+                            size="sm"
+                            title={
+                              call.status === "open"
+                                ? "Assumir chamado e abrir atendimento"
+                                : "Marcar chamado como resolvido"
+                            }
+                            variant={overdue ? "danger" : "secondary"}
+                          >
+                            {call.status === "open" ? "Assumir e abrir" : "Resolver"}
+                          </Button>
+                        </article>
+                      );
+                    })}
                   </div>
                 </details>
               )}
-            </div>
+
+              {canConfigure && showMetricsCockpit && (
+                <div className="salon-metrics-cockpit">
+                  <Card className="salon-metric-card">
+                    <div className="salon-metric-card__header">
+                      <span>Faturamento em aberto</span>
+                      <Icon name="cash" size={16} />
+                    </div>
+                    <strong>{formatMoney(totalActiveSalonCents)}</strong>
+                    <small>{activeOpenTabs.length} comanda(s) ativas no salão</small>
+                  </Card>
+
+                  <Card className="salon-metric-card">
+                    <div className="salon-metric-card__header">
+                      <span>Ocupação do salão</span>
+                      <Icon name="salon" size={16} />
+                    </div>
+                    <div className="salon-metric-card__row">
+                      <strong>{tableOccupancyRate}%</strong>
+                      <span className="salon-metric-card__subval">
+                        {occupiedTablesList.length}/{counts.all} mesas
+                      </span>
+                    </div>
+                    <div className="salon-occupancy-bar">
+                      <div
+                        className="salon-occupancy-bar__fill"
+                        style={{ width: `${tableOccupancyRate}%` }}
+                      />
+                    </div>
+                    <small>
+                      {occupiedSeats}/{totalSeats} lugares ocupados ({seatOccupancyRate}%)
+                    </small>
+                  </Card>
+
+                  <Card className="salon-metric-card">
+                    <div className="salon-metric-card__header">
+                      <span>Ticket médio / mesa</span>
+                      <Icon name="catalog" size={16} />
+                    </div>
+                    <strong>{formatMoney(avgTicketPerTableCents)}</strong>
+                    <small>Por mesa ocupada no turno</small>
+                  </Card>
+
+                  <Card className="salon-metric-card salon-metric-card--alert">
+                    <div className="salon-metric-card__header">
+                      <span>Atenção imediata</span>
+                      <Icon name="clock" size={16} />
+                    </div>
+                    <div className="salon-metric-card__alerts">
+                      {counts.closing > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--warning">
+                          <strong>{counts.closing}</strong> pedindo conta
+                        </span>
+                      )}
+                      {counts.attention > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--danger">
+                          <strong>{counts.attention}</strong> chamando garçom
+                        </span>
+                      )}
+                      {attentionSummary.overdue > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--danger">
+                          <strong>{attentionSummary.overdue}</strong> chamado(s) com SLA vencido
+                        </span>
+                      )}
+                      {attentionSummary.failedPrints > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--danger">
+                          <strong>{attentionSummary.failedPrints}</strong> falha(s) de impressão
+                        </span>
+                      )}
+                      {attentionSummary.printConfirmations > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--warning">
+                          <strong>{attentionSummary.printConfirmations}</strong> saída(s) físicas a
+                          confirmar
+                        </span>
+                      )}
+                      {counts.turnover > 0 && (
+                        <span className="salon-metric-pill salon-metric-pill--info">
+                          <strong>{counts.turnover}</strong> mesa(s) em giro/limpeza
+                        </span>
+                      )}
+                      {counts.closing === 0 &&
+                        counts.attention === 0 &&
+                        counts.turnover === 0 &&
+                        attentionSummary.failedPrints === 0 &&
+                        attentionSummary.printConfirmations === 0 &&
+                        attentionSummary.overdue === 0 && (
+                          <span className="salon-metric-pill salon-metric-pill--success">
+                            Operação em dia (sem pendências)
+                          </span>
+                        )}
+                    </div>
+                  </Card>
+                </div>
+              )}
+
+              <div className="salon-command-bar salon-command-bar--real">
+                <SalonSearch
+                  onChange={setQuery}
+                  onSelect={(option) => {
+                    const selected = activeTables.find((item) => item.id === option.id);
+                    setQuery("");
+                    setFloorFocusId(option.id);
+                    if (selected) selectTable(selected);
+                  }}
+                  options={activeTables.map((item) => {
+                    const room = data.rooms.find((candidate) => candidate.id === item.roomId)?.name;
+                    const assignment = operationalAssignmentForTable(item.id);
+                    const group = groupForTable(item.id);
+                    const memberLabels = group
+                      ? groupMembers(group.id)
+                          .flatMap(
+                            (id) =>
+                              data.tables.find((candidate) => candidate.id === id)?.label ?? [],
+                          )
+                          .join(" ")
+                      : "";
+                    return {
+                      id: item.id,
+                      label: item.label,
+                      meta: `${room ?? "Sem ambiente"} · ${assignment?.section.name ?? "Sem praça"} · ${item.seats} ${item.seats === 1 ? "lugar" : "lugares"}`,
+                      keywords: `${memberLabels} ${room ?? ""} ${assignment?.section.name ?? ""} ${assignment?.primary?.displayName ?? ""}`,
+                    };
+                  })}
+                  placeholder="Buscar mesa, ambiente ou praça"
+                  value={query}
+                />
+                <details className="salon-filter-menu" data-salon-floating-menu>
+                  <summary>
+                    <Icon name="list" size={15} />
+                    <span>Filtros</span>
+                    {advancedFilterCount > 0 && <b>{advancedFilterCount}</b>}
+                  </summary>
+                  <div className="salon-filter-menu__panel">
+                    <Label className="salon-select">
+                      <span>Ambiente</span>
+                      <NativeSelect
+                        onChange={(event) => setRoomFilter(event.target.value)}
+                        value={roomFilter}
+                      >
+                        <option value="all">Todos os ambientes</option>
+                        {data.rooms
+                          .filter((item) => item.active)
+                          .map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name}
+                            </option>
+                          ))}
+                      </NativeSelect>
+                    </Label>
+                    <Label className="salon-select">
+                      <span>Praça do turno</span>
+                      <NativeSelect
+                        onChange={(event) => setSectionFilter(event.target.value)}
+                        value={sectionFilter}
+                      >
+                        <option value="all">Todas as praças</option>
+                        {data.activeShift && (
+                          <option value="mine">Minhas praças e coberturas</option>
+                        )}
+                        {data.shiftSections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                    <div className="salon-filter-menu__actions">
+                      <Button onClick={saveCurrentFilter} size="sm" variant="ghost">
+                        Salvar visão
+                      </Button>
+                      <Button onClick={applySavedFilter} size="sm" variant="ghost">
+                        Aplicar salva
+                      </Button>
+                      {advancedFilterCount > 0 && (
+                        <Button
+                          onClick={() => {
+                            setRoomFilter("all");
+                            setSectionFilter("all");
+                          }}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </details>
+                <fieldset className="salon-view-toggle">
+                  <legend className="gm-sr-only">Visualização</legend>
+                  <Button
+                    aria-pressed={view === "map"}
+                    className="gm-pill"
+                    onClick={() => setView("map")}
+                    type="button"
+                    title="Visão em cartões"
+                  >
+                    <Icon name="grid" size={14} />
+                    <span>Painel</span>
+                  </Button>
+                  <Button
+                    aria-pressed={view === "floor"}
+                    className="gm-pill"
+                    onClick={() => setView("floor")}
+                    type="button"
+                    title="Planta baixa 2D"
+                  >
+                    <Icon name="salon" size={14} />
+                    <span>Planta</span>
+                  </Button>
+                  <Button
+                    aria-pressed={view === "list"}
+                    className="gm-pill"
+                    onClick={() => setView("list")}
+                    type="button"
+                    title="Lista rápida de alto giro"
+                  >
+                    <Icon name="list" size={14} />
+                    <span>Lista</span>
+                  </Button>
+                </fieldset>
+                <Button
+                  className="salon-open-fullscreen"
+                  onClick={() => void openOperationalFloorFullscreen()}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Icon name="salon" size={14} />
+                  <span>Abrir planta em tela cheia</span>
+                </Button>
+                <Button
+                  aria-label="Atalhos de teclado"
+                  className="salon-command-shortcuts"
+                  onClick={() => setShortcutsModalOpen(true)}
+                  size="sm"
+                  title="Atalhos de teclado [?]"
+                  variant="ghost"
+                >
+                  <Icon name="clock" size={14} />
+                  <span>Atalhos [?]</span>
+                </Button>
+                {canReorganizeTurn && (
+                  <Button
+                    aria-pressed={joinMode}
+                    className="salon-join-action"
+                    onClick={() => {
+                      setJoinMode((current) => !current);
+                      setJoinSelection([]);
+                    }}
+                    size="sm"
+                    variant={joinMode ? "secondary" : "ghost"}
+                  >
+                    {joinMode ? "Cancelar junção" : "Juntar mesas"}
+                  </Button>
+                )}
+              </div>
+
+              {(canConfigure || data.capabilities?.canAccessAllTabs) && data.activeShift && (
+                <details className="service-load-panel">
+                  <summary>
+                    <span>
+                      <strong>Carga por praça e responsável</strong>
+                      <small>Leitura operacional; qualquer redistribuição continua manual.</small>
+                    </span>
+                    <Badge tone="neutral">{operationalLoad.sections.length} praça(s)</Badge>
+                  </summary>
+                  <div className="service-load-panel__body">
+                    <section>
+                      <strong>Praças</strong>
+                      <div className="service-load-grid">
+                        {operationalLoad.sections.map((section) => (
+                          <article key={section.id} style={{ borderLeftColor: section.color }}>
+                            <strong>{section.name}</strong>
+                            <small>
+                              {section.occupied}/{section.tables} mesa(s) · {section.guests}{" "}
+                              pessoa(s)
+                            </small>
+                            <small>
+                              {section.calls} chamado(s)
+                              {data.capabilities?.canAccessAllTabs
+                                ? ` · ${formatMoney(section.totalCents)}`
+                                : ""}
+                            </small>
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                    <section>
+                      <strong>Equipe</strong>
+                      <div className="service-load-grid">
+                        {operationalLoad.staff.map((person) => (
+                          <article key={person.identityId}>
+                            <strong>{person.displayName}</strong>
+                            <small>
+                              {person.sections} praça(s) · {person.tabs} comanda(s) ·{" "}
+                              {person.guests} pessoa(s)
+                            </small>
+                            {data.capabilities?.canAccessAllTabs && (
+                              <small>{formatMoney(person.totalCents)} em aberto</small>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                      {canManageShift && (
+                        <Button onClick={openShiftSetup} size="sm" variant="ghost">
+                          Ajustar distribuição
+                        </Button>
+                      )}
+                    </section>
+                  </div>
+                </details>
+              )}
+            </section>
 
             {canConfigure && (
               <Modal
@@ -1881,6 +2937,59 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <p className="floor-management__intro">
                     O espaço físico é permanente. Praças e responsáveis pertencem ao turno.
                   </p>
+                  <section
+                    className="salon-setup-assistant"
+                    aria-labelledby="setup-readiness-title"
+                  >
+                    <header>
+                      <span>
+                        <small>Assistente de configuração</small>
+                        <strong id="setup-readiness-title">
+                          {data.activeShift ? "Prontidão do turno" : "Antes de abrir o turno"}
+                        </strong>
+                      </span>
+                      <Badge tone={preflightBlocked ? "warning" : "success"}>
+                        {preflightReady}/{preflight.length} concluídos
+                      </Badge>
+                    </header>
+                    <div className="salon-setup-assistant__progress" aria-hidden="true">
+                      <i style={{ width: `${(preflightReady / preflight.length) * 100}%` }} />
+                    </div>
+                    <div className="salon-next-action">
+                      <span>
+                        <small>Próxima ação</small>
+                        <strong>
+                          {nextPreflightItem
+                            ? `${nextPreflightItem.label}: ${nextPreflightItem.detail}`
+                            : data.activeShift
+                              ? "Turno pronto para operar"
+                              : "Revisar e abrir o turno"}
+                        </strong>
+                      </span>
+                      {(nextPreflightItem || data.activeShift) && (
+                        <Button
+                          onClick={() => goToPreflightItem(nextPreflightItem?.id)}
+                          size="sm"
+                          type="button"
+                        >
+                          {nextPreflightItem ? "Continuar configuração" : "Operar salão"}
+                        </Button>
+                      )}
+                    </div>
+                    <ol>
+                      {preflight.map((item) => (
+                        <li className={item.ready ? "is-ready" : ""} key={item.id}>
+                          <StatusDot
+                            tone={item.ready ? "success" : item.blocking ? "danger" : "warning"}
+                          />
+                          <span>
+                            <strong>{item.label}</strong>
+                            <small>{item.detail}</small>
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  </section>
                   <fieldset className="segmented floor-setup__scope">
                     <legend className="gm-sr-only">Tipo de configuração</legend>
                     <Button
@@ -1892,7 +3001,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     </Button>
                     <Button
                       aria-pressed={setupSection === "shift"}
-                      onClick={() => setSetupSection("shift")}
+                      onClick={openShiftSetup}
                       type="button"
                     >
                       Turno e praças
@@ -1901,7 +3010,29 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   {setupSection === "space" ? (
                     <div className="quick-actions-grid floor-management__forms floor-management__forms--real">
                       <form className="action-form" onSubmit={(event) => void createRoom(event)}>
-                        <h3>Novo ambiente físico</h3>
+                        <h3>{managedRoomId ? "Editar ambiente físico" : "Novo ambiente físico"}</h3>
+                        <Label>
+                          Gerenciar
+                          <NativeSelect
+                            onChange={(event) => {
+                              const nextId = event.target.value;
+                              setManagedRoomId(nextId);
+                              setRoomName(
+                                data.rooms.find((candidate) => candidate.id === nextId)?.name ?? "",
+                              );
+                            }}
+                            value={managedRoomId}
+                          >
+                            <option value="">Criar novo ambiente</option>
+                            {data.rooms
+                              .filter((item) => item.active)
+                              .map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}
+                                </option>
+                              ))}
+                          </NativeSelect>
+                        </Label>
                         <Label>
                           Nome
                           <Input
@@ -1912,8 +3043,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           />
                         </Label>
                         <Button disabled={busy || roomName.trim().length < 2} type="submit">
-                          Criar ambiente
+                          {busy ? "Salvando…" : managedRoomId ? "Salvar nome" : "Criar ambiente"}
                         </Button>
+                        {managedRoomId && (
+                          <Button
+                            disabled={busy}
+                            onClick={() => void archiveRoom()}
+                            type="button"
+                            variant="danger"
+                          >
+                            Arquivar ambiente
+                          </Button>
+                        )}
                       </form>
                       <form
                         className="action-form action-form--tables"
@@ -2032,162 +3173,191 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       </form>
                     </div>
                   ) : (
-                    <div className="quick-actions-grid floor-management__forms floor-management__forms--shift">
-                      <form
-                        className="action-form action-form--service-section"
-                        onSubmit={(event) => void createServiceSection(event)}
-                      >
-                        <h3>Modelo reutilizável de praça</h3>
-                        <Label>
-                          Nome
-                          <Input
-                            maxLength={120}
-                            minLength={2}
-                            onChange={(event) => setServiceSectionName(event.target.value)}
-                            placeholder="Ex.: Praça A"
-                            required
-                            value={serviceSectionName}
-                          />
-                        </Label>
-                        <Label>
-                          Cor
-                          <input
-                            className="border-input bg-background"
-                            aria-label="Cor da praça"
-                            onChange={(event) => setServiceSectionColor(event.target.value)}
-                            type="color"
-                            value={serviceSectionColor}
-                          />
-                        </Label>
-                        <Label>
-                          Perfil de serviço
-                          <NativeSelect
-                            onChange={(event) =>
-                              setServiceSectionMode(event.target.value as ServiceMode)
-                            }
-                            value={serviceSectionMode}
-                          >
-                            <option value="full_service">Serviço completo</option>
-                            <option value="quick_service">Giro rápido</option>
-                            <option value="bar">Bar e comandas</option>
-                            <option value="hybrid">Híbrido</option>
-                          </NativeSelect>
-                        </Label>
-                        <Label>
-                          Responsável padrão
-                          <NativeSelect
-                            onChange={(event) =>
-                              setServiceSectionDefaultResponsibleId(event.target.value)
-                            }
-                            value={serviceSectionDefaultResponsibleId}
-                          >
-                            <option value="">Definir a cada turno</option>
-                            {data.staff.map((person) => (
-                              <option key={person.identityId} value={person.identityId}>
-                                {person.displayName}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        </Label>
-                        <fieldset className="floor-setup__tables action-form__wide">
-                          <legend>Mesas padrão</legend>
-                          {data.tables
-                            .filter(
-                              (item) =>
-                                item.active &&
-                                !data.serviceSectionTables.some((row) => row.tableId === item.id),
-                            )
-                            .map((item) => (
-                              <Label key={item.id}>
-                                <input
-                                  className="accent-primary"
-                                  checked={serviceSectionTableIds.includes(item.id)}
-                                  onChange={() =>
-                                    setServiceSectionTableIds((current) =>
-                                      current.includes(item.id)
-                                        ? current.filter((id) => id !== item.id)
-                                        : [...current, item.id],
-                                    )
-                                  }
-                                  type="checkbox"
-                                />
-                                <span>
-                                  {item.label} ·{" "}
-                                  {data.rooms.find((room) => room.id === item.roomId)?.name}
-                                </span>
-                              </Label>
-                            ))}
-                        </fieldset>
+                    <div className="shift-setup-flow">
+                      <nav aria-label="Etapas da preparação do turno" className="shift-setup-steps">
                         <Button
-                          disabled={
-                            busy || !serviceSectionName.trim() || !serviceSectionTableIds.length
-                          }
-                          type="submit"
+                          aria-current={shiftSetupStep === "sections" ? "step" : undefined}
+                          onClick={() => setShiftSetupStep("sections")}
+                          type="button"
+                          variant="ghost"
                         >
-                          Salvar modelo de praça
+                          <small>1</small> Revisar praças
                         </Button>
-                      </form>
-
-                      {data.activeShift ? (
-                        <form
-                          className="action-form action-form--shift"
-                          onSubmit={(event) => void updateShiftAssignment(event)}
+                        <Button
+                          aria-current={shiftSetupStep === "team" ? "step" : undefined}
+                          disabled={!data.serviceSections.length && !data.activeShift}
+                          onClick={() => setShiftSetupStep("team")}
+                          type="button"
+                          variant="ghost"
                         >
-                          <h3>Organizar turno ativo</h3>
-                          <p className="field-hint">
-                            <strong>{data.activeShift.label}</strong> ·{" "}
-                            {data.activeShift.serviceMode === "full_service"
-                              ? "Serviço completo"
-                              : data.activeShift.serviceMode === "quick_service"
-                                ? "Giro rápido"
-                                : data.activeShift.serviceMode === "bar"
-                                  ? "Bar e comandas"
-                                  : "Híbrido"}
-                          </p>
-                          <Label>
-                            Praça do turno
-                            <NativeSelect
-                              onChange={(event) => {
-                                const nextId = event.target.value;
-                                setAssignmentSectionId(nextId);
-                                setAssignmentTableIds(
-                                  data.shiftSectionTables
-                                    .filter((row) => row.shiftSectionId === nextId)
-                                    .map((row) => row.tableId),
-                                );
-                                setAssignmentPrimaryId(
-                                  data.shiftSectionStaff.find(
-                                    (row) =>
-                                      row.shiftSectionId === nextId && row.role === "primary",
-                                  )?.identityId ?? "",
-                                );
-                                setAssignmentSupportIds(
-                                  data.shiftSectionStaff
-                                    .filter(
-                                      (row) =>
-                                        row.shiftSectionId === nextId && row.role === "support",
-                                    )
-                                    .map((row) => row.identityId),
-                                );
+                          <small>2</small> Distribuir equipe
+                        </Button>
+                        <Button
+                          aria-current={shiftSetupStep === "open" ? "step" : undefined}
+                          disabled={Boolean(data.activeShift) || preflightBlocked}
+                          onClick={() => setShiftSetupStep("open")}
+                          type="button"
+                          variant="ghost"
+                        >
+                          <small>3</small> Abrir turno
+                        </Button>
+                      </nav>
+
+                      {shiftSetupStep === "sections" && (
+                        <section className="service-section-manager">
+                          <header className="service-section-manager__header">
+                            <span>
+                              <small>Configuração permanente</small>
+                              <h3>Praças reutilizáveis</h3>
+                              <p>
+                                Defina mesas, cor, atendimento e titular padrão. Alterações não
+                                mudam o turno que já estiver aberto.
+                              </p>
+                            </span>
+                            <Button onClick={startNewServiceSection} size="sm" type="button">
+                              <Icon name="plus" size={14} /> Nova praça
+                            </Button>
+                          </header>
+
+                          {serviceSectionSummaries.length ? (
+                            <div className="service-section-list">
+                              {serviceSectionSummaries.map(
+                                ({ section, tableIds, defaultResponsible }) => (
+                                  <article key={section.id}>
+                                    <i
+                                      aria-hidden="true"
+                                      className="service-section-list__color"
+                                      style={{ backgroundColor: section.color }}
+                                    />
+                                    <span>
+                                      <strong>{section.name}</strong>
+                                      <small>
+                                        {tableIds.length} {tableIds.length === 1 ? "mesa" : "mesas"}
+                                        {" · "}
+                                        {serviceModeLabel(section.serviceMode)}
+                                      </small>
+                                    </span>
+                                    <Badge tone={defaultResponsible ? "success" : "warning"}>
+                                      {defaultResponsible?.displayName ?? "Sem titular padrão"}
+                                    </Badge>
+                                    <div>
+                                      <Button
+                                        onClick={() => editServiceSection(section.id)}
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                      >
+                                        Editar
+                                      </Button>
+                                      <Button
+                                        disabled={busy}
+                                        onClick={() =>
+                                          void archiveServiceSection(section.id, section.name)
+                                        }
+                                        size="sm"
+                                        type="button"
+                                        variant="ghost"
+                                      >
+                                        Arquivar
+                                      </Button>
+                                    </div>
+                                  </article>
+                                ),
+                              )}
+                            </div>
+                          ) : (
+                            <p className="shift-assignment-empty">
+                              Nenhuma praça configurada. Crie a primeira para poder abrir o turno.
+                            </p>
+                          )}
+                          {!serviceSectionEditorOpen && serviceSectionSummaries.length > 0 && (
+                            <footer>
+                              <Button onClick={() => setShiftSetupStep("team")} type="button">
+                                {data.activeShift
+                                  ? "Voltar à equipe do turno"
+                                  : "Continuar para equipe"}
+                              </Button>
+                            </footer>
+                          )}
+                        </section>
+                      )}
+
+                      {shiftSetupStep === "sections" && serviceSectionEditorOpen && (
+                        <form
+                          className="action-form action-form--service-section service-section-editor"
+                          onSubmit={(event) => void saveServiceSection(event)}
+                        >
+                          <header className="service-section-editor__header action-form__wide">
+                            <span>
+                              <small>
+                                {managedServiceSectionId ? "Editar modelo" : "Nova praça"}
+                              </small>
+                              <h3>
+                                {managedServiceSectionId
+                                  ? serviceSectionName || "Praça"
+                                  : "Configurar praça"}
+                              </h3>
+                            </span>
+                            <Button
+                              onClick={() => {
+                                resetServiceSectionEditor();
+                                setServiceSectionEditorOpen(false);
                               }}
-                              required
-                              value={assignmentSectionId}
+                              size="sm"
+                              type="button"
+                              variant="ghost"
                             >
-                              <option value="">Selecione</option>
-                              {data.shiftSections.map((section) => (
-                                <option key={section.id} value={section.id}>
-                                  {section.name}
-                                </option>
-                              ))}
-                            </NativeSelect>
-                          </Label>
+                              Cancelar
+                            </Button>
+                          </header>
                           <Label>
-                            Titular
+                            Nome
+                            <Input
+                              maxLength={120}
+                              minLength={2}
+                              onChange={(event) => setServiceSectionName(event.target.value)}
+                              placeholder="Ex.: Praça A"
+                              required
+                              value={serviceSectionName}
+                            />
+                          </Label>
+                          <div className="service-section-color">
+                            <Label>
+                              Cor da praça
+                              <input
+                                className="border-input bg-background"
+                                aria-label="Cor da borda das mesas"
+                                onChange={(event) => setServiceSectionColor(event.target.value)}
+                                type="color"
+                                value={serviceSectionColor}
+                              />
+                            </Label>
+                            <span>
+                              <i
+                                aria-hidden="true"
+                                className="service-section-color__preview"
+                                style={{ borderColor: serviceSectionColor }}
+                              >
+                                Mesa
+                              </i>
+                              <small>Aparece na borda das mesas durante o turno.</small>
+                            </span>
+                          </div>
+                          <ServiceModePicker
+                            legend="Como esta praça atende?"
+                            name="service-section-mode"
+                            onChange={setServiceSectionMode}
+                            value={serviceSectionMode}
+                          />
+                          <Label>
+                            Titular padrão — opcional
                             <NativeSelect
-                              onChange={(event) => setAssignmentPrimaryId(event.target.value)}
-                              value={assignmentPrimaryId}
+                              onChange={(event) =>
+                                setServiceSectionDefaultResponsibleId(event.target.value)
+                              }
+                              value={serviceSectionDefaultResponsibleId}
                             >
-                              <option value="">Sem titular</option>
+                              <option value="">Definir na preparação do turno</option>
                               {data.staff.map((person) => (
                                 <option key={person.identityId} value={person.identityId}>
                                   {person.displayName}
@@ -2195,64 +3365,313 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               ))}
                             </NativeSelect>
                           </Label>
-                          <fieldset className="floor-setup__tables action-form__wide">
-                            <legend>Apoio</legend>
-                            {data.staff
-                              .filter((person) => person.identityId !== assignmentPrimaryId)
-                              .map((person) => (
-                                <Label key={person.identityId}>
-                                  <input
-                                    className="accent-primary"
-                                    checked={assignmentSupportIds.includes(person.identityId)}
-                                    onChange={() =>
-                                      setAssignmentSupportIds((current) =>
-                                        current.includes(person.identityId)
-                                          ? current.filter((id) => id !== person.identityId)
-                                          : [...current, person.identityId],
-                                      )
-                                    }
-                                    type="checkbox"
+                          <p className="field-hint action-form__wide">
+                            Ao reaproveitar a equipe anterior, ela será priorizada. Este titular é
+                            usado quando não houver atribuição anterior.
+                          </p>
+                          <fieldset className="service-section-table-picker action-form__wide">
+                            <legend>Mesas da praça</legend>
+                            <div className="service-section-table-picker__toolbar">
+                              <Input
+                                aria-label="Buscar mesa para a praça"
+                                onChange={(event) =>
+                                  setServiceSectionTableQuery(event.target.value)
+                                }
+                                placeholder="Buscar mesa ou ambiente"
+                                value={serviceSectionTableQuery}
+                              />
+                              <NativeSelect
+                                aria-label="Filtrar mesas por ambiente"
+                                onChange={(event) =>
+                                  setServiceSectionRoomFilter(event.target.value)
+                                }
+                                value={serviceSectionRoomFilter}
+                              >
+                                <option value="all">Todos os ambientes</option>
+                                {data.rooms
+                                  .filter((room) => room.active)
+                                  .map((room) => (
+                                    <option key={room.id} value={room.id}>
+                                      {room.name}
+                                    </option>
+                                  ))}
+                              </NativeSelect>
+                              <Button
+                                disabled={!visibleServiceSectionTables.length}
+                                onClick={() => {
+                                  const visibleIds = visibleServiceSectionTables.map(
+                                    (item) => item.id,
+                                  );
+                                  const allSelected = visibleIds.every((id) =>
+                                    serviceSectionTableIds.includes(id),
+                                  );
+                                  setServiceSectionTableIds((current) =>
+                                    allSelected
+                                      ? current.filter((id) => !visibleIds.includes(id))
+                                      : [...new Set([...current, ...visibleIds])],
+                                  );
+                                }}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                {visibleServiceSectionTables.every((item) =>
+                                  serviceSectionTableIds.includes(item.id),
+                                ) && visibleServiceSectionTables.length
+                                  ? "Desmarcar visíveis"
+                                  : "Selecionar visíveis"}
+                              </Button>
+                            </div>
+                            <div className="service-section-table-picker__summary">
+                              <strong>{serviceSectionTableIds.length} selecionada(s)</strong>
+                              <Button
+                                onClick={openServiceSectionFloorSelection}
+                                size="sm"
+                                type="button"
+                                variant="secondary"
+                              >
+                                <Icon name="salon" size={14} /> Selecionar na planta
+                              </Button>
+                            </div>
+                            <div className="service-section-table-picker__rooms">
+                              {data.rooms
+                                .filter(
+                                  (room) =>
+                                    room.active &&
+                                    visibleServiceSectionTables.some(
+                                      (item) => item.roomId === room.id,
+                                    ),
+                                )
+                                .map((room) => (
+                                  <section key={room.id}>
+                                    <strong>{room.name}</strong>
+                                    <div>
+                                      {visibleServiceSectionTables
+                                        .filter((item) => item.roomId === room.id)
+                                        .map((item) => (
+                                          <Label key={item.id}>
+                                            <input
+                                              className="accent-primary"
+                                              checked={serviceSectionTableIds.includes(item.id)}
+                                              onChange={() =>
+                                                setServiceSectionTableIds((current) =>
+                                                  current.includes(item.id)
+                                                    ? current.filter((id) => id !== item.id)
+                                                    : [...current, item.id],
+                                                )
+                                              }
+                                              type="checkbox"
+                                            />
+                                            <span>{item.label}</span>
+                                          </Label>
+                                        ))}
+                                    </div>
+                                  </section>
+                                ))}
+                              {!visibleServiceSectionTables.length && (
+                                <p className="field-hint">Nenhuma mesa disponível neste filtro.</p>
+                              )}
+                            </div>
+                          </fieldset>
+                          <footer className="service-section-editor__actions action-form__wide">
+                            <span aria-live="polite">
+                              {!serviceSectionName.trim()
+                                ? "Informe o nome da praça."
+                                : !serviceSectionTableIds.length
+                                  ? "Selecione pelo menos uma mesa."
+                                  : `${serviceSectionTableIds.length} mesa(s) prontas para salvar.`}
+                            </span>
+                            <Button
+                              disabled={
+                                busy || !serviceSectionName.trim() || !serviceSectionTableIds.length
+                              }
+                              type="submit"
+                            >
+                              {busy
+                                ? "Salvando…"
+                                : managedServiceSectionId
+                                  ? "Salvar alterações"
+                                  : "Criar praça"}
+                            </Button>
+                          </footer>
+                        </form>
+                      )}
+
+                      {shiftSetupStep === "team" && data.activeShift && (
+                        <form
+                          className="action-form action-form--shift"
+                          onSubmit={(event) => void updateShiftAssignment(event)}
+                        >
+                          <header className="shift-assignment__header">
+                            <span>
+                              <h3>Equipe das praças</h3>
+                              <small>
+                                {data.activeShift.label} ·{" "}
+                                {serviceModeLabel(data.activeShift.serviceMode)}
+                              </small>
+                            </span>
+                            <Badge
+                              tone={
+                                shiftSectionAssignments.every(({ primary }) => primary)
+                                  ? "success"
+                                  : "warning"
+                              }
+                            >
+                              {shiftSectionAssignments.filter(({ primary }) => primary).length}/
+                              {shiftSectionAssignments.length} com titular
+                            </Badge>
+                          </header>
+
+                          <fieldset className="shift-section-picker action-form__wide">
+                            <legend>1. Escolha a praça</legend>
+                            <div>
+                              {shiftSectionAssignments.map(({ section, tableCount, primary }) => (
+                                <button
+                                  aria-pressed={assignmentSectionId === section.id}
+                                  key={section.id}
+                                  onClick={() => loadAssignmentSection(section.id)}
+                                  type="button"
+                                >
+                                  <i
+                                    aria-hidden="true"
+                                    className="shift-section-picker__color"
+                                    style={{ backgroundColor: section.color }}
                                   />
-                                  <span>{person.displayName}</span>
-                                </Label>
+                                  <span>
+                                    <strong>{section.name}</strong>
+                                    <small>
+                                      {tableCount} {tableCount === 1 ? "mesa" : "mesas"}
+                                    </small>
+                                  </span>
+                                  <b>{primary?.displayName ?? "Sem titular"}</b>
+                                </button>
                               ))}
+                            </div>
                           </fieldset>
-                          <fieldset className="floor-setup__tables action-form__wide">
-                            <legend>Mesas neste turno</legend>
-                            {data.tables
-                              .filter((item) => item.active)
-                              .map((item) => {
-                                const otherSection = data.shiftSectionTables.find(
-                                  (row) =>
-                                    row.tableId === item.id &&
-                                    row.shiftSectionId !== assignmentSectionId,
-                                );
-                                return (
-                                  <Label key={item.id}>
-                                    <input
-                                      className="accent-primary"
-                                      checked={assignmentTableIds.includes(item.id)}
-                                      disabled={Boolean(otherSection)}
-                                      onChange={() =>
-                                        setAssignmentTableIds((current) =>
-                                          current.includes(item.id)
-                                            ? current.filter((id) => id !== item.id)
-                                            : [...current, item.id],
-                                        )
-                                      }
-                                      type="checkbox"
-                                    />
-                                    <span>{item.label}</span>
-                                  </Label>
-                                );
-                              })}
-                          </fieldset>
-                          <Button
-                            disabled={busy || !assignmentSectionId || !assignmentTableIds.length}
-                            type="submit"
-                          >
-                            Atualizar praça do turno
-                          </Button>
+
+                          {selectedShiftSection ? (
+                            <section className="shift-assignment-editor action-form__wide">
+                              <header>
+                                <span>
+                                  <small>2. Defina quem atende</small>
+                                  <strong>{selectedShiftSection.section.name}</strong>
+                                </span>
+                                <Badge tone="neutral">
+                                  {selectedShiftSection.tableCount} mesa(s)
+                                </Badge>
+                              </header>
+                              <Label>
+                                Garçom titular
+                                <NativeSelect
+                                  onChange={(event) => {
+                                    const identityId = event.target.value;
+                                    setAssignmentPrimaryId(identityId);
+                                    setAssignmentSupportIds((current) =>
+                                      current.filter((id) => id !== identityId),
+                                    );
+                                  }}
+                                  value={assignmentPrimaryId}
+                                >
+                                  <option value="">Selecione o responsável</option>
+                                  {data.staff.map((person) => (
+                                    <option key={person.identityId} value={person.identityId}>
+                                      {person.displayName}
+                                    </option>
+                                  ))}
+                                </NativeSelect>
+                              </Label>
+                              {!data.staff.length && (
+                                <p className="field-hint" role="status">
+                                  Cadastre ou vincule a equipe antes de atribuir um titular.
+                                </p>
+                              )}
+
+                              <details className="shift-assignment-details">
+                                <summary>
+                                  <span>Apoios opcionais</span>
+                                  <Badge tone="neutral">{assignmentSupportIds.length}</Badge>
+                                </summary>
+                                <fieldset className="floor-setup__tables">
+                                  <legend>Quem também pode atender esta praça?</legend>
+                                  {data.staff
+                                    .filter((person) => person.identityId !== assignmentPrimaryId)
+                                    .map((person) => (
+                                      <Label key={person.identityId}>
+                                        <input
+                                          className="accent-primary"
+                                          checked={assignmentSupportIds.includes(person.identityId)}
+                                          onChange={() =>
+                                            setAssignmentSupportIds((current) =>
+                                              current.includes(person.identityId)
+                                                ? current.filter((id) => id !== person.identityId)
+                                                : [...current, person.identityId],
+                                            )
+                                          }
+                                          type="checkbox"
+                                        />
+                                        <span>{person.displayName}</span>
+                                      </Label>
+                                    ))}
+                                </fieldset>
+                              </details>
+
+                              <details className="shift-assignment-details">
+                                <summary>
+                                  <span>Revisar mesas da praça</span>
+                                  <Badge tone="neutral">{assignmentTableIds.length}</Badge>
+                                </summary>
+                                <p className="field-hint">
+                                  Use somente para mover uma mesa entre praças neste turno.
+                                </p>
+                                <fieldset className="floor-setup__tables">
+                                  <legend>Mesas neste turno</legend>
+                                  {data.tables
+                                    .filter((item) => item.active)
+                                    .map((item) => {
+                                      const otherSection = data.shiftSectionTables.find(
+                                        (row) =>
+                                          row.tableId === item.id &&
+                                          row.shiftSectionId !== assignmentSectionId,
+                                      );
+                                      return (
+                                        <Label key={item.id}>
+                                          <input
+                                            className="accent-primary"
+                                            checked={assignmentTableIds.includes(item.id)}
+                                            onChange={() =>
+                                              setAssignmentTableIds((current) =>
+                                                current.includes(item.id)
+                                                  ? current.filter((id) => id !== item.id)
+                                                  : [...current, item.id],
+                                              )
+                                            }
+                                            type="checkbox"
+                                          />
+                                          <span>
+                                            {item.label} ·{" "}
+                                            {
+                                              data.rooms.find((room) => room.id === item.roomId)
+                                                ?.name
+                                            }
+                                            {otherSection
+                                              ? ` · mover de ${data.shiftSections.find((section) => section.id === otherSection.shiftSectionId)?.name ?? "outra praça"}`
+                                              : ""}
+                                          </span>
+                                        </Label>
+                                      );
+                                    })}
+                                </fieldset>
+                              </details>
+
+                              <Button disabled={busy || !assignmentPrimaryId} type="submit">
+                                {busy ? "Salvando…" : "Salvar praça e equipe"}
+                              </Button>
+                            </section>
+                          ) : (
+                            <p className="shift-assignment-empty action-form__wide">
+                              Crie uma praça reutilizável para distribuir a equipe deste turno.
+                            </p>
+                          )}
                           <Button
                             disabled={busy}
                             onClick={() => {
@@ -2268,9 +3687,91 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             Encerrar turno
                           </Button>
                         </form>
-                      ) : (
-                        <form className="action-form" onSubmit={(event) => void openShift(event)}>
-                          <h3>Abrir turno</h3>
+                      )}
+
+                      {shiftSetupStep === "team" && !data.activeShift && (
+                        <section className="shift-team-preview">
+                          <header>
+                            <span>
+                              <small>Preparação da equipe</small>
+                              <h3>Titulares padrão</h3>
+                              <p>
+                                Revise quem assume cada praça. A equipe anterior, quando válida,
+                                terá prioridade na abertura.
+                              </p>
+                            </span>
+                            <Badge
+                              tone={
+                                reusableSectionsWithResponsible === data.serviceSections.length
+                                  ? "success"
+                                  : "warning"
+                              }
+                            >
+                              {reusableSectionsWithResponsible}/{data.serviceSections.length} com
+                              titular
+                            </Badge>
+                          </header>
+                          <div className="service-section-list">
+                            {serviceSectionSummaries.map(
+                              ({ section, tableIds, defaultResponsible }) => (
+                                <article key={section.id}>
+                                  <i
+                                    aria-hidden="true"
+                                    className="service-section-list__color"
+                                    style={{ backgroundColor: section.color }}
+                                  />
+                                  <span>
+                                    <strong>{section.name}</strong>
+                                    <small>
+                                      {tableIds.length} {tableIds.length === 1 ? "mesa" : "mesas"}
+                                    </small>
+                                  </span>
+                                  <Badge tone={defaultResponsible ? "success" : "warning"}>
+                                    {defaultResponsible?.displayName ?? "Definir no turno"}
+                                  </Badge>
+                                  <Button
+                                    onClick={() => {
+                                      editServiceSection(section.id);
+                                      setShiftSetupStep("sections");
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    {defaultResponsible ? "Alterar" : "Definir titular"}
+                                  </Button>
+                                </article>
+                              ),
+                            )}
+                          </div>
+                          <footer>
+                            <Button
+                              onClick={() => setShiftSetupStep("sections")}
+                              type="button"
+                              variant="ghost"
+                            >
+                              Voltar
+                            </Button>
+                            <Button onClick={() => setShiftSetupStep("open")} type="button">
+                              Revisar abertura
+                            </Button>
+                          </footer>
+                        </section>
+                      )}
+
+                      {shiftSetupStep === "open" && !data.activeShift && (
+                        <form
+                          className="action-form shift-open-review"
+                          onSubmit={(event) => void openShift(event)}
+                        >
+                          <header className="action-form__wide">
+                            <small>Revisão final</small>
+                            <h3>Abrir turno</h3>
+                            <p>
+                              Confira a cobertura abaixo. O atendimento geral foi definido
+                              automaticamente pelas praças.
+                            </p>
+                          </header>
                           <Label>
                             Identificação opcional
                             <Input
@@ -2280,18 +3781,15 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               value={shiftLabel}
                             />
                           </Label>
-                          <Label>
-                            Perfil predominante
-                            <NativeSelect
-                              onChange={(event) => setShiftMode(event.target.value as ServiceMode)}
-                              value={shiftMode}
-                            >
-                              <option value="full_service">Serviço completo</option>
-                              <option value="quick_service">Giro rápido</option>
-                              <option value="bar">Bar e comandas</option>
-                              <option value="hybrid">Híbrido</option>
-                            </NativeSelect>
-                          </Label>
+                          <div className="shift-open-review__mode">
+                            <small>Atendimento do turno</small>
+                            <strong>{serviceModeLabel(effectiveShiftMode)}</strong>
+                            <span>
+                              {effectiveShiftMode === "hybrid"
+                                ? "As praças usam formas diferentes de atendimento."
+                                : "Todas as praças usam o mesmo atendimento."}
+                            </span>
+                          </div>
                           <Label className="action-form__check">
                             <input
                               className="accent-primary"
@@ -2299,18 +3797,60 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               onChange={(event) => setCopyPreviousAssignments(event.target.checked)}
                               type="checkbox"
                             />
-                            <span>Reaproveitar a equipe do turno anterior</span>
+                            <span>
+                              <strong>Reaproveitar a equipe do turno anterior</strong>
+                              <small>
+                                Na ausência de uma atribuição anterior válida, será usado o titular
+                                padrão da praça.
+                              </small>
+                            </span>
                           </Label>
-                          <p className="field-hint">
-                            {data.serviceSections.length} modelo(s) de praça serão carregados
-                            automaticamente.
-                          </p>
-                          <Button
-                            disabled={busy || data.serviceSections.length === 0}
-                            type="submit"
-                          >
-                            Abrir turno
-                          </Button>
+                          <div className="shift-open-summary action-form__wide">
+                            <span>
+                              <strong>{data.serviceSections.length}</strong>
+                              <small>praças</small>
+                            </span>
+                            <span data-warning={reusableUnassignedTables > 0 || undefined}>
+                              <strong>{activeTables.length - reusableUnassignedTables}</strong>
+                              <small>de {activeTables.length} mesas cobertas</small>
+                            </span>
+                            <span
+                              data-warning={
+                                reusableSectionsWithResponsible < data.serviceSections.length ||
+                                undefined
+                              }
+                            >
+                              <strong>{reusableSectionsWithResponsible}</strong>
+                              <small>de {data.serviceSections.length} com titular padrão</small>
+                            </span>
+                          </div>
+                          <ul className="shift-open-checks action-form__wide">
+                            {preflight.map((item) => (
+                              <li data-ready={item.ready} key={item.id}>
+                                <StatusDot
+                                  tone={
+                                    item.ready ? "success" : item.blocking ? "danger" : "warning"
+                                  }
+                                />
+                                <span>
+                                  <strong>{item.label}</strong>
+                                  <small>{item.detail}</small>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          <footer className="service-section-editor__actions action-form__wide">
+                            <Button
+                              onClick={() => setShiftSetupStep("team")}
+                              type="button"
+                              variant="ghost"
+                            >
+                              Voltar
+                            </Button>
+                            <Button disabled={busy || preflightBlocked} type="submit">
+                              {busy ? "Abrindo…" : "Abrir turno"}
+                            </Button>
+                          </footer>
                         </form>
                       )}
                     </div>
@@ -2367,7 +3907,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <Label aria-disabled={!data.activeShift}>
                     <input
                       className="accent-primary"
-                      checked={joinAccountMode === "layout_only"}
+                      checked={effectiveJoinAccountMode === "layout_only"}
                       disabled={!data.activeShift}
                       onChange={() => setJoinAccountMode("layout_only")}
                       type="radio"
@@ -2383,7 +3923,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <Label>
                     <input
                       className="accent-primary"
-                      checked={joinAccountMode === "physical_only"}
+                      checked={effectiveJoinAccountMode === "physical_only"}
                       onChange={() => setJoinAccountMode("physical_only")}
                       type="radio"
                     />
@@ -2397,13 +3937,20 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <Label>
                     <input
                       className="accent-primary"
-                      checked={joinAccountMode === "single_tab"}
-                      onChange={() => setJoinAccountMode("single_tab")}
+                      checked={effectiveJoinAccountMode === "single_tab"}
+                      disabled={!mergePolicy.allowed}
+                      onChange={() => mergePolicy.allowed && setJoinAccountMode("single_tab")}
                       type="radio"
                     />
                     <span>
                       <strong>Usar uma única comanda</strong>
-                      <small>Pedidos, pessoas e valores passam para a comanda principal.</small>
+                      <small>
+                        {mergePolicy.allowed
+                          ? joiningFreeTables
+                            ? "As mesas ficam agrupadas agora; a primeira abertura cria a comanda única do grupo."
+                            : "Pedidos, pessoas e valores passam para a comanda principal."
+                          : "Mesas juntas, comandas separadas. A movimentação financeira impede a unificação."}
+                      </small>
                     </span>
                   </Label>
                 </fieldset>
@@ -2423,9 +3970,43 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     })}
                   </NativeSelect>
                 </Label>
-                {joinAccountMode !== "layout_only" && (
+                <Label className="compact-field">
+                  Motivo da junção
+                  <NativeSelect
+                    onChange={(event) =>
+                      setJoinReasonCode(event.target.value as typeof joinReasonCode)
+                    }
+                    value={joinReasonCode}
+                  >
+                    <option value="large_party">Grupo ou família grande</option>
+                    <option value="sit_together">
+                      Clientes já em consumo querem sentar juntos
+                    </option>
+                    <option value="accessibility">Necessidade de acessibilidade</option>
+                    <option value="operational_reorganization">Ajuste operacional do salão</option>
+                    <option value="other">Outro</option>
+                  </NativeSelect>
+                </Label>
+                {(joinReasonCode === "other" || joinReasonNote) && (
                   <Label className="compact-field">
-                    Responsável pelo grupo
+                    Detalhe do motivo
+                    <Input
+                      maxLength={500}
+                      minLength={3}
+                      onChange={(event) => setJoinReasonNote(event.target.value)}
+                      required={joinReasonCode === "other"}
+                      value={joinReasonNote}
+                    />
+                  </Label>
+                )}
+                {!mergePolicy.allowed && (
+                  <p className="field-hint" role="status">
+                    {mergePolicy.reason} Mesas juntas, comandas separadas.
+                  </p>
+                )}
+                {effectiveJoinAccountMode !== "layout_only" && (
+                  <Label className="compact-field">
+                    Coordenador deste atendimento
                     <NativeSelect
                       onChange={(event) => setJoinResponsibleIdentityId(event.target.value)}
                       value={joinResponsibleIdentityId}
@@ -2438,23 +4019,47 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     </NativeSelect>
                   </Label>
                 )}
-                {joinTabs.length > 1 && joinAccountMode === "single_tab" && (
+                {effectiveJoinAccountMode !== "layout_only" && (
+                  <p className="field-hint">
+                    O coordenador assume decisões do grupo nesta visita. As praças originais e seus
+                    titulares continuam registradas no turno.
+                  </p>
+                )}
+                {joinTabs.length > 1 && effectiveJoinAccountMode === "single_tab" && (
                   <p className="field-hint">
                     A unificação só é confirmada sem pagamentos parciais. Caso exista pagamento,
                     mantenha comandas separadas ou finalize a conciliação primeiro.
                   </p>
                 )}
+                {feedback && (
+                  <p
+                    aria-live="assertive"
+                    className="table-group-dialog__feedback"
+                    data-tone={feedback.tone}
+                    role={feedback.tone === "danger" ? "alert" : "status"}
+                  >
+                    {feedback.message}
+                  </p>
+                )}
                 <div className="table-group-dialog__actions">
-                  <Button onClick={() => setJoinDialogOpen(false)} variant="ghost">
+                  <Button onClick={() => setJoinDialogOpen(false)} type="button" variant="ghost">
                     Voltar
                   </Button>
-                  <Button disabled={busy} onClick={() => void confirmJoin()}>
+                  <Button
+                    disabled={
+                      busy || (joinReasonCode === "other" && joinReasonNote.trim().length < 3)
+                    }
+                    onClick={() => void confirmJoin()}
+                    type="button"
+                  >
                     {busy
                       ? "Juntando…"
-                      : joinAccountMode === "layout_only"
+                      : effectiveJoinAccountMode === "layout_only"
                         ? "Aproximar neste turno"
-                        : joinAccountMode === "single_tab"
-                          ? "Juntar e unificar comandas"
+                        : effectiveJoinAccountMode === "single_tab"
+                          ? joiningFreeTables
+                            ? "Juntar com comanda única"
+                            : "Juntar e unificar comandas"
                           : "Criar grupo separado"}
                   </Button>
                 </div>
@@ -2509,7 +4114,21 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </NativeSelect>
                 </Label>
                 <Label>
-                  Motivo
+                  Tipo de remanejamento
+                  <NativeSelect
+                    onChange={(event) =>
+                      setTransferReasonCode(event.target.value as typeof transferReasonCode)
+                    }
+                    value={transferReasonCode}
+                  >
+                    <option value="service_rebalance">Equilibrar atendimento</option>
+                    <option value="staff_coverage">Cobertura de equipe</option>
+                    <option value="operational_reorganization">Reorganização operacional</option>
+                    <option value="other">Outro</option>
+                  </NativeSelect>
+                </Label>
+                <Label>
+                  Observação do motivo
                   <Input
                     maxLength={500}
                     minLength={3}
@@ -2536,7 +4155,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     Cancelar
                   </Button>
                   <Button
-                    disabled={busy || transferReason.trim().length < 3}
+                    disabled={
+                      busy || (transferReasonCode === "other" && transferReason.trim().length < 3)
+                    }
                     onClick={() => void transferSelectedTable()}
                   >
                     {selectedGroup ? "Remanejar grupo" : "Confirmar remanejamento"}
@@ -2667,10 +4288,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               />
             )}
 
-            {feedback && (
+            {feedback && !joinDialogOpen && (
               <Toast
-                duration={feedback.tone === "danger" ? 0 : 4_500}
+                actionLabel={undoAction?.message}
+                duration={feedback.persistent || feedback.tone === "danger" ? 0 : 4_500}
                 message={feedback.message}
+                onAction={undoAction ? () => void runUndoAction() : undefined}
                 onDismiss={() => setFeedback("")}
                 title="Atualização do salão"
                 tone={feedback.tone}
@@ -2695,6 +4318,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     ).map(([id, label, count]) => (
                       <Button
                         aria-pressed={filterStatus === id}
+                        className="gm-pill"
                         key={id}
                         onClick={() => setFilterStatus(id)}
                         type="button"
@@ -2702,6 +4326,34 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         {label} <small>{count}</small>
                       </Button>
                     ))}
+                  </fieldset>
+                  <fieldset className="segmented salon-workspace-modes">
+                    <legend className="gm-sr-only">Modo da planta</legend>
+                    <Button
+                      aria-pressed={workspaceMode === "operate"}
+                      onClick={() => switchWorkspaceMode("operate")}
+                      type="button"
+                    >
+                      Operar
+                    </Button>
+                    {canEditSpace && (
+                      <Button
+                        aria-pressed={workspaceMode === "space"}
+                        onClick={() => switchWorkspaceMode("space")}
+                        type="button"
+                      >
+                        Editar espaço
+                      </Button>
+                    )}
+                    {canReorganizeTurn && data.activeShift && (
+                      <Button
+                        aria-pressed={workspaceMode === "shift"}
+                        onClick={() => switchWorkspaceMode("shift")}
+                        type="button"
+                      >
+                        Organizar turno
+                      </Button>
+                    )}
                   </fieldset>
                 </div>
 
@@ -2717,6 +4369,84 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </div>
                 )}
 
+                {view === "floor" &&
+                  workspaceMode === "shift" &&
+                  data.activeShift &&
+                  canManageShift && (
+                    <section className="shift-paint-toolbar" aria-label="Pintar praça no turno">
+                      <Label>
+                        Praça ativa
+                        <NativeSelect
+                          onChange={(event) => loadAssignmentSection(event.target.value)}
+                          value={assignmentSectionId}
+                        >
+                          <option value="">Selecione</option>
+                          {data.shiftSections.map((section) => (
+                            <option key={section.id} value={section.id}>
+                              {section.name}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </Label>
+                      <fieldset className="segmented">
+                        <legend className="gm-sr-only">Ferramenta de organização</legend>
+                        <Button
+                          aria-pressed={shiftEditorTool === "assign"}
+                          onClick={() => setShiftEditorTool("assign")}
+                          type="button"
+                        >
+                          Pintar mesas
+                        </Button>
+                        <Button
+                          aria-pressed={shiftEditorTool === "move"}
+                          onClick={() => setShiftEditorTool("move")}
+                          type="button"
+                        >
+                          Mover mesas
+                        </Button>
+                      </fieldset>
+                      <span>
+                        <strong>{assignmentTableIds.length}</strong> mesa(s) nesta praça, em
+                        qualquer ambiente físico
+                      </span>
+                      <Button
+                        disabled={busy || !assignmentSectionId}
+                        onClick={() => void updateShiftAssignment()}
+                        size="sm"
+                      >
+                        {busy ? "Salvando…" : "Salvar praças do turno"}
+                      </Button>
+                    </section>
+                  )}
+
+                {view === "floor" && workspaceMode === "template" && (
+                  <section className="shift-paint-toolbar" aria-label="Selecionar mesas da praça">
+                    <span>
+                      <small>Modelo reutilizável</small>
+                      <strong>{serviceSectionName}</strong>
+                    </span>
+                    <span>
+                      Clique nas mesas para incluir ou remover. A borda usa a cor escolhida.
+                    </span>
+                    <Badge tone={serviceSectionTableIds.length ? "success" : "warning"}>
+                      {serviceSectionTableIds.length} mesa(s)
+                    </Badge>
+                    <Button
+                      onClick={() => {
+                        setWorkspaceMode("operate");
+                        setSetupSection("shift");
+                        setShiftSetupStep("sections");
+                        setSetupOpen(true);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      Voltar à configuração
+                    </Button>
+                  </section>
+                )}
+
                 {filteredTables.length === 0 ? (
                   <EmptyState
                     icon={<Icon name="salon" size={28} />}
@@ -2725,25 +4455,112 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   />
                 ) : view === "floor" ? (
                   <FloorPlan
-                    canEdit={data.activeShift ? canReorganizeTurn : canConfigure}
+                    canEdit={
+                      workspaceMode === "space"
+                        ? canEditSpace
+                        : workspaceMode === "template"
+                          ? canEditSpace
+                          : workspaceMode === "shift" && canReorganizeTurn
+                    }
+                    canEditElements={workspaceMode === "space"}
                     editRequestKey={floorEditRequestKey}
-                    editActionLabel={data.activeShift ? "Reorganizar turno" : "Editar planta"}
+                    editActionLabel={
+                      workspaceMode === "shift"
+                        ? "Organizar turno"
+                        : workspaceMode === "template"
+                          ? "Selecionar mesas"
+                          : "Editar espaço"
+                    }
+                    editableItemIds={
+                      workspaceMode === "shift"
+                        ? data.tables.filter(canOperateTable).map((item) => item.id)
+                        : workspaceMode === "template"
+                          ? selectableServiceSectionTables.map((item) => item.id)
+                          : undefined
+                    }
+                    editorTool={
+                      workspaceMode === "template"
+                        ? "assign"
+                        : workspaceMode === "shift" && canManageShift
+                          ? shiftEditorTool
+                          : "move"
+                    }
                     editableZoneIds={
-                      data.activeShift
-                        ? []
-                        : data.rooms.filter((room) => room.active).map((room) => room.id)
+                      workspaceMode === "space"
+                        ? data.rooms.filter((room) => room.active).map((room) => room.id)
+                        : []
                     }
                     editingDescription={
-                      data.activeShift
+                      workspaceMode === "shift"
                         ? "Arraste mesas entre ambientes; a mudança vale apenas neste turno."
-                        : "Arraste mesas e limites para editar a planta física permanente."
+                        : workspaceMode === "template"
+                          ? "Clique nas mesas para definir esta praça reutilizável."
+                          : "Arraste mesas e limites para editar a planta física permanente."
                     }
+                    elements={floorPlanElements}
                     focusId={floorFocusId}
                     items={floorPlanItems}
                     joinMode={joinMode}
-                    layoutScope={data.activeShift ? "shift" : "permanent"}
-                    onSavePositions={data.activeShift ? saveShiftLayout : saveFloorLayout}
-                    saveActionLabel={data.activeShift ? "Aplicar no turno" : "Salvar planta"}
+                    layoutScope={
+                      workspaceMode === "space" || workspaceMode === "template" || !data.activeShift
+                        ? "permanent"
+                        : "shift"
+                    }
+                    onEditingChange={(editing) => {
+                      if (!editing && workspaceMode === "template") {
+                        setWorkspaceMode("operate");
+                        setSetupSection("shift");
+                        setShiftSetupStep("sections");
+                        setSetupOpen(true);
+                      } else if (!editing) {
+                        setWorkspaceMode("operate");
+                      }
+                    }}
+                    onEditSelect={(tableId) => {
+                      if (workspaceMode === "template") {
+                        if (serviceSectionOtherTableIds.has(tableId)) return;
+                        setServiceSectionTableIds((current) =>
+                          current.includes(tableId)
+                            ? current.filter((id) => id !== tableId)
+                            : [...current, tableId],
+                        );
+                        return;
+                      }
+                      if (!canManageShift) return;
+                      const target = data.tables.find((item) => item.id === tableId);
+                      if (!target || !canOperateTable(target)) {
+                        setFeedback(
+                          "Esta mesa está fora do seu escopo neste turno. O coordenador pode redistribuí-la.",
+                          "info",
+                        );
+                        return;
+                      }
+                      if (!assignmentSectionId) {
+                        setFeedback("Selecione uma praça antes de pintar mesas.", "info");
+                        return;
+                      }
+                      setAssignmentTableIds((current) =>
+                        current.includes(tableId)
+                          ? current.filter((id) => id !== tableId)
+                          : [...current, tableId],
+                      );
+                    }}
+                    {...(workspaceMode === "space" ? { onArchiveTable: archiveTable } : {})}
+                    onSavePositions={
+                      workspaceMode === "template"
+                        ? () => saveServiceSection()
+                        : workspaceMode === "shift"
+                          ? saveShiftLayout
+                          : saveFloorLayout
+                    }
+                    operateRequestKey={floorOperateRequestKey}
+                    saveActionLabel={
+                      workspaceMode === "shift"
+                        ? "Aplicar no turno"
+                        : workspaceMode === "template"
+                          ? "Salvar praça"
+                          : "Salvar espaço"
+                    }
                     onSelect={(operationId) => {
                       const selected = data.tables.find(
                         (candidate) => candidate.id === operationId,
@@ -2760,7 +4577,13 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       selectTable(selected);
                     }}
                     selectedIds={
-                      joinMode ? joinSelection : selectedTableId ? [selectedTableId] : []
+                      workspaceMode === "template"
+                        ? serviceSectionTableIds
+                        : joinMode
+                          ? joinSelection
+                          : selectedTableId
+                            ? [selectedTableId]
+                            : []
                     }
                     stations={[]}
                     viewportStorageKey={`giromesa:floor:${scope.organizationId}:${scope.unitId}`}
@@ -2801,8 +4624,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           ? elapsedLabel(serviceCall.createdAt)
                           : groupTabs.length > 0
                             ? `${groupTabs.reduce((s, t) => s + t.guestCount, 0) || 1} pes.`
-                            : "—";
-                        const isSelected = selectedTableId === item.id;
+                            : item.openedAt
+                              ? elapsedLabel(item.openedAt)
+                              : "—";
+                        const isSelected = joinMode
+                          ? joinSelection.includes(item.id)
+                          : selectedTableId === item.id;
 
                         return (
                           // biome-ignore lint/a11y/useSemanticElements: the row contains a nested action button.
@@ -2852,7 +4679,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             </div>
 
                             <div className="salon-fast-list-cell">
-                              <span>{assignment?.primary?.displayName ?? "Equipe"}</span>
+                              <span>
+                                {assignment?.primary?.displayName ??
+                                  item.responsibleDisplayName ??
+                                  "Equipe"}
+                              </span>
                             </div>
 
                             <div className="salon-fast-list-cell">
@@ -2878,8 +4709,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             </div>
 
                             <div className="salon-fast-list-cell salon-text-right">
-                              <strong>{totalCents > 0 ? formatMoney(totalCents) : "—"}</strong>
-                              {groupTabs.length > 1 && <small>{groupTabs.length} comandas</small>}
+                              <strong>
+                                {canSeeTableFinancials(item)
+                                  ? totalCents > 0
+                                    ? formatMoney(totalCents)
+                                    : "—"
+                                  : "Protegido"}
+                              </strong>
+                              {canSeeTableFinancials(item) && groupTabs.length > 1 && (
+                                <small>{groupTabs.length} comandas</small>
+                              )}
                             </div>
 
                             <div className="salon-fast-list-cell salon-text-right">
@@ -2899,13 +4738,15 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                         : "secondary"
                                 }
                               >
-                                {status === "available"
-                                  ? "Abrir"
-                                  : status === "attention"
-                                    ? "Atender"
-                                    : status === "closing"
-                                      ? "Fechar"
-                                      : "Atendimento"}
+                                {!canOperateTable(item)
+                                  ? "Ver panorama"
+                                  : status === "available"
+                                    ? "Abrir"
+                                    : status === "attention"
+                                      ? "Atender"
+                                      : status === "closing"
+                                        ? "Fechar"
+                                        : "Atendimento"}
                               </Button>
                             </div>
                           </div>
@@ -2930,17 +4771,23 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       const room = data.rooms.find(
                         (candidate) => candidate.id === item.roomId,
                       )?.name;
+                      const assignment = operationalAssignmentForTable(item.id);
                       const serviceCall = serviceCallForTable(item.id);
+                      const servicePhase = servicePhaseForTable(item.id);
+                      const operationalSince =
+                        serviceCall?.createdAt ?? servicePhase?.since ?? item.openedAt;
                       const totalCents = groupTabs.reduce(
                         (sum, groupTab) => sum + groupTab.totalCents,
                         0,
                       );
-                      const isSelected = selectedTableId === item.id;
+                      const isSelected = joinMode
+                        ? joinSelection.includes(item.id)
+                        : selectedTableId === item.id;
 
                       return (
                         <Button
                           aria-pressed={isSelected}
-                          className={`real-table real-table--${presentation.className} ${joinSelection.includes(item.id) ? "table-tile--joining" : ""} ${isSelected ? "selected" : ""}`}
+                          className={`real-table real-table--${presentation.className} ${joinMode && isSelected ? "table-tile--joining" : ""} ${isSelected ? "selected" : ""}`}
                           key={item.id}
                           onClick={() => {
                             if (joinMode) {
@@ -2965,41 +4812,46 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </div>
 
                           <div className="real-table__meta-row">
-                            <span className="real-table__room">{room ?? "Salão"}</span>
-                            {groupTabs.length > 0 && (
-                              <span className="real-table__time" title="Pessoas na mesa">
-                                <Icon name="user" size={11} />
-                                <small>
-                                  {groupTabs.reduce((sum, t) => sum + t.guestCount, 0) || 1}{" "}
-                                  {groupTabs.reduce((sum, t) => sum + t.guestCount, 0) === 1
-                                    ? "pessoa"
-                                    : "pessoas"}
-                                </small>
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="real-table__status">
-                            <StatusDot pulse={presentation.pulse} tone={presentation.tone} />
-                            <small>{presentation.label}</small>
-                            {serviceCall && (
-                              <span className="real-table__call-badge">
-                                {callKindLabel[serviceCall.kind]}
+                            <span
+                              className="real-table__room"
+                              title={`${room ?? "Salão"} · ${assignment?.section.name ?? "Sem praça"}`}
+                            >
+                              {room ?? "Salão"} <span aria-hidden="true">·</span>{" "}
+                              {assignment?.section.name ?? "Sem praça"}
+                            </span>
+                            {operationalSince && (
+                              <span className="real-table__time" title="Tempo neste atendimento">
+                                <Icon name="clock" size={11} />
+                                <small>{elapsedLabel(operationalSince)}</small>
                               </span>
                             )}
                           </div>
 
                           <div className="real-table__footer">
+                            <div className="real-table__status">
+                              <StatusDot pulse={presentation.pulse} tone={presentation.tone} />
+                              <small>{presentation.label}</small>
+                              {serviceCall &&
+                                callKindLabel[serviceCall.kind] !== presentation.label && (
+                                  <span className="real-table__call-badge">
+                                    {callKindLabel[serviceCall.kind]}
+                                  </span>
+                                )}
+                            </div>
                             <div className="real-table__value">
-                              {groupTabs.length ? (
+                              {groupTabs.length && canSeeTableFinancials(item) ? (
                                 <>
                                   <strong>{formatMoney(totalCents)}</strong>
                                   {itemGroup?.mode === "physical_only" && groupTabs.length > 1 && (
                                     <small> · {groupTabs.length} contas</small>
                                   )}
                                 </>
+                              ) : groupTabs.length ? (
+                                <span>Panorama protegido</span>
+                              ) : status === "available" ? (
+                                <span>Abrir</span>
                               ) : (
-                                <span>{presentation.label}</span>
+                                <span>{canOperateTable(item) ? "Atender" : "Ver panorama"}</span>
                               )}
                             </div>
                           </div>
@@ -3012,7 +4864,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             </div>
 
             <Modal
-              className="salon-service-modal"
+              className={`salon-service-modal${table && !tab ? " salon-service-modal--compact max-sm:items-stretch max-sm:p-0" : ""}`}
+              contentClassName={
+                table && !tab
+                  ? "h-fit max-h-[min(92dvh,680px)] w-[calc(100vw-2rem)] max-w-[680px] max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:rounded-none"
+                  : undefined
+              }
               description={
                 table && tab ? (
                   <div className="salon-service-modal__summary">
@@ -3020,13 +4877,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
                         "Sem ambiente"}
                       <span aria-hidden="true"> · </span>
-                      {selectedServiceMode === "full_service"
-                        ? "Serviço completo"
-                        : selectedServiceMode === "quick_service"
-                          ? "Giro rápido"
-                          : selectedServiceMode === "bar"
-                            ? "Bar e comandas"
-                            : "Operação híbrida"}
+                      {serviceModeLabel(selectedServiceMode)}
                     </span>
                     <div>
                       <Badge tone={selectedCall?.kind === "bill" ? "warning" : "info"}>
@@ -3040,19 +4891,34 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       <span aria-hidden="true">·</span>
                       <span>{selectedTabOpenedMinutes} min</span>
                       <span aria-hidden="true">·</span>
-                      <strong>Total: {formatMoney(tab.totalCents)}</strong>
+                      {selectedCanSeeFinancials && (
+                        <strong>Total: {formatMoney(tab.totalCents)}</strong>
+                      )}
                     </div>
                   </div>
                 ) : undefined
               }
               isOpen={Boolean(table)}
               onClose={() => setSelectedTableId(null)}
-              size="xl"
+              size={tab ? "xl" : "lg"}
               title={table?.label ?? "Atendimento da mesa"}
             >
               <div className="table-drawer salon-workspace salon-workspace--modal">
                 {table && (
                   <>
+                    <section className="salon-next-action" aria-label="Próxima ação da mesa">
+                      <span>
+                        <small>Próxima ação</small>
+                        <strong>{selectedNextAction}</strong>
+                      </span>
+                      <small>
+                        {selectedPhase
+                          ? `${servicePhasePresentation[selectedPhase.phase]} · ${elapsedLabel(selectedPhase.since)}`
+                          : selectedCall
+                            ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
+                            : "O sistema destaca somente a etapa operacional atual."}
+                      </small>
+                    </section>
                     <div className="table-operation-strip">
                       <div>
                         <span>
@@ -3088,73 +4954,82 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </span>
                         )}
                       </div>
-                      <nav aria-label="Ações rápidas da mesa">
-                        {selectedCall && (
-                          <Button
-                            disabled={busy}
-                            onClick={() =>
-                              void transitionCall(
-                                selectedCall.id,
-                                selectedCall.status === "open" ? "acknowledged" : "resolved",
-                              )
-                            }
-                            size="sm"
-                            variant={selectedCall.status === "open" ? "secondary" : "ghost"}
-                          >
-                            {selectedCall.status === "open"
-                              ? "Assumir chamado"
-                              : "Resolver chamado"}
-                          </Button>
-                        )}
+                      {selectedCanOperate && (
+                        <nav aria-label="Ações rápidas da mesa">
+                          {selectedCall && (
+                            <Button
+                              disabled={busy}
+                              onClick={() =>
+                                void transitionCall(
+                                  selectedCall.id,
+                                  selectedCall.status === "open" ? "acknowledged" : "resolved",
+                                )
+                              }
+                              size="sm"
+                              variant={selectedCall.status === "open" ? "secondary" : "ghost"}
+                            >
+                              {selectedCall.status === "open"
+                                ? "Assumir chamado"
+                                : "Resolver chamado"}
+                            </Button>
+                          )}
 
-                        {tab && (
-                          <Button onClick={() => setMoveTableOpen(true)} size="sm" variant="ghost">
-                            <Icon name="salon" size={14} />
-                            <span>Mudar Mesa</span>
-                          </Button>
-                        )}
-                        {canReorganizeTurn && (
-                          <details className="table-more-actions">
-                            <summary>Mais ações</summary>
-                            <div>
-                              {data.activeShift && (
+                          {tab && (
+                            <Button
+                              onClick={() => setMoveTableOpen(true)}
+                              size="sm"
+                              variant="ghost"
+                            >
+                              <Icon name="salon" size={14} />
+                              <span>Mudar Mesa</span>
+                            </Button>
+                          )}
+                          {canReorganizeTurn && (
+                            <details className="table-more-actions" data-salon-floating-menu>
+                              <summary>Mais ações</summary>
+                              <div>
+                                {data.activeShift && (
+                                  <Button
+                                    onClick={() => {
+                                      setSelectedTableId(null);
+                                      setView("floor");
+                                      setWorkspaceMode("shift");
+                                      setFloorFocusId(table.id);
+                                      setFloorEditRequestKey((current) => current + 1);
+                                    }}
+                                    size="sm"
+                                    variant="ghost"
+                                  >
+                                    Mover neste turno
+                                  </Button>
+                                )}
+                                {data.activeShift && selectedBaseSection && !selectedTransfer && (
+                                  <Button onClick={openTransferDialog} size="sm" variant="ghost">
+                                    Ajustar praça
+                                  </Button>
+                                )}
                                 <Button
                                   onClick={() => {
                                     setSelectedTableId(null);
                                     setView("floor");
-                                    setFloorFocusId(table.id);
-                                    setFloorEditRequestKey((current) => current + 1);
+                                    setWorkspaceMode("operate");
+                                    setJoinMode(true);
+                                    setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
+                                    setFloorFocusId(selectedGroup?.anchorTableId ?? table.id);
                                   }}
                                   size="sm"
                                   variant="ghost"
                                 >
-                                  Mover neste turno
+                                  Organizar com outra mesa
                                 </Button>
-                              )}
-                              {data.activeShift && selectedBaseSection && !selectedTransfer && (
-                                <Button onClick={openTransferDialog} size="sm" variant="ghost">
-                                  Ajustar praça
-                                </Button>
-                              )}
-                              <Button
-                                onClick={() => {
-                                  setSelectedTableId(null);
-                                  setView("floor");
-                                  setJoinMode(true);
-                                  setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
-                                  setFloorFocusId(selectedGroup?.anchorTableId ?? table.id);
-                                }}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                Organizar com outra mesa
-                              </Button>
-                            </div>
-                          </details>
-                        )}
-                      </nav>
+                              </div>
+                            </details>
+                          )}
+                        </nav>
+                      )}
                     </div>
-                    {scope.profileId === "waiter" &&
+                    {selectedCanOperate &&
+                      scope.profileId === "waiter" &&
                       selectedAssignment &&
                       selectedAssignment.primary?.identityId !== scope.identityId && (
                         <div className="cross-room-service-notice" role="note">
@@ -3198,7 +5073,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           )}
                         </div>
                       )}
-                    {selectedTransfer && canReorganizeTurn && (
+                    {selectedCanOperate && selectedTransfer && canReorganizeTurn && (
                       <div className="temporary-table-assignment" role="note">
                         <span>
                           <strong>
@@ -3218,7 +5093,28 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </Button>
                       </div>
                     )}
-                    {selectedGroup && (
+                    {selectedTimeline.length > 0 && (
+                      <details className="salon-table-timeline">
+                        <summary>Linha do tempo da mesa</summary>
+                        <ol>
+                          {selectedTimeline.map((item) => (
+                            <li key={item.id}>
+                              <time dateTime={item.at}>
+                                {new Date(item.at).toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </time>
+                              <span>
+                                <strong>{item.label}</strong>
+                                {item.detail && <small>{item.detail}</small>}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    )}
+                    {selectedCanOperate && selectedGroup && (
                       <div className="group-workspace-bar group-workspace-bar--real">
                         <span>
                           <strong>
@@ -3277,29 +5173,47 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       </div>
                     )}
 
-                    {selectedGroup?.mode === "physical_only" && selectedGroupTabs.length > 1 && (
-                      <fieldset className="group-account-tabs">
-                        <legend>Comandas do grupo</legend>
-                        {selectedGroupTabs.map((groupTab) => {
-                          const accountTable = data.tables.find(
-                            (candidate) => candidate.id === groupTab.tableId,
-                          );
-                          return (
-                            <Button
-                              aria-pressed={tab?.id === groupTab.id}
-                              key={groupTab.id}
-                              onClick={() => setSelectedTabId(groupTab.id)}
-                              type="button"
-                            >
-                              <span>{accountTable?.label ?? groupTab.label ?? "Comanda"}</span>
-                              <strong>{formatMoney(groupTab.totalCents)}</strong>
-                            </Button>
-                          );
-                        })}
-                      </fieldset>
-                    )}
+                    {selectedCanOperate &&
+                      selectedCanSeeFinancials &&
+                      selectedGroup?.mode === "physical_only" &&
+                      selectedGroupTabs.length > 1 && (
+                        <fieldset className="group-account-tabs">
+                          <legend>Comandas do grupo</legend>
+                          {selectedGroupTabs.map((groupTab) => {
+                            const accountTable = data.tables.find(
+                              (candidate) => candidate.id === groupTab.tableId,
+                            );
+                            return (
+                              <Button
+                                aria-pressed={tab?.id === groupTab.id}
+                                key={groupTab.id}
+                                onClick={() => setSelectedTabId(groupTab.id)}
+                                type="button"
+                              >
+                                <span>{accountTable?.label ?? groupTab.label ?? "Comanda"}</span>
+                                <strong>{formatMoney(groupTab.totalCents)}</strong>
+                              </Button>
+                            );
+                          })}
+                        </fieldset>
+                      )}
 
-                    {tab ? (
+                    {!selectedCanOperate ? (
+                      <Card className="table-start table-start--protected">
+                        <div>
+                          <p className="eyebrow">Panorama protegido</p>
+                          <h2>Atendimento de outra praça</h2>
+                          <span>
+                            {table.responsibleDisplayName
+                              ? `Responsável: ${table.responsibleDisplayName}. `
+                              : "Responsável preservado. "}
+                            {table.openedAt
+                              ? `Em atendimento desde ${new Date(table.openedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`
+                              : "Os dados pessoais, a comanda e os valores não estão no seu escopo."}
+                          </span>
+                        </div>
+                      </Card>
+                    ) : tab && canOpenTableWorkspace(accessForTable(table), tab.id) ? (
                       <TabWorkspace
                         compactHeading
                         initialView={selectedCall?.kind === "bill" ? "account" : "order"}
@@ -3338,9 +5252,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </Button>
                       </Card>
                     ) : (
-                      <Card className="table-start">
-                        <div>
-                          <p className="eyebrow">{table.label}</p>
+                      <section className="gm-card table-start table-start--opening">
+                        <div className="table-start__copy">
+                          <p className="eyebrow">
+                            {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
+                          </p>
                           <h2>
                             {table.status === "reserved"
                               ? "Confirmar chegada"
@@ -3356,31 +5272,73 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 : "A comanda abre vazia e o cardápio aparece imediatamente."}
                           </span>
                         </div>
-                        {!selectedUsesQuickFlow && (
-                          <Label className="compact-field">
-                            Pessoas
-                            <Input
-                              min={1}
-                              max={500}
-                              onChange={(event) => setGuests(Number(event.target.value))}
-                              type="number"
-                              value={guests}
-                            />
-                          </Label>
-                        )}
-                        <Button
-                          disabled={busy || (!selectedUsesQuickFlow && guests < 1)}
-                          onClick={() => void openTab()}
-                        >
-                          {busy
-                            ? "Abrindo…"
-                            : table.status === "reserved"
-                              ? "Confirmar chegada e pedir"
-                              : selectedUsesQuickFlow
-                                ? "Abrir e pedir"
-                                : "Abrir atendimento e pedir"}
-                        </Button>
-                      </Card>
+                        <div className="table-start__controls">
+                          {!selectedUsesQuickFlow && (
+                            <fieldset className="table-start__guests">
+                              <legend>Pessoas</legend>
+                              <div className="table-start__guest-stepper">
+                                <Button
+                                  aria-label="Diminuir quantidade de pessoas"
+                                  className="h-10 min-h-10 w-9 rounded-none px-0 text-base"
+                                  disabled={busy || guests <= 1}
+                                  onClick={() =>
+                                    setGuests((current) =>
+                                      Math.max(1, Number.isFinite(current) ? current - 1 : 1),
+                                    )
+                                  }
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  −
+                                </Button>
+                                <Input
+                                  aria-label="Pessoas"
+                                  className="h-10 w-12 rounded-none border-0 border-x px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  min={1}
+                                  max={500}
+                                  onBlur={() => guests < 1 && setGuests(1)}
+                                  onChange={(event) => {
+                                    const next = event.currentTarget.valueAsNumber;
+                                    setGuests(
+                                      Number.isFinite(next) ? Math.min(500, Math.max(0, next)) : 0,
+                                    );
+                                  }}
+                                  type="number"
+                                  value={guests}
+                                />
+                                <Button
+                                  aria-label="Aumentar quantidade de pessoas"
+                                  className="h-10 min-h-10 w-9 rounded-none px-0 text-base"
+                                  disabled={busy || guests >= 500}
+                                  onClick={() =>
+                                    setGuests((current) =>
+                                      Math.min(500, Number.isFinite(current) ? current + 1 : 1),
+                                    )
+                                  }
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  +
+                                </Button>
+                              </div>
+                            </fieldset>
+                          )}
+                          <Button
+                            disabled={busy || (!selectedUsesQuickFlow && guests < 1)}
+                            onClick={() => void openTab()}
+                          >
+                            {busy
+                              ? "Abrindo…"
+                              : table.status === "reserved"
+                                ? "Confirmar chegada e pedir"
+                                : selectedUsesQuickFlow
+                                  ? "Abrir e pedir"
+                                  : "Abrir atendimento e pedir"}
+                          </Button>
+                        </div>
+                      </section>
                     )}
                   </>
                 )}

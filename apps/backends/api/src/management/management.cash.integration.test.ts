@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   identities,
+  managementCashEntries,
   memberships,
   organizations,
   posTabPayments,
@@ -11,6 +12,7 @@ import {
   roleBindings,
   units,
 } from "@giromesa/db";
+import { AuthService } from "../auth/auth.service.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
@@ -32,6 +34,7 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
   const database = new DatabaseService();
   try {
     const management = new ManagementService(database, new ScopeService(database));
+    const auth = new AuthService(database);
     const suffix = randomUUID();
     const [organization] = await database.db
       .insert(organizations)
@@ -129,6 +132,18 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     );
     await assert.rejects(
       () =>
+        auth.assertCanEndOperation(cashier.id, {
+          organizationId: organization.id,
+          unitId: unit.id,
+        }),
+      (error) => errorCode(error) === "CASH_SHIFT_OPEN",
+    );
+    await auth.assertCanEndOperation(finance.id, {
+      organizationId: organization.id,
+      unitId: unit.id,
+    });
+    await assert.rejects(
+      () =>
         management.openCashShift(cashier.id, organization.id, unit.id, `open-a-again-${suffix}`, {
           openingCents: 0,
           cashRegisterId: registerA.id as string,
@@ -176,6 +191,7 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
         competenceDate: "2026-08-21",
         dueDate: "2026-08-21",
         lines: [],
+        attachments: [],
       },
     );
     await assert.rejects(
@@ -222,6 +238,7 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
         amountCents: 2_000,
         competenceDate: "2026-08-21",
         dueDate: "2026-08-21",
+        attachments: [],
       },
     );
     await assert.rejects(
@@ -257,6 +274,14 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
       { amountCents: 200, method: "cash", cashRegisterId: registerA.id as string },
     );
 
+    await management.handoverCashShift(
+      cashier.id,
+      organization.id,
+      unit.id,
+      shiftB.cashShiftId as string,
+      `handover-b-${suffix}`,
+      { toIdentityId: owner.id, reason: "Responsabilidade do caixa de destino" },
+    );
     const transfer = await management.transferCash(
       cashier.id,
       organization.id,
@@ -285,11 +310,60 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     assert.ok("transferId" in transferReplay);
     assert.equal(transferReplay.transferId, transfer.transferId);
     assert.equal(transferReplay.idempotentReplay, true);
+    assert.equal(transfer.status, "awaiting_destination");
+    await assert.rejects(
+      () =>
+        management.closeCashShift(
+          owner.id,
+          organization.id,
+          unit.id,
+          shiftB.cashShiftId as string,
+          `close-b-pending-transfer-${suffix}`,
+          { countedCents: 500 },
+        ),
+      (error) => errorCode(error) === "CASH_SHIFT_PENDING_DECISIONS",
+    );
+    await assert.rejects(
+      () =>
+        management.decideCashTransfer(
+          cashier.id,
+          organization.id,
+          unit.id,
+          transfer.transferId as string,
+          `accept-transfer-wrong-actor-${suffix}`,
+          { decision: "accept" },
+        ),
+      (error) => errorCode(error) === "CASH_TRANSFER_DESTINATION_RESPONSIBLE_REQUIRED",
+    );
+    const acceptedTransfer = await management.decideCashTransfer(
+      owner.id,
+      organization.id,
+      unit.id,
+      transfer.transferId as string,
+      `accept-transfer-${suffix}`,
+      { decision: "accept", note: "Valor recebido no caixa de destino" },
+    );
+    assert.equal(acceptedTransfer.status, "accepted");
     const afterTransfer = await management.listCashShifts(owner.id, organization.id, unit.id);
     const liveExpected = afterTransfer.shifts
       .filter((shift) => shift.status === "open")
       .reduce((sum, shift) => sum + (shift.expectedCents ?? 0), 0);
     assert.equal(liveExpected, 1_800);
+
+    await database.db.insert(managementCashEntries).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      cashShiftId: shiftB.cashShiftId as string,
+      direction: "out",
+      entryType: "reversal",
+      paymentMethod: "pix",
+      affectsDrawer: false,
+      amountCents: 100,
+      sourceType: "cash_test_reversal",
+      sourceId: randomUUID(),
+      actorIdentityId: owner.id,
+      description: "Estorno Pix durante o turno",
+    });
 
     const [tab] = await database.db
       .insert(posTabs)
@@ -328,7 +402,7 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
       {
         tenderCounts: [
           { method: "cash", observedCents: 800, source: "manual" },
-          { method: "pix", observedCents: 400, source: "manual" },
+          { method: "pix", observedCents: 300, source: "manual" },
         ],
       },
     );
@@ -336,7 +410,7 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     assert.equal(closeB.differenceCents, 0);
     assert.deepEqual(closeB.breakdown, [
       { method: "cash", amountCents: 800 },
-      { method: "pix", amountCents: 400 },
+      { method: "pix", amountCents: 300 },
     ]);
 
     const concurrent = await Promise.allSettled([
@@ -491,6 +565,18 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     );
     assert.ok("approvalId" in requested);
     assert.equal(requested.status, "pending");
+    await assert.rejects(
+      () =>
+        management.closeCashShift(
+          owner.id,
+          organization.id,
+          unit.id,
+          controlledShift.cashShiftId as string,
+          `close-with-pending-approval-${suffix}`,
+          { countedCents: 1_000 },
+        ),
+      (error) => errorCode(error) === "CASH_SHIFT_PENDING_DECISIONS",
+    );
     const beforeDecision = await management.cashShiftDetail(
       owner.id,
       organization.id,
@@ -521,6 +607,10 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     assert.equal(controlledClose.expectedCents, 1_101);
     assert.equal(controlledClose.reviewRequired, true);
     assert.equal(controlledClose.differenceSeverity, "critical");
+    await auth.assertCanEndOperation(cashier.id, {
+      organizationId: organization.id,
+      unitId: unit.id,
+    });
 
     const localDate = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
     const history = await management.cashShiftHistory(owner.id, organization.id, unit.id, {

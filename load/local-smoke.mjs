@@ -143,8 +143,12 @@ async function provisionFixtures(ownerUrl) {
     await sql.unsafe(
       `create role "${loginRole}" login password '${loginPassword}' noinherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
     );
+    await sql.unsafe(`grant usage on schema public to "${loginRole}"`);
     await sql.unsafe(
-      `grant giromesa_app, giromesa_identity, giromesa_public, giromesa_internal, giromesa_worker to "${loginRole}"`,
+      `grant select, insert, update, delete on all tables in schema public to "${loginRole}"`,
+    );
+    await sql.unsafe(
+      `grant usage, select, update on all sequences in schema public to "${loginRole}"`,
     );
     for (const tenant of tenants) {
       await sql`
@@ -190,7 +194,7 @@ async function provisionFixtures(ownerUrl) {
           slug,
           items,
           active,
-          publish_epoch,
+          version,
           published_at
         ) values (
           ${tenant.organizationId},
@@ -251,14 +255,10 @@ async function startApi(ownerUrl) {
   process.env.COMMAND_FINGERPRINT_KEYS = JSON.stringify({
     "load-v1": randomBytes(32).toString("base64"),
   });
-  const { createApplication } = await import("../apps/api/dist/app-factory.js");
+  const { createApplication } = await import("../apps/backends/api/dist/app-factory.js");
   const { app } = await createApplication();
   app.useLogger(false);
   await app.listen(0, "0.0.0.0");
-  const { DispatchCloudWorker } = await import(
-    "../apps/api/dist/pilot-operations/dispatch-cloud.worker.js"
-  );
-  app.get(DispatchCloudWorker).onModuleDestroy();
   const address = app.getHttpServer().address();
   if (!address || typeof address === "string") throw new Error("API did not expose a TCP port");
   return { app, port: address.port };

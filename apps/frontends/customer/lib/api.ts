@@ -9,6 +9,7 @@ export type PublicMenuBranding = {
   displayName: string;
   slogan?: string;
   logoUrl?: string;
+  coverImageUrl?: string;
   notice?: string;
   primaryColor?: string;
   accentColor?: string;
@@ -96,6 +97,10 @@ export function normalizePublicMenuSnapshot(payload: unknown): PublicMenuSnapsho
           ...(optionalText(branding.slogan) ? { slogan: optionalText(branding.slogan) } : {}),
           ...(typeof branding.logoUrl === "string" && /^https?:\/\//.test(branding.logoUrl)
             ? { logoUrl: branding.logoUrl }
+            : {}),
+          ...(typeof branding.coverImageUrl === "string" &&
+          /^https?:\/\//.test(branding.coverImageUrl)
+            ? { coverImageUrl: branding.coverImageUrl }
             : {}),
           ...(optionalText(branding.notice) ? { notice: optionalText(branding.notice) } : {}),
           ...(typeof branding.primaryColor === "string" &&

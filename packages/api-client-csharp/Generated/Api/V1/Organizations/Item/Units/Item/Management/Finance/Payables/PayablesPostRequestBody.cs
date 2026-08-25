@@ -16,6 +16,22 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         public IDictionary<string, object> AdditionalData { get; set; }
         /// <summary>The amountCents property</summary>
         public int? AmountCents { get; set; }
+        /// <summary>The attachments property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_attachments>? Attachments { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_attachments> Attachments { get; set; }
+#endif
+        /// <summary>The category property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Category { get; set; }
+#nullable restore
+#else
+        public string Category { get; set; }
+#endif
         /// <summary>The competenceDate property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -23,6 +39,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
 #nullable restore
 #else
         public string CompetenceDate { get; set; }
+#endif
+        /// <summary>The costCenter property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? CostCenter { get; set; }
+#nullable restore
+#else
+        public string CostCenter { get; set; }
 #endif
         /// <summary>The description property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -32,6 +56,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
 #else
         public string Description { get; set; }
 #endif
+        /// <summary>The documentNumber property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? DocumentNumber { get; set; }
+#nullable restore
+#else
+        public string DocumentNumber { get; set; }
+#endif
         /// <summary>The dueDate property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -39,6 +71,22 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
 #nullable restore
 #else
         public string DueDate { get; set; }
+#endif
+        /// <summary>The notes property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Notes { get; set; }
+#nullable restore
+#else
+        public string Notes { get; set; }
+#endif
+        /// <summary>The recurrence property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_recurrence? Recurrence { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_recurrence Recurrence { get; set; }
 #endif
         /// <summary>The supplierId property</summary>
         public Guid? SupplierId { get; set; }
@@ -68,9 +116,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
+                { "attachments", n => { Attachments = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_attachments>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_attachments.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "category", n => { Category = n.GetStringValue(); } },
                 { "competenceDate", n => { CompetenceDate = n.GetStringValue(); } },
+                { "costCenter", n => { CostCenter = n.GetStringValue(); } },
                 { "description", n => { Description = n.GetStringValue(); } },
+                { "documentNumber", n => { DocumentNumber = n.GetStringValue(); } },
                 { "dueDate", n => { DueDate = n.GetStringValue(); } },
+                { "notes", n => { Notes = n.GetStringValue(); } },
+                { "recurrence", n => { Recurrence = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_recurrence>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_recurrence.CreateFromDiscriminatorValue); } },
                 { "supplierId", n => { SupplierId = n.GetGuidValue(); } },
             };
         }
@@ -82,9 +136,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_attachments>("attachments", Attachments);
+            writer.WriteStringValue("category", Category);
             writer.WriteStringValue("competenceDate", CompetenceDate);
+            writer.WriteStringValue("costCenter", CostCenter);
             writer.WriteStringValue("description", Description);
+            writer.WriteStringValue("documentNumber", DocumentNumber);
             writer.WriteStringValue("dueDate", DueDate);
+            writer.WriteStringValue("notes", Notes);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Payables.PayablesPostRequestBody_recurrence>("recurrence", Recurrence);
             writer.WriteGuidValue("supplierId", SupplierId);
             writer.WriteAdditionalData(AdditionalData);
         }

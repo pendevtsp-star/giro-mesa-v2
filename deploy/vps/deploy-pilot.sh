@@ -140,6 +140,14 @@ valid = (
     and bool(entries.get("FOCUS_NFE_PRIMARY_TOKEN", "").strip())
     and key_valid
     and entries.get("MEDIA_ROOT") == "/app/data/media"
+    and entries.get("ACCOUNTANT_ATTACHMENT_SCAN_MODE") == "clamd"
+    and bool(entries.get("ACCOUNTANT_ATTACHMENT_CLAMD_HOST", "").strip())
+    and entries.get("ACCOUNTANT_ATTACHMENT_CLAMD_PORT", "").isdigit()
+    and 1 <= int(entries["ACCOUNTANT_ATTACHMENT_CLAMD_PORT"]) <= 65535
+    and entries.get("ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS", "").isdigit()
+    and 1000 <= int(entries["ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS"]) <= 30000
+    and entries.get("ACCOUNTANT_ATTACHMENT_RETENTION_DAYS", "").isdigit()
+    and int(entries["ACCOUNTANT_ATTACHMENT_RETENTION_DAYS"]) >= 1827
 )
 if not valid:
     raise SystemExit("FISCAL_PRODUCTION_HOMOLOGATION_REQUIRED")
@@ -191,7 +199,7 @@ PY
 python3 - "$recovery_matrix" "$source_migration_id" "$applied_migration_at" "$target_migration_id" "$recovery_migration_id" "$recovery_sha" <<'PY'
 import json, re, sys
 value=json.load(open(sys.argv[1],encoding="utf-8"))
-valid=value.get("schemaVersion")==1 and value.get("targetMigration")=="0053_petite_trauma" and any(
+valid=value.get("schemaVersion")==1 and value.get("targetMigration")==sys.argv[4] and any(
     item.get("appliedBefore")==sys.argv[2]
     and str(item.get("appliedBeforeWhen"))==sys.argv[3]
     and item.get("appliedAfter")==sys.argv[4]

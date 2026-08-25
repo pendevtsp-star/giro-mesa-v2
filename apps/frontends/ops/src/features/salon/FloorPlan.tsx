@@ -1,4 +1,9 @@
-import { Button } from "@giromesa/ui";
+import {
+  convexPolygonsOverlap,
+  floorPlacementConflicts,
+  rotatedRectangleCorners,
+} from "@giromesa/domain/floor-geometry";
+import { Button, Input, NativeSelect } from "@giromesa/ui";
 import {
   Fragment,
   type KeyboardEvent,
@@ -16,6 +21,8 @@ const PLAN_HEIGHT = 620;
 const PLAN_ASPECT = PLAN_WIDTH / PLAN_HEIGHT;
 const TABLE_WIDTH = 122;
 const TABLE_HEIGHT = 76;
+const MIN_TABLE_SIZE = 48;
+const MAX_TABLE_SIZE = 260;
 const MAX_COORDINATE = 1_000_000;
 
 export type FloorPlanStatus =
@@ -28,6 +35,15 @@ export type FloorPlanStatus =
   | "needs_cleaning"
   | "cleaning";
 
+export type FloorPlanTableShape = "round" | "square" | "rectangle";
+
+export interface FloorPlanGeometry {
+  width: number;
+  height: number;
+  rotation: number;
+  shape: FloorPlanTableShape;
+}
+
 export interface FloorPlanItem {
   id: string;
   operationId: string;
@@ -38,6 +54,12 @@ export interface FloorPlanItem {
   status: FloorPlanStatus;
   layoutX?: number | null;
   layoutY?: number | null;
+  width?: number | null;
+  height?: number | null;
+  rotation?: number | null;
+  shape?: FloorPlanTableShape | null;
+  sectionColor?: string;
+  sectionLabel?: string;
   responsible?: string;
   valueLabel?: string;
   groupId?: string;
@@ -53,6 +75,29 @@ export interface FloorPlanPosition {
   roomId?: string;
   x: number;
   y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  shape: FloorPlanTableShape;
+}
+
+export interface FloorPlanTableDetails {
+  tableId: string;
+  label: string;
+  seats: number;
+  roomId: string;
+}
+
+export interface FloorPlanElement {
+  id: string;
+  roomId: string;
+  kind: "label" | "barrier";
+  label?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
 }
 
 export interface FloorPlanZone {
@@ -109,6 +154,12 @@ function clamp(value: number, minimum: number, maximum: number) {
 
 function compactLabel(value: string, limit: number) {
   return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
+}
+
+export function floorPlanDensity(tableCount: number): "normal" | "dense" | "very-dense" {
+  if (tableCount > 300) return "very-dense";
+  if (tableCount > 120) return "dense";
+  return "normal";
 }
 
 function zoneWithBounds(
@@ -211,27 +262,85 @@ function pointInsidePolygon(
   return inside;
 }
 
-function tableFitsZone(x: number, y: number, zone: FloorPlanZone) {
-  const halfWidth = TABLE_WIDTH / 2 + 8;
-  const halfHeight = TABLE_HEIGHT / 2 + 8;
-  return [
-    { x: x - halfWidth, y: y - halfHeight },
-    { x: x + halfWidth, y: y - halfHeight },
-    { x: x + halfWidth, y: y + halfHeight },
-    { x: x - halfWidth, y: y + halfHeight },
-  ].every((point) => pointInsidePolygon(point, zone.points));
+function geometryFor(item: FloorPlanItem): FloorPlanGeometry {
+  const shape = item.shape ?? "rectangle";
+  const width = clamp(item.width ?? TABLE_WIDTH, MIN_TABLE_SIZE, MAX_TABLE_SIZE);
+  const height = clamp(
+    shape === "square" || shape === "round"
+      ? (item.height ?? width)
+      : (item.height ?? TABLE_HEIGHT),
+    MIN_TABLE_SIZE,
+    MAX_TABLE_SIZE,
+  );
+  return { width, height, rotation: item.rotation ?? 0, shape };
 }
 
-function tablesOverlap(left: { x: number; y: number }, right: { x: number; y: number }) {
-  return (
-    Math.abs(left.x - right.x) < TABLE_WIDTH + 18 && Math.abs(left.y - right.y) < TABLE_HEIGHT + 18
+export function floorPlanRectanglesOverlap(
+  left: { x: number; y: number; width: number; height: number; rotation?: number },
+  right: { x: number; y: number; width: number; height: number; rotation?: number },
+) {
+  return convexPolygonsOverlap(
+    rotatedRectangleCorners({ ...left, rotation: left.rotation ?? 0 }),
+    rotatedRectangleCorners({ ...right, rotation: right.rotation ?? 0 }),
   );
+}
+
+export function floorPlanPlacementAllowed(
+  placement: { x: number; y: number; width: number; height: number; rotation?: number },
+  roomBoundary: readonly { x: number; y: number }[],
+  occupied: readonly { x: number; y: number; width: number; height: number; rotation?: number }[],
+  barriers: readonly { x: number; y: number; width: number; height: number; rotation?: number }[],
+) {
+  const normalized = { ...placement, rotation: placement.rotation ?? 0 };
+  const boundary = floorPlacementConflicts(
+    { ...normalized, width: normalized.width + 16, height: normalized.height + 16 },
+    roomBoundary,
+    [],
+    [],
+  );
+  const collision = floorPlacementConflicts(
+    normalized,
+    roomBoundary,
+    occupied.map((item) => ({ ...item, rotation: item.rotation ?? 0 })),
+    barriers.map((item) => ({ ...item, rotation: item.rotation ?? 0 })),
+  );
+  return !boundary.outsideRoom && !collision.overlapsObject && !collision.overlapsBarrier;
+}
+
+export function floorPlanKeyboardMovement(key: string, step = 10) {
+  const movements: Record<string, { x: number; y: number }> = {
+    ArrowLeft: { x: -step, y: 0 },
+    ArrowRight: { x: step, y: 0 },
+    ArrowUp: { x: 0, y: -step },
+    ArrowDown: { x: 0, y: step },
+  };
+  return movements[key] ?? null;
+}
+
+function tableFitsZone(
+  x: number,
+  y: number,
+  zone: FloorPlanZone,
+  geometry: Pick<FloorPlanGeometry, "width" | "height" | "rotation"> = {
+    width: TABLE_WIDTH,
+    height: TABLE_HEIGHT,
+    rotation: 0,
+  },
+) {
+  return rotatedRectangleCorners({
+    x,
+    y,
+    width: geometry.width + 16,
+    height: geometry.height + 16,
+    rotation: geometry.rotation,
+  }).every((point) => pointInsidePolygon(point, zone.points));
 }
 
 export function buildFloorPlanPositions(
   items: FloorPlanItem[],
   stations: FloorPlanStation[] = [],
   savedZones: Array<{ id: string; label: string; points: Array<{ x: number; y: number }> }> = [],
+  elements: FloorPlanElement[] = [],
 ) {
   const zones = buildZones([...items, ...stations], savedZones);
   const positions: Record<string, { x: number; y: number }> = {};
@@ -253,13 +362,33 @@ export function buildFloorPlanPositions(
         if (tableFitsZone(x, y, zone)) candidates.push({ x, y });
       }
     }
-    const occupied: Array<{ x: number; y: number }> = [];
+    const occupied: Array<{
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      rotation: number;
+    }> = [];
+    const barriers = elements.flatMap((element) =>
+      element.kind === "barrier" && element.roomId === zone.id
+        ? [
+            {
+              x: element.x,
+              y: element.y,
+              width: element.width,
+              height: element.height,
+              rotation: element.rotation,
+            },
+          ]
+        : [],
+    );
     const ordered = [...areaItems].sort(
       (left, right) =>
         Number(right.layoutX !== null && right.layoutX !== undefined) -
         Number(left.layoutX !== null && left.layoutX !== undefined),
     );
     for (const item of ordered) {
+      const geometry = geometryFor(item);
       const persisted =
         item.layoutX !== null &&
         item.layoutX !== undefined &&
@@ -269,18 +398,22 @@ export function buildFloorPlanPositions(
           : null;
       const position =
         persisted &&
-        tableFitsZone(persisted.x, persisted.y, zone) &&
-        occupied.every((candidate) => !tablesOverlap(candidate, persisted))
+        floorPlanPlacementAllowed({ ...persisted, ...geometry }, zone.points, occupied, barriers)
           ? persisted
           : candidates.find((candidate) =>
-              occupied.every((placed) => !tablesOverlap(candidate, placed)),
+              floorPlanPlacementAllowed(
+                { ...candidate, ...geometry },
+                zone.points,
+                occupied,
+                barriers,
+              ),
             );
       if (!position) {
         unpositionedIds.push(item.id);
         continue;
       }
       positions[item.id] = position;
-      occupied.push(position);
+      occupied.push({ ...position, ...geometry });
     }
   }
   const rightEdge = Math.max(PLAN_WIDTH, ...zones.map((zone) => zone.x + zone.width));
@@ -300,12 +433,13 @@ export function buildJoinedShiftLayout(
   anchorId: string,
   stations: FloorPlanStation[] = [],
   savedZones: Array<{ id: string; label: string; points: Array<{ x: number; y: number }> }> = [],
+  elements: FloorPlanElement[] = [],
 ): JoinedShiftLayout {
   const selectedIds = [...new Set(tableIds)];
   const anchor = items.find((item) => item.id === anchorId);
   if (!anchor || selectedIds.length < 2) return { positions: [], unplacedIds: selectedIds };
 
-  const layout = buildFloorPlanPositions(items, stations, savedZones);
+  const layout = buildFloorPlanPositions(items, stations, savedZones, elements);
   const anchorPosition = layout.positions[anchor.id];
   const targetZone = layout.zones.find((zone) => zone.id === anchor.areaId);
   if (!anchorPosition || !targetZone) return { positions: [], unplacedIds: selectedIds };
@@ -313,13 +447,27 @@ export function buildJoinedShiftLayout(
   const occupied = items.flatMap((item) => {
     const position = layout.positions[item.id];
     return position && !selectedIds.includes(item.id) && item.areaId === targetZone.id
-      ? [position]
+      ? [{ ...position, ...geometryFor(item) }]
       : [];
   });
+  const barriers = elements.flatMap((element) =>
+    element.kind === "barrier" && element.roomId === targetZone.id
+      ? [
+          {
+            x: element.x,
+            y: element.y,
+            width: element.width,
+            height: element.height,
+            rotation: element.rotation,
+          },
+        ]
+      : [],
+  );
+  const anchorGeometry = geometryFor(anchor);
   const placed: FloorPlanPosition[] = [
-    { tableId: anchor.id, roomId: targetZone.id, ...anchorPosition },
+    { tableId: anchor.id, roomId: targetZone.id, ...anchorPosition, ...anchorGeometry },
   ];
-  const used = [...occupied, anchorPosition];
+  const used = [...occupied, { ...anchorPosition, ...anchorGeometry }];
   const stepX = TABLE_WIDTH + 22;
   const stepY = TABLE_HEIGHT + 24;
   const offsets: Array<{ x: number; y: number }> = [];
@@ -336,19 +484,26 @@ export function buildJoinedShiftLayout(
 
   const unplacedIds: string[] = [];
   for (const tableId of selectedIds.filter((id) => id !== anchor.id)) {
+    const item = items.find((candidateItem) => candidateItem.id === tableId);
+    const geometry = item
+      ? geometryFor(item)
+      : { width: TABLE_WIDTH, height: TABLE_HEIGHT, rotation: 0, shape: "rectangle" as const };
     const candidate = offsets
       .map((offset) => ({ x: anchorPosition.x + offset.x, y: anchorPosition.y + offset.y }))
-      .find(
-        (position) =>
-          tableFitsZone(position.x, position.y, targetZone) &&
-          used.every((occupiedPosition) => !tablesOverlap(position, occupiedPosition)),
+      .find((position) =>
+        floorPlanPlacementAllowed({ ...position, ...geometry }, targetZone.points, used, barriers),
       );
     if (!candidate) {
       unplacedIds.push(tableId);
       continue;
     }
-    placed.push({ tableId, roomId: targetZone.id, ...candidate });
-    used.push(candidate);
+    placed.push({
+      tableId,
+      roomId: targetZone.id,
+      ...candidate,
+      ...geometry,
+    });
+    used.push({ ...candidate, ...geometry });
   }
   return { positions: placed, unplacedIds };
 }
@@ -440,6 +595,7 @@ export function resolveFloorPlanFullscreenTarget(element: HTMLElement | null) {
 
 export function FloorPlan({
   items,
+  elements = [],
   selectedIds,
   focusId,
   joinMode,
@@ -453,11 +609,19 @@ export function FloorPlan({
   editingDescription = "Arraste as mesas e salve a nova organização.",
   layoutScope = "permanent",
   editRequestKey = 0,
+  operateRequestKey = 0,
+  canEditElements = layoutScope === "permanent",
+  editorTool = "move",
+  editableItemIds,
   onSelect,
   onSelectStation,
   onSavePositions,
+  onEditingChange,
+  onEditSelect,
+  onArchiveTable,
 }: {
   items: FloorPlanItem[];
+  elements?: FloorPlanElement[];
   selectedIds: string[];
   focusId?: string | null;
   joinMode: boolean;
@@ -471,12 +635,21 @@ export function FloorPlan({
   editingDescription?: string;
   layoutScope?: FloorPlanLayoutScope;
   editRequestKey?: number;
+  operateRequestKey?: number;
+  canEditElements?: boolean;
+  editorTool?: "move" | "assign";
+  editableItemIds?: string[];
   onSelect: (operationId: string) => void;
   onSelectStation?: (stationId: string) => void;
   onSavePositions?: (
     positions: FloorPlanPosition[],
     zones: FloorPlanZonePosition[],
+    elements: FloorPlanElement[],
+    tableDetails: FloorPlanTableDetails[],
   ) => boolean | Promise<boolean>;
+  onEditingChange?: (editing: boolean) => void;
+  onEditSelect?: (tableId: string) => void;
+  onArchiveTable?: (tableId: string) => boolean | Promise<boolean>;
 }) {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -485,6 +658,7 @@ export function FloorPlan({
   const layersRef = useRef<HTMLDetailsElement>(null);
   const focusedIdRef = useRef<string | null>(null);
   const editRequestRef = useRef(0);
+  const operateRequestRef = useRef(0);
   const panRef = useRef<
     | {
         pointerId: number;
@@ -499,15 +673,42 @@ export function FloorPlan({
     | { pointerId: number; tableId: string; areaId: string; offsetX: number; offsetY: number }
     | undefined
   >(undefined);
+  const elementDragRef = useRef<
+    { pointerId: number; elementId: string; offsetX: number; offsetY: number } | undefined
+  >(undefined);
+  const resizeRef = useRef<
+    | {
+        pointerId: number;
+        tableId: string;
+        start: { x: number; y: number };
+        geometry: FloorPlanGeometry;
+      }
+    | undefined
+  >(undefined);
   const zoneDragRef = useRef<{ pointerId: number; zoneId: string; pointIndex: number } | undefined>(
     undefined,
   );
   const gridId = `floor-plan-grid-${useId().replaceAll(":", "")}`;
   const layout = useMemo(
-    () => buildFloorPlanPositions(items, stations, zones),
-    [items, stations, zones],
+    () => buildFloorPlanPositions(items, stations, zones, elements),
+    [elements, items, stations, zones],
   );
   const [draftPositions, setDraftPositions] = useState(layout.positions);
+  const [draftGeometry, setDraftGeometry] = useState<Record<string, FloorPlanGeometry>>(() =>
+    Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])),
+  );
+  const [draftTableDetails, setDraftTableDetails] = useState<
+    Record<string, Omit<FloorPlanTableDetails, "tableId">>
+  >(() =>
+    Object.fromEntries(
+      items.map((item) => [item.id, { label: item.label, seats: item.seats, roomId: item.areaId }]),
+    ),
+  );
+  const [draftElements, setDraftElements] = useState(elements);
+  const [selectedEditorTarget, setSelectedEditorTarget] = useState<{
+    kind: "table" | "element";
+    id: string;
+  } | null>(null);
   const [draftAreaIds, setDraftAreaIds] = useState<Record<string, string>>(() =>
     Object.fromEntries(items.map((item) => [item.id, item.areaId])),
   );
@@ -526,8 +727,10 @@ export function FloorPlan({
   const [layersOpen, setLayersOpen] = useState(false);
   const [layers, setLayers] = useState({ space: true, tables: true, operation: true });
   const positions = editing ? draftPositions : layout.positions;
+  const visibleElements = editing ? draftElements : elements;
   const visibleZones = editing ? draftZones : layout.zones;
   const visibleItems = useMemo(() => items.filter((item) => !item.hidden), [items]);
+  const density = floorPlanDensity(visibleItems.length);
   const contentPoints = useMemo(
     () => [
       ...visibleZones.flatMap((zone) => zone.points),
@@ -535,19 +738,34 @@ export function FloorPlan({
         const position = positions[item.id];
         return position ? [position] : [];
       }),
+      ...visibleElements.flatMap((element) => [
+        { x: element.x - element.width / 2, y: element.y - element.height / 2 },
+        { x: element.x + element.width / 2, y: element.y + element.height / 2 },
+      ]),
     ],
-    [positions, visibleItems, visibleZones],
+    [positions, visibleElements, visibleItems, visibleZones],
   );
   const { width: viewWidth, height: viewHeight } = viewportDimensions(viewport.zoom, surfaceAspect);
 
   useEffect(() => {
     if (!editing) {
       setDraftPositions(layout.positions);
+      setDraftGeometry(Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])));
+      setDraftTableDetails(
+        Object.fromEntries(
+          items.map((item) => [
+            item.id,
+            { label: item.label, seats: item.seats, roomId: item.areaId },
+          ]),
+        ),
+      );
+      setDraftElements(elements);
+      setSelectedEditorTarget(null);
       setDraftAreaIds(Object.fromEntries(items.map((item) => [item.id, item.areaId])));
       setDraftZones(layout.zones);
       setDraftUnpositioned(new Set(layout.unpositionedIds));
     }
-  }, [editing, items, layout.positions, layout.unpositionedIds, layout.zones]);
+  }, [editing, elements, items, layout.positions, layout.unpositionedIds, layout.zones]);
 
   useEffect(() => {
     if (
@@ -560,12 +778,46 @@ export function FloorPlan({
     }
     editRequestRef.current = editRequestKey;
     setDraftPositions(layout.positions);
+    setDraftGeometry(Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])));
+    setDraftTableDetails(
+      Object.fromEntries(
+        items.map((item) => [
+          item.id,
+          { label: item.label, seats: item.seats, roomId: item.areaId },
+        ]),
+      ),
+    );
+    setDraftElements(elements);
+    setSelectedEditorTarget(null);
     setDraftAreaIds(Object.fromEntries(items.map((item) => [item.id, item.areaId])));
     setDraftZones(layout.zones);
     setDraftUnpositioned(new Set(layout.unpositionedIds));
     setLayers({ space: true, tables: true, operation: true });
     setEditing(true);
-  }, [canEdit, editRequestKey, items, layout, onSavePositions]);
+    onEditingChange?.(true);
+  }, [canEdit, editRequestKey, elements, items, layout, onEditingChange, onSavePositions]);
+
+  useEffect(() => {
+    if (!operateRequestKey || operateRequestRef.current === operateRequestKey) return;
+    operateRequestRef.current = operateRequestKey;
+    setDraftPositions(layout.positions);
+    setDraftGeometry(Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])));
+    setDraftTableDetails(
+      Object.fromEntries(
+        items.map((item) => [
+          item.id,
+          { label: item.label, seats: item.seats, roomId: item.areaId },
+        ]),
+      ),
+    );
+    setDraftElements(elements);
+    setDraftAreaIds(Object.fromEntries(items.map((item) => [item.id, item.areaId])));
+    setDraftZones(layout.zones);
+    setDraftUnpositioned(new Set(layout.unpositionedIds));
+    setSelectedEditorTarget(null);
+    setEditing(false);
+    onEditingChange?.(false);
+  }, [elements, items, layout, onEditingChange, operateRequestKey]);
 
   useEffect(() => {
     const onFullscreenChange = () =>
@@ -700,6 +952,99 @@ export function FloorPlan({
     );
   }
 
+  function updateGeometry(tableId: string, update: Partial<FloorPlanGeometry>) {
+    const item = items.find((candidate) => candidate.id === tableId);
+    if (!item) return;
+    const base = draftGeometry[tableId] ?? geometryFor(item);
+    const shape = update.shape ?? base.shape;
+    const width = clamp(update.width ?? base.width, MIN_TABLE_SIZE, MAX_TABLE_SIZE);
+    const next = {
+      ...base,
+      ...update,
+      width,
+      height: clamp(
+        shape === "square" || shape === "round"
+          ? (update.width ?? update.height ?? width)
+          : (update.height ?? base.height),
+        MIN_TABLE_SIZE,
+        MAX_TABLE_SIZE,
+      ),
+      rotation: ((Math.round(update.rotation ?? base.rotation) % 360) + 360) % 360,
+      shape,
+    };
+    const position = draftPositions[tableId];
+    const zone = visibleZones.find(
+      (candidate) => candidate.id === (draftAreaIds[tableId] ?? item.areaId),
+    );
+    if (position && zone && !tablePlacementAllowed(tableId, position, next, zone)) return;
+    setDraftGeometry((current) => ({ ...current, [tableId]: next }));
+  }
+
+  function tablePlacementAllowed(
+    tableId: string,
+    position: { x: number; y: number },
+    geometry: FloorPlanGeometry,
+    zone: FloorPlanZone,
+  ) {
+    const candidate = { ...position, ...geometry };
+    const occupied = visibleItems.flatMap((item) => {
+      if (item.id === tableId) return [];
+      const otherPosition = draftPositions[item.id] ?? positions[item.id];
+      if (!otherPosition) return [];
+      return [{ ...otherPosition, ...(draftGeometry[item.id] ?? geometryFor(item)) }];
+    });
+    const barriers = draftElements.flatMap((element) =>
+      element.kind === "barrier"
+        ? [
+            {
+              x: element.x,
+              y: element.y,
+              width: element.width,
+              height: element.height,
+              rotation: element.rotation,
+            },
+          ]
+        : [],
+    );
+    return floorPlanPlacementAllowed(candidate, zone.points, occupied, barriers);
+  }
+
+  function updateElement(elementId: string, update: Partial<FloorPlanElement>) {
+    const current = draftElements.find((element) => element.id === elementId);
+    if (!current) return;
+    const next = {
+      ...current,
+      ...update,
+      width: clamp(update.width ?? current.width, 24, 600),
+      height: clamp(update.height ?? current.height, 8, 300),
+      rotation: ((Math.round(update.rotation ?? current.rotation) % 360) + 360) % 360,
+    };
+    if (next.kind === "barrier") {
+      const zone = visibleZones.find((candidate) => candidate.id === next.roomId);
+      if (
+        !zone ||
+        !rotatedRectangleCorners(next).every((point) => pointInsidePolygon(point, zone.points))
+      ) {
+        return;
+      }
+      const overlapsTable = visibleItems.some((item) => {
+        const position = draftPositions[item.id] ?? positions[item.id];
+        if (!position) return false;
+        return convexPolygonsOverlap(
+          rotatedRectangleCorners(next),
+          rotatedRectangleCorners({
+            ...position,
+            ...(draftGeometry[item.id] ?? geometryFor(item)),
+          }),
+        );
+      });
+      if (overlapsTable) return;
+    }
+    setDraftElements((elements) =>
+      elements.map((element) => (element.id === elementId ? next : element)),
+    );
+  }
+
   function handlePlanKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const horizontalStep = viewWidth * 0.12;
     const verticalStep = viewHeight * 0.12;
@@ -754,6 +1099,44 @@ export function FloorPlan({
       }));
       return;
     }
+    const resize = resizeRef.current;
+    if (resize?.pointerId === event.pointerId) {
+      const point = worldPoint(event);
+      const deltaX = Math.abs(point.x - resize.start.x) * 2;
+      const deltaY = Math.abs(point.y - resize.start.y) * 2;
+      updateGeometry(resize.tableId, {
+        width: Math.max(MIN_TABLE_SIZE, deltaX),
+        height: Math.max(MIN_TABLE_SIZE, deltaY),
+      });
+      return;
+    }
+    const elementDrag = elementDragRef.current;
+    if (elementDrag?.pointerId === event.pointerId) {
+      const point = worldPoint(event);
+      const element = draftElements.find((candidate) => candidate.id === elementDrag.elementId);
+      if (!element) return;
+      const next = {
+        x: Math.round((point.x - elementDrag.offsetX) / 10) * 10,
+        y: Math.round((point.y - elementDrag.offsetY) / 10) * 10,
+      };
+      const zone = visibleZones.find((candidate) => pointInsidePolygon(next, candidate.points));
+      if (!zone) return;
+      if (
+        element.kind === "barrier" &&
+        visibleItems.some((item) => {
+          const position = draftPositions[item.id] ?? positions[item.id];
+          if (!position) return false;
+          return floorPlanRectanglesOverlap(
+            { ...next, width: element.width, height: element.height, rotation: element.rotation },
+            { ...position, ...(draftGeometry[item.id] ?? geometryFor(item)) },
+          );
+        })
+      ) {
+        return;
+      }
+      updateElement(element.id, { ...next, roomId: zone.id });
+      return;
+    }
     const drag = dragRef.current;
     if (drag?.pointerId === event.pointerId) {
       const point = worldPoint(event);
@@ -761,23 +1144,29 @@ export function FloorPlan({
         visibleZones.find((candidate) => pointInsidePolygon(point, candidate.points)) ??
         visibleZones.find((candidate) => candidate.id === draftAreaIds[drag.tableId]);
       if (!zone) return;
+      const geometry = draftGeometry[drag.tableId] ?? {
+        width: TABLE_WIDTH,
+        height: TABLE_HEIGHT,
+        rotation: 0,
+        shape: "rectangle" as const,
+      };
       const x =
         Math.round(
           clamp(
             point.x - drag.offsetX,
-            zone.x + TABLE_WIDTH / 2 + 12,
-            zone.x + zone.width - TABLE_WIDTH / 2 - 12,
+            zone.x + geometry.width / 2 + 12,
+            zone.x + zone.width - geometry.width / 2 - 12,
           ) / 10,
         ) * 10;
       const y =
         Math.round(
           clamp(
             point.y - drag.offsetY,
-            zone.y + TABLE_HEIGHT / 2 + 38,
-            zone.y + zone.height - TABLE_HEIGHT / 2 - 12,
+            zone.y + geometry.height / 2 + 38,
+            zone.y + zone.height - geometry.height / 2 - 12,
           ) / 10,
         ) * 10;
-      if (!tableFitsZone(x, y, zone)) return;
+      if (!tablePlacementAllowed(drag.tableId, { x, y }, geometry, zone)) return;
       setDraftPositions((current) => ({ ...current, [drag.tableId]: { x, y } }));
       setDraftAreaIds((current) => ({ ...current, [drag.tableId]: zone.id }));
       setDraftUnpositioned((current) => {
@@ -813,6 +1202,8 @@ export function FloorPlan({
   function finishPointer(event: ReactPointerEvent<SVGSVGElement>) {
     const finishedPan = panRef.current?.pointerId === event.pointerId && pannedRef.current;
     if (zoneDragRef.current?.pointerId === event.pointerId) zoneDragRef.current = undefined;
+    if (resizeRef.current?.pointerId === event.pointerId) resizeRef.current = undefined;
+    if (elementDragRef.current?.pointerId === event.pointerId) elementDragRef.current = undefined;
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = undefined;
     if (panRef.current?.pointerId === event.pointerId) panRef.current = undefined;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -834,12 +1225,19 @@ export function FloorPlan({
   }
 
   function startTableDrag(event: ReactPointerEvent<SVGGElement>, item: FloorPlanItem) {
-    if (!editing) return;
+    if (
+      !editing ||
+      editorTool === "assign" ||
+      (editableItemIds && !editableItemIds.includes(item.id))
+    ) {
+      return;
+    }
     event.stopPropagation();
     event.preventDefault();
     const point = worldPoint(event);
     const position = positions[item.id];
     if (!position) return;
+    setSelectedEditorTarget({ kind: "table", id: item.id });
     svgRef.current?.setPointerCapture(event.pointerId);
     dragRef.current = {
       pointerId: event.pointerId,
@@ -850,19 +1248,82 @@ export function FloorPlan({
     };
   }
 
+  function startResize(event: ReactPointerEvent<SVGCircleElement>, item: FloorPlanItem) {
+    if (!editing) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const position = positions[item.id];
+    if (!position) return;
+    svgRef.current?.setPointerCapture(event.pointerId);
+    setSelectedEditorTarget({ kind: "table", id: item.id });
+    resizeRef.current = {
+      pointerId: event.pointerId,
+      tableId: item.id,
+      start: position,
+      geometry: draftGeometry[item.id] ?? geometryFor(item),
+    };
+  }
+
+  function startElementDrag(event: ReactPointerEvent<SVGGElement>, element: FloorPlanElement) {
+    if (!editing || !canEditElements) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const point = worldPoint(event);
+    svgRef.current?.setPointerCapture(event.pointerId);
+    setSelectedEditorTarget({ kind: "element", id: element.id });
+    elementDragRef.current = {
+      pointerId: event.pointerId,
+      elementId: element.id,
+      offsetX: point.x - element.x,
+      offsetY: point.y - element.y,
+    };
+  }
+
   function activate(item: FloorPlanItem) {
     if (pannedRef.current) {
       pannedRef.current = false;
       return;
     }
-    if (editing || item.disabledReason) return;
+    if (editing) {
+      if (editorTool === "assign" && (!editableItemIds || editableItemIds.includes(item.id))) {
+        onEditSelect?.(item.id);
+      }
+      return;
+    }
+    if (item.disabledReason) return;
     onSelect(item.operationId);
   }
 
   function handleTableKey(event: KeyboardEvent<SVGGElement>, item: FloorPlanItem) {
-    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (editing && editorTool === "move") {
+        setSelectedEditorTarget({ kind: "table", id: item.id });
+        return;
+      }
+      activate(item);
+      return;
+    }
+    if (
+      !editing ||
+      editorTool !== "move" ||
+      (editableItemIds && !editableItemIds.includes(item.id))
+    ) {
+      return;
+    }
+    const movement = floorPlanKeyboardMovement(event.key);
+    if (!movement) return;
+    const position = draftPositions[item.id] ?? positions[item.id];
+    const zone = visibleZones.find(
+      (candidate) => candidate.id === (draftAreaIds[item.id] ?? item.areaId),
+    );
+    if (!position || !zone) return;
     event.preventDefault();
-    activate(item);
+    const next = { x: position.x + movement.x, y: position.y + movement.y };
+    const geometry = draftGeometry[item.id] ?? geometryFor(item);
+    if (!tablePlacementAllowed(item.id, next, geometry, zone)) return;
+    setSelectedEditorTarget({ kind: "table", id: item.id });
+    setDraftPositions((current) => ({ ...current, [item.id]: next }));
   }
 
   async function saveLayout() {
@@ -872,19 +1333,36 @@ export function FloorPlan({
       items.flatMap((item) => {
         if (draftUnpositioned.has(item.id)) return [];
         const position = draftPositions[item.id];
+        const geometry = draftGeometry[item.id] ?? geometryFor(item);
         return position
-          ? [{ tableId: item.id, roomId: draftAreaIds[item.id] ?? item.areaId, ...position }]
+          ? [
+              {
+                tableId: item.id,
+                roomId: draftAreaIds[item.id] ?? item.areaId,
+                ...position,
+                ...geometry,
+              },
+            ]
           : [];
       }),
       visibleZones.map((zone) => ({ roomId: zone.id, points: zone.points })),
+      draftElements,
+      items.map((item) => ({
+        tableId: item.id,
+        ...(draftTableDetails[item.id] ?? {
+          label: item.label,
+          seats: item.seats,
+          roomId: item.areaId,
+        }),
+        roomId: draftAreaIds[item.id] ?? draftTableDetails[item.id]?.roomId ?? item.areaId,
+      })),
     );
     setSaving(false);
-    if (saved !== false) setEditing(false);
-  }
-
-  async function toggleFullscreen() {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await resolveFloorPlanFullscreenTarget(wrapperRef.current)?.requestFullscreen();
+    if (saved !== false) {
+      setEditing(false);
+      setSelectedEditorTarget(null);
+      onEditingChange?.(false);
+    }
   }
 
   function moveFromMinimap(event: ReactPointerEvent<SVGSVGElement>) {
@@ -933,6 +1411,70 @@ export function FloorPlan({
     );
     return { id: groupId, members, anchor, center };
   });
+  const selectedEditorTable =
+    selectedEditorTarget?.kind === "table"
+      ? items.find((item) => item.id === selectedEditorTarget.id)
+      : undefined;
+  const selectedEditorElement =
+    selectedEditorTarget?.kind === "element"
+      ? draftElements.find((element) => element.id === selectedEditorTarget.id)
+      : undefined;
+
+  function addElement(kind: FloorPlanElement["kind"]) {
+    const zone = visibleZones[0];
+    if (!zone) return;
+    const width = kind === "label" ? 180 : 220;
+    const height = kind === "label" ? 44 : 18;
+    const tableRectangles = visibleItems.flatMap((item) => {
+      const position = draftPositions[item.id] ?? positions[item.id];
+      return position ? [{ ...position, ...(draftGeometry[item.id] ?? geometryFor(item)) }] : [];
+    });
+    const existingBarriers = draftElements.flatMap((element) =>
+      element.kind === "barrier" && element.roomId === zone.id
+        ? [
+            {
+              x: element.x,
+              y: element.y,
+              width: element.width,
+              height: element.height,
+              rotation: element.rotation,
+            },
+          ]
+        : [],
+    );
+    const available =
+      kind === "label"
+        ? { x: zone.x + zone.width / 2, y: zone.y + zone.height / 2 }
+        : Array.from({ length: 8 }, (_, row) =>
+            Array.from({ length: 8 }, (_unused, column) => ({
+              x: zone.x + 40 + column * 70,
+              y: zone.y + 60 + row * 54,
+            })),
+          )
+            .flat()
+            .find((position) =>
+              floorPlanPlacementAllowed(
+                { ...position, width, height, rotation: 0 },
+                zone.points,
+                existingBarriers,
+                tableRectangles,
+              ),
+            );
+    if (!available) return;
+    const element: FloorPlanElement = {
+      id: crypto.randomUUID(),
+      roomId: zone.id,
+      kind,
+      label: kind === "label" ? "Novo texto" : undefined,
+      x: available.x,
+      y: available.y,
+      width,
+      height,
+      rotation: 0,
+    };
+    setDraftElements((current) => [...current, element]);
+    setSelectedEditorTarget({ kind: "element", id: element.id });
+  }
 
   return (
     <div className="floor-plan" ref={wrapperRef}>
@@ -956,12 +1498,18 @@ export function FloorPlan({
                   disabled={saving}
                   onClick={() => {
                     setDraftPositions(layout.positions);
+                    setDraftGeometry(
+                      Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])),
+                    );
+                    setDraftElements(elements);
+                    setSelectedEditorTarget(null);
                     setDraftAreaIds(
                       Object.fromEntries(items.map((item) => [item.id, item.areaId])),
                     );
                     setDraftZones(layout.zones);
                     setDraftUnpositioned(new Set(layout.unpositionedIds));
                     setEditing(false);
+                    onEditingChange?.(false);
                   }}
                   size="sm"
                   variant="ghost"
@@ -976,10 +1524,16 @@ export function FloorPlan({
               <Button
                 onClick={() => {
                   setDraftPositions(layout.positions);
+                  setDraftGeometry(
+                    Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])),
+                  );
+                  setDraftElements(elements);
+                  setSelectedEditorTarget(null);
                   setDraftAreaIds(Object.fromEntries(items.map((item) => [item.id, item.areaId])));
                   setDraftZones(layout.zones);
                   setDraftUnpositioned(new Set(layout.unpositionedIds));
                   setEditing(true);
+                  onEditingChange?.(true);
                 }}
                 size="sm"
                 variant="ghost"
@@ -1052,16 +1606,6 @@ export function FloorPlan({
               Enquadrar seleção
             </Button>
           )}
-          {!editing && (
-            <Button
-              aria-pressed={fullscreen}
-              onClick={() => void toggleFullscreen()}
-              size="sm"
-              variant="ghost"
-            >
-              {fullscreen ? "Sair da planta" : "Abrir planta em tela cheia"}
-            </Button>
-          )}
         </div>
       </div>
 
@@ -1076,10 +1620,341 @@ export function FloorPlan({
         </div>
       )}
 
+      {editing && (
+        <section className="floor-plan-editor" aria-label="Ferramentas do editor">
+          {canEditElements && (
+            <div className="floor-plan-editor__create">
+              <Button onClick={() => addElement("label")} size="sm" variant="ghost">
+                + Texto
+              </Button>
+              <Button onClick={() => addElement("barrier")} size="sm" variant="ghost">
+                + Barreira
+              </Button>
+            </div>
+          )}
+          {selectedEditorTable ? (
+            <div className="floor-plan-editor__fields">
+              <strong>
+                {draftTableDetails[selectedEditorTable.id]?.label ?? selectedEditorTable.label}
+              </strong>
+              {layoutScope === "permanent" && (
+                <>
+                  <label htmlFor="floor-editor-table-name">
+                    Nome
+                    <Input
+                      aria-label="Nome da mesa"
+                      id="floor-editor-table-name"
+                      maxLength={60}
+                      minLength={1}
+                      onChange={(event) =>
+                        setDraftTableDetails((current) => ({
+                          ...current,
+                          [selectedEditorTable.id]: {
+                            ...(current[selectedEditorTable.id] ?? {
+                              label: selectedEditorTable.label,
+                              seats: selectedEditorTable.seats,
+                              roomId: selectedEditorTable.areaId,
+                            }),
+                            label: event.target.value,
+                          },
+                        }))
+                      }
+                      value={
+                        draftTableDetails[selectedEditorTable.id]?.label ??
+                        selectedEditorTable.label
+                      }
+                    />
+                  </label>
+                  <label htmlFor="floor-editor-table-seats">
+                    Lugares
+                    <Input
+                      aria-label="Lugares da mesa"
+                      id="floor-editor-table-seats"
+                      max={100}
+                      min={1}
+                      onChange={(event) =>
+                        setDraftTableDetails((current) => ({
+                          ...current,
+                          [selectedEditorTable.id]: {
+                            ...(current[selectedEditorTable.id] ?? {
+                              label: selectedEditorTable.label,
+                              seats: selectedEditorTable.seats,
+                              roomId: selectedEditorTable.areaId,
+                            }),
+                            seats: Number(event.target.value),
+                          },
+                        }))
+                      }
+                      type="number"
+                      value={
+                        draftTableDetails[selectedEditorTable.id]?.seats ??
+                        selectedEditorTable.seats
+                      }
+                    />
+                  </label>
+                  <label htmlFor="floor-editor-table-room">
+                    Ambiente
+                    <NativeSelect
+                      aria-label="Ambiente da mesa"
+                      id="floor-editor-table-room"
+                      onChange={(event) => {
+                        const roomId = event.target.value;
+                        setDraftTableDetails((current) => ({
+                          ...current,
+                          [selectedEditorTable.id]: {
+                            ...(current[selectedEditorTable.id] ?? {
+                              label: selectedEditorTable.label,
+                              seats: selectedEditorTable.seats,
+                              roomId: selectedEditorTable.areaId,
+                            }),
+                            roomId,
+                          },
+                        }));
+                        setDraftAreaIds((current) => ({
+                          ...current,
+                          [selectedEditorTable.id]: roomId,
+                        }));
+                        const zone = visibleZones.find((candidate) => candidate.id === roomId);
+                        const geometry =
+                          draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable);
+                        if (zone) {
+                          let available: { x: number; y: number } | undefined;
+                          for (
+                            let y = zone.y + geometry.height / 2 + 48;
+                            y <= zone.y + zone.height - geometry.height / 2 - 12 && !available;
+                            y += geometry.height + 24
+                          ) {
+                            for (
+                              let x = zone.x + geometry.width / 2 + 12;
+                              x <= zone.x + zone.width - geometry.width / 2 - 12;
+                              x += geometry.width + 22
+                            ) {
+                              if (
+                                tablePlacementAllowed(
+                                  selectedEditorTable.id,
+                                  { x, y },
+                                  geometry,
+                                  zone,
+                                )
+                              ) {
+                                available = { x, y };
+                                break;
+                              }
+                            }
+                          }
+                          if (available) {
+                            setDraftPositions((current) => ({
+                              ...current,
+                              [selectedEditorTable.id]: available,
+                            }));
+                            setDraftUnpositioned((current) => {
+                              const next = new Set(current);
+                              next.delete(selectedEditorTable.id);
+                              return next;
+                            });
+                          } else {
+                            setDraftUnpositioned((current) =>
+                              new Set(current).add(selectedEditorTable.id),
+                            );
+                          }
+                        }
+                      }}
+                      value={
+                        draftAreaIds[selectedEditorTable.id] ??
+                        draftTableDetails[selectedEditorTable.id]?.roomId ??
+                        selectedEditorTable.areaId
+                      }
+                    >
+                      {visibleZones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.label}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </label>
+                </>
+              )}
+              <label htmlFor="floor-editor-table-shape">
+                Formato
+                <NativeSelect
+                  aria-label="Formato da mesa"
+                  id="floor-editor-table-shape"
+                  onChange={(event) =>
+                    updateGeometry(selectedEditorTable.id, {
+                      shape: event.target.value as FloorPlanTableShape,
+                    })
+                  }
+                  value={
+                    (draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable))
+                      .shape
+                  }
+                >
+                  <option value="rectangle">Retangular</option>
+                  <option value="square">Quadrada</option>
+                  <option value="round">Redonda</option>
+                </NativeSelect>
+              </label>
+              <label htmlFor="floor-editor-table-width">
+                Largura
+                <Input
+                  aria-label="Largura da mesa"
+                  id="floor-editor-table-width"
+                  max={MAX_TABLE_SIZE}
+                  min={MIN_TABLE_SIZE}
+                  onChange={(event) =>
+                    updateGeometry(selectedEditorTable.id, { width: Number(event.target.value) })
+                  }
+                  type="number"
+                  value={
+                    (draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable))
+                      .width
+                  }
+                />
+              </label>
+              <label htmlFor="floor-editor-table-height">
+                Altura
+                <Input
+                  aria-label="Altura da mesa"
+                  id="floor-editor-table-height"
+                  disabled={
+                    (draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable))
+                      .shape !== "rectangle"
+                  }
+                  max={MAX_TABLE_SIZE}
+                  min={MIN_TABLE_SIZE}
+                  onChange={(event) =>
+                    updateGeometry(selectedEditorTable.id, { height: Number(event.target.value) })
+                  }
+                  type="number"
+                  value={
+                    (draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable))
+                      .height
+                  }
+                />
+              </label>
+              <label htmlFor="floor-editor-table-rotation">
+                Rotação
+                <Input
+                  aria-label="Rotação da mesa"
+                  id="floor-editor-table-rotation"
+                  max={359}
+                  min={-359}
+                  onChange={(event) =>
+                    updateGeometry(selectedEditorTable.id, { rotation: Number(event.target.value) })
+                  }
+                  step={5}
+                  type="number"
+                  value={
+                    (draftGeometry[selectedEditorTable.id] ?? geometryFor(selectedEditorTable))
+                      .rotation
+                  }
+                />
+              </label>
+              {layoutScope === "permanent" && onArchiveTable && (
+                <Button
+                  onClick={async () => {
+                    const label =
+                      draftTableDetails[selectedEditorTable.id]?.label ?? selectedEditorTable.label;
+                    if (
+                      !window.confirm(`Arquivar ${label}? Ela deixarÃ¡ de aparecer na operaÃ§Ã£o.`)
+                    ) {
+                      return;
+                    }
+                    const archived = await onArchiveTable(selectedEditorTable.id);
+                    if (archived !== false) setSelectedEditorTarget(null);
+                  }}
+                  size="sm"
+                  variant="danger"
+                >
+                  Arquivar mesa
+                </Button>
+              )}
+            </div>
+          ) : selectedEditorElement ? (
+            <div className="floor-plan-editor__fields">
+              <strong>{selectedEditorElement.kind === "label" ? "Texto" : "Barreira"}</strong>
+              {selectedEditorElement.kind === "label" && (
+                <label htmlFor="floor-editor-element-label">
+                  Conteúdo
+                  <Input
+                    aria-label="Conteúdo do texto"
+                    id="floor-editor-element-label"
+                    maxLength={80}
+                    onChange={(event) =>
+                      updateElement(selectedEditorElement.id, { label: event.target.value })
+                    }
+                    value={selectedEditorElement.label ?? ""}
+                  />
+                </label>
+              )}
+              <label htmlFor="floor-editor-element-width">
+                Largura
+                <Input
+                  aria-label="Largura do elemento"
+                  id="floor-editor-element-width"
+                  max={600}
+                  min={24}
+                  onChange={(event) =>
+                    updateElement(selectedEditorElement.id, { width: Number(event.target.value) })
+                  }
+                  type="number"
+                  value={selectedEditorElement.width}
+                />
+              </label>
+              <label htmlFor="floor-editor-element-height">
+                Altura
+                <Input
+                  aria-label="Altura do elemento"
+                  id="floor-editor-element-height"
+                  max={300}
+                  min={8}
+                  onChange={(event) =>
+                    updateElement(selectedEditorElement.id, { height: Number(event.target.value) })
+                  }
+                  type="number"
+                  value={selectedEditorElement.height}
+                />
+              </label>
+              <label htmlFor="floor-editor-element-rotation">
+                Rotação
+                <Input
+                  aria-label="Rotação do elemento"
+                  id="floor-editor-element-rotation"
+                  max={359}
+                  min={-359}
+                  onChange={(event) =>
+                    updateElement(selectedEditorElement.id, {
+                      rotation: Number(event.target.value),
+                    })
+                  }
+                  step={5}
+                  type="number"
+                  value={selectedEditorElement.rotation}
+                />
+              </label>
+              <Button
+                onClick={() => {
+                  setDraftElements((current) =>
+                    current.filter((element) => element.id !== selectedEditorElement.id),
+                  );
+                  setSelectedEditorTarget(null);
+                }}
+                size="sm"
+                variant="danger"
+              >
+                Remover
+              </Button>
+            </div>
+          ) : (
+            <small>Selecione uma mesa ou elemento para ajustar tamanho, formato e rotação.</small>
+          )}
+        </section>
+      )}
+
       <div className="floor-plan__viewport" ref={viewportRef}>
         <svg
           aria-label="Planta interativa do salão"
-          className={`floor-plan__svg ${editing ? "floor-plan__svg--editing" : ""}`}
+          className={`floor-plan__svg floor-plan__svg--${density} ${editing ? "floor-plan__svg--editing" : ""}`}
           onPointerCancel={finishPointer}
           onPointerDown={handlePlanPointerDown}
           onPointerMove={handlePointerMove}
@@ -1152,6 +2027,56 @@ export function FloorPlan({
                   ))}
               </g>
             ))}
+
+          {layers.space &&
+            visibleElements.map((element) => {
+              const selected =
+                selectedEditorTarget?.kind === "element" && selectedEditorTarget.id === element.id;
+              return (
+                // biome-ignore lint/a11y/useSemanticElements: SVG groups cannot contain native HTML buttons.
+                <g
+                  aria-label={
+                    element.kind === "label"
+                      ? `Texto: ${element.label ?? "sem conteúdo"}`
+                      : "Barreira física"
+                  }
+                  className={`floor-plan-element floor-plan-element--${element.kind} ${selected ? "floor-plan-element--selected" : ""}`}
+                  key={element.id}
+                  onKeyDown={(event) => {
+                    if (!editing) return;
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedEditorTarget({ kind: "element", id: element.id });
+                      return;
+                    }
+                    if (event.key === "Delete" || event.key === "Backspace") {
+                      event.preventDefault();
+                      setDraftElements((current) =>
+                        current.filter((candidate) => candidate.id !== element.id),
+                      );
+                      setSelectedEditorTarget(null);
+                    }
+                  }}
+                  onPointerDown={(event) => startElementDrag(event, element)}
+                  role="button"
+                  tabIndex={editing && canEditElements ? 0 : -1}
+                  transform={`translate(${element.x} ${element.y}) rotate(${element.rotation})`}
+                >
+                  <rect
+                    height={element.height}
+                    rx={element.kind === "label" ? 8 : 3}
+                    width={element.width}
+                    x={-element.width / 2}
+                    y={-element.height / 2}
+                  />
+                  {element.kind === "label" && (
+                    <text dominantBaseline="middle" textAnchor="middle" x={0} y={0}>
+                      {compactLabel(element.label ?? "Texto", 36)}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
 
           {layers.operation &&
             stations.map((station) => {
@@ -1232,6 +2157,12 @@ export function FloorPlan({
               const isAnchor = item.id === item.operationId;
               const seatLabel = `${item.seats} ${item.seats === 1 ? "lugar" : "lugares"}`;
               const ariaLabel = `${item.label}, ${statusLabels[item.status]}, ${seatLabel}${item.responsible ? `, responsável ${item.responsible}` : ""}${item.disabledReason ? `, indisponível: ${item.disabledReason}` : ""}`;
+              const geometry = editing
+                ? (draftGeometry[item.id] ?? geometryFor(item))
+                : geometryFor(item);
+              const priority = ["attention", "closing", "needs_cleaning"].includes(item.status);
+              const showState = density !== "very-dense" || selected || priority;
+              const showMeta = density === "normal" || selected;
               return (
                 <Fragment key={item.id}>
                   {/* biome-ignore lint/a11y/useSemanticElements: SVG table groups cannot contain native HTML buttons. */}
@@ -1239,50 +2170,118 @@ export function FloorPlan({
                     aria-disabled={Boolean(item.disabledReason)}
                     aria-label={ariaLabel}
                     aria-pressed={selected}
-                    className={`floor-plan-table floor-plan-table--${item.status} ${selected ? "floor-plan-table--selected" : ""} ${item.dimmed ? "floor-plan-table--dimmed" : ""} ${item.disabledReason ? "floor-plan-table--disabled" : ""} ${draftUnpositioned.has(item.id) ? "floor-plan-table--unpositioned" : ""}`}
+                    className={`floor-plan-table floor-plan-table--${item.status} ${selected ? "floor-plan-table--selected" : ""} ${item.dimmed ? "floor-plan-table--dimmed" : ""} ${item.disabledReason ? "floor-plan-table--disabled" : ""} ${editing && editableItemIds && !editableItemIds.includes(item.id) ? "floor-plan-table--editor-locked" : ""} ${draftUnpositioned.has(item.id) ? "floor-plan-table--unpositioned" : ""}`}
                     onClick={() => activate(item)}
                     onKeyDown={(event) => handleTableKey(event, item)}
                     onPointerDown={(event) => startTableDrag(event, item)}
                     role="button"
-                    tabIndex={editing ? -1 : 0}
-                    transform={`translate(${position.x} ${position.y})`}
+                    tabIndex={
+                      editing && editableItemIds && !editableItemIds.includes(item.id) ? -1 : 0
+                    }
+                    transform={`translate(${position.x} ${position.y}) rotate(${geometry.rotation})`}
                   >
                     <title>{item.disabledReason ?? ariaLabel}</title>
+                    {layers.operation && item.sectionColor && (
+                      <rect
+                        className="floor-plan-table__section-halo"
+                        fill="none"
+                        height={geometry.height + 14}
+                        rx={geometry.shape === "round" ? (geometry.height + 14) / 2 : 22}
+                        stroke={item.sectionColor}
+                        width={geometry.width + 14}
+                        x={-(geometry.width + 14) / 2}
+                        y={-(geometry.height + 14) / 2}
+                      />
+                    )}
                     <rect
                       className="floor-plan-table__surface"
-                      height={TABLE_HEIGHT}
-                      rx={item.seats <= 2 ? 32 : 18}
-                      width={TABLE_WIDTH}
-                      x={-TABLE_WIDTH / 2}
-                      y={-TABLE_HEIGHT / 2}
+                      height={geometry.height}
+                      rx={geometry.shape === "round" ? geometry.height / 2 : 18}
+                      width={geometry.width}
+                      x={-geometry.width / 2}
+                      y={-geometry.height / 2}
                     />
                     {layers.operation && (
-                      <circle className="floor-plan-table__status" cx={-46} cy={-24} r={5} />
+                      <circle
+                        className="floor-plan-table__status"
+                        cx={-geometry.width / 2 + 15}
+                        cy={-geometry.height / 2 + 14}
+                        r={5}
+                      />
                     )}
-                    <text className="floor-plan-table__label" textAnchor="middle" x={0} y={-12}>
+                    <text
+                      className="floor-plan-table__label"
+                      textAnchor="middle"
+                      x={0}
+                      y={showState ? (showMeta ? -12 : -4) : 5}
+                    >
                       {compactLabel(item.label, 18)}
                     </text>
-                    <text className="floor-plan-table__state" textAnchor="middle" x={0} y={8}>
-                      {draftUnpositioned.has(item.id)
-                        ? "Posicionar"
-                        : layers.operation
-                          ? statusLabels[item.status]
-                          : seatLabel}
-                    </text>
-                    <text className="floor-plan-table__meta" textAnchor="middle" x={0} y={27}>
-                      {compactLabel(
-                        layers.operation ? (item.valueLabel ?? seatLabel) : item.areaLabel,
-                        22,
-                      )}
-                    </text>
+                    {showState && (
+                      <text
+                        className="floor-plan-table__state"
+                        textAnchor="middle"
+                        x={0}
+                        y={showMeta ? 8 : 16}
+                      >
+                        {draftUnpositioned.has(item.id)
+                          ? "Posicionar"
+                          : layers.operation
+                            ? statusLabels[item.status]
+                            : seatLabel}
+                      </text>
+                    )}
+                    {showMeta && (
+                      <text className="floor-plan-table__meta" textAnchor="middle" x={0} y={27}>
+                        {compactLabel(
+                          layers.operation ? (item.valueLabel ?? seatLabel) : item.areaLabel,
+                          22,
+                        )}
+                      </text>
+                    )}
                     {layers.operation && selected && isAnchor && (
-                      <g className="floor-plan-table__selection" transform="translate(49 -31)">
+                      <g
+                        className="floor-plan-table__selection"
+                        transform={`translate(${geometry.width / 2 - 10} ${-geometry.height / 2 + 8})`}
+                      >
                         <circle r={13} />
                         <text textAnchor="middle" y={4}>
                           {joinMode ? selectionIndex : "✓"}
                         </text>
                       </g>
                     )}
+                    {editing &&
+                      editorTool === "move" &&
+                      (!editableItemIds || editableItemIds.includes(item.id)) &&
+                      selectedEditorTarget?.kind === "table" &&
+                      selectedEditorTarget.id === item.id && (
+                        <circle
+                          aria-label={`Redimensionar ${item.label}`}
+                          aria-valuemax={MAX_TABLE_SIZE}
+                          aria-valuemin={MIN_TABLE_SIZE}
+                          aria-valuenow={Math.round(geometry.width)}
+                          aria-valuetext={`${Math.round(geometry.width)} por ${Math.round(geometry.height)}`}
+                          className="floor-plan-table__resize-handle"
+                          cx={geometry.width / 2}
+                          cy={geometry.height / 2}
+                          onKeyDown={(event) => {
+                            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            const delta = event.key === "ArrowRight" ? 8 : -8;
+                            updateGeometry(item.id, {
+                              width: geometry.width + delta,
+                              ...(geometry.shape === "rectangle"
+                                ? { height: geometry.height + delta }
+                                : {}),
+                            });
+                          }}
+                          onPointerDown={(event) => startResize(event, item)}
+                          r={9}
+                          role="slider"
+                          tabIndex={0}
+                        />
+                      )}
                   </g>
                 </Fragment>
               );

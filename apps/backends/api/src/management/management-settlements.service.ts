@@ -31,7 +31,7 @@ import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
   allocateCents,
-  defaultSettlementConfig,
+  normalizeSettlementConfig,
   partnershipRewardCents,
   settlementPayableCents,
   teamServiceShareCents,
@@ -242,7 +242,9 @@ export class ManagementSettlementsService {
         ),
       )
       .limit(1);
-    return (settings?.configuration ?? defaultSettlementConfig) as SettlementConfigInput;
+    return normalizeSettlementConfig(
+      settings?.configuration as Partial<SettlementConfigInput> | undefined,
+    );
   }
 
   private async activePlan(

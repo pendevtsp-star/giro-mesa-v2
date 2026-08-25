@@ -9,23 +9,41 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class CallsPostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class CallsPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The copies property</summary>
+        public int? Copies { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The kind property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.Calls.CallsPostRequestBody_kind? Kind { get; set; }
+        /// <summary>The printerId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? PrinterId { get; set; }
+#nullable restore
+#else
+        public string PrinterId { get; set; }
+#endif
         /// <summary>The slaMinutes property</summary>
         public int? SlaMinutes { get; set; }
         /// <summary>The tabId property</summary>
         public Guid? TabId { get; set; }
+        /// <summary>The terminalId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? TerminalId { get; set; }
+#nullable restore
+#else
+        public string TerminalId { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.Calls.CallsPostRequestBody"/> and sets the default values.
         /// </summary>
         public CallsPostRequestBody()
         {
-            AdditionalData = new Dictionary<string, object>();
+            Copies = 1;
             Kind = global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.Calls.CallsPostRequestBody_kind.Assistance;
             SlaMinutes = 3;
         }
@@ -47,9 +65,13 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "copies", n => { Copies = n.GetIntValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "kind", n => { Kind = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.Calls.CallsPostRequestBody_kind>(); } },
+                { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "slaMinutes", n => { SlaMinutes = n.GetIntValue(); } },
                 { "tabId", n => { TabId = n.GetGuidValue(); } },
+                { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -59,10 +81,13 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("copies", Copies);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Item.Calls.CallsPostRequestBody_kind>("kind", Kind);
+            writer.WriteStringValue("printerId", PrinterId);
             writer.WriteIntValue("slaMinutes", SlaMinutes);
             writer.WriteGuidValue("tabId", TabId);
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteStringValue("terminalId", TerminalId);
         }
     }
 }

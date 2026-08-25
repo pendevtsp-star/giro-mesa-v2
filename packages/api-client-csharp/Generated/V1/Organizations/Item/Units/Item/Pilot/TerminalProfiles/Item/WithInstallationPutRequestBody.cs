@@ -34,6 +34,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
 #endif
         /// <summary>The mode property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_mode? Mode { get; set; }
+        /// <summary>The paymentMode property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_paymentMode? PaymentMode { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -81,6 +83,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
                 { "defaultRoute", n => { DefaultRoute = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_defaultRoute>(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_mode>(); } },
+                { "paymentMode", n => { PaymentMode = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_paymentMode>(); } },
                 { "printerId", n => { PrinterId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_printerId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_printerId.CreateFromDiscriminatorValue); } },
                 { "quickActions", n => { QuickActions = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_quickActions>()?.AsList(); } },
                 { "stationId", n => { StationId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_stationId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_stationId.CreateFromDiscriminatorValue); } },
@@ -98,6 +101,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProf
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_defaultRoute>("defaultRoute", DefaultRoute);
             writer.WriteStringValue("label", Label);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_mode>("mode", Mode);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_paymentMode>("paymentMode", PaymentMode);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_printerId>("printerId", PrinterId);
             writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody_quickActions>("quickActions", QuickActions);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TerminalProfiles.Item.WithInstallationPutRequestBody.WithInstallationPutRequestBody_stationId>("stationId", StationId);

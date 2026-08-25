@@ -22,6 +22,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.It
 #else
         public string Error { get; set; }
 #endif
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -66,6 +68,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.It
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "error", n => { Error = n.GetStringValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.Item.Status.StatusPutRequestBody_status>(); } },
                 { "terminalId", n => { TerminalId = n.GetStringValue(); } },
@@ -79,6 +82,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.It
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("error", Error);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteStringValue("printerId", PrinterId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.Item.Status.StatusPutRequestBody_status>("status", Status);
             writer.WriteStringValue("terminalId", TerminalId);

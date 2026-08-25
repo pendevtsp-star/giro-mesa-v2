@@ -37,10 +37,12 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         var cloudCommandId = Guid.NewGuid().ToString();
         var handler = new SyncHandler(store, edgeCommand.Id, cloudCommandId);
         var fiscalCredentials = new FocusCredentialStore();
+        var printerCommands = await CreatePrinterCommandsAsync(store, options);
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
             fiscalCredentials,
+            printerCommands,
             options,
             NullLogger<CloudSyncWorker>.Instance);
 
@@ -75,10 +77,12 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         await store.InitializeAsync();
         var cloudCommandId = Guid.NewGuid().ToString();
         var handler = new UnsupportedCommandHandler(cloudCommandId);
+        var printerCommands = await CreatePrinterCommandsAsync(store, options);
         var worker = new CloudSyncWorker(
             new HttpClient(handler),
             store,
             new FocusCredentialStore(),
+            printerCommands,
             options,
             NullLogger<CloudSyncWorker>.Instance);
 
@@ -90,6 +94,125 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.Null(cloudState?.ProcessedAt);
         Assert.Null(cloudState?.CloudAcknowledgedAt);
         Assert.Equal("CLOUD_COMMAND_UNSUPPORTED", cloudState?.Error);
+    }
+
+    [Fact]
+    public async Task SendsDiscriminatedPrintResultInCommandResultsAcknowledgement()
+    {
+        var options = PrinterOptions();
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var commandId = Guid.NewGuid().ToString();
+        var cloudPrintJobId = Guid.NewGuid().ToString();
+        var handler = new PrinterCommandHandler(commandId, cloudPrintJobId);
+        var gateway = new RecordingPrinterGateway(new(true, "accepted", null, 128, "kitchen"));
+        var processor = await CreatePrinterCommandsAsync(store, options, gateway);
+        var worker = new CloudSyncWorker(
+            new HttpClient(handler),
+            store,
+            new FocusCredentialStore(),
+            processor,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(2, handler.CallCount);
+        Assert.Equal(1, gateway.CallCount);
+        var state = Assert.IsType<CloudCommandState>(await store.GetCloudCommandStateAsync(commandId));
+        Assert.NotNull(state.CloudAcknowledgedAt);
+        Assert.Equal("printed", state.Result?.GetProperty("status").GetString());
+    }
+
+    [Fact]
+    public async Task NeverReprintsAConfirmationRequiredJobForAnotherCloudCommandReplay()
+    {
+        var options = PrinterOptions();
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var gateway = new RecordingPrinterGateway(new(
+            false,
+            "confirmation_required",
+            "PRINTER_RESULT_UNKNOWN",
+            0,
+            "kitchen"));
+        var processor = await CreatePrinterCommandsAsync(store, options, gateway);
+        var payload = JsonSerializer.SerializeToElement(new
+        {
+            cloudPrintJobId = Guid.NewGuid().ToString(),
+            idempotencyKey = "cloud-print-stable-0001",
+            stationId = "33333333-3333-4333-8333-333333333333",
+            stationName = "Cozinha",
+            printerId = "kitchen",
+            documentType = "kds_ticket",
+            copies = 1,
+            payload = new { reference = "101", items = Array.Empty<object>() },
+        }, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        var firstId = Guid.NewGuid().ToString();
+        await store.SaveCloudCommandsAsync([new(
+            firstId,
+            "print_job.execute",
+            payload,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5))]);
+        Assert.Equal(1, await processor.ProcessPendingAsync());
+
+        var replayId = Guid.NewGuid().ToString();
+        await store.SaveCloudCommandsAsync([new(
+            replayId,
+            "print_job.execute",
+            payload,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5))]);
+        Assert.Equal(1, await processor.ProcessPendingAsync());
+
+        Assert.Equal(1, gateway.CallCount);
+        var replay = Assert.IsType<CloudCommandState>(await store.GetCloudCommandStateAsync(replayId));
+        Assert.Equal("confirmation_required", replay.Result?.GetProperty("status").GetString());
+        Assert.True(replay.Result!.Value.GetProperty("duplicate").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ExecutesAnAlreadyPersistedPrintCommandBeforeAnOfflineSyncAttempt()
+    {
+        var options = PrinterOptions();
+        var store = new HubStore(options, NullLogger<HubStore>.Instance);
+        await store.InitializeAsync();
+        var commandId = Guid.NewGuid().ToString();
+        await store.SaveCloudCommandsAsync([new(
+            commandId,
+            "print_job.execute",
+            JsonSerializer.SerializeToElement(new
+            {
+                cloudPrintJobId = Guid.NewGuid().ToString(),
+                idempotencyKey = "cloud-print-offline-0001",
+                stationId = "33333333-3333-4333-8333-333333333333",
+                stationName = "Cozinha",
+                printerId = "kitchen",
+                documentType = "kds_ticket",
+                copies = 1,
+                payload = new { reference = "102", items = Array.Empty<object>() },
+            }, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddMinutes(5))]);
+        var gateway = new RecordingPrinterGateway(new(true, "accepted", null, 90, "kitchen"));
+        var processor = await CreatePrinterCommandsAsync(store, options, gateway);
+        var worker = new CloudSyncWorker(
+            new HttpClient(new OfflineHandler()),
+            store,
+            new FocusCredentialStore(),
+            processor,
+            options,
+            NullLogger<CloudSyncWorker>.Instance);
+
+        await worker.SyncOnceAsync();
+
+        Assert.Equal(1, gateway.CallCount);
+        Assert.Equal("offline", worker.Status);
+        var state = Assert.IsType<CloudCommandState>(await store.GetCloudCommandStateAsync(commandId));
+        Assert.NotNull(state.ProcessedAt);
+        Assert.Null(state.CloudAcknowledgedAt);
+        Assert.Equal("printed", state.Result?.GetProperty("status").GetString());
     }
 
     public Task InitializeAsync() => Task.CompletedTask;
@@ -112,6 +235,50 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         1,
         DateTimeOffset.UtcNow,
         "edge-command-0001");
+
+    private static async Task<CloudPrinterCommandProcessor> CreatePrinterCommandsAsync(
+        HubStore store,
+        IOptions<HubOptions> options,
+        IPrinterGateway? gateway = null)
+    {
+        var configurations = new PrinterConfigurationRegistry(
+            store,
+            options,
+            NullLogger<PrinterConfigurationRegistry>.Instance);
+        await configurations.InitializeAsync();
+        var printJobs = new PrintJobExecutor(
+            store,
+            gateway ?? new DisabledPrinterGateway(),
+            NullLogger<PrintJobExecutor>.Instance);
+        return new(
+            store,
+            configurations,
+            printJobs,
+            NullLogger<CloudPrinterCommandProcessor>.Instance);
+    }
+
+    private IOptions<HubOptions> PrinterOptions() => Options.Create(new HubOptions
+    {
+        DataDirectory = _directory,
+        DatabaseKey = "test-database-key-32-characters-long",
+        CloudApiBaseUrl = "https://cloud.example",
+        CloudSyncKey = "cloud-sync-secret",
+        Printers =
+        [
+            new PrinterOptions
+            {
+                Enabled = true,
+                Id = "kitchen",
+                Host = "127.0.0.1",
+                Port = 9100,
+                PaperWidthMm = 80,
+                CharactersPerLine = 48,
+                Default = true,
+                StationIds = ["33333333-3333-4333-8333-333333333333"],
+                DocumentTypes = ["kds_ticket", "partial_statement"],
+            },
+        ],
+    });
 
     private sealed class SyncHandler(HubStore store, string eventId, string cloudCommandId)
         : HttpMessageHandler
@@ -253,5 +420,103 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
                     "application/json"),
             };
         }
+    }
+
+    private sealed class PrinterCommandHandler(string commandId, string cloudPrintJobId)
+        : HttpMessageHandler
+    {
+        public int CallCount { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            CallCount += 1;
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            object response;
+            if (CallCount == 1)
+            {
+                Assert.Empty(body.RootElement.GetProperty("commandResults").EnumerateArray());
+                response = new
+                {
+                    acceptedEventIds = Array.Empty<string>(),
+                    rejectedEvents = Array.Empty<object>(),
+                    commands = new[]
+                    {
+                        new
+                        {
+                            id = commandId,
+                            type = "print_job.execute",
+                            payload = new
+                            {
+                                cloudPrintJobId,
+                                idempotencyKey = "cloud-print-ack-0001",
+                                stationId = "33333333-3333-4333-8333-333333333333",
+                                stationName = "Cozinha",
+                                printerId = "kitchen",
+                                documentType = "kds_ticket",
+                                copies = 1,
+                                payload = new { reference = "100", items = Array.Empty<object>() },
+                            },
+                            createdAt = DateTimeOffset.UtcNow,
+                            expiresAt = DateTimeOffset.UtcNow.AddMinutes(5),
+                        },
+                    },
+                    serverTime = DateTimeOffset.UtcNow,
+                };
+            }
+            else
+            {
+                Assert.Contains(
+                    commandId,
+                    body.RootElement.GetProperty("acknowledgedCommandIds")
+                        .EnumerateArray().Select(value => value.GetString()));
+                var result = Assert.Single(body.RootElement.GetProperty("commandResults").EnumerateArray());
+                Assert.Equal(commandId, result.GetProperty("commandId").GetString());
+                Assert.Equal("print_job.execute", result.GetProperty("type").GetString());
+                Assert.Equal(cloudPrintJobId, result.GetProperty("cloudPrintJobId").GetString());
+                Assert.Equal("printed", result.GetProperty("status").GetString());
+                response = new
+                {
+                    acceptedEventIds = Array.Empty<string>(),
+                    rejectedEvents = Array.Empty<object>(),
+                    commands = Array.Empty<object>(),
+                    serverTime = DateTimeOffset.UtcNow,
+                };
+            }
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(response, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
+                    Encoding.UTF8,
+                    "application/json"),
+            };
+        }
+    }
+
+    private sealed class RecordingPrinterGateway(PrintResult result) : IPrinterGateway
+    {
+        public int CallCount { get; private set; }
+        public CapabilityState Capability => new(true, "test", "test");
+
+        public Task<PrintResult> PrintAsync(
+            PrintRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            CallCount += 1;
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyList<PrinterStatus>> GetStatusesAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PrinterStatus>>([]);
+    }
+
+    private sealed class OfflineHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            throw new HttpRequestException("offline");
     }
 }

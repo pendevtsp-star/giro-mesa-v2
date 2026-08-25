@@ -26,6 +26,7 @@ import {
   type CashShiftHistoryQuery,
   type CashShiftReviewInput,
   type CashTerminalUpdateInput,
+  type CashTransferDecisionInput,
   type CashTransferInput,
   type ClockOutInput,
   type CloseCashShiftInput,
@@ -42,13 +43,32 @@ import {
   cashShiftHistoryQuerySchema,
   cashShiftReviewSchema,
   cashTerminalUpdateSchema,
+  cashTransferDecisionSchema,
   cashTransferSchema,
   clockOutSchema,
   closeCashShiftSchema,
   commissionRuleSchema,
   commissionSchema,
   commissionTransitionSchema,
+  type FinanceApprovalDecisionInput,
+  type FinanceApprovalRequestInput,
+  type FinanceEntryCancelInput,
+  type FinanceEntryUpdateInput,
+  type FinanceExportQuery,
+  type FinanceListQuery,
+  type FinancePaymentReversalInput,
+  type FinanceReconciliationResolutionInput,
+  type FinanceSettingsInput,
   type FinancialPaymentInput,
+  financeApprovalDecisionSchema,
+  financeApprovalRequestSchema,
+  financeEntryCancelSchema,
+  financeEntryUpdateSchema,
+  financeExportQuerySchema,
+  financeListQuerySchema,
+  financePaymentReversalSchema,
+  financeReconciliationResolutionSchema,
+  financeSettingsSchema,
   financialPaymentSchema,
   type InterunitTransferCancellationInput,
   type InterunitTransferInput,
@@ -115,6 +135,7 @@ import {
   type ProductionBatchCancellationInput,
   type ProductionBatchCompletionInput,
   type ProductionBatchInput,
+  type ProductReturnableClassificationInput,
   type ProductReturnableInput,
   type PurchaseInvoiceConfirmInput,
   type PurchaseListQuery,
@@ -140,6 +161,7 @@ import {
   productionBatchCancellationSchema,
   productionBatchCompletionSchema,
   productionBatchSchema,
+  productReturnableClassificationSchema,
   productReturnableSchema,
   purchaseInvoiceConfirmSchema,
   purchaseListQuerySchema,
@@ -155,7 +177,9 @@ import {
   type RecipeConfigurationInput,
   type ReconciliationInput,
   type ReportPeriodInput,
+  type ReturnableCustodyConfirmBulkInput,
   type ReturnableCustodyConfirmInput,
+  type ReturnableCustodyHandoffInput,
   type ReturnableIncidentInput,
   type ReturnableIncidentReviewInput,
   type ReturnableSupplierExchangeInput,
@@ -165,7 +189,9 @@ import {
   recipeConfigurationSchema,
   reconciliationSchema,
   reportPeriodSchema,
+  returnableCustodyConfirmBulkSchema,
   returnableCustodyConfirmSchema,
+  returnableCustodyHandoffSchema,
   returnableIncidentReviewSchema,
   returnableIncidentSchema,
   returnableSupplierExchangeResolutionSchema,
@@ -449,6 +475,60 @@ export class ManagementController {
       request.auth.identityId,
       organizationId,
       unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("inventory/returnables/custody/confirm-bulk")
+  confirmReturnableCustodyBulk(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(returnableCustodyConfirmBulkSchema)) body: ReturnableCustodyConfirmBulkInput,
+  ) {
+    return this.management.confirmReturnableCustodyBulk(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("inventory/returnables/custody/handoffs")
+  handoffReturnableCustodies(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(returnableCustodyHandoffSchema)) body: ReturnableCustodyHandoffInput,
+  ) {
+    return this.management.handoffReturnableCustodies(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Put("inventory/returnables/products/:productId/classification")
+  classifyProductReturnable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("productId", ParseUUIDPipe) productId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(productReturnableClassificationSchema))
+    body: ProductReturnableClassificationInput,
+  ) {
+    return this.management.classifyProductReturnable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      productId,
       idempotencyKey,
       body,
     );
@@ -1302,8 +1382,81 @@ export class ManagementController {
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(financeListQuerySchema)) query: FinanceListQuery,
   ) {
-    return this.management.financeDashboard(request.auth.identityId, organizationId, unitId);
+    return this.management.financeDashboard(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Get("finance/settings")
+  financeSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.management.financeSettings(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Put("finance/settings")
+  updateFinanceSettings(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeSettingsSchema)) body: FinanceSettingsInput,
+  ) {
+    return this.management.updateFinanceSettings(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("finance/export")
+  exportFinance(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query(new ZodPipe(financeExportQuerySchema)) query: FinanceExportQuery,
+  ) {
+    return this.management.exportFinance(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Post("finance/approvals")
+  requestFinanceApproval(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeApprovalRequestSchema)) body: FinanceApprovalRequestInput,
+  ) {
+    return this.management.requestFinanceApproval(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("finance/approvals/:approvalRequestId/decision")
+  decideFinanceApproval(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("approvalRequestId", ParseUUIDPipe) approvalRequestId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeApprovalDecisionSchema)) body: FinanceApprovalDecisionInput,
+  ) {
+    return this.management.decideFinanceApproval(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      approvalRequestId,
+      idempotencyKey,
+      body,
+    );
   }
 
   @Post("finance/payables")
@@ -1318,6 +1471,44 @@ export class ManagementController {
       request.auth.identityId,
       organizationId,
       unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Patch("finance/payables/:payableId")
+  updatePayable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("payableId", ParseUUIDPipe) payableId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeEntryUpdateSchema)) body: FinanceEntryUpdateInput,
+  ) {
+    return this.management.updatePayable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      payableId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("finance/payables/:payableId/cancel")
+  cancelPayable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("payableId", ParseUUIDPipe) payableId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeEntryCancelSchema)) body: FinanceEntryCancelInput,
+  ) {
+    return this.management.cancelPayable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      payableId,
       idempotencyKey,
       body,
     );
@@ -1342,6 +1533,25 @@ export class ManagementController {
     );
   }
 
+  @Post("finance/payables/payments/:paymentId/reverse")
+  reversePayablePayment(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("paymentId", ParseUUIDPipe) paymentId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financePaymentReversalSchema)) body: FinancePaymentReversalInput,
+  ) {
+    return this.management.reversePayablePayment(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      paymentId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Post("finance/receivables")
   createReceivable(
     @Req() request: AuthenticatedRequest,
@@ -1354,6 +1564,44 @@ export class ManagementController {
       request.auth.identityId,
       organizationId,
       unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Patch("finance/receivables/:receivableId")
+  updateReceivable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("receivableId", ParseUUIDPipe) receivableId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeEntryUpdateSchema)) body: FinanceEntryUpdateInput,
+  ) {
+    return this.management.updateReceivable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      receivableId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("finance/receivables/:receivableId/cancel")
+  cancelReceivable(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("receivableId", ParseUUIDPipe) receivableId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeEntryCancelSchema)) body: FinanceEntryCancelInput,
+  ) {
+    return this.management.cancelReceivable(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      receivableId,
       idempotencyKey,
       body,
     );
@@ -1373,6 +1621,25 @@ export class ManagementController {
       organizationId,
       unitId,
       receivableId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("finance/receivables/payments/:paymentId/reverse")
+  reverseReceivablePayment(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("paymentId", ParseUUIDPipe) paymentId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financePaymentReversalSchema)) body: FinancePaymentReversalInput,
+  ) {
+    return this.management.reverseReceivablePayment(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      paymentId,
       idempotencyKey,
       body,
     );
@@ -1548,6 +1815,25 @@ export class ManagementController {
     );
   }
 
+  @Post("cash-transfers/:cashTransferId/decision")
+  decideCashTransfer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("cashTransferId", ParseUUIDPipe) cashTransferId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(cashTransferDecisionSchema)) body: CashTransferDecisionInput,
+  ) {
+    return this.management.decideCashTransfer(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      cashTransferId,
+      idempotencyKey,
+      body,
+    );
+  }
+
   @Post("cash-shifts")
   openCashShift(
     @Req() request: AuthenticatedRequest,
@@ -1653,6 +1939,26 @@ export class ManagementController {
       request.auth.identityId,
       organizationId,
       unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("reconciliations/:reconciliationEntryId/resolve")
+  resolveFinanceReconciliation(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("reconciliationEntryId", ParseUUIDPipe) reconciliationEntryId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeReconciliationResolutionSchema))
+    body: FinanceReconciliationResolutionInput,
+  ) {
+    return this.management.resolveFinanceReconciliation(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      reconciliationEntryId,
       idempotencyKey,
       body,
     );

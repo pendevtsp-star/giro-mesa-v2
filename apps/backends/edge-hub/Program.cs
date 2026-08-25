@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using GiroMesa.EdgeHub;
@@ -13,6 +12,7 @@ builder.Services.Configure<HubOptions>(builder.Configuration.GetSection(HubOptio
 builder.Services.AddSingleton<HubStore>();
 builder.Services.AddSingleton<DeviceAuthenticator>();
 builder.Services.AddSingleton<FocusCredentialStore>();
+builder.Services.AddSingleton<PrinterConfigurationRegistry>();
 builder.Services.AddSingleton<IPaymentGateway, DisabledPaymentGateway>();
 builder.Services.AddHttpClient<FocusFiscalGateway>();
 builder.Services.AddSingleton<DisabledFiscalGateway>();
@@ -25,15 +25,13 @@ builder.Services.AddSingleton<IFiscalGateway>(services =>
         ? services.GetRequiredService<FocusFiscalGateway>()
         : services.GetRequiredService<DisabledFiscalGateway>();
 });
-builder.Services.AddSingleton<DisabledPrinterGateway>();
-builder.Services.AddSingleton<EscPosPrinterGateway>();
+builder.Services.AddSingleton<EscPosPrinterGateway>(services => new(
+    services.GetRequiredService<PrinterConfigurationRegistry>(),
+    services.GetRequiredService<ILogger<EscPosPrinterGateway>>()));
 builder.Services.AddSingleton<IPrinterGateway>(services =>
-{
-    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<HubOptions>>();
-    return options.Value.AvailablePrinters.Any(PrinterConfiguration.IsValid)
-        ? services.GetRequiredService<EscPosPrinterGateway>()
-        : services.GetRequiredService<DisabledPrinterGateway>();
-});
+    services.GetRequiredService<EscPosPrinterGateway>());
+builder.Services.AddSingleton<PrintJobExecutor>();
+builder.Services.AddSingleton<CloudPrinterCommandProcessor>();
 builder.Services.AddHttpClient<CloudSyncWorker>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
 builder.Services.AddSingleton<FiscalRecoveryWorker>();
@@ -42,6 +40,7 @@ builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequired
 var app = builder.Build();
 var store = app.Services.GetRequiredService<HubStore>();
 await store.InitializeAsync();
+await app.Services.GetRequiredService<PrinterConfigurationRegistry>().InitializeAsync();
 const string AuthenticatedDeviceIdKey = "giromesa.authenticated-device-id";
 
 app.Use(async (context, next) =>
@@ -106,7 +105,27 @@ app.MapGet("/v1/capabilities", (IPaymentGateway payment, IFiscalGateway fiscal, 
 app.MapGet("/v1/printers", async (IPrinterGateway printer) =>
     Results.Ok(new { printers = await printer.GetStatusesAsync() }));
 
-app.MapPost("/v1/printers/{printerId}/test", async (string printerId, IPrinterGateway printer) =>
+app.MapGet("/v1/printer-configurations", async (
+    PrinterConfigurationRegistry configurations,
+    bool? includeArchived) =>
+    Results.Ok(new
+    {
+        printers = await configurations.ListAsync(includeArchived == true),
+    }));
+
+app.MapGet("/v1/printers/diagnostics", async (
+    PrinterConfigurationRegistry configurations,
+    IPrinterGateway printer,
+    HubStore hubStore) => Results.Ok(new
+{
+    configuration = configurations.Diagnose(),
+    printers = await printer.GetStatusesAsync(),
+    queue = await hubStore.GetPrintQueueSummaryAsync(),
+}));
+
+app.MapPost("/v1/printers/{printerId}/test", async (
+    string printerId,
+    PrintJobExecutor printJobs) =>
 {
     if (string.IsNullOrWhiteSpace(printerId) || printerId.Length > 80)
         return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -121,13 +140,24 @@ app.MapPost("/v1/printers/{printerId}/test", async (string printerId, IPrinterGa
         items = Array.Empty<object>(),
         payments = Array.Empty<object>(),
     });
-    var result = await printer.PrintAsync(new PrintRequest(
+    PrintExecutionResult execution;
+    try
+    {
+        execution = await printJobs.ExecuteAsync(new PrintRequest(
         $"printer-test:{Guid.NewGuid():N}",
         printerId,
         "diagnostics",
         "partial_statement",
         payload));
-    return PrintMutationResult(result);
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(printerId)] = [exception.Message],
+        });
+    }
+    return PrintMutationResult(execution.Result);
 });
 
 app.MapPost("/v1/commands", async (OperationalCommand command, HubStore hubStore, HttpContext context) =>
@@ -371,59 +401,42 @@ app.MapPost("/v1/fiscal/number-invalidations", async (
 
 app.MapPost("/v1/print-jobs", async (
     PrintRequest request,
-    IPrinterGateway gateway,
-    HubStore hubStore,
-    ILogger<Program> logger) =>
+    PrintJobExecutor printJobs) =>
 {
-    if (string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.IdempotencyKey.Length > 180 ||
-        request.PrinterId?.Length > 80 ||
-        string.IsNullOrWhiteSpace(request.Station) || request.Station.Length > 120 ||
-        request.DocumentType is not ("partial_statement" or "payment_statement" or "final_receipt" or "kds_ticket") ||
-        request.Payload.ValueKind != JsonValueKind.Object ||
-        request.Payload.GetRawText().Length > 128_000 ||
-        request.Copies is < 1 or > 5)
+    if (PrintJobRules.Validate(request) is { } validationError)
     {
         return Results.ValidationProblem(new Dictionary<string, string[]>
         {
-            [nameof(request)] = ["Invalid print job."],
+            [nameof(request)] = [validationError],
         });
     }
-    var fingerprint = Convert.ToHexString(
-        SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(request)));
-    StoredPrintJob job;
-    bool inserted;
     try
     {
-        (job, inserted) = await hubStore.CreateOrGetPrintJobAsync(request, fingerprint);
+        var execution = await printJobs.ExecuteAsync(request);
+        return PrintMutationResult(execution.Result);
     }
     catch (InvalidOperationException exception) when (exception.Message == "PRINT_IDEMPOTENCY_CONFLICT")
     {
         return Results.Conflict(new { code = exception.Message });
     }
-    if (!inserted)
-    {
-        if (job.Status == "printing")
-            return Results.Conflict(new { code = "PRINT_ATTEMPT_IN_PROGRESS_OR_UNKNOWN" });
-        return PrintMutationResult(new PrintResult(
-            job.Status == "accepted",
-            job.Status,
-            job.ErrorCode,
-            job.BytesWritten,
-            job.PrinterId,
-            true));
-    }
-    PrintResult result;
+});
+
+app.MapGet("/v1/print-jobs", async (string? status, int? limit, HubStore hubStore) =>
+{
     try
     {
-        result = await gateway.PrintAsync(request);
+        return Results.Ok(new
+        {
+            jobs = await hubStore.ListPrintJobsAsync(status, Math.Clamp(limit ?? 100, 1, 500)),
+        });
     }
-    catch (Exception exception)
+    catch (ArgumentException)
     {
-        logger.LogError(exception, "Unexpected printer failure for {PrinterId}", request.PrinterId);
-        result = new(false, "failed", "PRINTER_GATEWAY_ERROR");
+        return Results.ValidationProblem(new Dictionary<string, string[]>
+        {
+            [nameof(status)] = ["status is invalid."],
+        });
     }
-    await hubStore.CompletePrintJobAsync(job.Id, result);
-    return PrintMutationResult(result);
 });
 
 app.MapGet("/v1/print-jobs/{jobId}", async (string jobId, HubStore hubStore) =>
@@ -494,16 +507,23 @@ static IResult PrintMutationResult(PrintResult result) => result.Status switch
 {
     _ when result.Success => Results.Accepted(value: result),
     "rejected" => Results.Json(result, statusCode: StatusCodes.Status422UnprocessableEntity),
+    "confirmation_required" => Results.Json(result, statusCode: StatusCodes.Status409Conflict),
     _ => Results.Json(result, statusCode: StatusCodes.Status503ServiceUnavailable),
 };
 
-static async Task<IResult> Health(HubStore hubStore, CloudSyncWorker sync)
+static async Task<IResult> Health(
+    HubStore hubStore,
+    CloudSyncWorker sync,
+    PrinterConfigurationRegistry configurations,
+    IPrinterGateway printer)
 {
     var databaseReady = await hubStore.CheckAsync();
     var kds = databaseReady ? await hubStore.GetKdsOperationalEnvelopeAsync() : null;
     var now = DateTimeOffset.UtcNow;
     var leaseValid = kds?.LeaseExpiresAt is null || kds.LeaseExpiresAt > now;
     var ready = databaseReady && kds is not null && leaseValid;
+    var printerDiagnostics = configurations.Diagnose();
+    var printQueue = databaseReady ? await hubStore.GetPrintQueueSummaryAsync() : null;
     var status = ready
         ? sync.Status == "offline" ? "degraded" : "ok"
         : "not-ready";
@@ -524,6 +544,14 @@ static async Task<IResult> Health(HubStore hubStore, CloudSyncWorker sync)
         rejected = kds?.Rejected ?? 0,
         projectionBlocked = kds?.ProjectionBlocked,
         leaseExpiresAt = kds?.LeaseExpiresAt,
+        printing = new
+        {
+            configured = printer.Capability.Configured,
+            printerDiagnostics.ActivePrinters,
+            printerDiagnostics.DefaultPrinterId,
+            printerDiagnostics.Issues,
+            queue = printQueue,
+        },
         now,
     }, statusCode: ready ? StatusCodes.Status200OK : StatusCodes.Status503ServiceUnavailable);
 }

@@ -87,6 +87,7 @@ describe("dados gerenciais reais", () => {
         alerts: [],
         operators: [],
         approvals: [],
+        pendingTransfers: [],
         adjustments: [],
         registers: [],
         availableTerminals: [],
@@ -116,6 +117,7 @@ describe("dados gerenciais reais", () => {
       alerts: [],
       operators: [],
       approvals: [],
+      pendingTransfers: [],
       adjustments: [],
       registers: [],
       availableTerminals: [],
@@ -151,6 +153,36 @@ describe("dados gerenciais reais", () => {
     ).toThrow(InvalidManagementPayloadError);
   });
 
+  it("aceita métricas nulas de fornecedor sem histórico", () => {
+    const parsed = parseInventory({
+      locations: [],
+      items: [],
+      balances: [],
+      lots: [],
+      recentMovements: [],
+      supplierPerformance: [
+        {
+          supplierId: "supplier-1",
+          supplierName: "Fornecedor novo",
+          fillRatePercent: null,
+          onTimePercent: null,
+          divergencePercent: null,
+          priceVariationPercent: null,
+        },
+      ],
+      automation: { pending: 0, failed: 0, lastProcessedAt: null },
+    });
+
+    expect(parsed.supplierPerformance[0]).toEqual({
+      supplierId: "supplier-1",
+      supplierName: "Fornecedor novo",
+      fillRatePercent: 0,
+      onTimePercent: 0,
+      divergencePercent: 0,
+      priceVariationPercent: null,
+    });
+  });
+
   it("preserva a relação entre gaveta, turno e terminal", () => {
     const parsed = parseCash({
       settings: {
@@ -161,6 +193,7 @@ describe("dados gerenciais reais", () => {
       alerts: [],
       operators: [],
       approvals: [],
+      pendingTransfers: [],
       adjustments: [],
       registers: [{ id: "register-1", name: "Bar", active: true, openShiftId: "shift-1" }],
       availableTerminals: [
@@ -275,6 +308,7 @@ describe("dados gerenciais reais", () => {
       inventoryItemId: "item-1",
       quantity: 3.5,
       reservedQuantity: 0,
+      blockedQuantity: 0,
       availableQuantity: 3.5,
       averageCostCents: 4_900,
     });

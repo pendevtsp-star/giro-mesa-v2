@@ -26,6 +26,9 @@ const timestamps = {
 };
 
 export type WaiterSettlementConfiguration = {
+  serviceChargeEnabled: boolean;
+  defaultServiceChargeBasisPoints: number;
+  serviceChargeApplication: "manual" | "suggest_dine_in";
   attributionMode: "final_responsible" | "order_creator";
   transferMode: "move_to_final" | "preserve_origin";
   serviceBase: "gross" | "net_after_discounts";

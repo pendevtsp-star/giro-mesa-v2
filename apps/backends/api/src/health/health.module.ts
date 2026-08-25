@@ -1,3 +1,4 @@
+import { type ApiCapability, apiHealthResponseSchema } from "@giromesa/contracts";
 import {
   Controller,
   Get,
@@ -9,10 +10,37 @@ import {
   ServiceUnavailableException,
   UseGuards,
 } from "@nestjs/common";
+import { ApiOkResponse } from "@nestjs/swagger";
 import { sql } from "drizzle-orm";
 import { googleConfiguration } from "../auth/google-oauth.js";
 import { InternalKeyGuard } from "../billing/internal-key.guard.js";
+import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
+
+export const RELEASE_SCHEMA_VERSION = 74;
+export const RELEASE_CAPABILITIES = [
+  "table_qr_lifecycle_v1",
+  "table_qr_metrics_v1",
+  "table_qr_presence_code_v1",
+  "ops_background_notifications_v1",
+  "table_qr_brand_upload_v1",
+  "ops_web_push_v1",
+  "public_menu_cover_image_v1",
+  "platform_backoffice_v1",
+  "platform_commercial_site_v1",
+  "crm_evolution_go_v1",
+  "crm_operational_inbox_v1",
+] satisfies ApiCapability[];
+
+export function releaseBuildSha() {
+  return (
+    process.env.BUILD_SHA?.trim() ||
+    process.env.GIROMESA_RELEASE_ARTIFACT_SHA?.trim() ||
+    process.env.GITHUB_SHA?.trim() ||
+    process.env.RENDER_GIT_COMMIT?.trim() ||
+    "local"
+  ).slice(0, 64);
+}
 
 @Injectable()
 export class MetricsService {
@@ -89,12 +117,33 @@ export class DatabaseReadinessService {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   async assertReady() {
-    let relation: string | null;
+    let readiness:
+      | {
+          management: string | null;
+          tableQrMetrics: string | null;
+          operationalPush: string | null;
+          whatsappMessages: string | null;
+          crmAutomations: string | null;
+          crmQuickReplies: string | null;
+        }
+      | undefined;
     try {
-      const [row] = await this.database.db.execute<{ relation: string | null }>(
-        sql`select to_regclass('public.management_time_tracking_settings')::text as relation`,
+      [readiness] = await this.database.db.execute<{
+        management: string | null;
+        tableQrMetrics: string | null;
+        operationalPush: string | null;
+        whatsappMessages: string | null;
+        crmAutomations: string | null;
+        crmQuickReplies: string | null;
+      }>(
+        sql`select
+          to_regclass('public.management_time_tracking_settings')::text as management,
+          to_regclass('public.pos_table_qr_metrics')::text as "tableQrMetrics",
+          to_regclass('public.pos_operational_push_subscriptions')::text as "operationalPush",
+          to_regclass('public.growth_whatsapp_messages')::text as "whatsappMessages",
+          to_regclass('public.growth_crm_automation_rules')::text as "crmAutomations",
+          to_regclass('public.growth_crm_quick_replies')::text as "crmQuickReplies"`,
       );
-      relation = row?.relation ?? null;
     } catch (error) {
       this.logger.error(
         "Database readiness check failed.",
@@ -105,12 +154,19 @@ export class DatabaseReadinessService {
         message: "Banco de dados indisponível.",
       });
     }
-    if (!relation) {
+    const missingRelations = [
+      !readiness?.management ? "management_time_tracking_settings" : null,
+      !readiness?.tableQrMetrics ? "pos_table_qr_metrics" : null,
+      !readiness?.operationalPush ? "pos_operational_push_subscriptions" : null,
+      !readiness?.whatsappMessages ? "growth_whatsapp_messages" : null,
+      !readiness?.crmAutomations ? "growth_crm_automation_rules" : null,
+      !readiness?.crmQuickReplies ? "growth_crm_quick_replies" : null,
+    ].filter((value): value is string => Boolean(value));
+    if (missingRelations.length > 0) {
       throw new ServiceUnavailableException({
         code: "DATABASE_MIGRATION_REQUIRED",
-        message:
-          "Schema do banco desatualizado: tabela management_time_tracking_settings ausente. Execute as migrations antes de iniciar a API.",
-        missingRelations: ["management_time_tracking_settings"],
+        message: "Schema do banco desatualizado. Execute as migrations antes de iniciar a API.",
+        missingRelations,
       });
     }
   }
@@ -127,6 +183,12 @@ export const emailDeliveryConfigured = () =>
 export const reportEmailDeliveryConfigured = () =>
   emailDeliveryConfigured() && process.env.REPORT_EMAIL_DELIVERY_HOMOLOGATED === "true";
 
+export const webPushConfigured = () =>
+  /^[A-Za-z0-9_-]{87}$/.test(process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() ?? "") &&
+  /^[A-Za-z0-9_-]{43}$/.test(process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() ?? "") &&
+  /^mailto:.+@.+|^https:\/\/.+/.test(process.env.WEB_PUSH_VAPID_SUBJECT?.trim() ?? "") &&
+  Buffer.from(process.env.OUTBOX_ENCRYPTION_KEY?.trim() ?? "", "base64").length === 32;
+
 @Controller(["api/v1/health", "health"])
 class HealthController {
   constructor(
@@ -135,16 +197,27 @@ class HealthController {
   ) {}
 
   @Get()
+  @ApiOkResponse({ schema: toOpenApiSchema(apiHealthResponseSchema) })
   async health() {
     await this.readiness.assertReady();
     return {
       status: "ok",
       version: "2.0.0",
+      buildSha: releaseBuildSha(),
+      schemaVersion: RELEASE_SCHEMA_VERSION,
+      capabilities: RELEASE_CAPABILITIES,
       database: "up",
       integrations: {
         asaas: process.env.ASAAS_API_KEY ? "configured_not_homologated" : "disabled",
         google: googleConfiguration() ? "configured" : "disabled",
         email: emailDeliveryConfigured() ? "configured" : "disabled",
+        webPush: webPushConfigured() ? "configured" : "disabled",
+        evolutionGo:
+          process.env.WHATSAPP_PROVIDER_ENABLED === "true" &&
+          process.env.WHATSAPP_PROVIDER_CREDENTIAL_REFERENCE === "evolution-go" &&
+          process.env.WHATSAPP_EVOLUTION_API_URL?.trim()
+            ? "configured_unit_status_required"
+            : "disabled",
         focus: "edge_capability_required",
         paygo: "external_homologation_required",
       },

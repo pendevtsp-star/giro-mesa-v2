@@ -14,13 +14,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
     {
         /// <summary>The durationMinutes property</summary>
         public int? DurationMinutes { get; set; }
-        /// <summary>The reason property</summary>
+        /// <summary>The reasonCode property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Tables.Item.Transfer.TransferPostRequestBody_reasonCode? ReasonCode { get; set; }
+        /// <summary>The reasonNote property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public string? Reason { get; set; }
+        public string? ReasonNote { get; set; }
 #nullable restore
 #else
-        public string Reason { get; set; }
+        public string ReasonNote { get; set; }
 #endif
         /// <summary>The targetShiftSectionId property</summary>
         public Guid? TargetShiftSectionId { get; set; }
@@ -52,7 +54,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "durationMinutes", n => { DurationMinutes = n.GetIntValue(); } },
-                { "reason", n => { Reason = n.GetStringValue(); } },
+                { "reasonCode", n => { ReasonCode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Tables.Item.Transfer.TransferPostRequestBody_reasonCode>(); } },
+                { "reasonNote", n => { ReasonNote = n.GetStringValue(); } },
                 { "targetShiftSectionId", n => { TargetShiftSectionId = n.GetGuidValue(); } },
                 { "transferOpenTab", n => { TransferOpenTab = n.GetBoolValue(); } },
             };
@@ -65,7 +68,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.I
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("durationMinutes", DurationMinutes);
-            writer.WriteStringValue("reason", Reason);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Shifts.Item.Tables.Item.Transfer.TransferPostRequestBody_reasonCode>("reasonCode", ReasonCode);
+            writer.WriteStringValue("reasonNote", ReasonNote);
             writer.WriteGuidValue("targetShiftSectionId", TargetShiftSectionId);
             writer.WriteBoolValue("transferOpenTab", TransferOpenTab);
         }

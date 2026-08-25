@@ -11,6 +11,7 @@ import {
   type ShellPaymentPairingResult,
 } from "../counter/pos-payment-bridge";
 import { type PaymentCapabilities, posPayments } from "../counter/pos-payments";
+import { ProductionPrintersPanel } from "./ProductionPrintersPanel";
 import { SmartPosAdminPanel } from "./SmartPosAdminPanel";
 import "./device.css";
 
@@ -239,6 +240,13 @@ export function DeviceSetupPage({
         canReconcile={canReconcile}
         key={pairingRevision}
         organizationId={organizationId}
+        unitId={unitId}
+      />
+
+      <ProductionPrintersPanel
+        canManage={canManage}
+        organizationId={organizationId}
+        runtime={runtime}
         unitId={unitId}
       />
 

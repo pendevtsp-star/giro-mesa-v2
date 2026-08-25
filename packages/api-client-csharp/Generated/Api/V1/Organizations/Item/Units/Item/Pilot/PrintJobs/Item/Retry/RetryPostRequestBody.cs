@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.PrintJob
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The printerId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -55,6 +57,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.PrintJob
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
@@ -66,6 +69,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.PrintJob
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteStringValue("printerId", PrinterId);
             writer.WriteStringValue("terminalId", TerminalId);
             writer.WriteAdditionalData(AdditionalData);

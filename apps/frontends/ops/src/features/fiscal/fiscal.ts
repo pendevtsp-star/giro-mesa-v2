@@ -103,7 +103,6 @@ export interface AccountingPackage {
   competence: string;
   status: "pending" | "ready" | "failed";
   generatedAt: string | null;
-  payload: Record<string, unknown>;
   files: Array<{ name: string; sizeBytes: number }>;
 }
 
@@ -115,7 +114,30 @@ export interface AccountantRequest {
   status: "open" | "resolved";
   dueAt: string | null;
   createdAt: string;
+  requestedBy: string | null;
+  resolution: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+  targetAudience: "accountant" | "establishment";
+  attachments: AccountantAttachment[];
 }
+
+export interface AccountantAttachment {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export type AccountantRequestFilter = "all" | "open" | "overdue" | "resolved";
+export type AccountantAttachmentContentType =
+  | "application/pdf"
+  | "application/xml"
+  | "text/xml"
+  | "text/csv"
+  | "image/jpeg"
+  | "image/png";
 
 export interface FiscalWorkspace {
   profile: FiscalProfile | null;
@@ -141,6 +163,7 @@ export interface AccountantWorkspace {
   periods: FiscalPeriod[];
   accountingPackage: AccountingPackage | null;
   requests: AccountantRequest[];
+  pagination: { page: number; pageSize: number; total: number } | null;
 }
 
 export class InvalidFiscalPayloadError extends Error {
@@ -225,7 +248,7 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
           ? [
               {
                 id: "accountant",
-                title: `${openAccountantRequests} solicitação(ões) do contador aberta(s)`,
+                title: accountantOpenRequestTitle(openAccountantRequests),
                 detail: "Consulte o Portal do contador para responder às pendências.",
                 severity: "info" as const,
               },
@@ -366,21 +389,25 @@ function parseFiscalProfile(value: unknown): FiscalProfile {
 
 export function parseAccountantWorkspace(value: unknown): AccountantWorkspace {
   const payload = record(value);
+  const requests = collection(payload.requests).map(parseAccountantRequest);
   return {
     periods: parsePeriods(payload.periods),
     accountingPackage:
       payload.accountingPackage === null ? null : parseAccountingPackage(payload.accountingPackage),
-    requests: collection(payload.requests).map((item) => ({
-      id: text(item.id),
-      competence: competenceDate(item.competence),
-      title: text(item.title),
-      detail: text(item.description),
-      status: oneOf(item.status, ["open", "resolved"]),
-      requestedBy: optionalText(item.requestedBy) ?? "Contabilidade",
-      dueAt: optionalText(item.dueDate),
-      createdAt: text(item.createdAt),
-    })),
+    requests,
+    pagination: Array.isArray(payload.requests)
+      ? null
+      : parseAccountantPagination(record(payload.requests).pagination),
   };
+}
+
+function parseAccountantPagination(value: unknown): AccountantWorkspace["pagination"] {
+  if (value === undefined) return null;
+  const pagination = record(value);
+  const page = count(pagination.page);
+  const pageSize = count(pagination.pageSize);
+  if (page < 1 || pageSize < 1) throw new InvalidFiscalPayloadError();
+  return { page, pageSize, total: count(pagination.total) };
 }
 
 function parseDocuments(value: unknown): FiscalDocument[] {
@@ -456,15 +483,156 @@ function parseAccountingPackage(value: unknown): AccountingPackage | null {
   const payload = record(value);
   if (payload.status === "unavailable") return null;
   const packageCompetence = payload.competence ?? record(payload.period).competence;
-  const accountingPackage = record(payload.accountingPackage);
-  const packagePayload = record(accountingPackage.payload);
+  const accountingPackage =
+    payload.accountingPackage === undefined ? payload : record(payload.accountingPackage);
+  const competence = competenceDate(packageCompetence);
+  const packageStatus = payload.status ?? accountingPackage.status;
   return {
-    competence: competenceDate(packageCompetence),
-    status: oneOf(payload.status ?? accountingPackage.status, ["pending", "ready", "failed"]),
-    generatedAt: optionalText(accountingPackage.generatedAt),
-    payload: packagePayload,
-    files: [{ name: `pacote-contabil-${competenceDate(packageCompetence)}.zip`, sizeBytes: 0 }],
+    competence,
+    status:
+      packageStatus === "available"
+        ? "ready"
+        : oneOf(packageStatus, ["pending", "ready", "failed"]),
+    generatedAt: optionalText(accountingPackage.generatedAt ?? payload.closedAt),
+    files: parseAccountingPackageFiles(accountingPackage.files, competence),
   };
+}
+
+function parseAccountingPackageFiles(
+  value: unknown,
+  competence: string,
+): AccountingPackage["files"] {
+  if (value === undefined) return [{ name: `pacote-contabil-${competence}.zip`, sizeBytes: 0 }];
+  if (!Array.isArray(value)) throw new InvalidFiscalPayloadError();
+  return value.map((item) => {
+    if (typeof item === "string") return { name: text(item), sizeBytes: 0 };
+    const file = record(item);
+    return {
+      name: text(file.name),
+      sizeBytes: file.sizeBytes === undefined ? 0 : count(file.sizeBytes),
+    };
+  });
+}
+
+function parseAccountantRequest(item: Record<string, unknown>): AccountantRequest {
+  return {
+    id: text(item.id),
+    competence: competenceDate(item.competence),
+    title: text(item.title),
+    detail: text(item.description ?? item.detail),
+    status: oneOf(item.status, ["open", "resolved"]),
+    dueAt: optionalText(item.dueDate ?? item.dueAt),
+    createdAt: text(item.createdAt),
+    requestedBy: optionalText(item.createdByName ?? item.requestedBy),
+    resolution: optionalText(item.resolution),
+    resolvedAt: optionalText(item.resolvedAt),
+    resolvedBy: optionalText(item.resolvedByName ?? item.resolvedBy),
+    targetAudience:
+      item.targetAudience === undefined
+        ? "accountant"
+        : oneOf(item.targetAudience, ["accountant", "establishment"]),
+    attachments:
+      item.attachments === undefined
+        ? []
+        : collection(item.attachments).map((attachment) => ({
+            id: text(attachment.id),
+            fileName: text(attachment.fileName ?? attachment.name),
+            contentType: text(attachment.contentType ?? attachment.mimeType),
+            sizeBytes: count(attachment.sizeBytes ?? attachment.bytes),
+            createdAt: text(attachment.createdAt),
+          })),
+  };
+}
+
+export function accountantOpenRequestTitle(count: number): string {
+  return count === 1
+    ? "1 solicitação do contador aberta"
+    : `${count} solicitações do contador abertas`;
+}
+
+export function accountantRequestStatusLabel(request: AccountantRequest): string {
+  if (request.status === "resolved") return "Resolvida";
+  return request.targetAudience === "accountant" ? "Aguardando contador" : "Aguardando empresa";
+}
+
+export function canResolveAccountantRequest(
+  request: AccountantRequest,
+  audience: "accountant" | "establishment",
+): boolean {
+  return request.status === "open" && request.targetAudience === audience;
+}
+
+export function accountantRequestViewFromHash(hash: string): {
+  filter: AccountantRequestFilter;
+  page: number;
+  targetAudience?: "accountant" | "establishment";
+} {
+  const params = new URLSearchParams(hash.split("?")[1] ?? "");
+  const status = params.get("status");
+  const filter: AccountantRequestFilter =
+    status === "open" || status === "overdue" || status === "resolved" ? status : "all";
+  const parsedPage = Number(params.get("page"));
+  const targetAudience = params.get("targetAudience");
+  return {
+    filter,
+    page: Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1,
+    ...(targetAudience === "accountant" || targetAudience === "establishment"
+      ? { targetAudience }
+      : {}),
+  };
+}
+
+export function accountantRequestHref(
+  filter: AccountantRequestFilter,
+  page: number,
+  targetAudience?: "accountant" | "establishment",
+): string {
+  return `#/accountant?${new URLSearchParams({
+    status: filter,
+    page: String(Math.max(1, page)),
+    ...(targetAudience ? { targetAudience } : {}),
+  })}`;
+}
+
+export function validateAccountantAttachment(file: {
+  name: string;
+  type: string;
+  size: number;
+}):
+  | { valid: true; contentType: AccountantAttachmentContentType }
+  | { valid: false; message: string } {
+  if (
+    !file.name ||
+    file.name.length > 180 ||
+    [...file.name].some(
+      (character) => character.charCodeAt(0) < 32 || '<>:"/\\|?*'.includes(character),
+    )
+  ) {
+    return { valid: false, message: "Use um nome de arquivo válido com até 180 caracteres." };
+  }
+  if (file.size < 1 || file.size > 3 * 1024 * 1024) {
+    return { valid: false, message: "O anexo deve ter até 3 MB." };
+  }
+  const byExtension = file.name.toLowerCase().endsWith(".xml")
+    ? "application/xml"
+    : file.name.toLowerCase().endsWith(".csv")
+      ? "text/csv"
+      : null;
+  const contentType = (file.type || byExtension) as AccountantAttachmentContentType | null;
+  if (
+    !contentType ||
+    ![
+      "application/pdf",
+      "application/xml",
+      "text/xml",
+      "text/csv",
+      "image/jpeg",
+      "image/png",
+    ].includes(contentType)
+  ) {
+    return { valid: false, message: "Envie PDF, XML, CSV, JPG ou PNG." };
+  }
+  return { valid: true, contentType };
 }
 
 function record(value: unknown): Record<string, unknown> {

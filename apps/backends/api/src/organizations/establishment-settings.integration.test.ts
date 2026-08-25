@@ -88,10 +88,14 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
     const scope = new ScopeService(database);
     const settings = new EstablishmentSettingsService(database, scope);
     await assert.rejects(() =>
-      settings.updateOrganization(manager.id, organization.id, { tradeName: "Sem permissão" }),
+      settings.updateOrganization(manager.id, organization.id, {
+        tradeName: "Sem permissão",
+        expectedRevision: organization.updatedAt.toISOString(),
+      }),
     );
     await assert.rejects(() =>
       settings.updateUnit(manager.id, organization.id, targetUnit.id, {
+        expectedRevision: 0,
         name: "Destino alterado",
         timezone: "America/Sao_Paulo",
         presentation: normalizeStoredBranding({}, "Destino").presentation,
@@ -115,6 +119,7 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
       periods: [{ start: "18:00", end: "02:00", endsNextDay: true }],
     };
     await settings.updateUnit(owner.id, organization.id, sourceUnit.id, {
+      expectedRevision: 0,
       name: "Origem",
       timezone: "America/Sao_Paulo",
       presentation: {
@@ -130,6 +135,7 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
       displayName: "Casa via legado",
       slogan: null,
       logoUrl: "https://cdn.example.test/logo.png",
+      coverImageUrl: "https://cdn.example.test/cover.webp",
       primaryColor: "#123456",
       accentColor: "#abcdef",
       openingHours: "Texto do endpoint legado",
@@ -141,20 +147,24 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
       .where(eq(posCatalogBranding.unitId, sourceUnit.id))
       .limit(1);
     assert.deepEqual(sourceAfterLegacyUpdate?.config.businessHours, hours);
+    assert.equal(
+      sourceAfterLegacyUpdate?.config.coverImageUrl,
+      "https://cdn.example.test/cover.webp",
+    );
 
     const copied = await settings.copy(
       owner.id,
       organization.id,
       sourceUnit.id,
       "settings-copy-0001",
-      { targetUnitIds: [targetUnit.id] },
+      { expectedRevision: 2, targetUnitIds: [targetUnit.id] },
     );
     const replayed = await settings.copy(
       owner.id,
       organization.id,
       sourceUnit.id,
       "settings-copy-0001",
-      { targetUnitIds: [targetUnit.id] },
+      { expectedRevision: 2, targetUnitIds: [targetUnit.id] },
     );
     assert.equal(copied.idempotentReplay, false);
     assert.equal(replayed.idempotentReplay, true);
@@ -169,6 +179,7 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
       )
       .limit(1);
     assert.equal(targetBranding?.config.displayName, "Casa via legado");
+    assert.equal(targetBranding?.config.coverImageUrl, "https://cdn.example.test/cover.webp");
     assert.deepEqual(targetBranding?.config.wifi, {
       ssid: "Destino",
       password: "senha-destino",
@@ -177,6 +188,7 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
     const beforeInvalidCopy = structuredClone(targetBranding?.config);
     await assert.rejects(() =>
       settings.copy(owner.id, organization.id, sourceUnit.id, "settings-copy-0002", {
+        expectedRevision: 2,
         targetUnitIds: [targetUnit.id, foreignUnit.id],
       }),
     );
@@ -207,6 +219,38 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
         ),
       );
     assert.equal(copiedOutboxEvents.length, 1);
+
+    const [restorableAudit] = await database.db
+      .select({ id: auditEvents.id })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organization.id),
+          eq(auditEvents.unitId, sourceUnit.id),
+          eq(auditEvents.action, "settings.unit.updated"),
+        ),
+      )
+      .limit(1);
+    assert.ok(restorableAudit);
+    const restored = await settings.restore(
+      owner.id,
+      organization.id,
+      sourceUnit.id,
+      "settings-restore-0001",
+      { auditEventId: restorableAudit.id, expectedRevision: 2 },
+    );
+    assert.equal(restored.revision, 3);
+    assert.equal(restored.presentation.displayName, "Casa Publicada");
+    assert.deepEqual(restored.presentation.wifi, {
+      ssid: "Origem",
+      password: "senha-origem",
+    });
+    await assert.rejects(() =>
+      settings.restore(owner.id, organization.id, sourceUnit.id, "settings-restore-stale", {
+        auditEventId: restorableAudit.id,
+        expectedRevision: 2,
+      }),
+    );
   } finally {
     if (organizationIds.length) {
       await database.db.delete(organizations).where(inArray(organizations.id, organizationIds));

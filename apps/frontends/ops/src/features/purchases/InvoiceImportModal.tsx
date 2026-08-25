@@ -7,6 +7,9 @@ import {
   type InventoryItemKind,
   type ManagementScope,
   operationalKey,
+  type PurchaseInvoice,
+  type PurchaseOrder,
+  type PurchaseOrderItem,
   type RecipeProduct,
   record,
   requiredString,
@@ -35,10 +38,11 @@ interface ImportLine {
   productId: string;
 }
 
-interface ImportDraft {
+export interface ImportDraft {
   id: string;
   accessKey: string;
   documentNumber: string;
+  issuedAt: string;
   totalCents: number;
   supplierId: string;
   lines: ImportLine[];
@@ -91,6 +95,7 @@ export function parseImport(value: unknown, selectedSupplierId: string): ImportD
     id: requiredString(header.id ?? header.importId),
     accessKey: text(header.accessKey),
     documentNumber: text(header.documentNumber),
+    issuedAt: text(header.issuedAt).slice(0, 10),
     totalCents: money(header.totalCents),
     supplierId: text(header.supplierId) || selectedSupplierId,
     lines: rawLines.map((candidate) => {
@@ -119,6 +124,40 @@ export function parseImport(value: unknown, selectedSupplierId: string): ImportD
   };
 }
 
+function milli(value: string | number | null): number {
+  return Math.round(Number(value ?? 0) * 1_000);
+}
+
+export function compatiblePurchaseOrders(
+  draft: ImportDraft,
+  supplierId: string,
+  orders: PurchaseOrder[],
+  orderItems: PurchaseOrderItem[],
+  invoices: PurchaseInvoice[],
+): PurchaseOrder[] {
+  const accepted = draft.lines.filter((line) => line.status !== "ignored");
+  const expected = new Map<string, number>();
+  for (const line of accepted) {
+    if (!line.inventoryItemId || expected.has(line.inventoryItemId)) return [];
+    expected.set(line.inventoryItemId, milli(line.quantity));
+  }
+  if (!expected.size) return [];
+  const invoiced = new Set(invoices.map((invoice) => invoice.purchaseOrderId));
+  return orders.filter((order) => {
+    if (order.status !== "approved" || order.supplierId !== supplierId || invoiced.has(order.id))
+      return false;
+    const lines = orderItems.filter((line) => line.purchaseOrderId === order.id);
+    return (
+      lines.length === expected.size &&
+      lines.every(
+        (line) =>
+          expected.get(line.inventoryItemId) ===
+          milli(line.quantity) - milli(line.receivedQuantity),
+      )
+    );
+  });
+}
+
 export function InvoiceImportModal({
   open,
   scope,
@@ -126,6 +165,9 @@ export function InvoiceImportModal({
   locations,
   suppliers,
   products,
+  orders,
+  orderItems,
+  invoices,
   onClose,
   onDone,
 }: {
@@ -135,12 +177,17 @@ export function InvoiceImportModal({
   locations: StockLocation[];
   suppliers: Supplier[];
   products: RecipeProduct[];
+  orders: PurchaseOrder[];
+  orderItems: PurchaseOrderItem[];
+  invoices: PurchaseInvoice[];
   onClose: () => void;
   onDone: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [supplierId, setSupplierId] = useState("");
   const [locationId, setLocationId] = useState("");
+  const [purchaseOrderId, setPurchaseOrderId] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [draft, setDraft] = useState<ImportDraft | null>(null);
   const [busy, setBusy] = useState<"upload" | "review" | "confirm" | "">("");
   const [reviewed, setReviewed] = useState(false);
@@ -150,6 +197,7 @@ export function InvoiceImportModal({
 
   function patchLine(id: string, patch: Partial<ImportLine>) {
     setReviewed(false);
+    setPurchaseOrderId("");
     setDraft((current) =>
       current
         ? {
@@ -177,6 +225,8 @@ export function InvoiceImportModal({
       const parsed = parseImport(imported, supplierId);
       setDraft(parsed);
       setSupplierId(parsed.supplierId);
+      setDueDate("");
+      setPurchaseOrderId("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Não foi possível ler a NF-e.");
     } finally {
@@ -236,6 +286,11 @@ export function InvoiceImportModal({
         draft.id,
         {
           locationId,
+          purchaseOrderId:
+            purchaseOrderId && compatibleOrders.some((order) => order.id === purchaseOrderId)
+              ? purchaseOrderId
+              : undefined,
+          dueDate,
           acceptTotalDivergence: divergence !== 0 ? acceptDivergence : undefined,
           divergenceReason: divergence !== 0 ? divergenceReason.trim() : undefined,
         },
@@ -260,6 +315,9 @@ export function InvoiceImportModal({
   );
   const linesTotal = draft?.lines.reduce((sum, line) => sum + line.totalCents, 0) ?? 0;
   const divergence = draft ? draft.totalCents - linesTotal : 0;
+  const compatibleOrders = draft
+    ? compatiblePurchaseOrders(draft, supplierId, orders, orderItems, invoices)
+    : [];
   return (
     <Modal isOpen={open} onClose={onClose} size="xl" title="Importar NF-e de compra">
       <div className="gm-form-stack">
@@ -319,6 +377,7 @@ export function InvoiceImportModal({
                 onChange={(event) => {
                   setSupplierId(event.target.value);
                   setReviewed(false);
+                  setPurchaseOrderId("");
                 }}
                 required
                 value={supplierId}
@@ -444,6 +503,25 @@ export function InvoiceImportModal({
             {reviewed && (
               <>
                 <label className="gm-form-field">
+                  <span>Pedido de compra</span>
+                  <NativeSelect
+                    onChange={(event) => setPurchaseOrderId(event.target.value)}
+                    value={purchaseOrderId}
+                  >
+                    <option value="">Criar pedido a partir da NF-e</option>
+                    {compatibleOrders.map((order) => (
+                      <option key={order.id} value={order.id}>
+                        {order.humanNumber
+                          ? `PUR-${String(order.humanNumber).padStart(6, "0")}`
+                          : order.id}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                  <small>
+                    Apenas pedidos aprovados com fornecedor, itens e quantidades iguais aparecem.
+                  </small>
+                </label>
+                <label className="gm-form-field">
                   <span>Local de entrada</span>
                   <NativeSelect
                     onChange={(event) => setLocationId(event.target.value)}
@@ -459,6 +537,16 @@ export function InvoiceImportModal({
                         </option>
                       ))}
                   </NativeSelect>
+                </label>
+                <label className="gm-form-field">
+                  <span>Vencimento da fatura</span>
+                  <Input
+                    min={draft.issuedAt || undefined}
+                    onChange={(event) => setDueDate(event.target.value)}
+                    required
+                    type="date"
+                    value={dueDate}
+                  />
                 </label>
                 {divergence !== 0 && (
                   <div className="gm-form-stack purchases-divergence" role="status">
@@ -507,6 +595,7 @@ export function InvoiceImportModal({
               disabled={
                 busy === "confirm" ||
                 !locationId ||
+                !dueDate ||
                 (divergence !== 0 && (!acceptDivergence || divergenceReason.trim().length < 5))
               }
               onClick={() => void confirm()}

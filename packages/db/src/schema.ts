@@ -1,11 +1,14 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -33,7 +36,13 @@ export const roleName = pgEnum("role_name", [
   "finance",
   "accountant",
 ]);
-export const catalogStatus = pgEnum("catalog_status", ["draft", "published", "discontinued"]);
+export const catalogStatus = pgEnum("catalog_status", [
+  "draft",
+  "approved",
+  "scheduled",
+  "published",
+  "discontinued",
+]);
 export const billingState = pgEnum("billing_state", [
   "draft",
   "onboarding",
@@ -356,10 +365,64 @@ export const commercialCatalogVersions = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     version: integer("version").notNull(),
     status: catalogStatus("status").notNull().default("draft"),
+    sourceVersionId: uuid("source_version_id"),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    landing: jsonb("landing")
+      .$type<
+        Record<
+          | "hero"
+          | "socialProof"
+          | "benefits"
+          | "howItWorks"
+          | "testimonials"
+          | "faq"
+          | "finalCta"
+          | "legal",
+          Record<string, unknown>
+        >
+      >()
+      .notNull()
+      .default(
+        {} as Record<
+          | "hero"
+          | "socialProof"
+          | "benefits"
+          | "howItWorks"
+          | "testimonials"
+          | "faq"
+          | "finalCta"
+          | "legal",
+          Record<string, unknown>
+        >,
+      ),
+    seo: jsonb("seo").$type<Record<string, unknown>>().notNull().default({}),
+    approvedByIdentityId: uuid("approved_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    scheduledPublishAt: timestamp("scheduled_publish_at", { withTimezone: true }),
+    publishedByIdentityId: uuid("published_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    ...timestamps,
   },
-  (table) => [uniqueIndex("commercial_catalog_version_unique").on(table.version)],
+  (table) => [
+    uniqueIndex("commercial_catalog_version_unique").on(table.version),
+    uniqueIndex("commercial_catalog_single_published_unique")
+      .on(table.status)
+      .where(sql`${table.status}::text = 'published'`),
+    uniqueIndex("commercial_catalog_single_scheduled_unique")
+      .on(table.status)
+      .where(sql`${table.status}::text = 'scheduled'`),
+    foreignKey({
+      name: "commercial_catalog_versions_source_version_id_fk",
+      columns: [table.sourceVersionId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+  ],
 );
 
 export const commercialPlans = pgTable(
@@ -375,10 +438,227 @@ export const commercialPlans = pgTable(
     annualPriceCents: integer("annual_price_cents").notNull(),
     includedUnits: integer("included_units").notNull(),
     entitlements: jsonb("entitlements").$type<string[]>().notNull().default([]),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    description: text("description").notNull().default(""),
+    features: jsonb("features").$type<string[]>().notNull().default([]),
+    featured: boolean("featured").notNull().default(false),
+    displayOrder: integer("display_order").notNull().default(0),
+    ctaLabel: varchar("cta_label", { length: 80 }).notNull().default("Começar agora"),
+    ctaHref: varchar("cta_href", { length: 240 }).notNull().default("/teste-gratis"),
+    ...timestamps,
   },
   (table) => [
     uniqueIndex("commercial_plan_catalog_slug_unique").on(table.catalogVersionId, table.slug),
+  ],
+);
+
+export const commercialPromotions = pgTable(
+  "commercial_promotions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id")
+      .notNull()
+      .references(() => commercialCatalogVersions.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    type: varchar("type", { length: 20 }).$type<"percentage" | "fixed" | "price">().notNull(),
+    value: integer("value").notNull(),
+    planSlugs: jsonb("plan_slugs").$type<string[]>().notNull().default([]),
+    cycles: jsonb("cycles").$type<Array<"monthly" | "annual">>().notNull().default([]),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    newCustomersOnly: boolean("new_customers_only").notNull().default(true),
+    code: varchar("code", { length: 40 }),
+    redemptionLimit: integer("redemption_limit"),
+    active: boolean("active").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("commercial_promotions_version_code_unique")
+      .on(table.catalogVersionId, table.code)
+      .where(sql`${table.code} is not null`),
+    index("commercial_promotions_window_idx").on(
+      table.catalogVersionId,
+      table.active,
+      table.startsAt,
+      table.endsAt,
+    ),
+    check(
+      "commercial_promotions_value_check",
+      sql`${table.value} > 0 and (${table.type} <> 'percentage' or ${table.value} <= 10000)`,
+    ),
+    check(
+      "commercial_promotions_window_check",
+      sql`${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
+    check(
+      "commercial_promotions_limit_check",
+      sql`${table.redemptionLimit} is null or ${table.redemptionLimit} > 0`,
+    ),
+  ],
+);
+
+export const commercialCampaigns = pgTable(
+  "commercial_campaigns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 80 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    status: varchar("status", { length: 16 })
+      .$type<"draft" | "active" | "paused" | "ended">()
+      .notNull()
+      .default("draft"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("commercial_campaigns_slug_unique").on(table.slug),
+    check(
+      "commercial_campaigns_status_check",
+      sql`${table.status} in ('draft', 'active', 'paused', 'ended')`,
+    ),
+    check(
+      "commercial_campaigns_window_check",
+      sql`${table.startsAt} is null or ${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
+  ],
+);
+
+export type CommercialExperimentVariant = {
+  key: string;
+  weight: number;
+  headline: string;
+  description: string;
+  ctaLabel: string;
+  ctaHref: string;
+};
+
+export const commercialExperiments = pgTable(
+  "commercial_experiments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id")
+      .notNull()
+      .references(() => commercialCatalogVersions.id, { onDelete: "cascade" }),
+    slug: varchar("slug", { length: 80 }).notNull(),
+    status: varchar("status", { length: 16 })
+      .$type<"draft" | "active" | "paused" | "ended">()
+      .notNull()
+      .default("draft"),
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    endsAt: timestamp("ends_at", { withTimezone: true }),
+    variants: jsonb("variants").$type<CommercialExperimentVariant[]>().notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("commercial_experiments_version_slug_unique").on(
+      table.catalogVersionId,
+      table.slug,
+    ),
+    index("commercial_experiments_active_idx").on(
+      table.catalogVersionId,
+      table.status,
+      table.startsAt,
+    ),
+    check(
+      "commercial_experiments_status_check",
+      sql`${table.status} in ('draft', 'active', 'paused', 'ended')`,
+    ),
+    check(
+      "commercial_experiments_window_check",
+      sql`${table.startsAt} is null or ${table.endsAt} is null or ${table.endsAt} > ${table.startsAt}`,
+    ),
+  ],
+);
+
+export const commercialExperimentImpressions = pgTable(
+  "commercial_experiment_impressions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    catalogVersionId: uuid("catalog_version_id")
+      .notNull()
+      .references(() => commercialCatalogVersions.id, { onDelete: "cascade" }),
+    experimentSlug: varchar("experiment_slug", { length: 80 }).notNull(),
+    variantKey: varchar("variant_key", { length: 40 }).notNull(),
+    visitorHash: varchar("visitor_hash", { length: 64 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("commercial_experiment_impressions_visitor_unique").on(
+      table.catalogVersionId,
+      table.experimentSlug,
+      table.visitorHash,
+    ),
+    index("commercial_experiment_impressions_variant_idx").on(
+      table.catalogVersionId,
+      table.experimentSlug,
+      table.variantKey,
+    ),
+  ],
+);
+
+export const commercialMediaAssets = pgTable(
+  "commercial_media_assets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    key: varchar("key", { length: 40 }).notNull(),
+    url: text("url").notNull(),
+    fileName: varchar("file_name", { length: 180 }).notNull(),
+    mimeType: varchar("mime_type", { length: 32 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    alt: varchar("alt", { length: 180 }).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("commercial_media_assets_key_unique").on(table.key),
+    check(
+      "commercial_media_assets_size_check",
+      sql`${table.sizeBytes} > 0 and ${table.sizeBytes} <= 2000000`,
+    ),
+  ],
+);
+
+export const commercialLeadStates = pgTable(
+  "commercial_lead_states",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sourceType: varchar("source_type", { length: 16 }).$type<"trial" | "contact">().notNull(),
+    sourceId: uuid("source_id").notNull(),
+    stage: varchar("stage", { length: 24 })
+      .$type<"new" | "qualified" | "contacted" | "converted" | "lost">()
+      .notNull()
+      .default("new"),
+    assignedToIdentityId: uuid("assigned_to_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    organizationId: uuid("organization_id").references(() => organizations.id, {
+      onDelete: "set null",
+    }),
+    notes: text("notes"),
+    lastContactAt: timestamp("last_contact_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("commercial_lead_states_source_unique").on(table.sourceType, table.sourceId),
+    index("commercial_lead_states_stage_idx").on(table.stage, table.updatedAt),
+    index("commercial_lead_states_assignee_idx").on(table.assignedToIdentityId, table.updatedAt),
+    check(
+      "commercial_lead_states_source_type_check",
+      sql`${table.sourceType} in ('trial', 'contact')`,
+    ),
+    check(
+      "commercial_lead_states_stage_check",
+      sql`${table.stage} in ('new', 'qualified', 'contacted', 'converted', 'lost')`,
+    ),
+    check(
+      "commercial_lead_states_conversion_check",
+      sql`${table.stage} <> 'converted' or ${table.organizationId} is not null`,
+    ),
   ],
 );
 
@@ -422,6 +702,18 @@ export const trialApplications = pgTable("trial_applications", {
   businessName: varchar("business_name", { length: 120 }).notNull(),
   segment: varchar("segment", { length: 80 }),
   planSlug: varchar("plan_slug", { length: 60 }).notNull(),
+  campaignSlug: varchar("campaign_slug", { length: 80 }),
+  landingVersion: integer("landing_version"),
+  utmSource: varchar("utm_source", { length: 120 }),
+  utmMedium: varchar("utm_medium", { length: 120 }),
+  utmCampaign: varchar("utm_campaign", { length: 160 }),
+  utmTerm: varchar("utm_term", { length: 160 }),
+  utmContent: varchar("utm_content", { length: 160 }),
+  termsVersion: varchar("terms_version", { length: 40 }),
+  privacyVersion: varchar("privacy_version", { length: 40 }),
+  experimentSlug: varchar("experiment_slug", { length: 80 }),
+  experimentVariantKey: varchar("experiment_variant_key", { length: 40 }),
+  experimentVisitorHash: varchar("experiment_visitor_hash", { length: 64 }),
   consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -432,6 +724,18 @@ export const contactRequests = pgTable("contact_requests", {
   email: varchar("email", { length: 254 }).notNull(),
   phone: varchar("phone", { length: 20 }).notNull(),
   message: text("message").notNull(),
+  campaignSlug: varchar("campaign_slug", { length: 80 }),
+  landingVersion: integer("landing_version"),
+  utmSource: varchar("utm_source", { length: 120 }),
+  utmMedium: varchar("utm_medium", { length: 120 }),
+  utmCampaign: varchar("utm_campaign", { length: 160 }),
+  utmTerm: varchar("utm_term", { length: 160 }),
+  utmContent: varchar("utm_content", { length: 160 }),
+  termsVersion: varchar("terms_version", { length: 40 }),
+  privacyVersion: varchar("privacy_version", { length: 40 }),
+  experimentSlug: varchar("experiment_slug", { length: 80 }),
+  experimentVariantKey: varchar("experiment_variant_key", { length: 40 }),
+  experimentVisitorHash: varchar("experiment_visitor_hash", { length: 64 }),
   consentedAt: timestamp("consented_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -476,23 +780,6 @@ export const providerCustomers = pgTable(
   (table) => [uniqueIndex("provider_customer_unique").on(table.provider, table.providerCustomerId)],
 );
 
-export const billingCheckouts = pgTable(
-  "billing_checkouts",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
-    provider: varchar("provider", { length: 30 }).notNull(),
-    providerCheckoutId: varchar("provider_checkout_id", { length: 160 }).notNull(),
-    status: varchar("status", { length: 40 }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    uniqueIndex("billing_checkout_provider_unique").on(table.provider, table.providerCheckoutId),
-  ],
-);
-
 export const subscriptions = pgTable(
   "subscriptions",
   {
@@ -508,11 +795,126 @@ export const subscriptions = pgTable(
     providerSubscriptionId: varchar("provider_subscription_id", { length: 160 }),
     cycle: billingCycle("cycle").notNull(),
     state: billingState("state").notNull().default("draft"),
+    contractedPriceCents: integer("contracted_price_cents"),
+    paymentMethod: varchar("payment_method", { length: 24 }).$type<"credit_card" | "pix">(),
+    currentPeriodStartsAt: timestamp("current_period_starts_at", { withTimezone: true }),
     currentPeriodEndsAt: timestamp("current_period_ends_at", { withTimezone: true }),
+    reconciliationStatus: varchar("reconciliation_status", { length: 24 })
+      .$type<"not_required" | "pending" | "succeeded" | "failed">()
+      .notNull()
+      .default("not_required"),
+    reconciliationError: text("reconciliation_error"),
     ...timestamps,
   },
   (table) => [
     uniqueIndex("subscriptions_provider_unique").on(table.provider, table.providerSubscriptionId),
+    uniqueIndex("subscriptions_organization_current_unique")
+      .on(table.organizationId)
+      .where(sql`${table.state} <> 'canceled'`),
+    check(
+      "subscriptions_contracted_price_check",
+      sql`${table.contractedPriceCents} IS NULL OR ${table.contractedPriceCents} >= 0`,
+    ),
+    check(
+      "subscriptions_current_period_check",
+      sql`${table.currentPeriodStartsAt} IS NULL OR ${table.currentPeriodEndsAt} IS NULL OR ${table.currentPeriodEndsAt} > ${table.currentPeriodStartsAt}`,
+    ),
+  ],
+);
+
+export const billingUpgradeQuotes = pgTable(
+  "billing_upgrade_quotes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subscriptionId: uuid("subscription_id")
+      .notNull()
+      .references(() => subscriptions.id, { onDelete: "cascade" }),
+    targetCommercialPlanId: uuid("target_commercial_plan_id")
+      .notNull()
+      .references(() => commercialPlans.id),
+    cycle: billingCycle("cycle").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    periodStartsAt: timestamp("period_starts_at", { withTimezone: true }).notNull(),
+    periodEndsAt: timestamp("period_ends_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    status: varchar("status", { length: 24 })
+      .$type<"quoted" | "consumed" | "expired" | "canceled">()
+      .notNull()
+      .default("quoted"),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("billing_upgrade_quotes_org_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    index("billing_upgrade_quotes_subscription_idx").on(table.subscriptionId, table.createdAt),
+    check("billing_upgrade_quotes_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "billing_upgrade_quotes_period_check",
+      sql`${table.periodEndsAt} > ${table.periodStartsAt}`,
+    ),
+    check("billing_upgrade_quotes_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
+  ],
+);
+
+export const billingCheckouts = pgTable(
+  "billing_checkouts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    subscriptionId: uuid("subscription_id").references(() => subscriptions.id, {
+      onDelete: "set null",
+    }),
+    targetCommercialPlanId: uuid("target_commercial_plan_id").references(() => commercialPlans.id),
+    upgradeQuoteId: uuid("upgrade_quote_id").references(() => billingUpgradeQuotes.id),
+    promotionId: uuid("promotion_id").references(() => commercialPromotions.id, {
+      onDelete: "set null",
+    }),
+    promotionCode: varchar("promotion_code", { length: 40 }),
+    promotionDiscountCents: integer("promotion_discount_cents").notNull().default(0),
+    promotionFingerprint: varchar("promotion_fingerprint", { length: 64 }),
+    provider: varchar("provider", { length: 30 }).notNull(),
+    providerCheckoutId: varchar("provider_checkout_id", { length: 160 }),
+    intent: varchar("intent", { length: 24 })
+      .$type<"subscribe" | "regularize" | "upgrade">()
+      .notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    amountCents: integer("amount_cents"),
+    cycle: billingCycle("cycle"),
+    paymentMethods: jsonb("payment_methods")
+      .$type<Array<"credit_card" | "pix">>()
+      .notNull()
+      .default(["credit_card", "pix"]),
+    providerCheckoutUrl: text("provider_checkout_url"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    status: varchar("status", { length: 40 }).notNull(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    reconciliationStatus: varchar("reconciliation_status", { length: 24 })
+      .$type<"not_required" | "pending" | "succeeded" | "failed">()
+      .notNull()
+      .default("not_required"),
+    reconciliationError: text("reconciliation_error"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("billing_checkout_provider_unique").on(table.provider, table.providerCheckoutId),
+    uniqueIndex("billing_checkouts_org_idempotency_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("billing_checkouts_upgrade_quote_unique").on(table.upgradeQuoteId),
+    check(
+      "billing_checkouts_amount_check",
+      sql`${table.amountCents} IS NULL OR ${table.amountCents} > 0`,
+    ),
+    check("billing_checkouts_promotion_discount_check", sql`${table.promotionDiscountCents} >= 0`),
   ],
 );
 
@@ -523,9 +925,14 @@ export const charges = pgTable(
     subscriptionId: uuid("subscription_id")
       .notNull()
       .references(() => subscriptions.id, { onDelete: "cascade" }),
+    billingCheckoutId: uuid("billing_checkout_id").references(() => billingCheckouts.id, {
+      onDelete: "set null",
+    }),
     providerChargeId: varchar("provider_charge_id", { length: 160 }).notNull(),
     amountCents: integer("amount_cents").notNull(),
     status: varchar("status", { length: 40 }).notNull(),
+    paymentMethod: varchar("payment_method", { length: 24 }).$type<"credit_card" | "pix">(),
+    paymentUrl: text("payment_url"),
     dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -543,6 +950,8 @@ export const paymentEvents = pgTable(
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
     receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
     processedAt: timestamp("processed_at", { withTimezone: true }),
+    processingAttempts: integer("processing_attempts").notNull().default(0),
+    lastProcessingError: text("last_processing_error"),
   },
   (table) => [
     uniqueIndex("payment_event_provider_unique").on(table.provider, table.providerEventId),
@@ -622,7 +1031,7 @@ export const outboxEvents = pgTable(
 export const hubHeartbeats = pgTable(
   "hub_heartbeats",
   {
-    unitId: uuid("unit_id").primaryKey(),
+    unitId: uuid("unit_id").notNull(),
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
@@ -632,6 +1041,10 @@ export const hubHeartbeats = pgTable(
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
   },
   (table) => [
+    primaryKey({
+      name: "hub_heartbeats_pkey",
+      columns: [table.unitId, table.hubId],
+    }),
     foreignKey({
       name: "hub_heartbeats_organization_unit_fk",
       columns: [table.organizationId, table.unitId],
@@ -665,6 +1078,7 @@ export const hubCommands = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    unique("hub_commands_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     uniqueIndex("hub_commands_unit_idempotency_unique").on(table.unitId, table.idempotencyKey),
     index("hub_commands_pending_idx").on(table.hubId, table.acknowledgedAt, table.createdAt),
     foreignKey({

@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Public.V1.Auth;
 using GiroMesa.ApiClient.Public.V1.CommercialCatalog;
+using GiroMesa.ApiClient.Public.V1.CommercialExperimentImpressions;
 using GiroMesa.ApiClient.Public.V1.Contact;
 using GiroMesa.ApiClient.Public.V1.Media;
 using GiroMesa.ApiClient.Public.V1.Menus;
@@ -29,6 +30,11 @@ namespace GiroMesa.ApiClient.Public.V1
         public global::GiroMesa.ApiClient.Public.V1.CommercialCatalog.CommercialCatalogRequestBuilder CommercialCatalog
         {
             get => new global::GiroMesa.ApiClient.Public.V1.CommercialCatalog.CommercialCatalogRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The commercialExperimentImpressions property</summary>
+        public global::GiroMesa.ApiClient.Public.V1.CommercialExperimentImpressions.CommercialExperimentImpressionsRequestBuilder CommercialExperimentImpressions
+        {
+            get => new global::GiroMesa.ApiClient.Public.V1.CommercialExperimentImpressions.CommercialExperimentImpressionsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The contact property</summary>
         public global::GiroMesa.ApiClient.Public.V1.Contact.ContactRequestBuilder Contact

@@ -12,6 +12,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PrintJobs.It
         #pragma warning disable CS1591
         Printing,
         #pragma warning restore CS1591
+        [EnumMember(Value = "confirmation_required")]
+        #pragma warning disable CS1591
+        Confirmation_required,
+        #pragma warning restore CS1591
         [EnumMember(Value = "printed")]
         #pragma warning disable CS1591
         Printed,

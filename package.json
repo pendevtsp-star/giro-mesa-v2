@@ -1,6 +1,6 @@
 {
   "name": "giromesa-v2",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "packageManager": "pnpm@11.7.0",
   "engines": {
@@ -21,6 +21,8 @@
     "production:baseline": "node scripts/check-production-baseline.mjs",
     "test:e2e": "playwright test",
     "test:e2e:real-ui": "playwright test --config=playwright.real.config.ts",
+    "test:e2e:cash-live": "playwright test --config=playwright.cash-live.config.ts",
+    "test:e2e:salon-live": "playwright test --config=playwright.salon-live.config.ts",
     "integrations:check": "node --env-file-if-exists=.env scripts/check-integrations.mjs",
     "smartpos:release-check": "node --env-file-if-exists=.env scripts/check-smartpos-release.mjs",
     "test:smartpos-release": "node --test scripts/check-smartpos-release.test.mjs",

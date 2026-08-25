@@ -1,15 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  returnableDepositChargeSchema,
+  returnablePolicySchema,
+} from "./management.inventory-controls.schemas.js";
+import {
   commissionSchema,
   overviewPreferencesSchema,
   overviewPriorityActionSchema,
+  productReturnableClassificationSchema,
   purchaseInvoiceConfirmSchema,
   purchaseOrderSchema,
   purchaseOrderUpdateSchema,
   purchaseReversalSchema,
   purchaseTransitionSchema,
   reportPeriodSchema,
+  returnableCustodyConfirmBulkSchema,
+  returnableCustodyConfirmSchema,
+  returnableCustodyHandoffSchema,
   selfClockInSchema,
   supplierInvoiceSchema,
   supplierUpdateSchema,
@@ -335,6 +343,80 @@ describe("commission money bounds", () => {
     );
     assert.equal(
       commissionSchema.safeParse({ personId, baseCents: 0, amountCents: 2_147_483_648 }).success,
+      false,
+    );
+  });
+});
+
+describe("returnable custody contracts", () => {
+  const issueMovementId = "00000000-0000-4000-8000-000000000001";
+  const containerInventoryItemId = "00000000-0000-4000-8000-000000000002";
+  const locationId = "00000000-0000-4000-8000-000000000003";
+  const toIdentityId = "00000000-0000-4000-8000-000000000004";
+
+  it("requires every return to reference one custody issue", () => {
+    assert.equal(
+      returnableCustodyConfirmSchema.safeParse({
+        containerInventoryItemId,
+        locationId,
+        quantity: "1",
+      }).success,
+      false,
+    );
+    assert.equal(
+      returnableCustodyConfirmSchema.safeParse({
+        issueMovementId,
+        containerInventoryItemId,
+        locationId,
+        quantity: "1",
+      }).success,
+      true,
+    );
+  });
+
+  it("rejects duplicate custody issues in bulk confirmation and handoff", () => {
+    const line = { issueMovementId, locationId, quantity: "1" };
+    assert.equal(
+      returnableCustodyConfirmBulkSchema.safeParse({ lines: [line, line] }).success,
+      false,
+    );
+    assert.equal(
+      returnableCustodyHandoffSchema.safeParse({
+        issueMovementIds: [issueMovementId, issueMovementId],
+        toIdentityId,
+        note: "Troca de turno",
+      }).success,
+      false,
+    );
+  });
+
+  it("keeps deposits optional and never exposes an automatic mode", () => {
+    assert.deepEqual(returnablePolicySchema.parse({}), {
+      depositMode: "disabled",
+      defaultDueDays: 7,
+      returnableClosePolicy: "warn",
+    });
+    assert.equal(
+      returnablePolicySchema.safeParse({
+        depositMode: "automatic",
+        defaultDueDays: 7,
+        returnableClosePolicy: "warn",
+      }).success,
+      false,
+    );
+    assert.equal(
+      returnableDepositChargeSchema.safeParse({ orderId: issueMovementId }).success,
+      true,
+    );
+  });
+
+  it("requires an explicit returnable classification", () => {
+    assert.equal(
+      productReturnableClassificationSchema.safeParse({ status: "returnable" }).success,
+      true,
+    );
+    assert.equal(
+      productReturnableClassificationSchema.safeParse({ status: "undecided" }).success,
       false,
     );
   });

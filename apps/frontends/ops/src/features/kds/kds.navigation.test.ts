@@ -43,9 +43,9 @@ describe("navegação do KDS", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
 
-    expect(kdsStationMenuLabel("unit-1")).toBe("Praça — não fixada");
+    expect(kdsStationMenuLabel("unit-1")).toBe("Estação — não fixada");
     values.set("giromesa:kds:unit-1:station-locked", "true");
     values.set("giromesa:kds:unit-1:station-label", "Bar");
-    expect(kdsStationMenuLabel("unit-1")).toBe("Praça — Bar");
+    expect(kdsStationMenuLabel("unit-1")).toBe("Estação — Bar");
   });
 });

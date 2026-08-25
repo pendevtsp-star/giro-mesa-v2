@@ -100,7 +100,7 @@ export function CatalogProductsPanel(props: CatalogProductsPanelProps) {
   if (catalog.products.length === 0) {
     return (
       <EmptyState
-        description="Crie uma categoria, uma praça de produção e depois o produto."
+        description="Crie uma categoria, uma estação de produção e depois o produto."
         icon={<Icon name="catalog" size={28} />}
         title="Catálogo pronto para o primeiro produto"
       />
@@ -575,7 +575,7 @@ function ProductMetadata({
           catalog.stations.find((station) => station.id === stationId)?.name ?? "não identificada";
         return (
           <span className="gm-pill" key={stationId}>
-            <Icon name="salon" size={12} /> Praça: {stationName}
+            <Icon name="salon" size={12} /> Estação: {stationName}
           </span>
         );
       })}

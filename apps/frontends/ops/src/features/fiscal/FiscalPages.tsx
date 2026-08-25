@@ -16,6 +16,11 @@ import { ApiClientError, api, type FocusCompanyOnboardingBody } from "../../api"
 import { dateLabel, type ManagementScope, RemoteGate, useRemote } from "../../management.shared";
 import { formatMoney } from "../../rules";
 import {
+  type AccountantRequestFilter,
+  accountantRequestHref,
+  accountantRequestStatusLabel,
+  accountantRequestViewFromHash,
+  canResolveAccountantRequest,
   type FiscalDashboard,
   type FiscalDocument,
   type FiscalDocumentDetail,
@@ -26,6 +31,7 @@ import {
   parseAccountantWorkspace,
   parseFiscalDocumentDetail,
   parseFiscalWorkspace,
+  validateAccountantAttachment,
 } from "./fiscal";
 import { fiscalTaxCsvTemplate, parseFiscalTaxCsv } from "./fiscal-csv";
 import "./fiscal.css";
@@ -387,6 +393,7 @@ export function RealFiscalPage({
                   <div className="fiscal-list">
                     {data.dashboard.pending.map((item) => {
                       const target = pendingActionSection(item.id);
+                      const opensAccountantPortal = item.id === "accountant";
                       return (
                         <article className="fiscal-list-row" key={item.id}>
                           <Badge tone={fiscalTone(item.severity)}>
@@ -399,11 +406,21 @@ export function RealFiscalPage({
                           {target !== "setup" || canConfigure ? (
                             <Button
                               className="fiscal-row-action"
-                              onClick={() => navigateSection(target)}
+                              onClick={() => {
+                                if (opensAccountantPortal) {
+                                  window.location.hash = accountantRequestHref(
+                                    "open",
+                                    1,
+                                    "establishment",
+                                  );
+                                  return;
+                                }
+                                navigateSection(target);
+                              }}
                               size="sm"
                               variant="ghost"
                             >
-                              Resolver
+                              {opensAccountantPortal ? "Abrir no Portal" : "Resolver"}
                             </Button>
                           ) : (
                             <small>Proprietário</small>
@@ -732,6 +749,17 @@ function FiscalDocumentDetailModal({
               <dd>{document.tabId || document.orderId ? "Sim" : "Não"}</dd>
             </div>
           </dl>
+          {document.tabId && (
+            <Button
+              onClick={() => {
+                window.location.hash = `#/counter?tab=${encodeURIComponent(document.tabId ?? "")}&origem=fiscal`;
+              }}
+              size="sm"
+              variant="secondary"
+            >
+              Abrir venda no balcão
+            </Button>
+          )}
           {document.accessKey && (
             <div className="fiscal-document-detail__key">
               <span>Chave de acesso</span>
@@ -764,6 +792,17 @@ function FiscalDocumentDetailModal({
               <div>
                 <strong>Como resolver</strong>
                 <p>{latestRejectionGuidance(document)}</p>
+                {latestRejectionGuidance(document).includes("classificação fiscal") && (
+                  <Button
+                    onClick={() => {
+                      window.location.hash = fiscalSectionHref("products");
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    Revisar classificação
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -1678,6 +1717,8 @@ function TaxRevisionForm({
   const [cstIcms, setCstIcms] = useState("");
   const [cstPis, setCstPis] = useState("");
   const [cstCofins, setCstCofins] = useState("");
+  const [cstIbsCbs, setCstIbsCbs] = useState("");
+  const [cClassTrib, setCClassTrib] = useState("");
   const [effectiveFrom, setEffectiveFrom] = useState(todayInput);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -1731,9 +1772,14 @@ function TaxRevisionForm({
       !/^[0-8]$/.test(origin) ||
       (!/^\d{3}$/.test(csosn) && !/^\d{2,3}$/.test(cstIcms)) ||
       !/^\d{2}$/.test(cstPis) ||
-      !/^\d{2}$/.test(cstCofins)
+      !/^\d{2}$/.test(cstCofins) ||
+      Boolean(cstIbsCbs) !== Boolean(cClassTrib) ||
+      (cstIbsCbs !== "" && !/^\d{3}$/.test(cstIbsCbs)) ||
+      (cClassTrib !== "" && !/^\d{6}$/.test(cClassTrib))
     ) {
-      setFeedback("Preencha NCM, CFOP, origem, ICMS, PIS e COFINS nos formatos indicados.");
+      setFeedback(
+        "Preencha os códigos nos formatos indicados. CST IBS/CBS e cClassTrib devem ser informados em conjunto.",
+      );
       return;
     }
     setBusy(true);
@@ -1751,6 +1797,8 @@ function TaxRevisionForm({
           ...(cstIcms ? { cstIcms } : {}),
           cstPis,
           cstCofins,
+          ...(cstIbsCbs ? { cstIbsCbs } : {}),
+          ...(cClassTrib ? { cClassTrib } : {}),
         },
       });
       setProductIds([]);
@@ -1761,6 +1809,8 @@ function TaxRevisionForm({
       setCstIcms("");
       setCstPis("");
       setCstCofins("");
+      setCstIbsCbs("");
+      setCClassTrib("");
       setFeedback(`${productIds.length} classificação(ões) fiscal(is) ativada(s).`);
       onSaved();
     } catch (error) {
@@ -1789,7 +1839,8 @@ function TaxRevisionForm({
             <p>
               NCM identifica o produto, CFOP descreve a operação e a origem informa onde a
               mercadoria foi produzida. CSOSN é usado no Simples Nacional; CST ICMS, nos demais
-              regimes.
+              regimes. CST IBS/CBS e cClassTrib são códigos da reforma tributária e devem ser
+              confirmados em conjunto com o contador.
             </p>
           </div>
         </details>
@@ -1975,6 +2026,30 @@ function TaxRevisionForm({
                 />
               </label>
               <label className="gm-form-field">
+                <span>CST IBS/CBS (opcional, 3 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={3}
+                  onChange={(event) => setCstIbsCbs(event.target.value)}
+                  pattern="\d{3}"
+                  value={cstIbsCbs}
+                />
+              </label>
+              <label className="gm-form-field">
+                <span>cClassTrib (opcional, 6 dígitos)</span>
+                <Input
+                  className="gm-control"
+                  disabled={!enabled}
+                  inputMode="numeric"
+                  maxLength={6}
+                  onChange={(event) => setCClassTrib(event.target.value)}
+                  pattern="\d{6}"
+                  value={cClassTrib}
+                />
+              </label>
+              <label className="gm-form-field">
                 <span>Vigência inicial</span>
                 <Input
                   className="gm-control"
@@ -2024,14 +2099,49 @@ function TaxRevisionForm({
   );
 }
 
-export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
+export function RealAccountantPage({
+  audience,
+  scope,
+}: {
+  audience: "accountant" | "establishment";
+  scope: ManagementScope;
+}) {
   const [competence, setCompetence] = useState(currentCompetence);
+  const [requestFilter, setRequestFilter] = useState<AccountantRequestFilter>(
+    () =>
+      accountantRequestViewFromHash(typeof window === "undefined" ? "" : window.location.hash)
+        .filter,
+  );
+  const [requestPage, setRequestPage] = useState(
+    () =>
+      accountantRequestViewFromHash(typeof window === "undefined" ? "" : window.location.hash).page,
+  );
+  const [targetAudienceOnly, setTargetAudienceOnly] = useState(
+    () =>
+      accountantRequestViewFromHash(typeof window === "undefined" ? "" : window.location.hash)
+        .targetAudience === audience,
+  );
   const [refresh, setRefresh] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "danger";
+    text: string;
+  } | null>(null);
   const [title, setTitle] = useState("");
   const [detail, setDetail] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [resolution, setResolution] = useState("");
+  useEffect(() => {
+    const restoreRequestView = () => {
+      const view = accountantRequestViewFromHash(window.location.hash);
+      setRequestFilter(view.filter);
+      setRequestPage(view.page);
+      setTargetAudienceOnly(view.targetAudience === audience);
+    };
+    window.addEventListener("hashchange", restoreRequestView);
+    return () => window.removeEventListener("hashchange", restoreRequestView);
+  }, [audience]);
   const loader = useCallback(async () => {
     const [periods, accountingPackage, requests] = await Promise.all([
       api.fiscal.periods(scope.organizationId, scope.unitId),
@@ -2041,23 +2151,57 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
           if (error instanceof ApiClientError && error.status === 404) return null;
           throw error;
         }),
-      api.fiscal.accountantRequests(scope.organizationId, scope.unitId, competence),
+      api.fiscal.accountantRequests(scope.organizationId, scope.unitId, {
+        ...(requestFilter === "resolved"
+          ? { status: "resolved" as const }
+          : requestFilter === "open" || requestFilter === "overdue"
+            ? { status: "open" as const }
+            : {}),
+        ...(requestFilter === "overdue" ? { overdue: true } : {}),
+        ...(targetAudienceOnly ? { targetAudience: audience } : {}),
+        page: requestPage,
+        pageSize: 25,
+      }),
     ]);
     return { periods, accountingPackage, requests };
-  }, [competence, scope.organizationId, scope.unitId]);
+  }, [
+    audience,
+    competence,
+    requestFilter,
+    requestPage,
+    scope.organizationId,
+    scope.unitId,
+    targetAudienceOnly,
+  ]);
   const remote = useRemote(
     { ...scope, refreshToken: (scope.refreshToken ?? 0) + refresh },
     loader,
     parseAccountantWorkspace,
   );
 
+  function changeRequestView(
+    filter: AccountantRequestFilter,
+    page: number,
+    audienceOnly = targetAudienceOnly,
+  ) {
+    setRequestFilter(filter);
+    setRequestPage(page);
+    setTargetAudienceOnly(audienceOnly);
+    window.history.replaceState(
+      null,
+      "",
+      accountantRequestHref(filter, page, audienceOnly ? audience : undefined),
+    );
+    setRefresh((value) => value + 1);
+  }
+
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !detail.trim()) {
-      setFeedback("Informe assunto e detalhes da solicitação.");
+      setFeedback({ tone: "danger", text: "Informe assunto e detalhes da solicitação." });
       return;
     }
-    setBusy(true);
+    setBusy("create");
     setFeedback(null);
     try {
       await api.fiscal.createAccountantRequest(scope.organizationId, scope.unitId, {
@@ -2069,26 +2213,125 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
       setTitle("");
       setDetail("");
       setDueAt("");
-      setFeedback("Solicitação registrada.");
+      setFeedback({ tone: "success", text: "Solicitação registrada." });
       setRefresh((value) => value + 1);
     } catch (error) {
-      setFeedback(customerFiscalError(error, "Não foi possível registrar a solicitação."));
+      setFeedback({
+        tone: "danger",
+        text: customerFiscalError(error, "Não foi possível registrar a solicitação."),
+      });
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
   async function downloadPackage() {
-    setBusy(true);
+    setBusy("download");
     setFeedback(null);
     try {
       saveDownloadedFile(
         await api.fiscal.accountingPackageContent(scope.organizationId, scope.unitId, competence),
       );
     } catch (error) {
-      setFeedback(customerFiscalError(error, "Não foi possível baixar o pacote contábil."));
+      setFeedback({
+        tone: "danger",
+        text: customerFiscalError(error, "Não foi possível baixar o pacote contábil."),
+      });
     } finally {
-      setBusy(false);
+      setBusy(null);
+    }
+  }
+
+  async function resolveRequest(event: FormEvent<HTMLFormElement>, requestId: string) {
+    event.preventDefault();
+    const currentRequest =
+      remote.state.status === "ready"
+        ? remote.state.data.requests.find((request) => request.id === requestId)
+        : null;
+    if (!currentRequest || !canResolveAccountantRequest(currentRequest, audience)) {
+      setFeedback({ tone: "danger", text: "Esta solicitação aguarda resposta da outra parte." });
+      return;
+    }
+    const answer = resolution.trim();
+    if (answer.length < 3) {
+      setFeedback({ tone: "danger", text: "Informe uma resposta com pelo menos 3 caracteres." });
+      return;
+    }
+    setBusy(`resolve:${requestId}`);
+    setFeedback(null);
+    try {
+      await api.fiscal.resolveAccountantRequest(scope.organizationId, scope.unitId, requestId, {
+        resolution: answer,
+      });
+      remote.update((current) => ({
+        ...current,
+        requests: current.requests.map((request) =>
+          request.id === requestId
+            ? { ...request, status: "resolved", resolution: answer }
+            : request,
+        ),
+      }));
+      setResolution("");
+      setResolvingId(null);
+      setFeedback({ tone: "success", text: "Resposta registrada e solicitação resolvida." });
+      setRefresh((value) => value + 1);
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: customerFiscalError(error, "Não foi possível resolver a solicitação."),
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function uploadAttachment(requestId: string, file: File, input: HTMLInputElement) {
+    const validation = validateAccountantAttachment(file);
+    if (!validation.valid) {
+      setFeedback({ tone: "danger", text: validation.message });
+      input.value = "";
+      return;
+    }
+    setBusy(`attachment:${requestId}`);
+    setFeedback(null);
+    try {
+      await api.fiscal.createAttachment(scope.organizationId, scope.unitId, requestId, {
+        fileName: file.name,
+        contentType: validation.contentType,
+        contentBase64: await fileContentBase64(file),
+      });
+      input.value = "";
+      setFeedback({ tone: "success", text: "Anexo enviado com segurança." });
+      setRefresh((value) => value + 1);
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: customerFiscalError(error, "Não foi possível enviar o anexo."),
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function downloadAttachment(requestId: string, attachmentId: string) {
+    setBusy(`attachment:${attachmentId}:download`);
+    setFeedback(null);
+    try {
+      saveDownloadedFile(
+        await api.fiscal.downloadAttachment(
+          scope.organizationId,
+          scope.unitId,
+          requestId,
+          attachmentId,
+        ),
+      );
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text: customerFiscalError(error, "Não foi possível baixar o anexo."),
+      });
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -2100,7 +2343,9 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
             <div className="accountant-toolbar__copy">
               <p className="eyebrow">Escopo contábil</p>
               <h2>Competência</h2>
-              <p className="fiscal-muted">Pacotes e solicitações seguem o período selecionado.</p>
+              <p className="fiscal-muted">
+                O pacote segue o período selecionado. As solicitações reúnem todas as competências.
+              </p>
             </div>
             <label>
               <span>Período</span>
@@ -2125,6 +2370,27 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
             </label>
           </Card>
 
+          {(remote.updating || remote.refreshError || feedback) && (
+            <div
+              aria-live="polite"
+              className={`accountant-status${feedback?.tone === "danger" || remote.refreshError ? " accountant-status--danger" : ""}`}
+              role={feedback?.tone === "danger" || remote.refreshError ? "alert" : "status"}
+            >
+              <span>
+                {remote.updating
+                  ? "Atualizando dados confirmados…"
+                  : remote.refreshError
+                    ? "Não foi possível atualizar. Os últimos dados confirmados continuam visíveis."
+                    : feedback?.text}
+              </span>
+              {remote.refreshError && (
+                <Button disabled={remote.updating} onClick={remote.retry} size="sm" variant="ghost">
+                  Tentar novamente
+                </Button>
+              )}
+            </div>
+          )}
+
           <div className="fiscal-columns">
             <Card className="fiscal-section-card accountant-panel accountant-package">
               <SectionHeading eyebrow="Entrega mensal" title="Pacote contábil" />
@@ -2147,14 +2413,14 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
                     {data.accountingPackage.files.map((file) => (
                       <li key={file.name}>
                         <span>{file.name}</span>
-                        <small>Manifesto, XMLs e DANFEs</small>
+                        <small>Incluído no pacote</small>
                       </li>
                     ))}
                   </ul>
                   {data.accountingPackage.status === "ready" ? (
-                    <Button disabled={busy} onClick={() => void downloadPackage()}>
+                    <Button disabled={busy !== null} onClick={() => void downloadPackage()}>
                       <Icon name="download" size={16} />
-                      {busy ? "Preparando…" : "Baixar pacote ZIP"}
+                      {busy === "download" ? "Preparando…" : "Baixar pacote ZIP"}
                     </Button>
                   ) : (
                     <p className="fiscal-muted">
@@ -2200,53 +2466,228 @@ export function RealAccountantPage({ scope }: { scope: ManagementScope }) {
                   <span>Prazo desejado</span>
                   <Input
                     className="gm-control"
-                    min={new Date().toISOString().slice(0, 10)}
+                    min={todayInput()}
                     onChange={(event) => setDueAt(event.target.value)}
                     type="date"
                     value={dueAt}
                   />
                 </label>
-                {feedback && (
-                  <p aria-live="polite" className="fiscal-form-feedback">
-                    {feedback}
-                  </p>
-                )}
-                <Button disabled={busy} type="submit">
-                  {!busy && <Icon name="plus" size={16} />}
-                  {busy ? "Enviando…" : "Registrar solicitação"}
+                <Button disabled={busy !== null} type="submit">
+                  {busy !== "create" && <Icon name="plus" size={16} />}
+                  {busy === "create" ? "Enviando…" : "Registrar solicitação"}
                 </Button>
               </form>
             </Card>
           </div>
 
           <Card className="fiscal-section-card accountant-panel accountant-requests">
+            <SegmentedTabs
+              active={requestFilter}
+              className="accountant-request-filters"
+              items={[
+                { id: "all", label: "Todas" },
+                { id: "open", label: "Abertas" },
+                { id: "overdue", label: "Vencidas" },
+                { id: "resolved", label: "Resolvidas" },
+              ]}
+              label="Filtrar solicitações"
+              onChange={(value) => changeRequestView(value as AccountantRequestFilter, 1, false)}
+            />
+            {targetAudienceOnly && (
+              <div className="accountant-audience-filter" role="status">
+                <span>Exibindo somente solicitações que aguardam sua resposta.</span>
+                <Button
+                  onClick={() => changeRequestView(requestFilter, 1, false)}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Ver todas
+                </Button>
+              </div>
+            )}
             <SectionHeading
               eyebrow="Acompanhamento"
               title="Solicitações"
-              badge={`${data.requests.length} registro(s)`}
+              badge={requestCountLabel(data.pagination?.total ?? data.requests.length)}
             />
             {data.requests.length ? (
               <div className="fiscal-list">
                 {data.requests.map((request) => (
                   <article className="accountant-request-row" key={request.id}>
-                    <div>
+                    <div className="accountant-request-row__content">
                       <strong>{request.title}</strong>
                       <p>{request.detail}</p>
                       <small>
                         {competenceLabel(request.competence)} · {dateLabel(request.createdAt)}
                         {request.dueAt ? ` · prazo ${dateLabel(request.dueAt)}` : ""}
+                        {request.requestedBy ? ` · por ${request.requestedBy}` : ""}
                       </small>
+                      {request.resolution && (
+                        <div className="accountant-request-answer">
+                          <strong>Resposta</strong>
+                          <p>{request.resolution}</p>
+                          {(request.resolvedBy || request.resolvedAt) && (
+                            <small>
+                              {request.resolvedBy
+                                ? `Por ${request.resolvedBy}`
+                                : "Resposta registrada"}
+                              {request.resolvedAt ? ` · ${dateLabel(request.resolvedAt)}` : ""}
+                            </small>
+                          )}
+                        </div>
+                      )}
+                      <details className="gm-disclosure accountant-request-attachments">
+                        <summary>
+                          Anexos
+                          {request.attachments.length ? ` (${request.attachments.length})` : ""}
+                        </summary>
+                        <div className="accountant-request-attachments__content">
+                          {request.attachments.length ? (
+                            <ul>
+                              {request.attachments.map((attachment) => (
+                                <li key={attachment.id}>
+                                  <span>
+                                    <strong>{attachment.fileName}</strong>
+                                    <small>{fileSizeLabel(attachment.sizeBytes)}</small>
+                                  </span>
+                                  <Button
+                                    disabled={busy !== null}
+                                    onClick={() =>
+                                      void downloadAttachment(request.id, attachment.id)
+                                    }
+                                    size="sm"
+                                    variant="ghost"
+                                  >
+                                    <Icon name="download" size={14} />
+                                    {busy === `attachment:${attachment.id}:download`
+                                      ? "Baixando…"
+                                      : "Baixar"}
+                                  </Button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <small>Nenhum arquivo anexado.</small>
+                          )}
+                          {request.status === "open" && (
+                            <label className="gm-form-field accountant-attachment-input">
+                              <span>Adicionar anexo</span>
+                              <Input
+                                accept=".pdf,.xml,.csv,.jpg,.jpeg,.png"
+                                aria-describedby={`attachment-help-${request.id}`}
+                                className="gm-control"
+                                disabled={busy !== null}
+                                onChange={(event) => {
+                                  const file = event.currentTarget.files?.[0];
+                                  if (file)
+                                    void uploadAttachment(request.id, file, event.currentTarget);
+                                }}
+                                type="file"
+                              />
+                              <small id={`attachment-help-${request.id}`}>
+                                PDF, XML, CSV, JPG ou PNG de até 3 MB.
+                              </small>
+                            </label>
+                          )}
+                        </div>
+                      </details>
                     </div>
-                    <Badge tone={fiscalTone(request.status)}>{requestLabel(request.status)}</Badge>
+                    <div className="accountant-request-row__actions">
+                      <Badge tone={fiscalTone(request.status)}>
+                        {accountantRequestStatusLabel(request)}
+                      </Badge>
+                      {canResolveAccountantRequest(request, audience) && (
+                        <Button
+                          aria-controls={`resolve-accountant-request-${request.id}`}
+                          aria-expanded={resolvingId === request.id}
+                          disabled={busy !== null}
+                          onClick={() => {
+                            const opening = resolvingId !== request.id;
+                            setResolvingId(opening ? request.id : null);
+                            setResolution("");
+                            setFeedback(null);
+                          }}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          {resolvingId === request.id
+                            ? "Cancelar resposta"
+                            : "Responder e resolver"}
+                        </Button>
+                      )}
+                    </div>
+                    {resolvingId === request.id &&
+                      canResolveAccountantRequest(request, audience) && (
+                        <form
+                          className="accountant-request-resolution gm-form-stack"
+                          id={`resolve-accountant-request-${request.id}`}
+                          onSubmit={(event) => void resolveRequest(event, request.id)}
+                        >
+                          <label className="gm-form-field">
+                            <span>Resposta</span>
+                            <Textarea
+                              autoFocus
+                              className="gm-control gm-control--textarea"
+                              maxLength={5000}
+                              onChange={(event) => setResolution(event.target.value)}
+                              required
+                              rows={3}
+                              value={resolution}
+                            />
+                          </label>
+                          <Button disabled={busy !== null} type="submit">
+                            {busy === `resolve:${request.id}`
+                              ? "Registrando…"
+                              : "Registrar resposta"}
+                          </Button>
+                        </form>
+                      )}
                   </article>
                 ))}
               </div>
             ) : (
               <EmptyState
-                description="Nenhuma pendência foi registrada nesta competência."
+                description={accountantEmptyDescription(requestFilter)}
                 icon={<Icon name="check" />}
                 title="Sem solicitações"
               />
+            )}
+            {data.pagination && data.pagination.total > data.pagination.pageSize && (
+              <nav aria-label="Páginas de solicitações" className="accountant-pagination">
+                <Button
+                  disabled={data.pagination.page <= 1 || remote.updating}
+                  onClick={() => {
+                    changeRequestView(
+                      requestFilter,
+                      Math.max(1, data.pagination?.page ? data.pagination.page - 1 : 1),
+                    );
+                  }}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Anterior
+                </Button>
+                <span>
+                  Página {data.pagination.page} de{" "}
+                  {Math.ceil(data.pagination.total / data.pagination.pageSize)}
+                </span>
+                <Button
+                  disabled={
+                    data.pagination.page * data.pagination.pageSize >= data.pagination.total ||
+                    remote.updating
+                  }
+                  onClick={() => {
+                    changeRequestView(
+                      requestFilter,
+                      data.pagination?.page ? data.pagination.page + 1 : 1,
+                    );
+                  }}
+                  size="sm"
+                  variant="secondary"
+                >
+                  Próxima
+                </Button>
+              </nav>
             )}
           </Card>
         </div>
@@ -2451,8 +2892,33 @@ function packageLabel(value: string) {
   );
 }
 
-function requestLabel(value: string) {
-  return ({ open: "Aberta", resolved: "Resolvida" } as Record<string, string>)[value] ?? value;
+function requestCountLabel(count: number) {
+  return count === 1 ? "1 solicitação" : `${count} solicitações`;
+}
+
+function accountantEmptyDescription(filter: AccountantRequestFilter) {
+  if (filter === "open") return "Nenhuma solicitação aberta foi encontrada.";
+  if (filter === "overdue") return "Nenhuma solicitação vencida exige atenção.";
+  if (filter === "resolved") return "Nenhuma solicitação foi resolvida ainda.";
+  return "Nenhuma solicitação foi registrada.";
+}
+
+function fileContentBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      const separator = result.indexOf(",");
+      if (separator < 0) reject(new Error("Não foi possível ler o arquivo."));
+      else resolve(result.slice(separator + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function fileSizeLabel(bytes: number) {
+  return bytes < 1024 ? `${bytes} B` : `${Math.ceil(bytes / 1024)} KB`;
 }
 
 function todayInput() {

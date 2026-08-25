@@ -92,6 +92,7 @@ const cases: readonly [SystemRole, OverviewProfileId][] = [
 
 describe("management overview role matrix", () => {
   it("derives every profile from scoped bindings and only emits authorized routes", () => {
+    assert.ok(overviewRoutes.cashier.includes("salon"));
     for (const [role, expectedProfile] of cases) {
       const profile = resolveOverviewProfile(
         [

@@ -1,18 +1,39 @@
 import { createHash, randomUUID } from "node:crypto";
-import type { OperationalCapability, PaymentAttemptStatus } from "@giromesa/contracts";
+import { isIP } from "node:net";
+import type {
+  ManualKdsTicketPrintInput,
+  OperationalCapability,
+  OperationalPushSubscription,
+  PaymentAttemptStatus,
+  PrintDocumentPayloadV2,
+} from "@giromesa/contracts";
 import {
   auditEvents,
   type Database,
   deviceEnrollments,
+  doseClubRedemptions,
   fiscalDocuments,
+  growthCustomers,
   identities,
+  loyaltyLedger,
+  loyaltyPrograms,
   managementCashAdjustments,
   managementCashEntries,
   managementCashRegisters,
   managementCashRegisterTerminals,
   managementCashShifts,
+  managementInventoryIssueRoutes,
+  managementInventoryItems,
+  managementInventoryReservations,
   managementOperationalLosses,
+  managementRecipeComponents,
+  managementRecipeVersions,
+  managementReturnableCustodyHandoffs,
+  managementReturnableCustodyMovements,
+  managementReturnablePolicies,
   managementSettlementSettings,
+  managementStockBalances,
+  managementStockLocations,
   memberships,
   organizations,
   outboxEvents,
@@ -22,6 +43,8 @@ import {
   posDiningTableGroupMembers,
   posDiningTableGroups,
   posDiningTables,
+  posFloorElements,
+  posFloorLayouts,
   posIdempotencyReceipts,
   posKdsAttentionAcknowledgements,
   posKdsBatchAssignments,
@@ -34,6 +57,7 @@ import {
   posModifierGroups,
   posModifierOptions,
   posOperationApprovals,
+  posOperationalPushSubscriptions,
   posOperationalShifts,
   posOrderItemModifiers,
   posOrderItems,
@@ -45,6 +69,8 @@ import {
   posPaymentReversals,
   posPaymentTerminalCertifications,
   posPrintJobs,
+  posPrintSplitParts,
+  posPrintSplits,
   posProductAvailability,
   posProductionStations,
   posProductModifierGroups,
@@ -60,7 +86,9 @@ import {
   posShiftSectionTables,
   posShiftTableLayouts,
   posShiftTableTransfers,
+  posTabCustomerLinks,
   posTabEvents,
+  posTableQrSettings,
   posTabPayments,
   posTabPresence,
   posTabs,
@@ -70,7 +98,15 @@ import {
   units,
   waitlistEntries,
 } from "@giromesa/db";
-import { billingAccess, hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
+import {
+  billingAccess,
+  encryptionKey,
+  encryptSecret,
+  floorPlacementConflicts,
+  hasPermission,
+  SYSTEM_ROLES,
+  type SystemRole,
+} from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
@@ -79,14 +115,21 @@ import {
   HttpStatus,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import * as argon2 from "argon2";
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { tablePresenceCode } from "../common/table-presence-code.js";
 import { DatabaseService } from "../database/database.module.js";
-import { resolveEstablishmentName } from "../organizations/establishment-settings.service.js";
+import { DoseClubIntegrationService } from "../doseclub-integration/doseclub-integration.service.js";
+import { loyaltyEarn } from "../growth/growth.rules.js";
+import { normalizeStoredBranding } from "../organizations/establishment-settings.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { bestPromotion, localCalendar } from "../public-menu/public-order-rules.js";
+import { tableAccessSecret } from "../public-menu/table-access-token.js";
 import {
+  allocatePrintSplitAmounts,
   approvalExpiresAt,
   assertKdsOrderHandoff,
   assertKdsTransition,
@@ -107,6 +150,7 @@ import {
   replayResult,
   requestHash,
   shouldAlertKdsCancellation,
+  suggestedServiceChargeBasisPoints,
   summarizeKdsDurations,
   tabTotals,
 } from "./pilot-rules.js";
@@ -117,6 +161,7 @@ import type {
   ClaimTabInput,
   CloseOperationalShiftInput,
   CloseTabInput,
+  CounterQueueQueryInput,
   DetachTableGroupInput,
   DiscountInput,
   FloorLayoutInput,
@@ -156,6 +201,7 @@ import type {
   PrintJobInput,
   PrintJobQueryInput,
   PrintJobStatusInput,
+  PrintSplitInput,
   ReopenTabInput,
   ReprintJobInput,
   RetryPrintJobInput,
@@ -166,8 +212,10 @@ import type {
   ShiftLayoutInput,
   ShiftSectionAssignmentInput,
   ShiftSectionCoverageInput,
+  ShiftSectionsBatchAssignmentInput,
   SplitTabInput,
   TableBatchInput,
+  TableEditInput,
   TableGroupInput,
   TableInput,
   TableTurnoverInput,
@@ -177,11 +225,36 @@ import type {
   TransferTabInput,
   UpdateTabInput,
 } from "./pilot-schemas.js";
-import { pointInsideFloorPolygon } from "./pilot-schemas.js";
 import { PilotSmartPosService } from "./pilot-smartpos.service.js";
+import { ProductionPrintingService } from "./production-printing.service.js";
 
 type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
+type CounterQueueStage = "new" | "production" | "ready" | "waiting" | "delivered" | "late";
+type CounterQueueRow = typeof posTabs.$inferSelect & { queueStage: CounterQueueStage };
+type OpenReturnableCustody = {
+  issueMovementId: string;
+  tabId: string;
+  containerInventoryItemId: string;
+  containerName: string;
+  openQuantity: string;
+  currentResponsibleIdentityId: string | null;
+};
+
+function returnableQuantityToMilli(value: string) {
+  const negative = value.startsWith("-");
+  const normalized = negative ? value.slice(1) : value;
+  const [whole = "0", fraction = ""] = normalized.split(".");
+  const milli = BigInt(whole) * 1_000n + BigInt(fraction.padEnd(3, "0").slice(0, 3));
+  return negative ? -milli : milli;
+}
+
+function returnableMilliToQuantity(value: bigint) {
+  const negative = value < 0n;
+  const absolute = negative ? -value : value;
+  const quantity = `${absolute / 1_000n}.${String(absolute % 1_000n).padStart(3, "0")}`;
+  return negative ? `-${quantity}` : quantity;
+}
 export type PaymentDeviceSignature = {
   credentialId?: string;
   timestamp?: string;
@@ -198,10 +271,289 @@ export class PilotPosService {
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
     private readonly smartPos: PilotSmartPosService = new PilotSmartPosService(database, scope),
+    private readonly productionPrinting?: ProductionPrintingService,
+    private readonly doseClub?: DoseClubIntegrationService,
   ) {}
 
   private async requireAccess(identityId: string, organizationId: string, unitId: string) {
     return this.scope.requireUnitAccess(identityId, organizationId, unitId);
+  }
+
+  private operationalPushPublicKey() {
+    const publicKey = process.env.WEB_PUSH_VAPID_PUBLIC_KEY?.trim() ?? "";
+    let encryptionConfigured = false;
+    try {
+      encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
+      encryptionConfigured = true;
+    } catch {
+      encryptionConfigured = false;
+    }
+    const configured =
+      /^[A-Za-z0-9_-]{87}$/.test(publicKey) &&
+      /^[A-Za-z0-9_-]{43}$/.test(process.env.WEB_PUSH_VAPID_PRIVATE_KEY?.trim() ?? "") &&
+      /^mailto:.+@.+|^https:\/\/.+/.test(process.env.WEB_PUSH_VAPID_SUBJECT?.trim() ?? "") &&
+      encryptionConfigured;
+    return configured ? publicKey : null;
+  }
+
+  private assertOperationalPushEndpoint(endpoint: string) {
+    const url = new URL(endpoint);
+    const host = url.hostname.toLowerCase();
+    const allowedSuffixes = [
+      "googleapis.com",
+      "push.services.mozilla.com",
+      "push.apple.com",
+      "notify.windows.com",
+    ];
+    if (
+      url.protocol !== "https:" ||
+      (url.port !== "" && url.port !== "443") ||
+      isIP(host) !== 0 ||
+      !allowedSuffixes.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+    ) {
+      throw new BadRequestException({
+        code: "WEB_PUSH_ENDPOINT_INVALID",
+        message: "O navegador informou um provedor de notificações não reconhecido.",
+      });
+    }
+  }
+
+  async operationalPushConfig(
+    identityId: string,
+    sessionId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    const publicKey = this.operationalPushPublicKey();
+    const [subscription] = await this.database.db
+      .select({ installationId: posOperationalPushSubscriptions.installationId })
+      .from(posOperationalPushSubscriptions)
+      .where(
+        and(
+          eq(posOperationalPushSubscriptions.installationId, installationId),
+          eq(posOperationalPushSubscriptions.organizationId, organizationId),
+          eq(posOperationalPushSubscriptions.unitId, unitId),
+          eq(posOperationalPushSubscriptions.identityId, identityId),
+          eq(posOperationalPushSubscriptions.sessionId, sessionId),
+          eq(posOperationalPushSubscriptions.enabled, true),
+        ),
+      )
+      .limit(1);
+    return { configured: publicKey !== null, publicKey, active: Boolean(subscription) };
+  }
+
+  async upsertOperationalPushSubscription(
+    identityId: string,
+    sessionId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+    input: OperationalPushSubscription,
+  ) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    if (!this.operationalPushPublicKey()) {
+      throw new HttpException(
+        {
+          code: "WEB_PUSH_NOT_CONFIGURED",
+          message: "As notificações externas ainda não foram configuradas nesta instalação.",
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    this.assertOperationalPushEndpoint(input.endpoint);
+    const expiresAt = input.expirationTime ? new Date(input.expirationTime) : null;
+    if (expiresAt && expiresAt <= new Date()) {
+      throw new BadRequestException({
+        code: "WEB_PUSH_SUBSCRIPTION_EXPIRED",
+        message: "A assinatura do navegador já expirou. Ative as notificações novamente.",
+      });
+    }
+    let envelope: ReturnType<typeof encryptSecret>;
+    try {
+      envelope = encryptSecret(
+        JSON.stringify(input),
+        encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY"),
+        `web-push:${installationId}`,
+      );
+    } catch {
+      throw new HttpException(
+        {
+          code: "WEB_PUSH_ENCRYPTION_UNAVAILABLE",
+          message: "As notificações externas estão temporariamente indisponíveis.",
+        },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+    const endpointHash = createHash("sha256").update(input.endpoint).digest("hex");
+    await this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`web-push:${endpointHash}`}))`);
+      await tx
+        .delete(posOperationalPushSubscriptions)
+        .where(
+          and(
+            eq(posOperationalPushSubscriptions.endpointHash, endpointHash),
+            ne(posOperationalPushSubscriptions.installationId, installationId),
+          ),
+        );
+      await tx
+        .insert(posOperationalPushSubscriptions)
+        .values({
+          installationId,
+          organizationId,
+          unitId,
+          identityId,
+          sessionId,
+          endpointHash,
+          encryptedSubscription: envelope.encryptedSecret,
+          encryptionIv: envelope.iv,
+          encryptionAuthTag: envelope.authTag,
+          subscriptionExpiresAt: expiresAt,
+          enabled: true,
+          lastFailedAt: null,
+          lastFailureCode: null,
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: posOperationalPushSubscriptions.installationId,
+          set: {
+            organizationId,
+            unitId,
+            identityId,
+            sessionId,
+            endpointHash,
+            encryptedSubscription: envelope.encryptedSecret,
+            encryptionIv: envelope.iv,
+            encryptionAuthTag: envelope.authTag,
+            subscriptionExpiresAt: expiresAt,
+            enabled: true,
+            lastFailedAt: null,
+            lastFailureCode: null,
+            updatedAt: new Date(),
+          },
+        });
+      await tx.insert(auditEvents).values({
+        organizationId,
+        actorIdentityId: identityId,
+        action: "pos.operational_push.subscribed",
+        entityType: "push_installation",
+        entityId: installationId,
+        metadata: { unitId },
+      });
+    });
+    return { configured: true, publicKey: this.operationalPushPublicKey(), active: true };
+  }
+
+  async removeOperationalPushSubscription(
+    identityId: string,
+    sessionId: string,
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    await this.database.db.transaction(async (tx) => {
+      const removed = await tx
+        .delete(posOperationalPushSubscriptions)
+        .where(
+          and(
+            eq(posOperationalPushSubscriptions.installationId, installationId),
+            eq(posOperationalPushSubscriptions.organizationId, organizationId),
+            eq(posOperationalPushSubscriptions.unitId, unitId),
+            eq(posOperationalPushSubscriptions.identityId, identityId),
+            eq(posOperationalPushSubscriptions.sessionId, sessionId),
+          ),
+        )
+        .returning({ installationId: posOperationalPushSubscriptions.installationId });
+      if (removed.length > 0) {
+        await tx.insert(auditEvents).values({
+          organizationId,
+          actorIdentityId: identityId,
+          action: "pos.operational_push.unsubscribed",
+          entityType: "push_installation",
+          entityId: installationId,
+          metadata: { unitId },
+        });
+      }
+    });
+  }
+
+  private async publicServiceIdentity(organizationId: string) {
+    const email = `public-orders+${organizationId}@system.giromesa.invalid`;
+    await this.database.db
+      .insert(identities)
+      .values({
+        email,
+        displayName: "Canal público de pedidos",
+        kind: "service",
+        emailVerifiedAt: new Date(),
+      })
+      .onConflictDoNothing();
+    const [identity] = await this.database.db
+      .select({ id: identities.id, kind: identities.kind })
+      .from(identities)
+      .where(eq(identities.email, email))
+      .limit(1);
+    if (identity?.kind !== "service") {
+      throw new Error("PUBLIC_ORDER_SERVICE_IDENTITY_UNAVAILABLE");
+    }
+    return identity.id;
+  }
+
+  private async tableBelongsToTab(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    tab: { id: string; tableId: string | null },
+  ) {
+    const [table] = await tx
+      .select({ id: posDiningTables.id })
+      .from(posDiningTables)
+      .where(
+        and(
+          eq(posDiningTables.organizationId, organizationId),
+          eq(posDiningTables.unitId, unitId),
+          eq(posDiningTables.id, tableId),
+          eq(posDiningTables.active, true),
+        ),
+      )
+      .limit(1);
+    if (!table) return false;
+    if (tab.tableId === tableId) return true;
+    const [group] = await tx
+      .select({ id: posDiningTableGroups.id })
+      .from(posDiningTableGroupMembers)
+      .innerJoin(
+        posDiningTableGroups,
+        and(
+          eq(posDiningTableGroups.organizationId, posDiningTableGroupMembers.organizationId),
+          eq(posDiningTableGroups.unitId, posDiningTableGroupMembers.unitId),
+          eq(posDiningTableGroups.id, posDiningTableGroupMembers.groupId),
+        ),
+      )
+      .where(
+        and(
+          eq(posDiningTableGroupMembers.organizationId, organizationId),
+          eq(posDiningTableGroupMembers.unitId, unitId),
+          eq(posDiningTableGroupMembers.tableId, tableId),
+          eq(posDiningTableGroups.primaryTabId, tab.id),
+          eq(posDiningTableGroups.mode, "single_tab"),
+          isNull(posDiningTableGroups.dissolvedAt),
+        ),
+      )
+      .limit(1);
+    return Boolean(group);
+  }
+
+  private assertPromisedAtNotPast(promisedAt: string | null | undefined) {
+    if (promisedAt && new Date(promisedAt).getTime() < Date.now() - 60_000) {
+      throw new BadRequestException({
+        code: "PROMISED_AT_IN_PAST",
+        message: "Informe um prazo futuro.",
+      });
+    }
   }
 
   private async createPosPayment(
@@ -618,11 +970,409 @@ export class PilotPosService {
     }
   }
 
+  private async restoreShiftTransferSnapshots(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    transfers: Array<{
+      id: string;
+      tabId: string | null;
+      previousShiftSectionId: string | null;
+      previousResponsibleIdentityId: string | null;
+      targetShiftSectionId: string;
+      appliedResponsibleIdentityId: string | null;
+      appliedTabVersion: number | null;
+    }>,
+  ) {
+    const restoredTabIds: string[] = [];
+    const preservedTabIds: string[] = [];
+    for (const transfer of transfers) {
+      if (!transfer.tabId || transfer.appliedTabVersion === null) continue;
+      const [tab] = await tx
+        .select({
+          id: posTabs.id,
+          status: posTabs.status,
+          shiftSectionId: posTabs.shiftSectionId,
+          responsibleIdentityId: posTabs.responsibleIdentityId,
+          version: posTabs.version,
+        })
+        .from(posTabs)
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.id, transfer.tabId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      const unchangedSinceTransfer =
+        tab?.status === "open" &&
+        tab.shiftSectionId === transfer.targetShiftSectionId &&
+        tab.responsibleIdentityId === transfer.appliedResponsibleIdentityId &&
+        tab.version === transfer.appliedTabVersion;
+      if (!tab || !unchangedSinceTransfer) {
+        preservedTabIds.push(transfer.tabId);
+        continue;
+      }
+      const [restored] = await tx
+        .update(posTabs)
+        .set({
+          shiftSectionId: transfer.previousShiftSectionId,
+          responsibleIdentityId: transfer.previousResponsibleIdentityId,
+          version: tab.version + 1,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.id, tab.id),
+            eq(posTabs.version, tab.version),
+          ),
+        )
+        .returning({ id: posTabs.id });
+      if (!restored) {
+        preservedTabIds.push(transfer.tabId);
+        continue;
+      }
+      restoredTabIds.push(tab.id);
+      await this.recordEvent(
+        tx,
+        actorIdentityId,
+        organizationId,
+        unitId,
+        tab.id,
+        "tab.handover_restored",
+        {
+          transferId: transfer.id,
+          shiftSectionId: transfer.previousShiftSectionId,
+          responsibleIdentityId: transfer.previousResponsibleIdentityId,
+        },
+      );
+    }
+    return { restoredTabIds, preservedTabIds };
+  }
+
+  private async reconcileExpiredShiftTableTransfers(
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+  ) {
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`pos-expired-transfer:${organizationId}:${unitId}`}))`,
+      );
+      const expired = await tx
+        .select({
+          id: posShiftTableTransfers.id,
+          tabId: posShiftTableTransfers.tabId,
+          previousShiftSectionId: posShiftTableTransfers.previousShiftSectionId,
+          previousResponsibleIdentityId: posShiftTableTransfers.previousResponsibleIdentityId,
+          targetShiftSectionId: posShiftTableTransfers.targetShiftSectionId,
+          appliedResponsibleIdentityId: posShiftTableTransfers.appliedResponsibleIdentityId,
+          appliedTabVersion: posShiftTableTransfers.appliedTabVersion,
+        })
+        .from(posShiftTableTransfers)
+        .where(
+          and(
+            eq(posShiftTableTransfers.organizationId, organizationId),
+            eq(posShiftTableTransfers.unitId, unitId),
+            isNull(posShiftTableTransfers.endedAt),
+            lte(posShiftTableTransfers.expiresAt, new Date()),
+          ),
+        )
+        .for("update");
+      if (!expired.length) return { restoredTabIds: [], preservedTabIds: [] };
+      const outcome = await this.restoreShiftTransferSnapshots(
+        tx,
+        actorIdentityId,
+        organizationId,
+        unitId,
+        expired,
+      );
+      const endedAt = new Date();
+      await tx
+        .update(posShiftTableTransfers)
+        .set({ endedAt, endedByIdentityId: actorIdentityId })
+        .where(
+          inArray(
+            posShiftTableTransfers.id,
+            expired.map(({ id }) => id),
+          ),
+        );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId,
+        action: "pos.shift_table.transfer_expired",
+        entityType: "unit",
+        entityId: unitId,
+        metadata: { transferIds: expired.map(({ id }) => id), ...outcome },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.shift_table.transfer_expired",
+        aggregateType: "unit",
+        aggregateId: unitId,
+        payload: { organizationId, unitId, ...outcome },
+      });
+      return outcome;
+    });
+  }
+
+  private async requireTabOperationalAccess(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabIds: string[],
+  ) {
+    const roles = await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
+    const scopedRoles = roles.filter((row) => row.unitId === null || row.unitId === unitId);
+    if (scopedRoles.some((row) => ["owner", "manager", "cashier"].includes(row.role))) return;
+    const uniqueTabIds = [...new Set(tabIds)];
+    const tabs = await this.database.db
+      .select({
+        id: posTabs.id,
+        tableId: posTabs.tableId,
+        operationalShiftId: posTabs.operationalShiftId,
+        shiftSectionId: posTabs.shiftSectionId,
+        responsibleIdentityId: posTabs.responsibleIdentityId,
+      })
+      .from(posTabs)
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationId),
+          eq(posTabs.unitId, unitId),
+          inArray(posTabs.id, uniqueTabIds),
+        ),
+      );
+    if (tabs.length !== uniqueTabIds.length) throw new NotFoundException({ code: "TAB_NOT_FOUND" });
+    const activeStaff = await this.database.db
+      .select({
+        shiftId: posShiftSectionStaff.shiftId,
+        shiftSectionId: posShiftSectionStaff.shiftSectionId,
+      })
+      .from(posShiftSectionStaff)
+      .innerJoin(
+        posOperationalShifts,
+        and(
+          eq(posOperationalShifts.organizationId, posShiftSectionStaff.organizationId),
+          eq(posOperationalShifts.unitId, posShiftSectionStaff.unitId),
+          eq(posOperationalShifts.id, posShiftSectionStaff.shiftId),
+        ),
+      )
+      .where(
+        and(
+          eq(posShiftSectionStaff.organizationId, organizationId),
+          eq(posShiftSectionStaff.unitId, unitId),
+          eq(posShiftSectionStaff.identityId, identityId),
+          eq(posOperationalShifts.status, "active"),
+        ),
+      );
+    const staffKeys = new Set(activeStaff.map((row) => `${row.shiftId}:${row.shiftSectionId}`));
+    const tableIds = tabs.flatMap((tab) => (tab.tableId ? [tab.tableId] : []));
+    const coordinatedTableIds = tableIds.length
+      ? new Set(
+          (
+            await this.database.db
+              .select({ tableId: posDiningTableGroupMembers.tableId })
+              .from(posDiningTableGroupMembers)
+              .innerJoin(
+                posDiningTableGroups,
+                and(
+                  eq(
+                    posDiningTableGroups.organizationId,
+                    posDiningTableGroupMembers.organizationId,
+                  ),
+                  eq(posDiningTableGroups.unitId, posDiningTableGroupMembers.unitId),
+                  eq(posDiningTableGroups.id, posDiningTableGroupMembers.groupId),
+                ),
+              )
+              .where(
+                and(
+                  eq(posDiningTableGroupMembers.organizationId, organizationId),
+                  eq(posDiningTableGroupMembers.unitId, unitId),
+                  inArray(posDiningTableGroupMembers.tableId, tableIds),
+                  eq(posDiningTableGroups.responsibleIdentityId, identityId),
+                  isNull(posDiningTableGroups.dissolvedAt),
+                ),
+              )
+          ).map(({ tableId }) => tableId),
+        )
+      : new Set<string>();
+    const deniedTabIds = tabs
+      .filter(
+        (tab) =>
+          tab.responsibleIdentityId !== identityId &&
+          !(tab.tableId && coordinatedTableIds.has(tab.tableId)) &&
+          !(
+            tab.operationalShiftId &&
+            tab.shiftSectionId &&
+            staffKeys.has(`${tab.operationalShiftId}:${tab.shiftSectionId}`)
+          ),
+      )
+      .map(({ id }) => id);
+    if (deniedTabIds.length) {
+      throw new ForbiddenException({
+        code: "TAB_OUTSIDE_OPERATIONAL_ASSIGNMENT",
+        tabIds: deniedTabIds,
+      });
+    }
+  }
+
+  private async terminalExecutionProfile(
+    organizationId: string,
+    unitId: string,
+    installationId: string,
+  ) {
+    const [profile] = await this.database.db
+      .select()
+      .from(posTerminalProfiles)
+      .where(
+        and(
+          eq(posTerminalProfiles.organizationId, organizationId),
+          eq(posTerminalProfiles.unitId, unitId),
+          eq(posTerminalProfiles.installationId, installationId),
+        ),
+      )
+      .limit(1);
+    if (!profile) throw new ConflictException({ code: "TERMINAL_PROFILE_REQUIRED" });
+    return profile;
+  }
+
+  private async canOperateCashier(identityId: string, organizationId: string, unitId: string) {
+    const roles = await this.scope.requireOrganizationRole(
+      identityId,
+      organizationId,
+      SYSTEM_ROLES,
+    );
+    return roles.some(
+      (row) =>
+        (row.unitId === null || row.unitId === unitId) &&
+        ["owner", "manager", "cashier"].includes(row.role),
+    );
+  }
+
+  private async printAccessScope(identityId: string, organizationId: string, unitId: string) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    const roles = await this.scope.requireOrganizationRole(
+      identityId,
+      organizationId,
+      SYSTEM_ROLES,
+    );
+    const scopedRoles = roles.filter((row) => row.unitId === null || row.unitId === unitId);
+    const canManage = scopedRoles.some((row) =>
+      hasPermission(row.role as SystemRole, "operations:printing:manage"),
+    );
+    const canRequest = scopedRoles.some((row) =>
+      hasPermission(row.role as SystemRole, "operations:printing:request"),
+    );
+    const isKds = scopedRoles.some((row) => row.role === "kds");
+    if (!canManage && !canRequest) {
+      throw new ForbiddenException({ code: "POS_CAPABILITY_DENIED" });
+    }
+    return { canManage, canRequest, isKds };
+  }
+
+  private assertPrintJobAccess(
+    access: { canManage: boolean; canRequest: boolean; isKds: boolean },
+    requestedByIdentityId: string,
+    identityId: string,
+    documentType?: string,
+  ) {
+    if (access.isKds && documentType === "kds_ticket") return;
+    if (!access.canManage && (!access.canRequest || requestedByIdentityId !== identityId)) {
+      throw new ForbiddenException({ code: "PRINT_JOB_OUTSIDE_REQUESTER_SCOPE" });
+    }
+  }
+
+  private async lockFloorLayoutRevision(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    expectedRevision: number,
+  ) {
+    await tx
+      .insert(posFloorLayouts)
+      .values({ organizationId, unitId, revision: 1, updatedByIdentityId: identityId })
+      .onConflictDoNothing({
+        target: [posFloorLayouts.organizationId, posFloorLayouts.unitId],
+      });
+    const [floorLayout] = await tx
+      .select()
+      .from(posFloorLayouts)
+      .where(
+        and(eq(posFloorLayouts.organizationId, organizationId), eq(posFloorLayouts.unitId, unitId)),
+      )
+      .for("update")
+      .limit(1);
+    if (!floorLayout) throw new Error("Floor layout revision row was not initialized");
+    if (floorLayout.revision !== expectedRevision) {
+      throw new ConflictException({
+        code: "FLOOR_LAYOUT_VERSION_CONFLICT",
+        expectedRevision,
+        currentRevision: floorLayout.revision,
+      });
+    }
+    return floorLayout;
+  }
+
+  private async bumpFloorLayoutRevision(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    currentRevision: number,
+  ) {
+    const [updatedFloorLayout] = await tx
+      .update(posFloorLayouts)
+      .set({
+        revision: currentRevision + 1,
+        updatedByIdentityId: identityId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(posFloorLayouts.organizationId, organizationId),
+          eq(posFloorLayouts.unitId, unitId),
+          eq(posFloorLayouts.revision, currentRevision),
+        ),
+      )
+      .returning();
+    if (!updatedFloorLayout) {
+      throw new ConflictException({ code: "FLOOR_LAYOUT_VERSION_CONFLICT" });
+    }
+    return updatedFloorLayout;
+  }
+
   async listFloor(identityId: string, organizationId: string, unitId: string) {
     await this.requireAccess(identityId, organizationId, unitId);
+    const roleRows = await this.scope.requireOrganizationRole(
+      identityId,
+      organizationId,
+      SYSTEM_ROLES,
+    );
+    await this.reconcileExpiredShiftTableTransfers(identityId, organizationId, unitId);
+    const scopedRoles = new Set(
+      roleRows
+        .filter((row) => row.unitId === null || row.unitId === unitId)
+        .map((row) => row.role as SystemRole),
+    );
+    const canAccessAllTabs = ["owner", "manager", "cashier"].some((role) =>
+      scopedRoles.has(role as SystemRole),
+    );
     const [
       rooms,
       tables,
+      floorLayouts,
+      floorElements,
       tabs,
       tableGroups,
       tableGroupMembers,
@@ -645,6 +1395,25 @@ export class PilotPosService {
           and(
             eq(posDiningTables.organizationId, organizationId),
             eq(posDiningTables.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(posFloorLayouts)
+        .where(
+          and(
+            eq(posFloorLayouts.organizationId, organizationId),
+            eq(posFloorLayouts.unitId, unitId),
+          ),
+        )
+        .limit(1),
+      this.database.db
+        .select()
+        .from(posFloorElements)
+        .where(
+          and(
+            eq(posFloorElements.organizationId, organizationId),
+            eq(posFloorElements.unitId, unitId),
           ),
         ),
       this.database.db
@@ -751,6 +1520,29 @@ export class PilotPosService {
             ),
           )
       : [];
+    const callPrintJobs = serviceCalls.length
+      ? await this.database.db
+          .select({
+            id: posPrintJobs.id,
+            serviceCallId: posPrintJobs.serviceCallId,
+            status: posPrintJobs.status,
+            requestedByIdentityId: posPrintJobs.requestedByIdentityId,
+            lastError: posPrintJobs.lastError,
+            createdAt: posPrintJobs.createdAt,
+          })
+          .from(posPrintJobs)
+          .where(
+            and(
+              eq(posPrintJobs.organizationId, organizationId),
+              eq(posPrintJobs.unitId, unitId),
+              inArray(
+                posPrintJobs.serviceCallId,
+                serviceCalls.map(({ id }) => id),
+              ),
+            ),
+          )
+          .orderBy(desc(posPrintJobs.createdAt))
+      : [];
     const tablePhases = tabs.flatMap((tab) => {
       if (!tab.tableId) return [];
       const orders = activeOrders.filter((order) => order.tabId === tab.id);
@@ -835,19 +1627,201 @@ export class PilotPosService {
                 eq(posShiftTableTransfers.unitId, unitId),
                 eq(posShiftTableTransfers.shiftId, activeShift.id),
                 isNull(posShiftTableTransfers.endedAt),
-                gt(posShiftTableTransfers.expiresAt, new Date()),
               ),
             ),
         ])
       : [[], [], [], [], []];
+    const assignedShiftSectionIds = new Set(
+      shiftSectionStaff
+        .filter((assignment) => assignment.identityId === identityId)
+        .map((assignment) => assignment.shiftSectionId),
+    );
+    const coordinatedGroupIds = new Set(
+      tableGroups
+        .filter((group) => group.responsibleIdentityId === identityId)
+        .map((group) => group.id),
+    );
+    const coordinatedTableIds = new Set(
+      tableGroupMembers
+        .filter((member) => coordinatedGroupIds.has(member.groupId))
+        .map((member) => member.tableId),
+    );
+    const fullTabIds = new Set(
+      tabs
+        .filter(
+          (tab) =>
+            canAccessAllTabs ||
+            tab.responsibleIdentityId === identityId ||
+            (tab.tableId !== null && coordinatedTableIds.has(tab.tableId)) ||
+            (tab.shiftSectionId !== null && assignedShiftSectionIds.has(tab.shiftSectionId)),
+        )
+        .map((tab) => tab.id),
+    );
+    const visibleTabs = tabs.filter((tab) => fullTabIds.has(tab.id));
+    const visibleTabIds = visibleTabs.map((tab) => tab.id);
+    const [tabPaymentTotals, tabReversalTotals, activePaymentAttempts, tabLossTotals] =
+      visibleTabIds.length
+        ? await Promise.all([
+            this.database.db
+              .select({
+                tabId: posTabPayments.tabId,
+                paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)`,
+              })
+              .from(posTabPayments)
+              .where(
+                and(
+                  eq(posTabPayments.organizationId, organizationId),
+                  eq(posTabPayments.unitId, unitId),
+                  inArray(posTabPayments.tabId, visibleTabIds),
+                ),
+              )
+              .groupBy(posTabPayments.tabId),
+            this.database.db
+              .select({
+                tabId: posTabPayments.tabId,
+                reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`,
+              })
+              .from(posPaymentReversals)
+              .innerJoin(posTabPayments, eq(posTabPayments.id, posPaymentReversals.paymentId))
+              .where(
+                and(
+                  eq(posPaymentReversals.organizationId, organizationId),
+                  eq(posPaymentReversals.unitId, unitId),
+                  eq(posPaymentReversals.status, "approved"),
+                  inArray(posTabPayments.tabId, visibleTabIds),
+                ),
+              )
+              .groupBy(posTabPayments.tabId),
+            this.database.db
+              .select({ tabId: posPaymentAttempts.tabId })
+              .from(posPaymentAttempts)
+              .where(
+                and(
+                  eq(posPaymentAttempts.organizationId, organizationId),
+                  eq(posPaymentAttempts.unitId, unitId),
+                  inArray(posPaymentAttempts.tabId, visibleTabIds),
+                  or(
+                    inArray(posPaymentAttempts.status, ["processing", "unknown"]),
+                    and(
+                      eq(posPaymentAttempts.status, "created"),
+                      gt(posPaymentAttempts.expiresAt, new Date()),
+                    ),
+                  ),
+                ),
+              )
+              .groupBy(posPaymentAttempts.tabId),
+            this.database.db
+              .select({
+                tabId: managementOperationalLosses.tabId,
+                coveredLossCents: sql<number>`coalesce(sum(${managementOperationalLosses.amountCents}), 0)`,
+              })
+              .from(managementOperationalLosses)
+              .where(
+                and(
+                  eq(managementOperationalLosses.organizationId, organizationId),
+                  eq(managementOperationalLosses.unitId, unitId),
+                  inArray(managementOperationalLosses.tabId, visibleTabIds),
+                  eq(managementOperationalLosses.status, "approved"),
+                  eq(managementOperationalLosses.type, "unpaid_tab"),
+                ),
+              )
+              .groupBy(managementOperationalLosses.tabId),
+          ])
+        : [[], [], [], []];
+    const paidByTabId = new Map(tabPaymentTotals.map((row) => [row.tabId, Number(row.paidCents)]));
+    const reversedByTabId = new Map(
+      tabReversalTotals.map((row) => [row.tabId, Number(row.reversedCents)]),
+    );
+    const activeAttemptTabIds = new Set(activePaymentAttempts.map((row) => row.tabId));
+    const lossByTabId = new Map(
+      tabLossTotals.map((row) => [row.tabId, Number(row.coveredLossCents)]),
+    );
+    const visibleTabsWithMergePolicy = visibleTabs.map((tab) => {
+      const paidCents = (paidByTabId.get(tab.id) ?? 0) - (reversedByTabId.get(tab.id) ?? 0);
+      const blockedReason = activeAttemptTabIds.has(tab.id)
+        ? ("active_payment_attempt" as const)
+        : paidCents > 0
+          ? ("payment_recorded" as const)
+          : (lossByTabId.get(tab.id) ?? 0) > 0
+            ? ("covered_loss" as const)
+            : null;
+      return {
+        ...tab,
+        structuralMergeAllowed: blockedReason === null,
+        structuralMergeBlockedReason: blockedReason,
+      };
+    });
+    const openTabByTableId = new Map(
+      tabs.flatMap((tab) => (tab.tableId ? [[tab.tableId, tab] as const] : [])),
+    );
+    const staffNameByIdentityId = new Map(
+      staff.map(({ identityId: staffIdentityId, displayName }) => [staffIdentityId, displayName]),
+    );
+    const elevatedFloorAccess = scopedRoles.has("owner") || scopedRoles.has("manager");
+    const cashierFloorAccess = scopedRoles.has("cashier");
+    const canManagePrint = [...scopedRoles].some((role) =>
+      hasPermission(role, "operations:printing:manage"),
+    );
     return {
       rooms: rooms.map(({ legacyResponsibleIdentityId: _legacy, ...room }) => room),
-      tables,
-      openTabs: tabs,
-      tableGroups,
+      floorRevision: floorLayouts[0]?.revision ?? 1,
+      layoutElements: floorElements.map(
+        ({ layoutX, layoutY, layoutWidth, layoutHeight, layoutRotation, ...element }) => ({
+          ...element,
+          x: layoutX,
+          y: layoutY,
+          width: layoutWidth,
+          height: layoutHeight,
+          rotation: layoutRotation,
+        }),
+      ),
+      tables: tables.map((table) => ({
+        ...table,
+        openedAt: openTabByTableId.get(table.id)?.createdAt ?? null,
+        responsibleDisplayName: openTabByTableId.get(table.id)?.responsibleIdentityId
+          ? (staffNameByIdentityId.get(
+              openTabByTableId.get(table.id)?.responsibleIdentityId as string,
+            ) ?? null)
+          : null,
+        accessLevel: elevatedFloorAccess
+          ? ("manage" as const)
+          : cashierFloorAccess
+            ? ("financial" as const)
+            : openTabByTableId.get(table.id) &&
+                fullTabIds.has(openTabByTableId.get(table.id)?.id as string)
+              ? ("operate" as const)
+              : ("overview" as const),
+      })),
+      openTabs: visibleTabsWithMergePolicy,
+      tableGroups: tableGroups.map((group) => ({
+        ...group,
+        primaryTabId:
+          group.primaryTabId && fullTabIds.has(group.primaryTabId) ? group.primaryTabId : null,
+      })),
       tableGroupMembers,
-      serviceCalls,
-      tablePhases,
+      serviceCalls: serviceCalls.map((call) => {
+        const printJob = callPrintJobs.find((candidate) => candidate.serviceCallId === call.id);
+        const canReadPrintJob =
+          canManagePrint ||
+          Boolean(call.tabId && fullTabIds.has(call.tabId)) ||
+          printJob?.requestedByIdentityId === identityId;
+        return {
+          ...call,
+          tabId: call.tabId && fullTabIds.has(call.tabId) ? call.tabId : null,
+          printStatus: printJob?.status ?? null,
+          printJobId: printJob && canReadPrintJob ? printJob.id : null,
+          printLastErrorCode:
+            printJob && canReadPrintJob && printJob.lastError
+              ? printJob.lastError === "PRINTER_RESULT_UNKNOWN"
+                ? "PRINTER_RESULT_UNKNOWN"
+                : "PRINT_FAILED"
+              : null,
+        };
+      }),
+      tablePhases: tablePhases.map((phase) => ({
+        ...phase,
+        tabId: fullTabIds.has(phase.tabId) ? phase.tabId : null,
+      })),
       staff,
       serviceSections: sections,
       serviceSectionTables: sectionTables,
@@ -855,13 +1829,69 @@ export class PilotPosService {
       shiftSections,
       shiftSectionTables,
       shiftSectionStaff,
-      shiftTableLayouts: shiftTableLayouts.map(({ layoutX, layoutY, ...layout }) => ({
-        ...layout,
-        x: layoutX,
-        y: layoutY,
+      shiftTableLayouts: shiftTableLayouts.map(
+        ({ layoutX, layoutY, layoutRotation, ...layout }) => ({
+          ...layout,
+          x: layoutX,
+          y: layoutY,
+          rotation: layoutRotation,
+        }),
+      ),
+      shiftRevision: activeShift?.assignmentRevision ?? null,
+      shiftTableTransfers: shiftTableTransfers.map((transfer) => ({
+        ...transfer,
+        tabId: transfer.tabId && fullTabIds.has(transfer.tabId) ? transfer.tabId : null,
+        expired: transfer.expiresAt <= new Date(),
+        confirmationRequired:
+          transfer.expiresAt <= new Date() && transfer.tabId !== null ? "restore_transfer" : null,
       })),
-      shiftTableTransfers,
+      capabilities: {
+        canManageFloor: [...scopedRoles].some((role) =>
+          hasPermission(role, "operations:floor:manage"),
+        ),
+        canManageShift: [...scopedRoles].some((role) =>
+          hasPermission(role, "operations:shift:manage"),
+        ),
+        canReorganizeTables: [...scopedRoles].some((role) =>
+          hasPermission(role, "operations:tables:reorganize"),
+        ),
+        canRequestPrint: [...scopedRoles].some((role) =>
+          hasPermission(role, "operations:printing:request"),
+        ),
+        canManagePrint,
+        canAccessAllTabs,
+      },
       serviceMode: activeShift?.serviceMode ?? "hybrid",
+    };
+  }
+
+  async tableQrPresence(identityId: string, organizationId: string, unitId: string) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    const [settings, unit] = await Promise.all([
+      this.database.db
+        .select({ presenceProtection: posTableQrSettings.presenceProtection })
+        .from(posTableQrSettings)
+        .where(
+          and(
+            eq(posTableQrSettings.organizationId, organizationId),
+            eq(posTableQrSettings.unitId, unitId),
+          ),
+        )
+        .limit(1),
+      this.database.db
+        .select({ timezone: units.timezone })
+        .from(units)
+        .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+        .limit(1),
+    ]);
+    if (!unit[0]) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const mode = settings[0]?.presenceProtection === "daily_code" ? "daily_code" : "session_only";
+    return {
+      mode,
+      code:
+        mode === "daily_code"
+          ? tablePresenceCode(tableAccessSecret(), organizationId, unitId, unit[0].timezone)
+          : null,
     };
   }
 
@@ -871,13 +1901,41 @@ export class PilotPosService {
     unitId: string,
     input: FloorLayoutInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
     const tableIds = input.tables.map((table) => table.tableId);
-    const roomIds = input.rooms.map((room) => room.roomId);
+    const requestedRoomIds = [
+      ...new Set([
+        ...input.rooms.map((room) => room.roomId),
+        ...input.tables.map((table) => table.roomId),
+        ...(input.layoutElements?.map((element) => element.roomId) ?? []),
+      ]),
+    ];
     return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        input.expectedRevision,
+      );
       const scopedTables = tableIds.length
         ? await tx
-            .select({ id: posDiningTables.id })
+            .select({
+              id: posDiningTables.id,
+              roomId: posDiningTables.roomId,
+              label: posDiningTables.label,
+              status: posDiningTables.status,
+              layoutX: posDiningTables.layoutX,
+              layoutY: posDiningTables.layoutY,
+              layoutWidth: posDiningTables.layoutWidth,
+              layoutHeight: posDiningTables.layoutHeight,
+              layoutRotation: posDiningTables.layoutRotation,
+            })
             .from(posDiningTables)
             .where(
               and(
@@ -894,9 +1952,25 @@ export class PilotPosService {
           message: "Uma ou mais mesas não pertencem a esta unidade ou estão inativas.",
         });
       }
+      const inputTableById = new Map(input.tables.map((table) => [table.tableId, table]));
+      const blockedMove = scopedTables.find((table) => {
+        const next = inputTableById.get(table.id);
+        return (
+          next && next.roomId !== table.roomId && ["occupied", "reserved"].includes(table.status)
+        );
+      });
+      if (blockedMove) {
+        throw new ConflictException({
+          code: "ACTIVE_TABLE_CANNOT_CHANGE_ROOM",
+          tableId: blockedMove.id,
+        });
+      }
+      const roomIds = [
+        ...new Set([...requestedRoomIds, ...scopedTables.map((table) => table.roomId)]),
+      ];
       const scopedRooms = roomIds.length
         ? await tx
-            .select({ id: posDiningRooms.id })
+            .select({ id: posDiningRooms.id, layoutPolygon: posDiningRooms.layoutPolygon })
             .from(posDiningRooms)
             .where(
               and(
@@ -913,48 +1987,187 @@ export class PilotPosService {
           message: "Um ou mais ambientes não pertencem a esta unidade ou estão inativos.",
         });
       }
-      const roomTables = roomIds.length
-        ? await tx
-            .select({
-              id: posDiningTables.id,
-              roomId: posDiningTables.roomId,
-              layoutX: posDiningTables.layoutX,
-              layoutY: posDiningTables.layoutY,
-            })
-            .from(posDiningTables)
+      const storedFloorElements = await tx
+        .select()
+        .from(posFloorElements)
+        .where(
+          and(
+            eq(posFloorElements.organizationId, organizationId),
+            eq(posFloorElements.unitId, unitId),
+          ),
+        );
+      const floorElementsForValidation =
+        input.layoutElements ??
+        storedFloorElements.map((element) => ({
+          id: element.id,
+          roomId: element.roomId,
+          kind: element.kind as "label" | "barrier",
+          label: element.label ?? undefined,
+          x: element.layoutX,
+          y: element.layoutY,
+          width: element.layoutWidth,
+          height: element.layoutHeight,
+          rotation: element.layoutRotation,
+        }));
+      const roomTables =
+        roomIds.length || tableIds.length
+          ? await tx
+              .select({
+                id: posDiningTables.id,
+                roomId: posDiningTables.roomId,
+                label: posDiningTables.label,
+                layoutX: posDiningTables.layoutX,
+                layoutY: posDiningTables.layoutY,
+                layoutWidth: posDiningTables.layoutWidth,
+                layoutHeight: posDiningTables.layoutHeight,
+                layoutRotation: posDiningTables.layoutRotation,
+              })
+              .from(posDiningTables)
+              .where(
+                and(
+                  eq(posDiningTables.organizationId, organizationId),
+                  eq(posDiningTables.unitId, unitId),
+                  eq(posDiningTables.active, true),
+                  or(
+                    ...(roomIds.length ? [inArray(posDiningTables.roomId, roomIds)] : []),
+                    ...(tableIds.length ? [inArray(posDiningTables.id, tableIds)] : []),
+                  ),
+                ),
+              )
+          : [];
+      const nextTablePositions = new Map(
+        input.tables.map((table) => [
+          table.tableId,
+          {
+            roomId: table.roomId,
+            x: table.x,
+            y: table.y,
+            width: table.width,
+            height: table.height,
+            rotation: table.rotation,
+          },
+        ]),
+      );
+      const inputRoomById = new Map(input.rooms.map((room) => [room.roomId, room.points]));
+      const validationRooms = scopedRooms.map((room) => ({
+        roomId: room.id,
+        points: inputRoomById.get(room.id) ?? room.layoutPolygon ?? [],
+      }));
+      for (const room of validationRooms) {
+        if (room.points.length < 3) {
+          throw new BadRequestException({
+            code: "FLOOR_LAYOUT_ROOM_GEOMETRY_REQUIRED",
+            roomId: room.roomId,
+          });
+        }
+        const occupied: Array<{
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          rotation: number;
+        }> = [];
+        const barriers = floorElementsForValidation
+          .filter((element) => element.roomId === room.roomId && element.kind === "barrier")
+          .map((element) => ({
+            x: element.x,
+            y: element.y,
+            width: element.width,
+            height: element.height,
+            rotation: element.rotation,
+          }));
+        const invalid = roomTables.find((table) => {
+          const nextPosition = nextTablePositions.get(table.id);
+          if ((nextPosition?.roomId ?? table.roomId) !== room.roomId) return false;
+          const placement =
+            nextPosition ??
+            (table.layoutX !== null && table.layoutY !== null
+              ? {
+                  x: table.layoutX,
+                  y: table.layoutY,
+                  width: table.layoutWidth,
+                  height: table.layoutHeight,
+                  rotation: table.layoutRotation,
+                }
+              : null);
+          if (!placement) return false;
+          const conflicts = floorPlacementConflicts(placement, room.points, occupied, barriers);
+          occupied.push(placement);
+          return conflicts.outsideRoom || conflicts.overlapsObject || conflicts.overlapsBarrier;
+        });
+        if (invalid) {
+          throw new BadRequestException({
+            code: "FLOOR_LAYOUT_GEOMETRY_CONFLICT",
+            message: "Uma mesa ficou fora do ambiente ou sobreposta a outra mesa/barreira.",
+            tableId: invalid.id,
+          });
+        }
+        const outsideElement = floorElementsForValidation.find(
+          (element) =>
+            element.roomId === room.roomId &&
+            floorPlacementConflicts(
+              {
+                x: element.x,
+                y: element.y,
+                width: element.width,
+                height: element.height,
+                rotation: element.rotation,
+              },
+              room.points,
+              [],
+              [],
+            ).outsideRoom,
+        );
+        if (outsideElement) {
+          throw new BadRequestException({
+            code: "FLOOR_LAYOUT_ELEMENT_OUTSIDE_ROOM",
+            elementId: outsideElement.id ?? null,
+            roomId: room.roomId,
+          });
+        }
+      }
+      const finalLabels = new Map<string, string>();
+      for (const table of roomTables) {
+        const next = inputTableById.get(table.id);
+        const key = `${next?.roomId ?? table.roomId}:${(next?.label ?? table.label).toLocaleLowerCase("pt-BR")}`;
+        const conflictingTableId = finalLabels.get(key);
+        if (conflictingTableId && conflictingTableId !== table.id) {
+          throw new ConflictException({
+            code: "TABLE_LABEL_CONFLICT",
+            tableIds: [conflictingTableId, table.id],
+          });
+        }
+        finalLabels.set(key, table.id);
+      }
+      if (input.tables.length) {
+        for (const table of input.tables) {
+          await tx
+            .update(posDiningTables)
+            .set({ label: `__layout_${table.tableId}`, updatedAt: new Date() })
             .where(
               and(
                 eq(posDiningTables.organizationId, organizationId),
                 eq(posDiningTables.unitId, unitId),
-                eq(posDiningTables.active, true),
-                inArray(posDiningTables.roomId, roomIds),
+                eq(posDiningTables.id, table.tableId),
               ),
-            )
-        : [];
-      const nextTablePositions = new Map(
-        input.tables.map((table) => [table.tableId, { x: table.x, y: table.y }]),
-      );
-      for (const room of input.rooms) {
-        const outside = roomTables.find((table) => {
-          if (table.roomId !== room.roomId) return false;
-          const position =
-            nextTablePositions.get(table.id) ??
-            (table.layoutX !== null && table.layoutY !== null
-              ? { x: table.layoutX, y: table.layoutY }
-              : null);
-          return position ? !pointInsideFloorPolygon(position, room.points) : false;
-        });
-        if (outside) {
-          throw new BadRequestException({
-            code: "FLOOR_LAYOUT_TABLE_OUTSIDE_ROOM",
-            message: "Ajuste as paredes: uma ou mais mesas ficaram fora do ambiente.",
-          });
+            );
         }
       }
       for (const table of input.tables) {
         await tx
           .update(posDiningTables)
-          .set({ layoutX: table.x, layoutY: table.y, updatedAt: new Date() })
+          .set({
+            roomId: table.roomId,
+            label: table.label,
+            seats: table.seats,
+            layoutX: table.x,
+            layoutY: table.y,
+            layoutWidth: table.width,
+            layoutHeight: table.height,
+            layoutRotation: table.rotation,
+            layoutShape: table.shape,
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(posDiningTables.organizationId, organizationId),
@@ -975,6 +2188,44 @@ export class PilotPosService {
             ),
           );
       }
+      let elements = storedFloorElements;
+      if (input.layoutElements) {
+        await tx
+          .delete(posFloorElements)
+          .where(
+            and(
+              eq(posFloorElements.organizationId, organizationId),
+              eq(posFloorElements.unitId, unitId),
+            ),
+          );
+        elements = input.layoutElements.length
+          ? await tx
+              .insert(posFloorElements)
+              .values(
+                input.layoutElements.map((element) => ({
+                  ...(element.id ? { id: element.id } : {}),
+                  organizationId,
+                  unitId,
+                  roomId: element.roomId,
+                  kind: element.kind,
+                  label: element.label,
+                  layoutX: element.x,
+                  layoutY: element.y,
+                  layoutWidth: element.width,
+                  layoutHeight: element.height,
+                  layoutRotation: element.rotation,
+                })),
+              )
+              .returning()
+          : [];
+      }
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
       await tx.insert(auditEvents).values({
         organizationId,
         unitId,
@@ -982,9 +2233,41 @@ export class PilotPosService {
         action: "pos.floor_layout.updated",
         entityType: "unit",
         entityId: unitId,
-        metadata: { tableIds, roomIds },
+        metadata: {
+          tableIds,
+          roomIds,
+          elementIds: elements.map((element) => element.id),
+          revision: updatedFloorLayout.revision,
+        },
       });
-      return { tables: input.tables, rooms: input.rooms };
+      await tx.insert(outboxEvents).values({
+        topic: "pos.floor_layout.updated",
+        aggregateType: "unit",
+        aggregateId: unitId,
+        payload: {
+          organizationId,
+          unitId,
+          revision: updatedFloorLayout.revision,
+          tableIds,
+          roomIds,
+          elementIds: elements.map((element) => element.id),
+        },
+      });
+      return {
+        revision: updatedFloorLayout.revision,
+        tables: input.tables,
+        rooms: input.rooms,
+        layoutElements: elements.map(
+          ({ layoutX, layoutY, layoutWidth, layoutHeight, layoutRotation, ...element }) => ({
+            ...element,
+            x: layoutX,
+            y: layoutY,
+            width: layoutWidth,
+            height: layoutHeight,
+            rotation: layoutRotation,
+          }),
+        ),
+      };
     });
   }
 
@@ -995,14 +2278,18 @@ export class PilotPosService {
     shiftId: string,
     input: ShiftLayoutInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-    ]);
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:shift:manage",
+    );
     return this.database.db.transaction(async (tx) => {
       const [shift] = await tx
-        .select({ id: posOperationalShifts.id })
+        .select({
+          id: posOperationalShifts.id,
+          assignmentRevision: posOperationalShifts.assignmentRevision,
+        })
         .from(posOperationalShifts)
         .where(
           and(
@@ -1012,13 +2299,29 @@ export class PilotPosService {
             eq(posOperationalShifts.status, "active"),
           ),
         )
+        .for("update")
         .limit(1);
       if (!shift) throw new NotFoundException({ code: "ACTIVE_SHIFT_NOT_FOUND" });
+      if (input.expectedRevision !== shift.assignmentRevision) {
+        throw new ConflictException({
+          code: "SHIFT_LAYOUT_VERSION_CONFLICT",
+          expectedRevision: input.expectedRevision,
+          currentRevision: shift.assignmentRevision,
+        });
+      }
       const tableIds = input.tables.map((table) => table.tableId);
       const roomIds = [...new Set(input.tables.map((table) => table.roomId))];
       const [tables, rooms] = await Promise.all([
         tx
-          .select({ id: posDiningTables.id })
+          .select({
+            id: posDiningTables.id,
+            roomId: posDiningTables.roomId,
+            x: posDiningTables.layoutX,
+            y: posDiningTables.layoutY,
+            width: posDiningTables.layoutWidth,
+            height: posDiningTables.layoutHeight,
+            rotation: posDiningTables.layoutRotation,
+          })
           .from(posDiningTables)
           .where(
             and(
@@ -1044,16 +2347,91 @@ export class PilotPosService {
         throw new NotFoundException({ code: "SHIFT_LAYOUT_ENTITY_NOT_FOUND" });
       }
       const roomById = new Map(rooms.map((room) => [room.id, room]));
-      const outside = input.tables.find((table) => {
-        const polygon = roomById.get(table.roomId)?.polygon;
-        return polygon && !pointInsideFloorPolygon({ x: table.x, y: table.y }, polygon);
-      });
-      if (outside) {
-        throw new BadRequestException({
-          code: "SHIFT_LAYOUT_OUTSIDE_ROOM",
-          message: "A mesa temporária precisa ficar dentro de um ambiente físico.",
-          tableId: outside.tableId,
-        });
+      const [barriers, permanentRoomTables] = await Promise.all([
+        tx
+          .select()
+          .from(posFloorElements)
+          .where(
+            and(
+              eq(posFloorElements.organizationId, organizationId),
+              eq(posFloorElements.unitId, unitId),
+              eq(posFloorElements.kind, "barrier"),
+              inArray(posFloorElements.roomId, roomIds),
+            ),
+          ),
+        tx
+          .select({
+            id: posDiningTables.id,
+            roomId: posDiningTables.roomId,
+            x: posDiningTables.layoutX,
+            y: posDiningTables.layoutY,
+            width: posDiningTables.layoutWidth,
+            height: posDiningTables.layoutHeight,
+            rotation: posDiningTables.layoutRotation,
+          })
+          .from(posDiningTables)
+          .where(
+            and(
+              eq(posDiningTables.organizationId, organizationId),
+              eq(posDiningTables.unitId, unitId),
+              eq(posDiningTables.active, true),
+              inArray(posDiningTables.roomId, roomIds),
+            ),
+          ),
+      ]);
+      const movedTableIds = new Set(tableIds);
+      for (const roomId of roomIds) {
+        const polygon = roomById.get(roomId)?.polygon;
+        if (!polygon || polygon.length < 3) {
+          throw new BadRequestException({ code: "SHIFT_LAYOUT_ROOM_GEOMETRY_REQUIRED", roomId });
+        }
+        const occupied = permanentRoomTables
+          .filter(
+            (table) =>
+              table.roomId === roomId &&
+              !movedTableIds.has(table.id) &&
+              table.x !== null &&
+              table.y !== null,
+          )
+          .map((table) => ({
+            x: table.x as number,
+            y: table.y as number,
+            width: table.width,
+            height: table.height,
+            rotation: table.rotation,
+          }));
+        for (const layout of input.tables.filter((table) => table.roomId === roomId)) {
+          const table = tables.find((candidate) => candidate.id === layout.tableId);
+          if (!table) continue;
+          const placement = {
+            x: layout.x,
+            y: layout.y,
+            width: table.width,
+            height: table.height,
+            rotation: layout.rotation,
+          };
+          const conflicts = floorPlacementConflicts(
+            placement,
+            polygon,
+            occupied,
+            barriers
+              .filter((barrier) => barrier.roomId === roomId)
+              .map((barrier) => ({
+                x: barrier.layoutX,
+                y: barrier.layoutY,
+                width: barrier.layoutWidth,
+                height: barrier.layoutHeight,
+                rotation: barrier.layoutRotation,
+              })),
+          );
+          if (conflicts.outsideRoom || conflicts.overlapsObject || conflicts.overlapsBarrier) {
+            throw new BadRequestException({
+              code: "SHIFT_LAYOUT_GEOMETRY_CONFLICT",
+              tableId: layout.tableId,
+            });
+          }
+          occupied.push(placement);
+        }
       }
       await tx
         .delete(posShiftTableLayouts)
@@ -1073,6 +2451,7 @@ export class PilotPosService {
           roomId: table.roomId,
           layoutX: table.x,
           layoutY: table.y,
+          layoutRotation: table.rotation,
           movedByIdentityId: identityId,
         })),
       );
@@ -1083,19 +2462,230 @@ export class PilotPosService {
         action: "pos.shift_layout.updated",
         entityType: "operational_shift",
         entityId: shiftId,
-        metadata: { tableCount: input.tables.length },
+        metadata: { tableCount: input.tables.length, revision: shift.assignmentRevision + 1 },
       });
-      return { shiftId, tables: input.tables };
+      const [updatedShift] = await tx
+        .update(posOperationalShifts)
+        .set({ assignmentRevision: shift.assignmentRevision + 1, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posOperationalShifts.organizationId, organizationId),
+            eq(posOperationalShifts.unitId, unitId),
+            eq(posOperationalShifts.id, shiftId),
+            eq(posOperationalShifts.assignmentRevision, shift.assignmentRevision),
+          ),
+        )
+        .returning({ assignmentRevision: posOperationalShifts.assignmentRevision });
+      if (!updatedShift) throw new ConflictException({ code: "SHIFT_LAYOUT_VERSION_CONFLICT" });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.shift_layout.updated",
+        aggregateType: "operational_shift",
+        aggregateId: shiftId,
+        payload: {
+          organizationId,
+          unitId,
+          shiftId,
+          revision: updatedShift.assignmentRevision,
+          tableIds,
+        },
+      });
+      return {
+        shiftId,
+        shiftRevision: updatedShift.assignmentRevision,
+        tables: input.tables,
+      };
     });
   }
 
   async createRoom(identityId: string, organizationId: string, unitId: string, input: RoomInput) {
-    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
-    const [room] = await this.database.db
-      .insert(posDiningRooms)
-      .values({ organizationId, unitId, ...input })
-      .returning();
-    return room;
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        input.expectedRevision,
+      );
+      const roomInput = { name: input.name, sortOrder: input.sortOrder };
+      const [room] = await tx
+        .insert(posDiningRooms)
+        .values({ organizationId, unitId, ...roomInput })
+        .returning();
+      if (!room) throw new Error("Room insert did not return a row");
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.room.created",
+        entityType: "dining_room",
+        entityId: room.id,
+        metadata: { ...roomInput, revision: updatedFloorLayout.revision },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.room.created",
+        aggregateType: "dining_room",
+        aggregateId: room.id,
+        payload: {
+          organizationId,
+          unitId,
+          roomId: room.id,
+          revision: updatedFloorLayout.revision,
+        },
+      });
+      return { ...room, floorRevision: updatedFloorLayout.revision };
+    });
+  }
+
+  async updateRoom(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    roomId: string,
+    input: RoomInput,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        input.expectedRevision,
+      );
+      const roomInput = { name: input.name, sortOrder: input.sortOrder };
+      const [room] = await tx
+        .update(posDiningRooms)
+        .set({ ...roomInput, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posDiningRooms.organizationId, organizationId),
+            eq(posDiningRooms.unitId, unitId),
+            eq(posDiningRooms.id, roomId),
+            eq(posDiningRooms.active, true),
+          ),
+        )
+        .returning();
+      if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND" });
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.room.updated",
+        entityType: "dining_room",
+        entityId: roomId,
+        metadata: { ...roomInput, revision: updatedFloorLayout.revision },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.room.updated",
+        aggregateType: "dining_room",
+        aggregateId: roomId,
+        payload: { organizationId, unitId, roomId, revision: updatedFloorLayout.revision },
+      });
+      return { ...room, floorRevision: updatedFloorLayout.revision };
+    });
+  }
+
+  async archiveRoom(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    roomId: string,
+    expectedRevision: number,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        expectedRevision,
+      );
+      const activeTables = await tx
+        .select({ id: posDiningTables.id, status: posDiningTables.status })
+        .from(posDiningTables)
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.roomId, roomId),
+            eq(posDiningTables.active, true),
+          ),
+        )
+        .for("update");
+      if (activeTables.length) {
+        throw new ConflictException({
+          code: "ROOM_HAS_ACTIVE_TABLES",
+          tableIds: activeTables.map(({ id }) => id),
+        });
+      }
+      const [room] = await tx
+        .update(posDiningRooms)
+        .set({ active: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posDiningRooms.organizationId, organizationId),
+            eq(posDiningRooms.unitId, unitId),
+            eq(posDiningRooms.id, roomId),
+            eq(posDiningRooms.active, true),
+          ),
+        )
+        .returning();
+      if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND" });
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.room.archived",
+        entityType: "dining_room",
+        entityId: roomId,
+        metadata: { revision: updatedFloorLayout.revision },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.room.archived",
+        aggregateType: "dining_room",
+        aggregateId: roomId,
+        payload: { organizationId, unitId, roomId, revision: updatedFloorLayout.revision },
+      });
+      return { roomId, archived: true, floorRevision: updatedFloorLayout.revision };
+    });
   }
 
   async createServiceSection(
@@ -1176,7 +2766,184 @@ export class PilotPosService {
         entityId: section.id,
         metadata: { tableIds: input.tableIds, serviceMode: input.serviceMode },
       });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.service_section.created",
+        aggregateType: "service_section",
+        aggregateId: section.id,
+        payload: { organizationId, unitId, sectionId: section.id },
+      });
       return { section, tableIds: input.tableIds };
+    });
+  }
+
+  async updateServiceSection(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    serviceSectionId: string,
+    input: ServiceSectionInput,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    if (input.defaultResponsibleIdentityId) {
+      await this.requireOperationalIdentity(
+        organizationId,
+        unitId,
+        input.defaultResponsibleIdentityId,
+      );
+    }
+    return this.database.db.transaction(async (tx) => {
+      const [section] = await tx
+        .select({ id: posServiceSections.id })
+        .from(posServiceSections)
+        .where(
+          and(
+            eq(posServiceSections.organizationId, organizationId),
+            eq(posServiceSections.unitId, unitId),
+            eq(posServiceSections.id, serviceSectionId),
+            eq(posServiceSections.active, true),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!section) throw new NotFoundException({ code: "SERVICE_SECTION_NOT_FOUND" });
+
+      const tables = await tx
+        .select({ id: posDiningTables.id })
+        .from(posDiningTables)
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.active, true),
+            inArray(posDiningTables.id, input.tableIds),
+          ),
+        );
+      if (tables.length !== input.tableIds.length) {
+        throw new NotFoundException({
+          code: "SERVICE_SECTION_TABLE_NOT_FOUND",
+          message: "Uma ou mais mesas não pertencem a esta unidade ou estão inativas.",
+        });
+      }
+      const assigned = await tx
+        .select({ tableId: posServiceSectionTables.tableId })
+        .from(posServiceSectionTables)
+        .where(
+          and(
+            eq(posServiceSectionTables.organizationId, organizationId),
+            eq(posServiceSectionTables.unitId, unitId),
+            ne(posServiceSectionTables.sectionId, serviceSectionId),
+            inArray(posServiceSectionTables.tableId, input.tableIds),
+          ),
+        );
+      if (assigned.length) {
+        throw new ConflictException({
+          code: "SERVICE_SECTION_TABLE_ALREADY_ASSIGNED",
+          message: "Uma ou mais mesas já pertencem a outro modelo de praça.",
+          tableIds: assigned.map((row) => row.tableId),
+        });
+      }
+
+      const [updated] = await tx
+        .update(posServiceSections)
+        .set({
+          name: input.name,
+          color: input.color.toUpperCase(),
+          serviceMode: input.serviceMode,
+          defaultResponsibleIdentityId: input.defaultResponsibleIdentityId ?? null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(posServiceSections.organizationId, organizationId),
+            eq(posServiceSections.unitId, unitId),
+            eq(posServiceSections.id, serviceSectionId),
+            eq(posServiceSections.active, true),
+          ),
+        )
+        .returning();
+      if (!updated) throw new NotFoundException({ code: "SERVICE_SECTION_NOT_FOUND" });
+      await tx
+        .delete(posServiceSectionTables)
+        .where(
+          and(
+            eq(posServiceSectionTables.organizationId, organizationId),
+            eq(posServiceSectionTables.unitId, unitId),
+            eq(posServiceSectionTables.sectionId, serviceSectionId),
+          ),
+        );
+      await tx.insert(posServiceSectionTables).values(
+        input.tableIds.map((tableId) => ({
+          organizationId,
+          unitId,
+          sectionId: serviceSectionId,
+          tableId,
+        })),
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.service_section.updated",
+        entityType: "service_section",
+        entityId: serviceSectionId,
+        metadata: { tableIds: input.tableIds, serviceMode: input.serviceMode },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.service_section.updated",
+        aggregateType: "service_section",
+        aggregateId: serviceSectionId,
+        payload: { organizationId, unitId, sectionId: serviceSectionId },
+      });
+      return { section: updated, tableIds: input.tableIds };
+    });
+  }
+
+  async archiveServiceSection(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    serviceSectionId: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.database.db.transaction(async (tx) => {
+      const [section] = await tx
+        .update(posServiceSections)
+        .set({ active: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posServiceSections.organizationId, organizationId),
+            eq(posServiceSections.unitId, unitId),
+            eq(posServiceSections.id, serviceSectionId),
+            eq(posServiceSections.active, true),
+          ),
+        )
+        .returning({ id: posServiceSections.id });
+      if (!section) throw new NotFoundException({ code: "SERVICE_SECTION_NOT_FOUND" });
+      await tx
+        .delete(posServiceSectionTables)
+        .where(
+          and(
+            eq(posServiceSectionTables.organizationId, organizationId),
+            eq(posServiceSectionTables.unitId, unitId),
+            eq(posServiceSectionTables.sectionId, serviceSectionId),
+          ),
+        );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.service_section.archived",
+        entityType: "service_section",
+        entityId: serviceSectionId,
+        metadata: {},
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.service_section.archived",
+        aggregateType: "service_section",
+        aggregateId: serviceSectionId,
+        payload: { organizationId, unitId, sectionId: serviceSectionId },
+      });
+      return { serviceSectionId, archived: true };
     });
   }
 
@@ -1444,7 +3211,11 @@ export class PilotPosService {
     );
     return this.database.db.transaction(async (tx) => {
       const [section] = await tx
-        .select({ id: posShiftSections.id, name: posShiftSections.name })
+        .select({
+          id: posShiftSections.id,
+          name: posShiftSections.name,
+          assignmentRevision: posOperationalShifts.assignmentRevision,
+        })
         .from(posShiftSections)
         .innerJoin(
           posOperationalShifts,
@@ -1463,8 +3234,16 @@ export class PilotPosService {
             eq(posOperationalShifts.status, "active"),
           ),
         )
+        .for("update")
         .limit(1);
       if (!section) throw new NotFoundException({ code: "ACTIVE_SHIFT_SECTION_NOT_FOUND" });
+      if (input.expectedRevision !== section.assignmentRevision) {
+        throw new ConflictException({
+          code: "SHIFT_LAYOUT_VERSION_CONFLICT",
+          expectedRevision: input.expectedRevision,
+          currentRevision: section.assignmentRevision,
+        });
+      }
       const tables = await tx
         .select({ id: posDiningTables.id })
         .from(posDiningTables)
@@ -1547,6 +3326,21 @@ export class PilotPosService {
           })),
         );
       }
+      const [updatedShift] = await tx
+        .update(posOperationalShifts)
+        .set({ assignmentRevision: section.assignmentRevision + 1, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posOperationalShifts.organizationId, organizationId),
+            eq(posOperationalShifts.unitId, unitId),
+            eq(posOperationalShifts.id, shiftId),
+            eq(posOperationalShifts.assignmentRevision, section.assignmentRevision),
+          ),
+        )
+        .returning({ assignmentRevision: posOperationalShifts.assignmentRevision });
+      if (!updatedShift) {
+        throw new ConflictException({ code: "SHIFT_LAYOUT_VERSION_CONFLICT" });
+      }
       await tx.insert(auditEvents).values({
         organizationId,
         unitId,
@@ -1554,15 +3348,230 @@ export class PilotPosService {
         action: "pos.shift_section.assignment_updated",
         entityType: "shift_section",
         entityId: shiftSectionId,
-        metadata: { tableIds: input.tableIds, staff: nextStaff },
+        metadata: {
+          tableIds: input.tableIds,
+          staff: nextStaff,
+          revision: updatedShift.assignmentRevision,
+        },
       });
       await tx.insert(outboxEvents).values({
         topic: "pos.shift_section.assignment_updated",
         aggregateType: "shift_section",
         aggregateId: shiftSectionId,
-        payload: { organizationId, unitId, shiftId, shiftSectionId },
+        payload: {
+          organizationId,
+          unitId,
+          shiftId,
+          shiftSectionId,
+          revision: updatedShift.assignmentRevision,
+        },
       });
-      return { section, tableIds: input.tableIds, staff: nextStaff };
+      return {
+        section: { id: section.id, name: section.name },
+        tableIds: input.tableIds,
+        staff: nextStaff,
+        revision: updatedShift.assignmentRevision,
+      };
+    });
+  }
+
+  async updateShiftSectionsAssignments(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    shiftId: string,
+    input: ShiftSectionsBatchAssignmentInput,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:shift:manage",
+    );
+    const staffIds = [
+      ...new Set(
+        input.assignments.flatMap((assignment) => [
+          ...(assignment.primaryIdentityId ? [assignment.primaryIdentityId] : []),
+          ...assignment.supportIdentityIds,
+        ]),
+      ),
+    ];
+    await Promise.all(
+      staffIds.map((staffId) => this.requireOperationalIdentity(organizationId, unitId, staffId)),
+    );
+    return this.database.db.transaction(async (tx) => {
+      const [shift] = await tx
+        .select({
+          id: posOperationalShifts.id,
+          assignmentRevision: posOperationalShifts.assignmentRevision,
+        })
+        .from(posOperationalShifts)
+        .where(
+          and(
+            eq(posOperationalShifts.organizationId, organizationId),
+            eq(posOperationalShifts.unitId, unitId),
+            eq(posOperationalShifts.id, shiftId),
+            eq(posOperationalShifts.status, "active"),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!shift) throw new NotFoundException({ code: "ACTIVE_SHIFT_NOT_FOUND" });
+      if (input.expectedRevision !== shift.assignmentRevision) {
+        throw new ConflictException({
+          code: "SHIFT_LAYOUT_VERSION_CONFLICT",
+          expectedRevision: input.expectedRevision,
+          currentRevision: shift.assignmentRevision,
+        });
+      }
+      const sectionIds = input.assignments.map(({ shiftSectionId }) => shiftSectionId);
+      const sections = await tx
+        .select({ id: posShiftSections.id, name: posShiftSections.name })
+        .from(posShiftSections)
+        .where(
+          and(
+            eq(posShiftSections.organizationId, organizationId),
+            eq(posShiftSections.unitId, unitId),
+            eq(posShiftSections.shiftId, shiftId),
+            inArray(posShiftSections.id, sectionIds),
+          ),
+        );
+      if (sections.length !== sectionIds.length) {
+        throw new NotFoundException({ code: "ACTIVE_SHIFT_SECTION_NOT_FOUND" });
+      }
+      const tableIds = input.assignments.flatMap(({ tableIds: ids }) => ids);
+      const tables = tableIds.length
+        ? await tx
+            .select({ id: posDiningTables.id })
+            .from(posDiningTables)
+            .where(
+              and(
+                eq(posDiningTables.organizationId, organizationId),
+                eq(posDiningTables.unitId, unitId),
+                eq(posDiningTables.active, true),
+                inArray(posDiningTables.id, tableIds),
+              ),
+            )
+        : [];
+      if (tables.length !== tableIds.length) {
+        throw new NotFoundException({ code: "SHIFT_SECTION_TABLE_NOT_FOUND" });
+      }
+      const conflicts = tableIds.length
+        ? await tx
+            .select({ tableId: posShiftSectionTables.tableId })
+            .from(posShiftSectionTables)
+            .where(
+              and(
+                eq(posShiftSectionTables.organizationId, organizationId),
+                eq(posShiftSectionTables.unitId, unitId),
+                eq(posShiftSectionTables.shiftId, shiftId),
+                sql`${posShiftSectionTables.shiftSectionId} NOT IN (${sql.join(
+                  sectionIds.map((sectionId) => sql`${sectionId}`),
+                  sql`, `,
+                )})`,
+                inArray(posShiftSectionTables.tableId, tableIds),
+              ),
+            )
+        : [];
+      if (conflicts.length) {
+        throw new ConflictException({
+          code: "SHIFT_TABLE_ALREADY_ASSIGNED",
+          tableIds: conflicts.map(({ tableId }) => tableId),
+        });
+      }
+      await tx
+        .delete(posShiftSectionTables)
+        .where(
+          and(
+            eq(posShiftSectionTables.organizationId, organizationId),
+            eq(posShiftSectionTables.unitId, unitId),
+            eq(posShiftSectionTables.shiftId, shiftId),
+            inArray(posShiftSectionTables.shiftSectionId, sectionIds),
+          ),
+        );
+      await tx
+        .delete(posShiftSectionStaff)
+        .where(
+          and(
+            eq(posShiftSectionStaff.organizationId, organizationId),
+            eq(posShiftSectionStaff.unitId, unitId),
+            eq(posShiftSectionStaff.shiftId, shiftId),
+            inArray(posShiftSectionStaff.shiftSectionId, sectionIds),
+          ),
+        );
+      const nextTableAssignments = input.assignments.flatMap((assignment) =>
+        assignment.tableIds.map((tableId) => ({
+          organizationId,
+          unitId,
+          shiftId,
+          shiftSectionId: assignment.shiftSectionId,
+          tableId,
+        })),
+      );
+      if (nextTableAssignments.length) {
+        await tx.insert(posShiftSectionTables).values(nextTableAssignments);
+      }
+      const staff = input.assignments.flatMap((assignment) => [
+        ...(assignment.primaryIdentityId
+          ? [
+              {
+                organizationId,
+                unitId,
+                shiftId,
+                shiftSectionId: assignment.shiftSectionId,
+                identityId: assignment.primaryIdentityId,
+                role: "primary" as const,
+              },
+            ]
+          : []),
+        ...assignment.supportIdentityIds.map((staffId) => ({
+          organizationId,
+          unitId,
+          shiftId,
+          shiftSectionId: assignment.shiftSectionId,
+          identityId: staffId,
+          role: "support" as const,
+        })),
+      ]);
+      if (staff.length) await tx.insert(posShiftSectionStaff).values(staff);
+      const [updatedShift] = await tx
+        .update(posOperationalShifts)
+        .set({ assignmentRevision: shift.assignmentRevision + 1, updatedAt: new Date() })
+        .where(
+          and(
+            eq(posOperationalShifts.organizationId, organizationId),
+            eq(posOperationalShifts.unitId, unitId),
+            eq(posOperationalShifts.id, shiftId),
+            eq(posOperationalShifts.assignmentRevision, shift.assignmentRevision),
+          ),
+        )
+        .returning({ assignmentRevision: posOperationalShifts.assignmentRevision });
+      if (!updatedShift) {
+        throw new ConflictException({ code: "SHIFT_LAYOUT_VERSION_CONFLICT" });
+      }
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.shift_sections.assignments_updated",
+        entityType: "operational_shift",
+        entityId: shiftId,
+        metadata: {
+          revision: updatedShift.assignmentRevision,
+          assignments: input.assignments,
+        },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.shift_sections.assignments_updated",
+        aggregateType: "operational_shift",
+        aggregateId: shiftId,
+        payload: { organizationId, unitId, shiftId, revision: updatedShift.assignmentRevision },
+      });
+      return {
+        shiftId,
+        revision: updatedShift.assignmentRevision,
+        assignments: input.assignments,
+      };
     });
   }
 
@@ -1883,7 +3892,9 @@ export class PilotPosService {
               sourceShiftSectionId: assignment.shiftSectionId,
               targetShiftSectionId: targetSection.id,
               expiresAt,
-              reason: input.reason,
+              reason: input.reasonNote ?? input.reasonCode,
+              reasonCode: input.reasonCode,
+              reasonNote: input.reasonNote,
               transferredByIdentityId: identityId,
             })),
         )
@@ -1909,7 +3920,9 @@ export class PilotPosService {
             .select({
               id: posTabs.id,
               tableId: posTabs.tableId,
+              shiftSectionId: posTabs.shiftSectionId,
               responsibleIdentityId: posTabs.responsibleIdentityId,
+              version: posTabs.version,
             })
             .from(posTabs)
             .where(
@@ -1922,6 +3935,20 @@ export class PilotPosService {
             )
         : [];
       if (openTabs.length) {
+        for (const tab of openTabs) {
+          const transfer = transfers.find((row) => row.tableId === tab.tableId);
+          if (!transfer) continue;
+          await tx
+            .update(posShiftTableTransfers)
+            .set({
+              tabId: tab.id,
+              previousShiftSectionId: tab.shiftSectionId,
+              previousResponsibleIdentityId: tab.responsibleIdentityId,
+              appliedResponsibleIdentityId: targetPrimary?.identityId ?? tab.responsibleIdentityId,
+              appliedTabVersion: tab.version + 1,
+            })
+            .where(eq(posShiftTableTransfers.id, transfer.id));
+        }
         await tx
           .update(posTabs)
           .set({
@@ -1945,7 +3972,8 @@ export class PilotPosService {
             tab.id,
             "tab.handed_over",
             {
-              reason: input.reason,
+              reasonCode: input.reasonCode,
+              reasonNote: input.reasonNote ?? null,
               sourceShiftSectionId: baseAssignments.find(
                 (assignment) => assignment.tableId === tab.tableId,
               )?.shiftSectionId,
@@ -1973,7 +4001,8 @@ export class PilotPosService {
           targetShiftSectionId: targetSection.id,
           expiresAt: expiresAt.toISOString(),
           transferredOpenTabs: openTabs.length,
-          reason: input.reason,
+          reasonCode: input.reasonCode,
+          reasonNote: input.reasonNote ?? null,
         },
       });
       await tx.insert(outboxEvents).values({
@@ -2013,6 +4042,11 @@ export class PilotPosService {
           sourceShiftSectionId: posShiftTableTransfers.sourceShiftSectionId,
           targetShiftSectionId: posShiftTableTransfers.targetShiftSectionId,
           expiresAt: posShiftTableTransfers.expiresAt,
+          tabId: posShiftTableTransfers.tabId,
+          previousShiftSectionId: posShiftTableTransfers.previousShiftSectionId,
+          previousResponsibleIdentityId: posShiftTableTransfers.previousResponsibleIdentityId,
+          appliedResponsibleIdentityId: posShiftTableTransfers.appliedResponsibleIdentityId,
+          appliedTabVersion: posShiftTableTransfers.appliedTabVersion,
         })
         .from(posShiftTableTransfers)
         .innerJoin(
@@ -2075,6 +4109,11 @@ export class PilotPosService {
           sourceShiftSectionId: posShiftTableTransfers.sourceShiftSectionId,
           targetShiftSectionId: posShiftTableTransfers.targetShiftSectionId,
           expiresAt: posShiftTableTransfers.expiresAt,
+          tabId: posShiftTableTransfers.tabId,
+          previousShiftSectionId: posShiftTableTransfers.previousShiftSectionId,
+          previousResponsibleIdentityId: posShiftTableTransfers.previousResponsibleIdentityId,
+          appliedResponsibleIdentityId: posShiftTableTransfers.appliedResponsibleIdentityId,
+          appliedTabVersion: posShiftTableTransfers.appliedTabVersion,
         })
         .from(posShiftTableTransfers)
         .where(
@@ -2107,6 +4146,13 @@ export class PilotPosService {
         if (!assignment) throw new ForbiddenException({ code: "SHIFT_TABLE_TRANSFER_DENIED" });
       }
       const endedAt = new Date();
+      const restoration = await this.restoreShiftTransferSnapshots(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        transfers,
+      );
       await tx
         .update(posShiftTableTransfers)
         .set({ endedAt, endedByIdentityId: identityId })
@@ -2129,6 +4175,7 @@ export class PilotPosService {
           sourceShiftSectionIds: [...new Set(transfers.map((row) => row.sourceShiftSectionId))],
           targetShiftSectionIds: [...new Set(transfers.map((row) => row.targetShiftSectionId))],
           naturalExpiry: transfers.every((row) => row.expiresAt <= endedAt),
+          ...restoration,
         },
       });
       await tx.insert(outboxEvents).values({
@@ -2137,7 +4184,14 @@ export class PilotPosService {
         aggregateId: group?.id ?? tableId,
         payload: { organizationId, unitId, shiftId, tableIds },
       });
-      return { tableIds, active: false, endedAt };
+      return {
+        tableIds,
+        active: false,
+        endedAt,
+        ...restoration,
+        confirmationRequired:
+          restoration.preservedTabIds.length > 0 ? "tab_changed_after_transfer" : null,
+      };
     });
   }
 
@@ -2214,6 +4268,112 @@ export class PilotPosService {
           ? [{ ...tab, targetIdentityId }]
           : [];
       });
+      const shiftStaff = await tx
+        .select({ identityId: posShiftSectionStaff.identityId })
+        .from(posShiftSectionStaff)
+        .where(
+          and(
+            eq(posShiftSectionStaff.organizationId, organizationId),
+            eq(posShiftSectionStaff.unitId, unitId),
+            eq(posShiftSectionStaff.shiftId, activeShift.id),
+          ),
+        );
+      const shiftIdentityIds = new Set([
+        activeShift.openedByIdentityId,
+        ...shiftStaff.map((staff) => staff.identityId),
+        ...openTabs.flatMap((tab) =>
+          tab.responsibleIdentityId ? [tab.responsibleIdentityId] : [],
+        ),
+      ]);
+      const allOpenReturnableCustodies = await this.lockOpenReturnableCustodyForTabs(
+        tx,
+        organizationId,
+        unitId,
+      );
+      const openTabIds = new Set(openTabs.map((tab) => tab.id));
+      const openReturnableCustodies = allOpenReturnableCustodies.filter((custody) => {
+        const sourceKey = custody.currentResponsibleIdentityId ?? "unassigned";
+        return (
+          openTabIds.has(custody.tabId) ||
+          handoverBySource.has(sourceKey) ||
+          (custody.currentResponsibleIdentityId !== null &&
+            shiftIdentityIds.has(custody.currentResponsibleIdentityId))
+        );
+      });
+      const custodyTarget = (custody: OpenReturnableCustody) =>
+        input.handoverIdentityId ??
+        handoverBySource.get(custody.currentResponsibleIdentityId ?? "unassigned");
+      const pendingReturnables = openReturnableCustodies.filter(
+        (custody) => !custodyTarget(custody),
+      );
+      const [configuredReturnablePolicy] = await tx
+        .select({ returnableClosePolicy: managementReturnablePolicies.returnableClosePolicy })
+        .from(managementReturnablePolicies)
+        .where(
+          and(
+            eq(managementReturnablePolicies.organizationId, organizationId),
+            eq(managementReturnablePolicies.unitId, unitId),
+          ),
+        )
+        .limit(1);
+      const returnableClosePolicy = configuredReturnablePolicy?.returnableClosePolicy ?? "warn";
+      const pendingReturnableMilli = pendingReturnables.reduce(
+        (sum, custody) => sum + returnableQuantityToMilli(custody.openQuantity),
+        0n,
+      );
+      const pendingReturnableSnapshot = {
+        policy: returnableClosePolicy,
+        issueCount: pendingReturnables.length,
+        openQuantity: returnableMilliToQuantity(pendingReturnableMilli),
+        issues: pendingReturnables.map((custody) => ({
+          issueMovementId: custody.issueMovementId,
+          tabId: custody.tabId,
+          containerInventoryItemId: custody.containerInventoryItemId,
+          containerName: custody.containerName,
+          openQuantity: custody.openQuantity,
+          responsibleIdentityId: custody.currentResponsibleIdentityId,
+        })),
+      };
+      const mustBlockReturnables = returnableClosePolicy === "block";
+      const mustAcknowledgeReturnables =
+        returnableClosePolicy === "warn" && input.returnableDecision !== "acknowledge";
+      if (pendingReturnables.length > 0 && (mustBlockReturnables || mustAcknowledgeReturnables)) {
+        throw new ConflictException({
+          code: "SHIFT_HAS_OPEN_RETURNABLE_CUSTODY",
+          message: mustBlockReturnables
+            ? "Transfira ou confirme a devolução dos vasilhames antes de encerrar o turno."
+            : "Há custódias de vasilhames sem destinatário. Confirme a ciência para encerrar o turno.",
+          policy: returnableClosePolicy,
+          pending: pendingReturnableSnapshot,
+        });
+      }
+      const returnableCustodyHandoffs = openReturnableCustodies.flatMap((custody) => {
+        const targetIdentityId = custodyTarget(custody);
+        if (!targetIdentityId || targetIdentityId === custody.currentResponsibleIdentityId)
+          return [];
+        return [
+          {
+            organizationId,
+            unitId,
+            issueMovementId: custody.issueMovementId,
+            fromIdentityId: custody.currentResponsibleIdentityId,
+            toIdentityId: targetIdentityId,
+            fromShiftReference: activeShift.id,
+            toShiftReference: null,
+            note: input.reason ?? "Passagem de turno confirmada",
+            idempotencyKey: `shift-handoff:${activeShift.id}:${custody.issueMovementId}`,
+            actorIdentityId: identityId,
+            occurredAt: closedAt,
+          },
+        ];
+      });
+      if (returnableCustodyHandoffs.length > 0) {
+        await tx
+          .insert(managementReturnableCustodyHandoffs)
+          .values(returnableCustodyHandoffs)
+          .onConflictDoNothing();
+      }
+      const pendingReturnableCustodies = pendingReturnables.length;
       for (const targetIdentityId of [
         ...new Set(handedOverTabs.map((tab) => tab.targetIdentityId)),
       ]) {
@@ -2269,6 +4429,10 @@ export class PilotPosService {
           handoverIdentityId: input.handoverIdentityId ?? null,
           handoverAssignments: input.handoverAssignments ?? [],
           handedOverTabs: handedOverTabs.length,
+          returnableCustodyHandoffs: returnableCustodyHandoffs.length,
+          pendingReturnableCustodies,
+          returnableClosePolicy,
+          returnableDecision: input.returnableDecision ?? null,
           reason: input.reason ?? null,
         },
       });
@@ -2276,7 +4440,15 @@ export class PilotPosService {
         topic: "pos.operational_shift.closed",
         aggregateType: "operational_shift",
         aggregateId: shift.id,
-        payload: { organizationId, unitId, shiftId: shift.id, openTabs: openTabs.length },
+        payload: {
+          organizationId,
+          unitId,
+          shiftId: shift.id,
+          openTabs: openTabs.length,
+          returnableCustodyHandoffs: returnableCustodyHandoffs.length,
+          pendingReturnableCustodies,
+          returnableClosePolicy,
+        },
       });
       return {
         shift,
@@ -2286,6 +4458,10 @@ export class PilotPosService {
           responsibleIdentityId: input.handoverIdentityId ?? null,
           assignments: input.handoverAssignments ?? [],
           handedOverTabs: handedOverTabs.length,
+          returnableCustodyHandoffs: returnableCustodyHandoffs.length,
+          pendingReturnableCustodies,
+          returnableClosePolicy,
+          pendingReturnables: pendingReturnableSnapshot,
         },
       };
     });
@@ -2298,10 +4474,264 @@ export class PilotPosService {
     roomId: string,
     input: TableInput,
   ) {
-    const [table] = await this.createTables(identityId, organizationId, unitId, roomId, {
-      tables: [input],
+    const result = await this.createTables(identityId, organizationId, unitId, roomId, {
+      expectedRevision: input.expectedRevision,
+      tables: [
+        {
+          label: input.label,
+          seats: input.seats,
+          width: input.width,
+          height: input.height,
+          rotation: input.rotation,
+          shape: input.shape,
+        },
+      ],
     });
-    return table;
+    const table = result.tables[0];
+    if (!table) throw new Error("Table batch insert did not return a row");
+    return { ...table, floorRevision: result.floorRevision };
+  }
+
+  async updateTable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    input: TableEditInput,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        input.expectedRevision,
+      );
+      const [current, room] = await Promise.all([
+        tx
+          .select()
+          .from(posDiningTables)
+          .where(
+            and(
+              eq(posDiningTables.organizationId, organizationId),
+              eq(posDiningTables.unitId, unitId),
+              eq(posDiningTables.id, tableId),
+              eq(posDiningTables.active, true),
+            ),
+          )
+          .for("update")
+          .limit(1)
+          .then((rows) => rows[0] ?? null),
+        tx
+          .select({ id: posDiningRooms.id })
+          .from(posDiningRooms)
+          .where(
+            and(
+              eq(posDiningRooms.organizationId, organizationId),
+              eq(posDiningRooms.unitId, unitId),
+              eq(posDiningRooms.id, input.roomId),
+              eq(posDiningRooms.active, true),
+            ),
+          )
+          .limit(1)
+          .then((rows) => rows[0] ?? null),
+      ]);
+      if (!current) throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
+      if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND" });
+      if (current.roomId !== input.roomId && ["occupied", "reserved"].includes(current.status)) {
+        throw new ConflictException({ code: "ACTIVE_TABLE_CANNOT_CHANGE_ROOM" });
+      }
+      const [table] = await tx
+        .update(posDiningTables)
+        .set({
+          roomId: input.roomId,
+          label: input.label,
+          seats: input.seats,
+          layoutWidth: input.width,
+          layoutHeight: input.height,
+          layoutRotation: input.rotation,
+          layoutShape: input.shape,
+          updatedAt: new Date(),
+        })
+        .where(eq(posDiningTables.id, tableId))
+        .returning();
+      if (!table) throw new Error("Table update did not return a row");
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.table.updated",
+        entityType: "dining_table",
+        entityId: tableId,
+        metadata: {
+          fromRoomId: current.roomId,
+          roomId: input.roomId,
+          label: input.label,
+          seats: input.seats,
+          width: input.width,
+          height: input.height,
+          rotation: input.rotation,
+          shape: input.shape,
+          revision: updatedFloorLayout.revision,
+        },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.table.updated",
+        aggregateType: "dining_table",
+        aggregateId: tableId,
+        payload: {
+          organizationId,
+          unitId,
+          tableId,
+          roomId: input.roomId,
+          revision: updatedFloorLayout.revision,
+        },
+      });
+      return { ...table, floorRevision: updatedFloorLayout.revision };
+    });
+  }
+
+  async archiveTable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    expectedRevision: number,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
+    );
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        expectedRevision,
+      );
+      const [table] = await tx
+        .select()
+        .from(posDiningTables)
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.id, tableId),
+            eq(posDiningTables.active, true),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!table) throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
+      if (["occupied", "reserved"].includes(table.status)) {
+        throw new ConflictException({ code: "TABLE_OPERATIONALLY_BLOCKED", status: table.status });
+      }
+      const [[openTab], [activeShiftReference], [activeGroup]] = await Promise.all([
+        tx
+          .select({ id: posTabs.id })
+          .from(posTabs)
+          .where(
+            and(
+              eq(posTabs.organizationId, organizationId),
+              eq(posTabs.unitId, unitId),
+              eq(posTabs.tableId, tableId),
+              eq(posTabs.status, "open"),
+            ),
+          )
+          .limit(1),
+        tx
+          .select({ shiftId: posShiftSectionTables.shiftId })
+          .from(posShiftSectionTables)
+          .innerJoin(
+            posOperationalShifts,
+            and(
+              eq(posOperationalShifts.organizationId, posShiftSectionTables.organizationId),
+              eq(posOperationalShifts.unitId, posShiftSectionTables.unitId),
+              eq(posOperationalShifts.id, posShiftSectionTables.shiftId),
+            ),
+          )
+          .where(
+            and(
+              eq(posShiftSectionTables.organizationId, organizationId),
+              eq(posShiftSectionTables.unitId, unitId),
+              eq(posShiftSectionTables.tableId, tableId),
+              eq(posOperationalShifts.status, "active"),
+            ),
+          )
+          .limit(1),
+        tx
+          .select({ groupId: posDiningTableGroupMembers.groupId })
+          .from(posDiningTableGroupMembers)
+          .innerJoin(
+            posDiningTableGroups,
+            and(
+              eq(posDiningTableGroups.organizationId, posDiningTableGroupMembers.organizationId),
+              eq(posDiningTableGroups.unitId, posDiningTableGroupMembers.unitId),
+              eq(posDiningTableGroups.id, posDiningTableGroupMembers.groupId),
+            ),
+          )
+          .where(
+            and(
+              eq(posDiningTableGroupMembers.organizationId, organizationId),
+              eq(posDiningTableGroupMembers.unitId, unitId),
+              eq(posDiningTableGroupMembers.tableId, tableId),
+              isNull(posDiningTableGroups.dissolvedAt),
+            ),
+          )
+          .limit(1),
+      ]);
+      if (openTab || activeShiftReference || activeGroup) {
+        throw new ConflictException({
+          code: "TABLE_HAS_ACTIVE_REFERENCES",
+          openTabId: openTab?.id ?? null,
+          shiftId: activeShiftReference?.shiftId ?? null,
+          groupId: activeGroup?.groupId ?? null,
+        });
+      }
+      await tx
+        .update(posDiningTables)
+        .set({ active: false, updatedAt: new Date() })
+        .where(eq(posDiningTables.id, tableId));
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.table.archived",
+        entityType: "dining_table",
+        entityId: tableId,
+        metadata: { revision: updatedFloorLayout.revision },
+      });
+      await tx.insert(outboxEvents).values({
+        topic: "pos.table.archived",
+        aggregateType: "dining_table",
+        aggregateId: tableId,
+        payload: { organizationId, unitId, tableId, revision: updatedFloorLayout.revision },
+      });
+      return { tableId, archived: true, floorRevision: updatedFloorLayout.revision };
+    });
   }
 
   async updateTableTurnover(
@@ -2398,47 +4828,102 @@ export class PilotPosService {
     roomId: string,
     input: TableBatchInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
-    const [room] = await this.database.db
-      .select({ id: posDiningRooms.id })
-      .from(posDiningRooms)
-      .where(
-        and(
-          eq(posDiningRooms.organizationId, organizationId),
-          eq(posDiningRooms.unitId, unitId),
-          eq(posDiningRooms.id, roomId),
-          eq(posDiningRooms.active, true),
-        ),
-      )
-      .limit(1);
-    if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND" });
-    const normalizedLabels = input.tables.map((table) => table.label.toLocaleLowerCase("pt-BR"));
-    const existingTables = await this.database.db
-      .select({ label: posDiningTables.label })
-      .from(posDiningTables)
-      .where(
-        and(
-          eq(posDiningTables.organizationId, organizationId),
-          eq(posDiningTables.unitId, unitId),
-          eq(posDiningTables.roomId, roomId),
-        ),
-      );
-    const existingLabels = new Set(
-      existingTables.map((table) => table.label.toLocaleLowerCase("pt-BR")),
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:floor:manage",
     );
-    if (
-      new Set(normalizedLabels).size !== normalizedLabels.length ||
-      normalizedLabels.some((label) => existingLabels.has(label))
-    ) {
-      throw new ConflictException({
-        code: "TABLE_LABEL_CONFLICT",
-        message: "Uma ou mais mesas já existem. Nenhuma mesa foi adicionada.",
+    return this.database.db.transaction(async (tx) => {
+      const floorLayout = await this.lockFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        input.expectedRevision,
+      );
+      const [room] = await tx
+        .select({ id: posDiningRooms.id })
+        .from(posDiningRooms)
+        .where(
+          and(
+            eq(posDiningRooms.organizationId, organizationId),
+            eq(posDiningRooms.unitId, unitId),
+            eq(posDiningRooms.id, roomId),
+            eq(posDiningRooms.active, true),
+          ),
+        )
+        .limit(1);
+      if (!room) throw new NotFoundException({ code: "ROOM_NOT_FOUND" });
+      const normalizedLabels = input.tables.map((table) => table.label.toLocaleLowerCase("pt-BR"));
+      const existingTables = await tx
+        .select({ label: posDiningTables.label })
+        .from(posDiningTables)
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.roomId, roomId),
+          ),
+        );
+      const existingLabels = new Set(
+        existingTables.map((table) => table.label.toLocaleLowerCase("pt-BR")),
+      );
+      if (
+        new Set(normalizedLabels).size !== normalizedLabels.length ||
+        normalizedLabels.some((label) => existingLabels.has(label))
+      ) {
+        throw new ConflictException({ code: "TABLE_LABEL_CONFLICT" });
+      }
+      const tables = await tx
+        .insert(posDiningTables)
+        .values(
+          input.tables.map((table) => ({
+            organizationId,
+            unitId,
+            roomId,
+            label: table.label,
+            seats: table.seats,
+            layoutWidth: table.width,
+            layoutHeight: table.height,
+            layoutRotation: table.rotation,
+            layoutShape: table.shape,
+          })),
+        )
+        .returning();
+      const updatedFloorLayout = await this.bumpFloorLayoutRevision(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        floorLayout.revision,
+      );
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "pos.tables.created",
+        entityType: "dining_room",
+        entityId: roomId,
+        metadata: {
+          tableIds: tables.map(({ id }) => id),
+          revision: updatedFloorLayout.revision,
+        },
       });
-    }
-    return this.database.db
-      .insert(posDiningTables)
-      .values(input.tables.map((table) => ({ organizationId, unitId, roomId, ...table })))
-      .returning();
+      await tx.insert(outboxEvents).values({
+        topic: "pos.tables.created",
+        aggregateType: "dining_room",
+        aggregateId: roomId,
+        payload: {
+          organizationId,
+          unitId,
+          roomId,
+          tableIds: tables.map(({ id }) => id),
+          revision: updatedFloorLayout.revision,
+        },
+      });
+      return { tables, floorRevision: updatedFloorLayout.revision };
+    });
   }
 
   async setManagerPin(
@@ -2488,6 +4973,187 @@ export class PilotPosService {
       .select()
       .from(posTabs)
       .where(and(eq(posTabs.organizationId, organizationId), eq(posTabs.unitId, unitId)));
+  }
+
+  async listCounterQueue(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: CounterQueueQueryInput,
+  ) {
+    await this.requireAccess(identityId, organizationId, unitId);
+    const queueCte = sql`
+      with kds_rollup as (
+        select tickets.order_id,
+               count(*) filter (where tickets.status <> 'canceled')::int as ticket_count,
+               count(*) filter (where tickets.status in ('pending', 'preparing'))::int as production_ticket_count,
+               count(*) filter (where tickets.status in ('ready', 'done'))::int as ready_ticket_count
+          from pos_kds_tickets tickets
+         where tickets.organization_id = ${organizationId}::uuid
+           and tickets.unit_id = ${unitId}::uuid
+         group by tickets.order_id
+      ), order_rollup as (
+        select orders.tab_id,
+               count(*) filter (where orders.status <> 'canceled')::int as active_order_count,
+               count(*) filter (
+                 where orders.status <> 'canceled'
+                   and (
+                     orders.status in ('ready', 'served')
+                     or (
+                       coalesce(kds.ticket_count, 0) > 0
+                       and coalesce(kds.ready_ticket_count, 0) = coalesce(kds.ticket_count, 0)
+                     )
+                   )
+               )::int as ready_order_count,
+               count(*) filter (
+                 where orders.status <> 'canceled'
+                   and (
+                     orders.status in ('sent', 'preparing')
+                     or coalesce(kds.production_ticket_count, 0) > 0
+                   )
+               )::int as production_order_count
+          from pos_orders orders
+          left join kds_rollup kds on kds.order_id = orders.id
+         where orders.organization_id = ${organizationId}::uuid
+           and orders.unit_id = ${unitId}::uuid
+         group by orders.tab_id
+      ), queue as (
+        select tabs.*,
+               case
+                 when tabs.status = 'closed' then 'delivered'
+                 when coalesce(orders.active_order_count, 0) > 0
+                   and coalesce(orders.ready_order_count, 0) = coalesce(orders.active_order_count, 0)
+                   then case when tabs.ready_notified_at is not null then 'waiting' else 'ready' end
+                 when tabs.promised_at is not null and tabs.promised_at < now() then 'late'
+                 when coalesce(orders.production_order_count, 0) > 0 then 'production'
+                 else 'new'
+               end as queue_stage
+          from pos_tabs tabs
+          left join order_rollup orders on orders.tab_id = tabs.id
+         where tabs.organization_id = ${organizationId}::uuid
+           and tabs.unit_id = ${unitId}::uuid
+           and tabs.table_id is null
+           and tabs.status in ('open', 'closed')
+           and (tabs.status = 'open' or tabs.closed_at >= now() - interval '24 hours')
+      )
+    `;
+    const baseFilter = sql`
+      (${query.channel} = 'all' or queue.fulfillment_type = ${query.channel})
+      and (
+        ${query.query} = ''
+        or position(
+          lower(${query.query}) in lower(concat_ws(
+            ' ',
+            queue.label,
+            queue.customer_name,
+            queue.customer_phone,
+            queue.display_number::text
+          ))
+        ) > 0
+      )
+    `;
+    const offset = (query.page - 1) * query.limit;
+    const [items, [summary]] = await Promise.all([
+      this.database.db.execute<CounterQueueRow>(sql`
+        ${queueCte}
+        select queue.id,
+               queue.organization_id as "organizationId",
+               queue.unit_id as "unitId",
+               queue.table_id as "tableId",
+               queue.operational_shift_id as "operationalShiftId",
+               queue.shift_section_id as "shiftSectionId",
+               queue.opened_by_identity_id as "openedByIdentityId",
+               queue.responsible_identity_id as "responsibleIdentityId",
+               queue.label,
+               queue.display_number as "displayNumber",
+               queue.fulfillment_type as "fulfillmentType",
+               queue.customer_name as "customerName",
+               queue.customer_phone as "customerPhone",
+               queue.ready_notification_consent as "readyNotificationConsent",
+               queue.service_notes as "serviceNotes",
+               queue.delivery_address as "deliveryAddress",
+               queue.promised_at as "promisedAt",
+               queue.ready_notified_at as "readyNotifiedAt",
+               queue.guest_count as "guestCount",
+               queue.version,
+               queue.status,
+               queue.merged_into_tab_id as "mergedIntoTabId",
+               queue.service_charge_basis_points as "serviceChargeBasisPoints",
+               queue.tip_cents as "tipCents",
+               queue.subtotal_cents as "subtotalCents",
+               queue.discount_cents as "discountCents",
+               queue.service_charge_cents as "serviceChargeCents",
+               queue.total_cents as "totalCents",
+               queue.closed_at as "closedAt",
+               queue.created_at as "createdAt",
+               queue.updated_at as "updatedAt",
+               queue.queue_stage as "queueStage"
+         from queue
+         where ${baseFilter}
+           and (
+             (${query.stage} = 'all' and queue.status = 'open')
+             or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
+           )
+         order by case queue.queue_stage
+                    when 'late' then 0
+                    when 'ready' then 1
+                    when 'waiting' then 2
+                    when 'new' then 3
+                    when 'production' then 4
+                    else 5
+                  end,
+                  case when queue.queue_stage = 'delivered' then queue.closed_at end desc nulls last,
+                  queue.promised_at asc nulls last,
+                  queue.created_at asc
+         limit ${query.limit}
+        offset ${offset}
+      `),
+      this.database.db.execute<{
+        all: number;
+        new: number;
+        production: number;
+        ready: number;
+        waiting: number;
+        delivered: number;
+        late: number;
+        selectedTotal: number;
+      }>(sql`
+        ${queueCte}
+        select count(*) filter (where queue.status = 'open')::int as all,
+               count(*) filter (where queue.queue_stage = 'new')::int as new,
+               count(*) filter (where queue.queue_stage = 'production')::int as production,
+               count(*) filter (where queue.queue_stage = 'ready')::int as ready,
+               count(*) filter (where queue.queue_stage = 'waiting')::int as waiting,
+               count(*) filter (where queue.queue_stage = 'delivered')::int as delivered,
+               count(*) filter (where queue.queue_stage = 'late')::int as late,
+               count(*) filter (
+                 where (${query.stage} = 'all' and queue.status = 'open')
+                    or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
+               )::int as "selectedTotal"
+          from queue
+         where ${baseFilter}
+      `),
+    ]);
+    const counts = {
+      all: summary?.all ?? 0,
+      new: summary?.new ?? 0,
+      production: summary?.production ?? 0,
+      ready: summary?.ready ?? 0,
+      waiting: summary?.waiting ?? 0,
+      delivered: summary?.delivered ?? 0,
+      late: summary?.late ?? 0,
+    };
+    const total = summary?.selectedTotal ?? 0;
+    return {
+      items,
+      counts,
+      pagination: {
+        page: query.page,
+        limit: query.limit,
+        total,
+        totalPages: Math.ceil(total / query.limit),
+      },
+    };
   }
 
   async getTab(identityId: string, organizationId: string, unitId: string, tabId: string) {
@@ -2542,11 +5208,24 @@ export class PilotPosService {
                 inArray(posOrderItemModifiers.orderItemId, itemIds),
               ),
             );
+    const doseClubRedemptionRows =
+      itemIds.length === 0
+        ? []
+        : await this.database.db
+            .select()
+            .from(doseClubRedemptions)
+            .where(
+              and(
+                eq(doseClubRedemptions.organizationId, organizationId),
+                eq(doseClubRedemptions.unitId, unitId),
+                inArray(doseClubRedemptions.orderItemId, itemIds),
+              ),
+            );
     const [paymentRows, events, presence] = await Promise.all([
       this.database.db
         .select({
           payment: posTabPayments,
-          reversedCents: sql<number>`coalesce(${posPaymentReversals.amountCents}, 0)`.mapWith(
+          reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`.mapWith(
             Number,
           ),
         })
@@ -2566,7 +5245,8 @@ export class PilotPosService {
             eq(posTabPayments.unitId, unitId),
             eq(posTabPayments.tabId, tabId),
           ),
-        ),
+        )
+        .groupBy(posTabPayments.id),
       this.database.db
         .select({
           id: posTabEvents.id,
@@ -2621,6 +5301,7 @@ export class PilotPosService {
       },
       events,
       presence,
+      doseClubRedemptions: doseClubRedemptionRows,
     };
   }
 
@@ -2632,6 +5313,7 @@ export class PilotPosService {
     input: OpenTabInput,
     offlineIds?: { tabId: string },
   ) {
+    this.assertPromisedAtNotPast(input.promisedAt);
     await this.requireScopedCapability(
       identityId,
       organizationId,
@@ -2655,6 +5337,7 @@ export class PilotPosService {
         let reservationPreviousStatus: "booked" | "confirmed" | null = null;
         let reservationServiceNotes: string | null = null;
         let waitlistPreviousStatus: "waiting" | "notified" | null = null;
+        let customerId = input.customerId ?? null;
         let displayNumber: number | null = null;
         if (!input.tableId) {
           await tx.execute(
@@ -2720,7 +5403,11 @@ export class PilotPosService {
             sql`select pg_advisory_xact_lock(hashtext(${`growth-reservation:${organizationId}:${input.reservationId}`}))`,
           );
           const [reservation] = await tx
-            .select({ status: reservations.status, notes: reservations.notes })
+            .select({
+              status: reservations.status,
+              notes: reservations.notes,
+              customerId: reservations.customerId,
+            })
             .from(reservations)
             .where(
               and(
@@ -2739,13 +5426,17 @@ export class PilotPosService {
           }
           reservationPreviousStatus = reservation.status;
           reservationServiceNotes = reservation.notes;
+          if (customerId && reservation.customerId && customerId !== reservation.customerId) {
+            throw new ConflictException({ code: "RESERVATION_CUSTOMER_MISMATCH" });
+          }
+          customerId ??= reservation.customerId;
         }
         if (input.waitlistEntryId) {
           await tx.execute(
             sql`select pg_advisory_xact_lock(hashtext(${`growth-waitlist:${organizationId}:${input.waitlistEntryId}`}))`,
           );
           const [entry] = await tx
-            .select({ status: waitlistEntries.status })
+            .select({ status: waitlistEntries.status, customerId: waitlistEntries.customerId })
             .from(waitlistEntries)
             .where(
               and(
@@ -2763,6 +5454,30 @@ export class PilotPosService {
             });
           }
           waitlistPreviousStatus = entry.status;
+          if (customerId && entry.customerId && customerId !== entry.customerId) {
+            throw new ConflictException({ code: "WAITLIST_CUSTOMER_MISMATCH" });
+          }
+          customerId ??= entry.customerId;
+        }
+        const [customer] = customerId
+          ? await tx
+              .select({
+                id: growthCustomers.id,
+                name: growthCustomers.name,
+                phone: growthCustomers.phone,
+              })
+              .from(growthCustomers)
+              .where(
+                and(
+                  eq(growthCustomers.organizationId, organizationId),
+                  eq(growthCustomers.id, customerId),
+                  isNull(growthCustomers.archivedAt),
+                ),
+              )
+              .limit(1)
+          : [];
+        if (customerId && !customer) {
+          throw new NotFoundException({ code: "CUSTOMER_NOT_FOUND" });
         }
         const [activeShift] = await tx
           .select({ id: posOperationalShifts.id })
@@ -2902,6 +5617,22 @@ export class PilotPosService {
           tableGroup?.responsibleIdentityId ??
           sectionPrimary?.identityId ??
           identityId;
+        const [settlementSettings] = await tx
+          .select({ configuration: managementSettlementSettings.configuration })
+          .from(managementSettlementSettings)
+          .where(
+            and(
+              eq(managementSettlementSettings.organizationId, organizationId),
+              eq(managementSettlementSettings.unitId, unitId),
+            ),
+          )
+          .limit(1);
+        const serviceConfiguration = settlementSettings?.configuration;
+        const fulfillmentType = input.fulfillmentType ?? "dine_in";
+        const serviceChargeBasisPoints = suggestedServiceChargeBasisPoints(
+          fulfillmentType,
+          serviceConfiguration,
+        );
         const [tab] = await tx
           .insert(posTabs)
           .values({
@@ -2917,18 +5648,28 @@ export class PilotPosService {
               input.customerName?.trim() ||
               (displayNumber ? `Balcão #${displayNumber}` : undefined),
             displayNumber,
-            fulfillmentType: input.fulfillmentType ?? "dine_in",
-            customerName: input.customerName?.trim() || undefined,
-            customerPhone: input.customerPhone?.trim() || undefined,
+            fulfillmentType,
+            customerName: input.customerName?.trim() || customer?.name || undefined,
+            customerPhone: input.customerPhone?.trim() || customer?.phone || undefined,
             readyNotificationConsent: input.readyNotificationConsent ?? false,
             serviceNotes: reservationServiceNotes ?? (input.serviceNotes?.trim() || undefined),
             deliveryAddress: input.deliveryAddress?.trim() || undefined,
             promisedAt: input.promisedAt ? new Date(input.promisedAt) : undefined,
             guestCount: input.guestCount,
+            serviceChargeBasisPoints,
             openedByIdentityId: identityId,
           })
           .returning();
         if (!tab) throw new Error("Tab insert did not return a row");
+        if (customerId) {
+          await tx.insert(posTabCustomerLinks).values({
+            organizationId,
+            unitId,
+            tabId: tab.id,
+            customerId,
+            linkedByIdentityId: identityId,
+          });
+        }
         if (input.tableId) {
           const occupiedTableIds =
             tableGroup?.mode === "single_tab"
@@ -3049,6 +5790,7 @@ export class PilotPosService {
           operationalShiftId: activeShift?.id,
           shiftSectionId: shiftSection?.id,
           responsibleIdentityId,
+          customerId,
           reservationId: input.reservationId,
           waitlistEntryId: input.waitlistEntryId,
         });
@@ -3064,6 +5806,7 @@ export class PilotPosService {
     tabId: string,
     input: UpdateTabInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -3081,6 +5824,9 @@ export class PilotPosService {
           message: "A comanda foi alterada por outra pessoa. Recarregue antes de salvar.",
           currentVersion: tab.version,
         });
+      }
+      if (input.promisedAt && tab.promisedAt?.getTime() !== new Date(input.promisedAt).getTime()) {
+        this.assertPromisedAtNotPast(input.promisedAt);
       }
       const nextFulfillmentType = input.fulfillmentType ?? tab.fulfillmentType;
       const nextDeliveryAddress =
@@ -3146,6 +5892,7 @@ export class PilotPosService {
     tabId: string,
     input: ClaimTabInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -3254,14 +6001,69 @@ export class PilotPosService {
       "waiter",
       "cashier",
     ]);
+    if (input.tabId) {
+      await this.requireTabOperationalAccess(identityId, organizationId, unitId, [input.tabId]);
+    }
+    if (input.installationId || input.terminalId || input.printerId) {
+      await this.requireScopedCapability(
+        identityId,
+        organizationId,
+        unitId,
+        "operations:printing:request",
+      );
+    }
+    return this.createServiceCallCore(
+      identityId,
+      organizationId,
+      unitId,
+      tableId,
+      idempotencyKey,
+      input,
+      "ops",
+    );
+  }
+
+  async createPublicServiceCall(
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    tabId: string | undefined,
+    idempotencyKey: string,
+    kind: "assistance" | "bill",
+  ) {
+    const identityId = await this.publicServiceIdentity(organizationId);
+    return this.createServiceCallCore(
+      identityId,
+      organizationId,
+      unitId,
+      tableId,
+      idempotencyKey,
+      { kind, tabId, slaMinutes: kind === "bill" ? 5 : 3, copies: 1 },
+      "qr_table",
+    );
+  }
+
+  private async createServiceCallCore(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    idempotencyKey: string,
+    input: ServiceCallInput,
+    channel: "ops" | "qr_table",
+  ) {
     return this.idempotent(
       identityId,
       organizationId,
       unitId,
       idempotencyKey,
-      "service-call.create",
-      { tableId, ...input },
+      channel === "qr_table" ? "public-table-service-call.create" : "service-call.create",
+      { tableId, channel, ...input },
       async (tx) => {
+        const { installationId, terminalId, printerId, copies, ...serviceCallInput } = input;
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`pos-service-call:${organizationId}:${unitId}:${tableId}:${serviceCallInput.kind}`}))`,
+        );
         const [table] = await tx
           .select({ id: posDiningTables.id })
           .from(posDiningTables)
@@ -3275,25 +6077,35 @@ export class PilotPosService {
           )
           .limit(1);
         if (!table) throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
-        if (input.tabId) {
+        let responsibleIdentityId: string | null = null;
+        if (serviceCallInput.tabId) {
           const [tab] = await tx
-            .select({ id: posTabs.id, status: posTabs.status, tableId: posTabs.tableId })
+            .select({
+              id: posTabs.id,
+              status: posTabs.status,
+              tableId: posTabs.tableId,
+              responsibleIdentityId: posTabs.responsibleIdentityId,
+            })
             .from(posTabs)
             .where(
               and(
                 eq(posTabs.organizationId, organizationId),
                 eq(posTabs.unitId, unitId),
-                eq(posTabs.id, input.tabId),
+                eq(posTabs.id, serviceCallInput.tabId),
               ),
             )
             .limit(1);
           if (!tab) throw new NotFoundException({ code: "TAB_NOT_FOUND" });
-          if (tab.status !== "open" || tab.tableId !== tableId) {
+          if (
+            tab.status !== "open" ||
+            !(await this.tableBelongsToTab(tx, organizationId, unitId, tableId, tab))
+          ) {
             throw new ConflictException({
               code: "SERVICE_CALL_TAB_MISMATCH",
               message: "A comanda informada não está aberta nesta mesa.",
             });
           }
+          responsibleIdentityId = tab.responsibleIdentityId;
         }
         const [existing] = await tx
           .select()
@@ -3303,15 +6115,55 @@ export class PilotPosService {
               eq(posServiceCalls.organizationId, organizationId),
               eq(posServiceCalls.unitId, unitId),
               eq(posServiceCalls.tableId, tableId),
-              eq(posServiceCalls.kind, input.kind),
+              eq(posServiceCalls.kind, serviceCallInput.kind),
               ne(posServiceCalls.status, "resolved"),
             ),
           )
           .limit(1);
-        if (existing) return { call: existing, duplicate: true };
+        if (existing) {
+          const [existingPrintJob] = await tx
+            .select()
+            .from(posPrintJobs)
+            .where(
+              and(
+                eq(posPrintJobs.organizationId, organizationId),
+                eq(posPrintJobs.unitId, unitId),
+                eq(posPrintJobs.serviceCallId, existing.id),
+              ),
+            )
+            .orderBy(desc(posPrintJobs.createdAt))
+            .limit(1);
+          return {
+            call: existing,
+            duplicate: true,
+            printJob: existingPrintJob ?? null,
+            deliveryRoute: existingPrintJob ? "local" : "cashier",
+          };
+        }
+        if (channel === "qr_table") {
+          const [recent] = await tx
+            .select({ id: posServiceCalls.id })
+            .from(posServiceCalls)
+            .where(
+              and(
+                eq(posServiceCalls.organizationId, organizationId),
+                eq(posServiceCalls.unitId, unitId),
+                eq(posServiceCalls.tableId, tableId),
+                eq(posServiceCalls.kind, serviceCallInput.kind),
+                gt(posServiceCalls.createdAt, new Date(Date.now() - 30_000)),
+              ),
+            )
+            .limit(1);
+          if (recent) {
+            throw new HttpException(
+              { code: "PUBLIC_SERVICE_CALL_COOLDOWN", retryAfterSeconds: 30 },
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
+          }
+        }
         const [call] = await tx
           .insert(posServiceCalls)
-          .values({ organizationId, unitId, tableId, ...input })
+          .values({ organizationId, unitId, tableId, ...serviceCallInput })
           .returning();
         if (!call) throw new Error("Service call insert did not return a row");
         if (call.tabId) {
@@ -3326,17 +6178,72 @@ export class PilotPosService {
               callId: call.id,
               tableId,
               kind: call.kind,
+              channel,
+              responsibleIdentityId,
             },
+            { entityType: "service_call", entityId: call.id },
           );
         } else {
+          if (channel === "qr_table") {
+            await tx.insert(auditEvents).values({
+              organizationId,
+              unitId,
+              actorIdentityId: identityId,
+              action: "pos.call.opened",
+              entityType: "service_call",
+              entityId: call.id,
+              metadata: { tableId, kind: call.kind, channel, responsibleIdentityId },
+            });
+          }
           await tx.insert(outboxEvents).values({
             topic: "pos.call.opened",
             aggregateType: "service_call",
             aggregateId: call.id,
-            payload: { organizationId, unitId, callId: call.id, tableId, kind: call.kind },
+            payload: {
+              organizationId,
+              unitId,
+              callId: call.id,
+              tableId,
+              kind: call.kind,
+              channel,
+              responsibleIdentityId,
+            },
           });
         }
-        return { call, duplicate: false };
+        let printJob: Awaited<ReturnType<PilotPosService["queuePrintJob"]>> | null = null;
+        if (call.kind === "bill" && call.tabId) {
+          const printInput: PrintJobInput = {
+            documentType: "partial_statement",
+            copies,
+            installationId,
+            terminalId,
+            printerId,
+            serviceCallId: call.id,
+          };
+          const target = await this.resolvePrintTarget(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            printInput,
+          );
+          if (target.deliveryRoute === "local") {
+            printJob = await this.queuePrintJob(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              call.tabId,
+              printInput,
+            );
+          }
+        }
+        return {
+          call,
+          duplicate: false,
+          printJob,
+          deliveryRoute: printJob ? "local" : "cashier",
+        };
       },
     );
   }
@@ -3664,12 +6571,27 @@ export class PilotPosService {
     idempotencyKey: string,
     input: PaymentAttemptCreateInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedCapability(
       identityId,
       organizationId,
       unitId,
       "operations:payments:record",
     );
+    const terminalProfile = await this.terminalExecutionProfile(
+      organizationId,
+      unitId,
+      input.installationId,
+    );
+    if (
+      terminalProfile.paymentMode !== "homologated_pos" ||
+      terminalProfile.paymentStatus !== "homologated"
+    ) {
+      throw new ConflictException({
+        code: "HOMOLOGATED_POS_REQUIRED",
+        route: terminalProfile.paymentMode === "cashier" ? "cashier" : "cashier_fallback",
+      });
+    }
     return this.idempotent(
       identityId,
       organizationId,
@@ -4904,24 +7826,25 @@ export class PilotPosService {
       unitId,
       "operations:payments:record",
     );
-    if (input.cashRegisterId && !input.installationId) {
-      await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
-    }
-    if (["credit_card", "debit_card", "pix"].includes(input.method)) {
-      const [integratedTerminal] = await this.database.db
-        .select({ installationId: posTerminalProfiles.installationId })
-        .from(posTerminalProfiles)
-        .where(
-          and(
-            eq(posTerminalProfiles.organizationId, organizationId),
-            eq(posTerminalProfiles.unitId, unitId),
-            eq(posTerminalProfiles.paymentStatus, "homologated"),
-          ),
-        )
-        .limit(1);
-      if (integratedTerminal) {
-        await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
+    const cashierActor = await this.canOperateCashier(identityId, organizationId, unitId);
+    if (input.installationId) {
+      const terminalProfile = await this.terminalExecutionProfile(
+        organizationId,
+        unitId,
+        input.installationId,
+      );
+      if (terminalProfile.paymentMode === "disabled") {
+        throw new ConflictException({ code: "PAYMENT_ROUTED_TO_CASHIER", route: "cashier" });
       }
+      if (terminalProfile.paymentMode === "homologated_pos") {
+        throw new ConflictException({ code: "PAYMENT_ATTEMPT_REQUIRED" });
+      }
+      if (!cashierActor) {
+        throw new ForbiddenException({ code: "CASHIER_TERMINAL_REQUIRED" });
+      }
+    } else if (!cashierActor) {
+      throw new ConflictException({ code: "PAYMENT_ROUTED_TO_CASHIER", route: "cashier" });
     }
     return this.idempotent(
       identityId,
@@ -4984,12 +7907,13 @@ export class PilotPosService {
     idempotencyKey: string,
     input: PrintJobInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:printing:request",
+    );
     return this.idempotent(
       identityId,
       organizationId,
@@ -5011,18 +7935,108 @@ export class PilotPosService {
     );
   }
 
+  async createPrintSplit(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    idempotencyKey: string,
+    input: PrintSplitInput,
+  ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:printing:request",
+    );
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "print-split.create",
+      { tabId, ...input },
+      async (tx) => {
+        const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
+        const balanceSnapshotCents =
+          tab.totalCents -
+          paymentState.paidCents -
+          paymentState.reservedCents -
+          paymentState.coveredLossCents;
+        const amounts = allocatePrintSplitAmounts(
+          balanceSnapshotCents,
+          input.method,
+          input.partCount,
+          input.fixedAmountCents,
+        );
+        const [split] = await tx
+          .insert(posPrintSplits)
+          .values({
+            organizationId,
+            unitId,
+            tabId,
+            balanceSnapshotCents,
+            method: input.method,
+            partCount: input.partCount,
+            createdByIdentityId: identityId,
+          })
+          .returning();
+        if (!split) throw new Error("Print split insert did not return a row");
+        const parts = await tx
+          .insert(posPrintSplitParts)
+          .values(
+            amounts.map((amountCents, index) => ({
+              organizationId,
+              unitId,
+              splitId: split.id,
+              partNumber: index + 1,
+              amountCents,
+            })),
+          )
+          .returning();
+        const printJobs = [];
+        for (const part of parts) {
+          printJobs.push(
+            await this.queuePrintJob(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              tabId,
+              {
+                documentType: input.documentType,
+                copies: input.copies,
+                installationId: input.installationId,
+                terminalId: input.terminalId,
+                printerId: input.printerId,
+                serviceCallId: input.serviceCallId,
+              },
+              {
+                id: part.id,
+                splitId: split.id,
+                partNumber: part.partNumber,
+                partCount: split.partCount,
+                amountCents: part.amountCents,
+                balanceSnapshotCents,
+                method: split.method,
+              },
+            ),
+          );
+        }
+        return { split, parts, printJobs };
+      },
+    );
+  }
+
   async listPrintJobs(
     identityId: string,
     organizationId: string,
     unitId: string,
     query: PrintJobQueryInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
     return this.database.db
       .select()
       .from(posPrintJobs)
@@ -5030,7 +8044,15 @@ export class PilotPosService {
         and(
           eq(posPrintJobs.organizationId, organizationId),
           eq(posPrintJobs.unitId, unitId),
+          printAccess.canManage
+            ? undefined
+            : printAccess.isKds
+              ? eq(posPrintJobs.documentType, "kds_ticket")
+              : eq(posPrintJobs.requestedByIdentityId, identityId),
           query.tabId ? eq(posPrintJobs.tabId, query.tabId) : undefined,
+          query.stationId ? eq(posPrintJobs.stationId, query.stationId) : undefined,
+          query.kdsTicketId ? eq(posPrintJobs.kdsTicketId, query.kdsTicketId) : undefined,
+          query.documentType ? eq(posPrintJobs.documentType, query.documentType) : undefined,
           query.status ? eq(posPrintJobs.status, query.status) : undefined,
           query.terminalId
             ? or(isNull(posPrintJobs.terminalId), eq(posPrintJobs.terminalId, query.terminalId))
@@ -5052,12 +8074,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: PrintJobStatusInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
     return this.idempotent(
       identityId,
       organizationId,
@@ -5081,6 +8098,23 @@ export class PilotPosService {
           )
           .limit(1);
         if (!current) throw new NotFoundException({ code: "PRINT_JOB_NOT_FOUND" });
+        this.assertPrintJobAccess(
+          printAccess,
+          current.requestedByIdentityId,
+          identityId,
+          current.documentType,
+        );
+        if (current.documentType === "kds_ticket") {
+          throw new ConflictException({ code: "KDS_PRINT_JOB_RESULT_VIA_HUB_REQUIRED" });
+        }
+        if (
+          !printAccess.canManage &&
+          (!current.terminalId ||
+            input.terminalId !== current.terminalId ||
+            (input.printerId !== undefined && input.printerId !== current.printerId))
+        ) {
+          throw new ForbiddenException({ code: "PRINT_JOB_TERMINAL_BINDING_MISMATCH" });
+        }
         assertPrintJobTransition(current.status, input.status);
         const now = new Date();
         const [printJob] = await tx
@@ -5093,7 +8127,12 @@ export class PilotPosService {
             printingAt: input.status === "printing" ? now : current.printingAt,
             printedAt: input.status === "printed" ? now : null,
             failedAt: input.status === "failed" ? now : null,
-            lastError: input.status === "failed" ? (input.error ?? "Falha de impressão") : null,
+            lastError:
+              input.status === "failed"
+                ? (input.error ?? "Falha de impressão")
+                : input.status === "confirmation_required"
+                  ? "PRINTER_RESULT_UNKNOWN"
+                  : null,
             updatedAt: now,
           })
           .where(
@@ -5105,6 +8144,24 @@ export class PilotPosService {
           )
           .returning();
         if (!printJob) throw new Error("Print job update did not return a row");
+        if (input.status === "printed" && current.serviceCallId) {
+          await tx
+            .update(posServiceCalls)
+            .set({
+              status: "resolved",
+              resolvedByIdentityId: identityId,
+              resolvedAt: now,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(posServiceCalls.organizationId, organizationId),
+                eq(posServiceCalls.unitId, unitId),
+                eq(posServiceCalls.id, current.serviceCallId),
+                ne(posServiceCalls.status, "resolved"),
+              ),
+            );
+        }
         await this.recordEvent(
           tx,
           identityId,
@@ -5128,12 +8185,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: RetryPrintJobInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
     return this.idempotent(
       identityId,
       organizationId,
@@ -5157,18 +8209,40 @@ export class PilotPosService {
           )
           .limit(1);
         if (!current) throw new NotFoundException({ code: "PRINT_JOB_NOT_FOUND" });
+        this.assertPrintJobAccess(
+          printAccess,
+          current.requestedByIdentityId,
+          identityId,
+          current.documentType,
+        );
+        if (current.documentType === "kds_ticket") {
+          throw new ConflictException({ code: "KDS_PRINT_RETRY_REQUIRES_REPRINT_REASON" });
+        }
         if (current.status !== "failed") {
           throw new ConflictException({
             code: "PRINT_JOB_NOT_FAILED",
             message: "Somente impressões com falha podem ser reenfileiradas.",
           });
         }
+        const inheritedInstallationId =
+          input.installationId ??
+          (current.terminalId &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            current.terminalId,
+          )
+            ? current.terminalId
+            : undefined);
+        const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, {
+          installationId: inheritedInstallationId,
+          terminalId: input.terminalId ?? current.terminalId ?? undefined,
+          printerId: input.printerId ?? current.printerId ?? undefined,
+        });
         const [printJob] = await tx
           .update(posPrintJobs)
           .set({
             status: "queued",
-            terminalId: input.terminalId ?? current.terminalId,
-            printerId: input.printerId ?? current.printerId,
+            terminalId: target.terminalId,
+            printerId: target.printerId,
             printingAt: null,
             printedAt: null,
             failedAt: null,
@@ -5207,12 +8281,43 @@ export class PilotPosService {
     idempotencyKey: string,
     input: ReprintJobInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
+    const [productionSource] = await this.database.db
+      .select()
+      .from(posPrintJobs)
+      .where(
+        and(
+          eq(posPrintJobs.organizationId, organizationId),
+          eq(posPrintJobs.unitId, unitId),
+          eq(posPrintJobs.id, printJobId),
+        ),
+      )
+      .limit(1);
+    if (productionSource?.documentType === "kds_ticket") {
+      this.assertPrintJobAccess(
+        printAccess,
+        productionSource.requestedByIdentityId,
+        identityId,
+        productionSource.documentType,
+      );
+      if (productionSource.status === "confirmation_required") {
+        throw new ConflictException({ code: "PRINT_JOB_RESULT_CONFIRMATION_REQUIRED" });
+      }
+      if (productionSource.status !== "printed" && productionSource.status !== "failed") {
+        throw new ConflictException({ code: "PRINT_JOB_NOT_REPRINTABLE" });
+      }
+      if (!this.productionPrinting) {
+        throw new ConflictException({ code: "PRODUCTION_PRINTING_NOT_CONFIGURED" });
+      }
+      return this.productionPrinting.reprintKdsJobAuthorized(
+        identityId,
+        organizationId,
+        unitId,
+        printJobId,
+        idempotencyKey,
+        input,
+      );
+    }
     return this.idempotent(
       identityId,
       organizationId,
@@ -5233,12 +8338,31 @@ export class PilotPosService {
           )
           .limit(1);
         if (!source) throw new NotFoundException({ code: "PRINT_JOB_NOT_FOUND" });
+        this.assertPrintJobAccess(
+          printAccess,
+          source.requestedByIdentityId,
+          identityId,
+          source.documentType,
+        );
         if (source.status !== "printed") {
           throw new ConflictException({
             code: "PRINT_JOB_NOT_PRINTED",
             message: "Somente um documento já impresso pode ser reimpresso.",
           });
         }
+        const inheritedInstallationId =
+          input.installationId ??
+          (source.terminalId &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+            source.terminalId,
+          )
+            ? source.terminalId
+            : undefined);
+        const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, {
+          installationId: inheritedInstallationId,
+          terminalId: input.terminalId ?? source.terminalId ?? undefined,
+          printerId: input.printerId ?? source.printerId ?? undefined,
+        });
         const [printJob] = await tx
           .insert(posPrintJobs)
           .values({
@@ -5247,8 +8371,8 @@ export class PilotPosService {
             tabId: source.tabId,
             documentType: source.documentType,
             copies: input.copies ?? source.copies,
-            terminalId: input.terminalId ?? source.terminalId,
-            printerId: input.printerId ?? source.printerId,
+            terminalId: target.terminalId,
+            printerId: target.printerId,
             payload: source.payload,
             requestedByIdentityId: identityId,
             reprintOfJobId: source.id,
@@ -5271,6 +8395,193 @@ export class PilotPosService {
     );
   }
 
+  private async lockOpenReturnableCustodyForTabs(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabIds?: string[],
+  ): Promise<OpenReturnableCustody[]> {
+    if (tabIds?.length === 0) return [];
+    const orderScope = [eq(posOrders.organizationId, organizationId), eq(posOrders.unitId, unitId)];
+    if (tabIds) orderScope.push(inArray(posOrders.tabId, tabIds));
+    const orders = await tx
+      .select({ id: posOrders.id, tabId: posOrders.tabId })
+      .from(posOrders)
+      .where(and(...orderScope));
+    if (orders.length === 0) return [];
+    const tabIdByOrderId = new Map(orders.map((order) => [order.id, order.tabId]));
+    const issued = await tx
+      .select({
+        id: managementReturnableCustodyMovements.id,
+        orderId: managementReturnableCustodyMovements.orderId,
+        containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
+        containerName: managementInventoryItems.name,
+        quantityDelta: managementReturnableCustodyMovements.quantityDelta,
+        responsibleIdentityId: managementReturnableCustodyMovements.responsibleIdentityId,
+      })
+      .from(managementReturnableCustodyMovements)
+      .innerJoin(
+        managementInventoryItems,
+        and(
+          eq(
+            managementInventoryItems.organizationId,
+            managementReturnableCustodyMovements.organizationId,
+          ),
+          eq(managementInventoryItems.unitId, managementReturnableCustodyMovements.unitId),
+          eq(
+            managementInventoryItems.id,
+            managementReturnableCustodyMovements.containerInventoryItemId,
+          ),
+        ),
+      )
+      .where(
+        and(
+          eq(managementReturnableCustodyMovements.organizationId, organizationId),
+          eq(managementReturnableCustodyMovements.unitId, unitId),
+          eq(managementReturnableCustodyMovements.type, "issue"),
+          inArray(
+            managementReturnableCustodyMovements.orderId,
+            orders.map((order) => order.id),
+          ),
+        ),
+      )
+      .for("update");
+    if (issued.length === 0) return [];
+
+    const childMovement = alias(managementReturnableCustodyMovements, "returnable_custody_child");
+    const openIssues = await tx
+      .select({
+        issueMovementId: managementReturnableCustodyMovements.id,
+        openQuantity: sql<string>`${managementReturnableCustodyMovements.quantityDelta} + coalesce(sum(${childMovement.quantityDelta}), 0)`,
+      })
+      .from(managementReturnableCustodyMovements)
+      .leftJoin(
+        childMovement,
+        and(
+          eq(childMovement.organizationId, managementReturnableCustodyMovements.organizationId),
+          eq(childMovement.unitId, managementReturnableCustodyMovements.unitId),
+          eq(childMovement.parentMovementId, managementReturnableCustodyMovements.id),
+        ),
+      )
+      .where(
+        inArray(
+          managementReturnableCustodyMovements.id,
+          issued.map((issue) => issue.id),
+        ),
+      )
+      .groupBy(managementReturnableCustodyMovements.id)
+      .having(
+        sql`${managementReturnableCustodyMovements.quantityDelta} + coalesce(sum(${childMovement.quantityDelta}), 0) > 0`,
+      );
+    if (openIssues.length === 0) return [];
+
+    const openIds = openIssues.map((issue) => issue.issueMovementId);
+    const custodyHandoffs = await tx
+      .select({
+        issueMovementId: managementReturnableCustodyHandoffs.issueMovementId,
+        toIdentityId: managementReturnableCustodyHandoffs.toIdentityId,
+      })
+      .from(managementReturnableCustodyHandoffs)
+      .where(
+        and(
+          eq(managementReturnableCustodyHandoffs.organizationId, organizationId),
+          eq(managementReturnableCustodyHandoffs.unitId, unitId),
+          inArray(managementReturnableCustodyHandoffs.issueMovementId, openIds),
+        ),
+      )
+      .orderBy(
+        desc(managementReturnableCustodyHandoffs.occurredAt),
+        desc(managementReturnableCustodyHandoffs.createdAt),
+      );
+    const latestResponsibleByIssueId = new Map<string, string>();
+    for (const handoff of custodyHandoffs) {
+      if (!latestResponsibleByIssueId.has(handoff.issueMovementId)) {
+        latestResponsibleByIssueId.set(handoff.issueMovementId, handoff.toIdentityId);
+      }
+    }
+    const openById = new Map(openIssues.map((issue) => [issue.issueMovementId, issue]));
+    return issued.flatMap((issue) => {
+      const open = openById.get(issue.id);
+      const tabId = issue.orderId ? tabIdByOrderId.get(issue.orderId) : null;
+      if (!open || !tabId) return [];
+      return [
+        {
+          issueMovementId: issue.id,
+          tabId,
+          containerInventoryItemId: issue.containerInventoryItemId,
+          containerName: issue.containerName,
+          openQuantity: open.openQuantity,
+          currentResponsibleIdentityId:
+            latestResponsibleByIssueId.get(issue.id) ?? issue.responsibleIdentityId,
+        },
+      ];
+    });
+  }
+
+  private async returnableCloseSnapshot(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    const [configuredPolicy] = await tx
+      .select({ returnableClosePolicy: managementReturnablePolicies.returnableClosePolicy })
+      .from(managementReturnablePolicies)
+      .where(
+        and(
+          eq(managementReturnablePolicies.organizationId, organizationId),
+          eq(managementReturnablePolicies.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    const policy = configuredPolicy?.returnableClosePolicy ?? "warn";
+    const openIssues = await this.lockOpenReturnableCustodyForTabs(tx, organizationId, unitId, [
+      tabId,
+    ]);
+    const [pendingProcessing] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(outboxEvents)
+      .where(
+        and(
+          eq(outboxEvents.aggregateType, "tab"),
+          eq(outboxEvents.aggregateId, tabId),
+          inArray(outboxEvents.topic, ["pos.order.sent", "pos.item.canceled"]),
+          isNull(outboxEvents.processedAt),
+          sql`${outboxEvents.payload} ->> 'organizationId' = ${organizationId}`,
+          sql`${outboxEvents.payload} ->> 'unitId' = ${unitId}`,
+        ),
+      );
+    const containers = new Map<
+      string,
+      { inventoryItemId: string; name: string; issueCount: number; openMilli: bigint }
+    >();
+    let totalOpenMilli = 0n;
+    for (const issue of openIssues) {
+      const openMilli = returnableQuantityToMilli(issue.openQuantity);
+      totalOpenMilli += openMilli;
+      const current = containers.get(issue.containerInventoryItemId);
+      containers.set(issue.containerInventoryItemId, {
+        inventoryItemId: issue.containerInventoryItemId,
+        name: issue.containerName,
+        issueCount: (current?.issueCount ?? 0) + 1,
+        openMilli: (current?.openMilli ?? 0n) + openMilli,
+      });
+    }
+    const pendingEventCount = Number(pendingProcessing?.count ?? 0);
+    return {
+      policy,
+      hasPending: openIssues.length > 0 || pendingEventCount > 0,
+      issueCount: openIssues.length,
+      openQuantity: returnableMilliToQuantity(totalOpenMilli),
+      containers: [...containers.values()].map(({ openMilli, ...container }) => ({
+        ...container,
+        openQuantity: returnableMilliToQuantity(openMilli),
+      })),
+      processingPending: pendingEventCount > 0,
+      pendingEventCount,
+    };
+  }
+
   async closeTab(
     identityId: string,
     organizationId: string,
@@ -5279,6 +8590,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: CloseTabInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedCapability(identityId, organizationId, unitId, "operations:tabs:close");
     return this.idempotent(
       identityId,
@@ -5308,6 +8620,20 @@ export class PilotPosService {
           throw new ConflictException({
             code: "TAB_HAS_ACTIVE_PAYMENT_ATTEMPT",
             message: "Conclua ou cancele a cobrança ativa antes de fechar a comanda.",
+          });
+        }
+        const returnables = await this.returnableCloseSnapshot(tx, organizationId, unitId, tabId);
+        const mustBlock = returnables.policy === "block";
+        const needsAcknowledgement =
+          returnables.policy === "warn" && input.returnableDecision !== "acknowledge";
+        if (returnables.hasPending && (mustBlock || needsAcknowledgement)) {
+          throw new ConflictException({
+            code: "TAB_HAS_OPEN_RETURNABLE_CUSTODY",
+            message: mustBlock
+              ? "Confirme a devolução dos vasilhames antes de fechar a comanda."
+              : "Há vasilhames pendentes. Confirme a ciência para continuar o fechamento.",
+            policy: returnables.policy,
+            pending: returnables,
           });
         }
         const paidCents = paymentState.paidCents;
@@ -5397,22 +8723,41 @@ export class PilotPosService {
               );
           }
         }
+        const loyaltyEntry = await this.earnLoyaltyForClosedTab(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          tabId,
+          paidCents,
+          now,
+        );
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.closed", {
           paidCents,
           operationalLossCents,
           printRequested: input.printRequested,
           releasedTableIds,
           turnoverStatus: releasedTableIds.length > 0 ? "needs_cleaning" : null,
+          loyaltyEarned: loyaltyEntry?.amount ?? 0,
+          returnables,
         });
         const printJob = input.printRequested
           ? await this.queuePrintJob(tx, identityId, organizationId, unitId, tabId, {
               documentType: "final_receipt",
               copies: input.printOptions?.copies ?? 1,
+              installationId: input.printOptions?.installationId,
               terminalId: input.printOptions?.terminalId,
               printerId: input.printOptions?.printerId,
             })
           : null;
-        return { tab: closed, paidCents, operationalLossCents, printJob };
+        return {
+          tab: closed,
+          paidCents,
+          operationalLossCents,
+          printJob,
+          loyaltyEntry,
+          returnables,
+        };
       },
     );
   }
@@ -5595,11 +8940,19 @@ export class PilotPosService {
           )
           .returning();
         if (!reopened) throw new ConflictException({ code: "TAB_NOT_CLOSED" });
+        const loyaltyReversal = await this.reverseLoyaltyForReopenedTab(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          tabId,
+        );
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.reopened", {
           reason: input.reason,
           approverMembershipId: membership.id,
+          loyaltyReversed: loyaltyReversal ? -loyaltyReversal.amount : 0,
         });
-        return { tab: reopened };
+        return { tab: reopened, loyaltyReversal };
       },
     );
   }
@@ -5860,6 +9213,7 @@ export class PilotPosService {
       modifierIdForOption: (itemId: string, optionId: string) => string;
     },
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -5867,18 +9221,114 @@ export class PilotPosService {
       "cashier",
     ]);
     await this.requireOperationalBilling(organizationId);
+    const hasDoseClubItem = input.items.some((item) => Boolean(item.doseClub));
+    if (hasDoseClubItem && !this.doseClub) {
+      throw new ServiceUnavailableException({ code: "DOSECLUB_NOT_CONFIGURED" });
+    }
+    const doseClubContext = hasDoseClubItem
+      ? await this.doseClub?.draftContext(organizationId, unitId, tabId)
+      : undefined;
+    return this.createOrderCore(
+      identityId,
+      organizationId,
+      unitId,
+      tabId,
+      idempotencyKey,
+      input,
+      "ops",
+      offlineIds,
+      undefined,
+      doseClubContext,
+    );
+  }
+
+  async createPublicTableOrder(
+    organizationId: string,
+    unitId: string,
+    tableId: string,
+    tabId: string,
+    idempotencyKey: string,
+    input: OrderInput,
+  ) {
+    await this.requireOperationalBilling(organizationId);
+    if (input.items.some((item) => Boolean(item.doseClub))) {
+      throw new BadRequestException({ code: "DOSECLUB_QR_ORDER_NOT_SUPPORTED" });
+    }
+    const identityId = await this.publicServiceIdentity(organizationId);
+    return this.createOrderCore(
+      identityId,
+      organizationId,
+      unitId,
+      tabId,
+      idempotencyKey,
+      input,
+      "qr_table",
+      undefined,
+      tableId,
+    );
+  }
+
+  private async createOrderCore(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    idempotencyKey: string,
+    input: OrderInput,
+    source: "ops" | "qr_table",
+    offlineIds?: {
+      orderId: string;
+      itemIds: string[];
+      modifierIdForOption: (itemId: string, optionId: string) => string;
+    },
+    originTableId?: string,
+    doseClubContext?: { integrationId: string; externalCustomerId: string },
+  ) {
     return this.idempotent(
       identityId,
       organizationId,
       unitId,
       idempotencyKey,
-      "order.create",
-      { tabId, ...input },
+      source === "qr_table" ? "public-table-order.create" : "order.create",
+      { tabId, originTableId: originTableId ?? null, source, ...input },
       async (tx) => {
         if (offlineIds && offlineIds.itemIds.length !== input.items.length) {
           throw new BadRequestException({ code: "INVALID_OFFLINE_ENTITY_IDS" });
         }
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        if (
+          source === "qr_table" &&
+          (!originTableId ||
+            !(await this.tableBelongsToTab(tx, organizationId, unitId, originTableId, tab)))
+        ) {
+          throw new ConflictException({ code: "PUBLIC_TABLE_SESSION_CHANGED" });
+        }
+        if (source === "qr_table") {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`public-table-order:${organizationId}:${unitId}:${tabId}:${originTableId}`}))`,
+          );
+          const [pending] = await tx
+            .select({ id: posOrders.id })
+            .from(posOrders)
+            .where(
+              and(
+                eq(posOrders.organizationId, organizationId),
+                eq(posOrders.unitId, unitId),
+                eq(posOrders.tabId, tabId),
+                eq(posOrders.originTableId, originTableId as string),
+                eq(posOrders.source, "qr_table"),
+                eq(posOrders.status, "draft"),
+              ),
+            )
+            .limit(1);
+          if (pending) {
+            throw new ConflictException({
+              code: "PUBLIC_TABLE_ORDER_PENDING",
+              orderId: pending.id,
+              message: "A mesa já possui um pedido aguardando confirmação.",
+            });
+          }
+        }
         const [unit] = await tx
           .select({ timezone: units.timezone })
           .from(units)
@@ -5892,7 +9342,8 @@ export class PilotPosService {
             organizationId,
             unitId,
             tabId,
-            originTableId: tab.tableId,
+            originTableId: originTableId ?? tab.tableId,
+            source,
             createdByIdentityId: identityId,
           })
           .returning();
@@ -5917,7 +9368,17 @@ export class PilotPosService {
               eq(posCatalogPromotions.active, true),
             ),
           );
+        const qrRequestedByProduct = new Map<string, number>();
         for (const [itemIndex, item] of input.items.entries()) {
+          if (item.doseClub && !doseClubContext) {
+            throw new ServiceUnavailableException({ code: "DOSECLUB_NOT_CONFIGURED" });
+          }
+          if (item.doseClub && item.modifierOptionIds.length > 0) {
+            throw new BadRequestException({
+              code: "DOSECLUB_MODIFIERS_NOT_SUPPORTED",
+              productId: item.productId,
+            });
+          }
           const productRows = await tx
             .select({
               id: posProducts.id,
@@ -5999,36 +9460,50 @@ export class PilotPosService {
           ) {
             throw new ConflictException({ code: "PRODUCT_UNAVAILABLE", productId: item.productId });
           }
-          const [reservedStock] = await tx
-            .update(posProductAvailability)
-            .set({
-              soldToday: sql`case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${item.quantity} else ${item.quantity} end`,
-              stockDate: businessDate,
-              updatedAt: orderCreatedAt,
-            })
-            .where(
-              and(
-                eq(posProductAvailability.organizationId, organizationId),
-                eq(posProductAvailability.unitId, unitId),
-                eq(posProductAvailability.productId, item.productId),
-                or(
-                  eq(posProductAvailability.available, true),
-                  lte(posProductAvailability.operationalResetAt, orderCreatedAt),
-                ),
-                sql`${posProductAvailability.dailyStock} is null or (case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${item.quantity} else ${item.quantity} end) <= ${posProductAvailability.dailyStock}`,
-              ),
-            )
-            .returning({
-              dailyStock: posProductAvailability.dailyStock,
-              soldToday: posProductAvailability.soldToday,
-            });
-          if (!reservedStock) {
+          const qrRequested = (qrRequestedByProduct.get(item.productId) ?? 0) + item.quantity;
+          const currentSold = product.stockDate === businessDate ? product.soldToday : 0;
+          if (
+            source === "qr_table" &&
+            product.dailyStock !== null &&
+            currentSold + qrRequested > product.dailyStock
+          ) {
             const effectiveSold = product.stockDate === businessDate ? product.soldToday : 0;
             throw new ConflictException({
               code: "PRODUCT_DAILY_STOCK_EXCEEDED",
               productId: item.productId,
               remaining: Math.max(0, (product.dailyStock ?? 0) - effectiveSold),
             });
+          }
+          if (source === "qr_table") {
+            qrRequestedByProduct.set(item.productId, qrRequested);
+          } else {
+            const [reservedStock] = await tx
+              .update(posProductAvailability)
+              .set({
+                soldToday: sql`case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${item.quantity} else ${item.quantity} end`,
+                stockDate: businessDate,
+                updatedAt: orderCreatedAt,
+              })
+              .where(
+                and(
+                  eq(posProductAvailability.organizationId, organizationId),
+                  eq(posProductAvailability.unitId, unitId),
+                  eq(posProductAvailability.productId, item.productId),
+                  or(
+                    eq(posProductAvailability.available, true),
+                    lte(posProductAvailability.operationalResetAt, orderCreatedAt),
+                  ),
+                  sql`${posProductAvailability.dailyStock} is null or (case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${item.quantity} else ${item.quantity} end) <= ${posProductAvailability.dailyStock}`,
+                ),
+              )
+              .returning({ id: posProductAvailability.productId });
+            if (!reservedStock) {
+              throw new ConflictException({
+                code: "PRODUCT_DAILY_STOCK_EXCEEDED",
+                productId: item.productId,
+                remaining: Math.max(0, (product.dailyStock ?? 0) - currentSold),
+              });
+            }
           }
           const optionIds = [...new Set(item.modifierOptionIds)];
           const options =
@@ -6101,33 +9576,36 @@ export class PilotPosService {
             0,
           );
           const channel = tab.fulfillmentType === "delivery" ? "delivery" : "salon";
-          const basePriceCents =
-            channel === "delivery"
+          const basePriceCents = item.doseClub
+            ? 0
+            : channel === "delivery"
               ? (product.deliveryPriceCents ?? product.priceCents)
               : product.priceCents;
           const now = new Date();
           const local = localCalendar(now, unit.timezone);
-          const promotion = bestPromotion(
-            catalogPromotions
-              .filter(
-                (candidate) =>
-                  (!candidate.startsAt || candidate.startsAt <= now) &&
-                  (!candidate.endsAt || candidate.endsAt > now),
-              )
-              .map((candidate) => ({
-                ...candidate,
-                channels: candidate.channels.map((candidateChannel) =>
-                  candidateChannel === "salon" ? "pickup" : candidateChannel,
-                ),
-              })),
-            product.id,
-            product.categoryId,
-            channel === "delivery" ? "delivery" : "pickup",
-            local.weekday,
-            local.minute,
-            basePriceCents,
-            item.quantity,
-          );
+          const promotion = item.doseClub
+            ? null
+            : bestPromotion(
+                catalogPromotions
+                  .filter(
+                    (candidate) =>
+                      (!candidate.startsAt || candidate.startsAt <= now) &&
+                      (!candidate.endsAt || candidate.endsAt > now),
+                  )
+                  .map((candidate) => ({
+                    ...candidate,
+                    channels: candidate.channels.map((candidateChannel) =>
+                      candidateChannel === "salon" ? "pickup" : candidateChannel,
+                    ),
+                  })),
+                product.id,
+                product.categoryId,
+                channel === "delivery" ? "delivery" : "pickup",
+                local.weekday,
+                local.minute,
+                basePriceCents,
+                item.quantity,
+              );
           const promotionDiscountCents = promotion?.discountCents ?? 0;
           const amounts = itemAmounts(item.quantity, basePriceCents, modifierPerUnitCents);
           const [created] = await tx
@@ -6154,6 +9632,19 @@ export class PilotPosService {
             })
             .returning();
           if (!created) throw new Error("Order item insert did not return a row");
+          if (item.doseClub && doseClubContext && this.doseClub) {
+            await this.doseClub.stageRedemption(tx, {
+              organizationId,
+              unitId,
+              integrationId: doseClubContext.integrationId,
+              orderId: order.id,
+              orderItemId: created.id,
+              externalCustomerId: doseClubContext.externalCustomerId,
+              externalClubId: item.doseClub.externalClubId,
+              externalProductId: product.id,
+              doses: item.quantity,
+            });
+          }
           if (promotion)
             appliedPromotions.push({
               itemId: created.id,
@@ -6181,34 +9672,66 @@ export class PilotPosService {
           orderId: order.id,
           itemCount: createdItems.length,
           appliedPromotions,
+          source,
         });
+        if (source === "qr_table") {
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            tabId,
+            "public_table_order.requested",
+            {
+              orderId: order.id,
+              tableId: originTableId ?? tab.tableId,
+              channel: "qr_table",
+              itemCount: createdItems.length,
+            },
+            { entityType: "order", entityId: order.id },
+          );
+        }
         return { order, items: createdItems, totals };
       },
     );
   }
 
-  async sendOrder(
+  async rejectPublicTableOrder(
     identityId: string,
     organizationId: string,
     unitId: string,
     orderId: string,
     idempotencyKey: string,
-    offlineIds?: { ticketIdForStation: (stationId: string) => string },
+    input: { reason: string },
   ) {
+    const [scope] = await this.database.db
+      .select({ tabId: posOrders.tabId, source: posOrders.source })
+      .from(posOrders)
+      .where(
+        and(
+          eq(posOrders.organizationId, organizationId),
+          eq(posOrders.unitId, unitId),
+          eq(posOrders.id, orderId),
+        ),
+      )
+      .limit(1);
+    if (scope?.source !== "qr_table") {
+      throw new NotFoundException({ code: "PUBLIC_TABLE_ORDER_NOT_FOUND" });
+    }
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [scope.tabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
       "waiter",
       "cashier",
     ]);
-    await this.requireOperationalBilling(organizationId);
     return this.idempotent(
       identityId,
       organizationId,
       unitId,
       idempotencyKey,
-      "order.send",
-      { orderId },
+      "public-table-order.reject",
+      { orderId, reason: input.reason },
       async (tx) => {
         await this.lockKdsOrder(tx, organizationId, unitId, orderId);
         const [order] = await tx
@@ -6222,23 +9745,16 @@ export class PilotPosService {
             ),
           )
           .limit(1);
-        if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
-        if (order.status !== "draft") {
-          throw new ConflictException({ code: "ORDER_NOT_DRAFT", status: order.status });
+        if (order?.source !== "qr_table") {
+          throw new NotFoundException({ code: "PUBLIC_TABLE_ORDER_NOT_FOUND" });
         }
-        const tab = await this.requireOpenTab(tx, organizationId, unitId, order.tabId);
-        const [activeShift] = await tx
-          .select({ serviceMode: posOperationalShifts.serviceMode })
-          .from(posOperationalShifts)
-          .where(
-            and(
-              eq(posOperationalShifts.organizationId, organizationId),
-              eq(posOperationalShifts.unitId, unitId),
-              eq(posOperationalShifts.status, "active"),
-            ),
-          )
-          .limit(1);
-        const serviceMode = activeShift?.serviceMode ?? "hybrid";
+        if (order.status !== "draft") {
+          throw new ConflictException({
+            code: "PUBLIC_TABLE_ORDER_NOT_DRAFT",
+            status: order.status,
+          });
+        }
+        await this.requireOpenTab(tx, organizationId, unitId, order.tabId);
         const items = await tx
           .select()
           .from(posOrderItems)
@@ -6246,211 +9762,723 @@ export class PilotPosService {
             and(
               eq(posOrderItems.organizationId, organizationId),
               eq(posOrderItems.unitId, unitId),
-              eq(posOrderItems.orderId, orderId),
+              eq(posOrderItems.orderId, order.id),
               eq(posOrderItems.status, "draft"),
             ),
           );
         if (items.length === 0) throw new ConflictException({ code: "ORDER_EMPTY" });
-        const productIds = [...new Set(items.map((item) => item.productId))].sort();
-        const initialRoutes = await tx
-          .select({
-            productId: posProductStations.productId,
-            stationId: posProductStations.stationId,
-            stage: posProductStations.stage,
-            active: posProductionStations.active,
-          })
-          .from(posProductStations)
-          .innerJoin(
-            posProductionStations,
-            and(
-              eq(posProductionStations.organizationId, posProductStations.organizationId),
-              eq(posProductionStations.unitId, posProductStations.unitId),
-              eq(posProductionStations.id, posProductStations.stationId),
-            ),
-          )
-          .where(
-            and(
-              eq(posProductStations.organizationId, organizationId),
-              eq(posProductStations.unitId, unitId),
-              inArray(posProductStations.productId, productIds),
-            ),
-          )
-          .orderBy(asc(posProductStations.productId), asc(posProductStations.stationId));
-        if (
-          productIds.some(
-            (productId) => !initialRoutes.some((route) => route.productId === productId),
-          )
-        ) {
-          throw new ConflictException({ code: "PRODUCT_WITHOUT_STATION" });
-        }
-        const initialStationIds = [
-          ...new Set(initialRoutes.map((route) => route.stationId)),
-        ].sort();
-        await this.lockKdsStations(tx, organizationId, unitId, initialStationIds);
-        const routes = await tx
-          .select({
-            productId: posProductStations.productId,
-            stationId: posProductStations.stationId,
-            stage: posProductStations.stage,
-            active: posProductionStations.active,
-          })
-          .from(posProductStations)
-          .innerJoin(
-            posProductionStations,
-            and(
-              eq(posProductionStations.organizationId, posProductStations.organizationId),
-              eq(posProductionStations.unitId, posProductStations.unitId),
-              eq(posProductionStations.id, posProductStations.stationId),
-            ),
-          )
-          .where(
-            and(
-              eq(posProductStations.organizationId, organizationId),
-              eq(posProductStations.unitId, unitId),
-              inArray(posProductStations.productId, productIds),
-            ),
-          )
-          .orderBy(asc(posProductStations.productId), asc(posProductStations.stationId));
-        const initialRouteKeys = initialRoutes.map(
-          (route) => `${route.productId}:${route.stationId}:${route.stage}`,
-        );
-        const currentRouteKeys = routes.map(
-          (route) => `${route.productId}:${route.stationId}:${route.stage}`,
-        );
-        if (
-          currentRouteKeys.length !== initialRouteKeys.length ||
-          currentRouteKeys.some((route, index) => route !== initialRouteKeys[index])
-        ) {
-          throw new ConflictException({ code: "KDS_PRODUCT_ROUTING_CHANGED_RETRY" });
-        }
-        if (routes.some((route) => !route.active)) {
-          throw new ConflictException({ code: "ORDER_HAS_INACTIVE_STATION" });
-        }
-        const stationIdsByProduct = new Map<string, string[]>();
-        const stageByProductStation = new Map<string, number>();
-        for (const route of routes) {
-          stationIdsByProduct.set(route.productId, [
-            ...(stationIdsByProduct.get(route.productId) ?? []),
-            route.stationId,
-          ]);
-          stageByProductStation.set(`${route.productId}:${route.stationId}`, route.stage);
-        }
-        const stationIds = [...new Set(routes.map((route) => route.stationId))].sort();
         const now = new Date();
-        for (const item of items) {
-          const primaryStationId = stationIdsByProduct.get(item.productId)?.[0];
-          if (!primaryStationId) {
-            throw new ConflictException({
-              code: "PRODUCT_WITHOUT_STATION",
-              productId: item.productId,
-            });
-          }
-          if (item.stationId !== primaryStationId) {
-            await tx
-              .update(posOrderItems)
-              .set({ stationId: primaryStationId, updatedAt: now })
-              .where(
-                and(
-                  eq(posOrderItems.organizationId, organizationId),
-                  eq(posOrderItems.unitId, unitId),
-                  eq(posOrderItems.id, item.id),
-                  eq(posOrderItems.orderId, orderId),
-                  eq(posOrderItems.status, "draft"),
-                ),
-              );
-          }
-        }
-        await tx
-          .update(posOrders)
-          .set({ status: "sent", sentAt: now, updatedAt: now })
-          .where(
-            and(
-              eq(posOrders.organizationId, organizationId),
-              eq(posOrders.unitId, unitId),
-              eq(posOrders.id, orderId),
-              eq(posOrders.status, "draft"),
-            ),
-          );
         await tx
           .update(posOrderItems)
-          .set({ status: "queued", updatedAt: now })
+          .set({
+            status: "canceled",
+            canceledAt: now,
+            canceledReason: input.reason,
+            updatedAt: now,
+          })
           .where(
             and(
               eq(posOrderItems.organizationId, organizationId),
               eq(posOrderItems.unitId, unitId),
-              eq(posOrderItems.orderId, orderId),
+              eq(posOrderItems.orderId, order.id),
               eq(posOrderItems.status, "draft"),
             ),
           );
-        const ticketIds = [];
-        for (const stationId of stationIds) {
-          const stationItems = items.filter((item) =>
-            stationIdsByProduct.get(item.productId)?.includes(stationId),
-          );
-          const stationDispatch = stationItems.map((item) => ({
-            item,
-            ...initialKdsCourseDispatch(serviceMode, item.course),
-            stage: stageByProductStation.get(`${item.productId}:${stationId}`) ?? 1,
-          }));
-          const minimumStageByItem = new Map(
-            stationItems.map((item) => [
-              item.id,
-              Math.min(
-                ...routes
-                  .filter((route) => route.productId === item.productId)
-                  .map((route) => route.stage),
-              ),
-            ]),
-          );
-          const estimatedMinutes = Math.max(
-            0,
-            ...stationDispatch
-              .filter(({ fired }) => fired)
-              .map(({ item }) => item.estimatedPrepTimeMinutes ?? 0),
-          );
-          const dueAt =
-            tab.promisedAt ??
-            (estimatedMinutes > 0 ? new Date(now.getTime() + estimatedMinutes * 60_000) : null);
-          const [ticket] = await tx
-            .insert(posKdsTickets)
-            .values({
-              ...(offlineIds ? { id: offlineIds.ticketIdForStation(stationId) } : {}),
-              organizationId,
-              unitId,
-              orderId,
-              stationId,
-              priority: order.kdsPriority,
-              dueAt,
-            })
-            .returning();
-          if (!ticket) throw new Error("KDS ticket insert did not return a row");
-          ticketIds.push(ticket.id);
-          await tx.insert(posKdsTicketItems).values(
-            stationDispatch.map(({ item, held: courseHeld, stage }) => {
-              const dependencyHeld = stage > (minimumStageByItem.get(item.id) ?? 1);
-              return {
-                organizationId,
-                unitId,
-                ticketId: ticket.id,
-                orderItemId: item.id,
-                quantity: item.quantity,
-                status: "queued" as const,
-                stage,
-                courseHeld,
-                dependencyHeld,
-                held: courseHeld || dependencyHeld,
-                heldAt: courseHeld || dependencyHeld ? now : null,
-                firedAt: courseHeld || dependencyHeld ? null : now,
-              };
-            }),
+        const [canceledOrder] = await tx
+          .update(posOrders)
+          .set({ status: "canceled", updatedAt: now })
+          .where(
+            and(
+              eq(posOrders.organizationId, organizationId),
+              eq(posOrders.unitId, unitId),
+              eq(posOrders.id, order.id),
+              eq(posOrders.status, "draft"),
+            ),
+          )
+          .returning({ id: posOrders.id });
+        if (!canceledOrder) {
+          throw new ConflictException({ code: "PUBLIC_TABLE_ORDER_NOT_DRAFT" });
+        }
+        const totals = await this.recalculateTab(tx, organizationId, unitId, order.tabId);
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          order.tabId,
+          "public_table_order.rejected",
+          { orderId, reason: input.reason, channel: "qr_table" },
+          { entityType: "order", entityId: order.id },
+        );
+        return { orderId, status: "canceled" as const, source: "qr_table" as const, totals };
+      },
+    );
+  }
+
+  private async reserveOrderInventory(
+    tx: Transaction,
+    input: {
+      identityId: string;
+      organizationId: string;
+      unitId: string;
+      orderId: string;
+      sentAt: Date;
+      items: Array<{ id: string; productId: string; quantity: number; stationId: string | null }>;
+    },
+  ) {
+    const productIds = [...new Set(input.items.map((item) => item.productId))];
+    const [components, inventoryItems, issueRoutes] = await Promise.all([
+      tx
+        .select({
+          id: managementRecipeComponents.id,
+          inventoryItemId: managementRecipeComponents.inventoryItemId,
+          locationId: managementRecipeComponents.locationId,
+          lossBasisPoints: managementRecipeComponents.lossBasisPoints,
+          productId: managementRecipeVersions.productId,
+          quantityMilli: managementRecipeComponents.quantityMilli,
+        })
+        .from(managementRecipeVersions)
+        .innerJoin(
+          managementRecipeComponents,
+          and(
+            eq(managementRecipeComponents.organizationId, managementRecipeVersions.organizationId),
+            eq(managementRecipeComponents.unitId, managementRecipeVersions.unitId),
+            eq(managementRecipeComponents.recipeVersionId, managementRecipeVersions.id),
+          ),
+        )
+        .where(
+          and(
+            eq(managementRecipeVersions.organizationId, input.organizationId),
+            eq(managementRecipeVersions.unitId, input.unitId),
+            inArray(managementRecipeVersions.productId, productIds),
+            lte(managementRecipeVersions.validFrom, input.sentAt),
+            or(
+              isNull(managementRecipeVersions.validUntil),
+              gt(managementRecipeVersions.validUntil, input.sentAt),
+            ),
+          ),
+        ),
+      tx
+        .select({
+          allowNegative: managementInventoryItems.allowNegative,
+          id: managementInventoryItems.id,
+          kind: managementInventoryItems.kind,
+          productId: managementInventoryItems.productId,
+        })
+        .from(managementInventoryItems)
+        .where(
+          and(
+            eq(managementInventoryItems.organizationId, input.organizationId),
+            eq(managementInventoryItems.unitId, input.unitId),
+            eq(managementInventoryItems.active, true),
+          ),
+        ),
+      tx
+        .select({
+          locationId: managementInventoryIssueRoutes.locationId,
+          productId: managementInventoryIssueRoutes.productId,
+          stationId: managementInventoryIssueRoutes.stationId,
+        })
+        .from(managementInventoryIssueRoutes)
+        .where(
+          and(
+            eq(managementInventoryIssueRoutes.organizationId, input.organizationId),
+            eq(managementInventoryIssueRoutes.unitId, input.unitId),
+            eq(managementInventoryIssueRoutes.active, true),
+            inArray(managementInventoryIssueRoutes.productId, productIds),
+          ),
+        ),
+    ]);
+    const recipesByProduct = new Map<string, typeof components>();
+    for (const component of components)
+      recipesByProduct.set(component.productId, [
+        ...(recipesByProduct.get(component.productId) ?? []),
+        component,
+      ]);
+    const resaleByProduct = new Map<string, typeof inventoryItems>();
+    const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
+    for (const item of inventoryItems) {
+      if (!item.productId || item.kind !== "resale") continue;
+      resaleByProduct.set(item.productId, [...(resaleByProduct.get(item.productId) ?? []), item]);
+    }
+    const reservations = new Map<
+      string,
+      { inventoryItemId: string; locationId: string; quantityMilli: bigint; allowNegative: boolean }
+    >();
+    const addReservation = (
+      inventoryItemId: string,
+      locationId: string,
+      quantityMilli: bigint,
+      allowNegative: boolean,
+    ) => {
+      const key = `${inventoryItemId}:${locationId}`;
+      const current = reservations.get(key);
+      reservations.set(key, {
+        inventoryItemId,
+        locationId,
+        quantityMilli: (current?.quantityMilli ?? 0n) + quantityMilli,
+        allowNegative,
+      });
+    };
+    for (const orderItem of input.items) {
+      const recipe = recipesByProduct.get(orderItem.productId) ?? [];
+      if (recipe.length) {
+        for (const component of recipe) {
+          const yieldBasisPoints = BigInt(10_000 - component.lossBasisPoints);
+          const netMilli = BigInt(component.quantityMilli) * BigInt(orderItem.quantity);
+          addReservation(
+            component.inventoryItemId,
+            component.locationId,
+            (netMilli * 10_000n + yieldBasisPoints - 1n) / yieldBasisPoints,
+            inventoryById.get(component.inventoryItemId)?.allowNegative ?? false,
           );
         }
-        await this.recordEvent(tx, identityId, organizationId, unitId, order.tabId, "order.sent", {
-          orderId,
-          ticketIds,
+        continue;
+      }
+      const directItems = resaleByProduct.get(orderItem.productId) ?? [];
+      if (directItems.length === 0) continue;
+      if (directItems.length > 1)
+        throw new ConflictException({
+          code: "INVENTORY_MAPPING_AMBIGUOUS",
+          productId: orderItem.productId,
         });
-        return { orderId, status: "sent", ticketIds };
-      },
+      const inventoryItem = directItems[0];
+      if (!inventoryItem) continue;
+      const route =
+        issueRoutes.find(
+          (candidate) =>
+            candidate.productId === orderItem.productId &&
+            candidate.stationId === orderItem.stationId,
+        ) ??
+        issueRoutes.find(
+          (candidate) =>
+            candidate.productId === orderItem.productId && candidate.stationId === null,
+        );
+      let locationId = route?.locationId;
+      if (!locationId) {
+        const balances = await tx
+          .select({ locationId: managementStockBalances.locationId })
+          .from(managementStockBalances)
+          .innerJoin(
+            managementStockLocations,
+            and(
+              eq(managementStockLocations.organizationId, managementStockBalances.organizationId),
+              eq(managementStockLocations.unitId, managementStockBalances.unitId),
+              eq(managementStockLocations.id, managementStockBalances.locationId),
+              eq(managementStockLocations.active, true),
+            ),
+          )
+          .where(
+            and(
+              eq(managementStockBalances.organizationId, input.organizationId),
+              eq(managementStockBalances.unitId, input.unitId),
+              eq(managementStockBalances.inventoryItemId, inventoryItem.id),
+            ),
+          );
+        if (balances.length !== 1)
+          throw new ConflictException({
+            code: "INVENTORY_ISSUE_ROUTE_MISSING",
+            productId: orderItem.productId,
+          });
+        locationId = balances[0]?.locationId;
+      }
+      if (locationId)
+        addReservation(
+          inventoryItem.id,
+          locationId,
+          BigInt(orderItem.quantity) * 1_000n,
+          inventoryItem.allowNegative,
+        );
+    }
+    const quantity = (milli: bigint) =>
+      `${milli / 1_000n}.${String(milli % 1_000n).padStart(3, "0")}`;
+    const quantityMilli = (value: string) => {
+      const [whole = "0", fraction = ""] = value.split(".");
+      return BigInt(whole) * 1_000n + BigInt(fraction.padEnd(3, "0").slice(0, 3));
+    };
+    for (const reservation of [...reservations.values()].sort((left, right) =>
+      `${left.inventoryItemId}:${left.locationId}`.localeCompare(
+        `${right.inventoryItemId}:${right.locationId}`,
+      ),
+    )) {
+      const rows = await tx.execute<{
+        quantity: string;
+        reservedQuantity: string;
+        blockedQuantity: string;
+      }>(sql`
+        select balance.quantity,
+               coalesce((select sum(r.quantity) from management_inventory_reservations r
+                 where r.organization_id = balance.organization_id and r.unit_id = balance.unit_id
+                   and r.location_id = balance.location_id and r.inventory_item_id = balance.inventory_item_id
+                   and r.status = 'active' and (r.expires_at is null or r.expires_at > now())), 0) as "reservedQuantity",
+               coalesce((select sum(lot.quantity) from management_inventory_lots lot
+                 inner join management_inventory_lot_holds hold on hold.organization_id = lot.organization_id
+                   and hold.unit_id = lot.unit_id and hold.lot_id = lot.id and hold.status = 'active'
+                 where lot.organization_id = balance.organization_id and lot.unit_id = balance.unit_id
+                   and lot.location_id = balance.location_id and lot.inventory_item_id = balance.inventory_item_id
+                   and lot.active = true), 0) as "blockedQuantity"
+        from management_stock_balances balance
+        where balance.organization_id = ${input.organizationId}::uuid
+          and balance.unit_id = ${input.unitId}::uuid
+          and balance.location_id = ${reservation.locationId}::uuid
+          and balance.inventory_item_id = ${reservation.inventoryItemId}::uuid
+        for update
+      `);
+      const balance = rows[0];
+      if (!balance)
+        throw new ConflictException({
+          code: "INVENTORY_STOCK_BALANCE_MISSING",
+          inventoryItemId: reservation.inventoryItemId,
+        });
+      const availableMilli =
+        quantityMilli(balance.quantity) -
+        quantityMilli(balance.reservedQuantity) -
+        quantityMilli(balance.blockedQuantity);
+      if (!reservation.allowNegative && availableMilli < reservation.quantityMilli)
+        throw new ConflictException({
+          code: "INVENTORY_STOCK_INSUFFICIENT",
+          inventoryItemId: reservation.inventoryItemId,
+          availableQuantity: quantity(availableMilli > 0n ? availableMilli : 0n),
+          requiredQuantity: quantity(reservation.quantityMilli),
+        });
+      await tx
+        .insert(managementInventoryReservations)
+        .values({
+          organizationId: input.organizationId,
+          unitId: input.unitId,
+          inventoryItemId: reservation.inventoryItemId,
+          locationId: reservation.locationId,
+          quantity: quantity(reservation.quantityMilli),
+          sourceType: "order",
+          sourceId: input.orderId,
+          reason: `Pedido ${input.orderId}`,
+          expiresAt: new Date(input.sentAt.getTime() + 24 * 60 * 60_000),
+          idempotencyKey: `order:${input.orderId}:${reservation.inventoryItemId}:${reservation.locationId}`,
+          actorIdentityId: input.identityId,
+        })
+        .onConflictDoNothing();
+    }
+  }
+
+  async sendOrder(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    orderId: string,
+    idempotencyKey: string,
+    offlineIds?: { ticketIdForStation: (stationId: string) => string },
+  ) {
+    const [orderScope] = await this.database.db
+      .select({ tabId: posOrders.tabId })
+      .from(posOrders)
+      .where(
+        and(
+          eq(posOrders.organizationId, organizationId),
+          eq(posOrders.unitId, unitId),
+          eq(posOrders.id, orderId),
+        ),
+      )
+      .limit(1);
+    if (!orderScope) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [orderScope.tabId]);
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "waiter",
+      "cashier",
+    ]);
+    await this.requireOperationalBilling(organizationId);
+    const preparedDoseClubRedemptions = this.doseClub
+      ? await this.doseClub.reserveOrder(organizationId, unitId, orderId)
+      : [];
+    try {
+      return await this.idempotent(
+        identityId,
+        organizationId,
+        unitId,
+        idempotencyKey,
+        "order.send",
+        { orderId },
+        async (tx) => {
+          await this.lockKdsOrder(tx, organizationId, unitId, orderId);
+          const [order] = await tx
+            .select()
+            .from(posOrders)
+            .where(
+              and(
+                eq(posOrders.organizationId, organizationId),
+                eq(posOrders.unitId, unitId),
+                eq(posOrders.id, orderId),
+              ),
+            )
+            .limit(1);
+          if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+          if (order.status !== "draft") {
+            throw new ConflictException({ code: "ORDER_NOT_DRAFT", status: order.status });
+          }
+          const tab = await this.requireOpenTab(tx, organizationId, unitId, order.tabId);
+          const [activeShift] = await tx
+            .select({ serviceMode: posOperationalShifts.serviceMode })
+            .from(posOperationalShifts)
+            .where(
+              and(
+                eq(posOperationalShifts.organizationId, organizationId),
+                eq(posOperationalShifts.unitId, unitId),
+                eq(posOperationalShifts.status, "active"),
+              ),
+            )
+            .limit(1);
+          const serviceMode = activeShift?.serviceMode ?? "hybrid";
+          const items = await tx
+            .select()
+            .from(posOrderItems)
+            .where(
+              and(
+                eq(posOrderItems.organizationId, organizationId),
+                eq(posOrderItems.unitId, unitId),
+                eq(posOrderItems.orderId, orderId),
+                eq(posOrderItems.status, "draft"),
+              ),
+            );
+          if (items.length === 0) throw new ConflictException({ code: "ORDER_EMPTY" });
+          const productIds = [...new Set(items.map((item) => item.productId))].sort();
+          const initialRoutes = await tx
+            .select({
+              productId: posProductStations.productId,
+              stationId: posProductStations.stationId,
+              stage: posProductStations.stage,
+              active: posProductionStations.active,
+              station: posProductionStations,
+            })
+            .from(posProductStations)
+            .innerJoin(
+              posProductionStations,
+              and(
+                eq(posProductionStations.organizationId, posProductStations.organizationId),
+                eq(posProductionStations.unitId, posProductStations.unitId),
+                eq(posProductionStations.id, posProductStations.stationId),
+              ),
+            )
+            .where(
+              and(
+                eq(posProductStations.organizationId, organizationId),
+                eq(posProductStations.unitId, unitId),
+                inArray(posProductStations.productId, productIds),
+              ),
+            )
+            .orderBy(asc(posProductStations.productId), asc(posProductStations.stationId));
+          if (
+            productIds.some(
+              (productId) => !initialRoutes.some((route) => route.productId === productId),
+            )
+          ) {
+            throw new ConflictException({ code: "PRODUCT_WITHOUT_STATION" });
+          }
+          const initialStationIds = [
+            ...new Set(initialRoutes.map((route) => route.stationId)),
+          ].sort();
+          await this.lockKdsStations(tx, organizationId, unitId, initialStationIds);
+          const routes = await tx
+            .select({
+              productId: posProductStations.productId,
+              stationId: posProductStations.stationId,
+              stage: posProductStations.stage,
+              active: posProductionStations.active,
+              station: posProductionStations,
+            })
+            .from(posProductStations)
+            .innerJoin(
+              posProductionStations,
+              and(
+                eq(posProductionStations.organizationId, posProductStations.organizationId),
+                eq(posProductionStations.unitId, posProductStations.unitId),
+                eq(posProductionStations.id, posProductStations.stationId),
+              ),
+            )
+            .where(
+              and(
+                eq(posProductStations.organizationId, organizationId),
+                eq(posProductStations.unitId, unitId),
+                inArray(posProductStations.productId, productIds),
+              ),
+            )
+            .orderBy(asc(posProductStations.productId), asc(posProductStations.stationId));
+          const initialRouteKeys = initialRoutes.map(
+            (route) => `${route.productId}:${route.stationId}:${route.stage}`,
+          );
+          const currentRouteKeys = routes.map(
+            (route) => `${route.productId}:${route.stationId}:${route.stage}`,
+          );
+          if (
+            currentRouteKeys.length !== initialRouteKeys.length ||
+            currentRouteKeys.some((route, index) => route !== initialRouteKeys[index])
+          ) {
+            throw new ConflictException({ code: "KDS_PRODUCT_ROUTING_CHANGED_RETRY" });
+          }
+          if (routes.some((route) => !route.active)) {
+            throw new ConflictException({ code: "ORDER_HAS_INACTIVE_STATION" });
+          }
+          const stations = [
+            ...new Map(routes.map((route) => [route.station.id, route.station])).values(),
+          ];
+          if (this.productionPrinting) {
+            this.productionPrinting.assertStationsCanReceiveOrder(stations);
+          } else {
+            const disabledStation = stations.find((station) => station.deliveryMode === "disabled");
+            if (disabledStation) {
+              throw new ConflictException({
+                code: "PRODUCTION_STATION_DELIVERY_DISABLED",
+                stationId: disabledStation.id,
+              });
+            }
+          }
+          const stationById = new Map(stations.map((station) => [station.id, station]));
+          const stationIdsByProduct = new Map<string, string[]>();
+          const stageByProductStation = new Map<string, number>();
+          for (const route of routes) {
+            stationIdsByProduct.set(route.productId, [
+              ...(stationIdsByProduct.get(route.productId) ?? []),
+              route.stationId,
+            ]);
+            stageByProductStation.set(`${route.productId}:${route.stationId}`, route.stage);
+          }
+          const stationIds = [...new Set(routes.map((route) => route.stationId))].sort();
+          const now = new Date();
+          if (order.source === "qr_table") {
+            const [unit] = await tx
+              .select({ timezone: units.timezone })
+              .from(units)
+              .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+              .limit(1);
+            if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+            const businessDate = new Intl.DateTimeFormat("en-CA", {
+              timeZone: unit.timezone,
+            }).format(now);
+            const requestedByProduct = new Map<string, number>();
+            for (const item of items) {
+              requestedByProduct.set(
+                item.productId,
+                (requestedByProduct.get(item.productId) ?? 0) + item.quantity,
+              );
+            }
+            for (const [productId, quantity] of requestedByProduct) {
+              const [reserved] = await tx
+                .update(posProductAvailability)
+                .set({
+                  soldToday: sql`case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${quantity} else ${quantity} end`,
+                  stockDate: businessDate,
+                  updatedAt: now,
+                })
+                .where(
+                  and(
+                    eq(posProductAvailability.organizationId, organizationId),
+                    eq(posProductAvailability.unitId, unitId),
+                    eq(posProductAvailability.productId, productId),
+                    or(
+                      eq(posProductAvailability.available, true),
+                      lte(posProductAvailability.operationalResetAt, now),
+                    ),
+                    sql`${posProductAvailability.dailyStock} is null or (case when ${posProductAvailability.stockDate} = ${businessDate} then ${posProductAvailability.soldToday} + ${quantity} else ${quantity} end) <= ${posProductAvailability.dailyStock}`,
+                  ),
+                )
+                .returning({ id: posProductAvailability.productId });
+              if (!reserved) {
+                throw new ConflictException({
+                  code: "PRODUCT_DAILY_STOCK_EXCEEDED",
+                  productId,
+                });
+              }
+            }
+          }
+          for (const item of items) {
+            const primaryStationId = stationIdsByProduct.get(item.productId)?.[0];
+            if (!primaryStationId) {
+              throw new ConflictException({
+                code: "PRODUCT_WITHOUT_STATION",
+                productId: item.productId,
+              });
+            }
+            if (item.stationId !== primaryStationId) {
+              await tx
+                .update(posOrderItems)
+                .set({ stationId: primaryStationId, updatedAt: now })
+                .where(
+                  and(
+                    eq(posOrderItems.organizationId, organizationId),
+                    eq(posOrderItems.unitId, unitId),
+                    eq(posOrderItems.id, item.id),
+                    eq(posOrderItems.orderId, orderId),
+                    eq(posOrderItems.status, "draft"),
+                  ),
+                );
+            }
+          }
+          await this.doseClub?.assertReservedAndMarkCommitPending(
+            tx,
+            organizationId,
+            unitId,
+            orderId,
+          );
+          await this.reserveOrderInventory(tx, {
+            identityId,
+            organizationId,
+            unitId,
+            orderId,
+            sentAt: now,
+            items: items.map((item) => ({
+              id: item.id,
+              productId: item.productId,
+              quantity: item.quantity,
+              stationId: stationIdsByProduct.get(item.productId)?.[0] ?? item.stationId,
+            })),
+          });
+          await tx
+            .update(posOrders)
+            .set({ status: "sent", sentAt: now, updatedAt: now })
+            .where(
+              and(
+                eq(posOrders.organizationId, organizationId),
+                eq(posOrders.unitId, unitId),
+                eq(posOrders.id, orderId),
+                eq(posOrders.status, "draft"),
+              ),
+            );
+          await tx
+            .update(posOrderItems)
+            .set({ status: "queued", updatedAt: now })
+            .where(
+              and(
+                eq(posOrderItems.organizationId, organizationId),
+                eq(posOrderItems.unitId, unitId),
+                eq(posOrderItems.orderId, orderId),
+                eq(posOrderItems.status, "draft"),
+              ),
+            );
+          const ticketIds = [];
+          const printJobIds: string[] = [];
+          for (const stationId of stationIds) {
+            const stationItems = items.filter((item) =>
+              stationIdsByProduct.get(item.productId)?.includes(stationId),
+            );
+            const stationDispatch = stationItems.map((item) => ({
+              item,
+              ...initialKdsCourseDispatch(serviceMode, item.course),
+              stage: stageByProductStation.get(`${item.productId}:${stationId}`) ?? 1,
+            }));
+            const minimumStageByItem = new Map(
+              stationItems.map((item) => [
+                item.id,
+                Math.min(
+                  ...routes
+                    .filter((route) => route.productId === item.productId)
+                    .map((route) => route.stage),
+                ),
+              ]),
+            );
+            const estimatedMinutes = Math.max(
+              0,
+              ...stationDispatch
+                .filter(({ fired }) => fired)
+                .map(({ item }) => item.estimatedPrepTimeMinutes ?? 0),
+            );
+            const dueAt =
+              tab.promisedAt ??
+              (estimatedMinutes > 0 ? new Date(now.getTime() + estimatedMinutes * 60_000) : null);
+            const [ticket] = await tx
+              .insert(posKdsTickets)
+              .values({
+                ...(offlineIds ? { id: offlineIds.ticketIdForStation(stationId) } : {}),
+                organizationId,
+                unitId,
+                orderId,
+                stationId,
+                priority: order.kdsPriority,
+                dueAt,
+              })
+              .returning();
+            if (!ticket) throw new Error("KDS ticket insert did not return a row");
+            ticketIds.push(ticket.id);
+            await tx.insert(posKdsTicketItems).values(
+              stationDispatch.map(({ item, held: courseHeld, stage }) => {
+                const dependencyHeld = stage > (minimumStageByItem.get(item.id) ?? 1);
+                return {
+                  organizationId,
+                  unitId,
+                  ticketId: ticket.id,
+                  orderItemId: item.id,
+                  quantity: item.quantity,
+                  status: "queued" as const,
+                  stage,
+                  courseHeld,
+                  dependencyHeld,
+                  held: courseHeld || dependencyHeld,
+                  heldAt: courseHeld || dependencyHeld ? now : null,
+                  firedAt: courseHeld || dependencyHeld ? null : now,
+                };
+              }),
+            );
+            const station = stationById.get(stationId);
+            if (!station) throw new ConflictException({ code: "PRODUCTION_STATION_NOT_FOUND" });
+            const printJob = await this.productionPrinting?.queueAutomaticTicket(tx, {
+              identityId,
+              organizationId,
+              unitId,
+              tab,
+              order,
+              ticket,
+              station,
+              dispatch: stationDispatch.map(({ item, stage }) => ({ item, stage })),
+            });
+            if (printJob) printJobIds.push(printJob.id);
+          }
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            order.tabId,
+            "order.sent",
+            {
+              orderId,
+              ticketIds,
+            },
+          );
+          await this.recalculateTab(tx, organizationId, unitId, order.tabId);
+          return { orderId, status: "sent", ticketIds, printJobIds };
+        },
+      );
+    } catch (error) {
+      await this.doseClub?.cancelPrepared(
+        preparedDoseClubRedemptions,
+        "Envio da comanda não foi concluído",
+      );
+      throw error;
+    }
+  }
+
+  async requestKdsTicketPrint(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    ticketId: string,
+    idempotencyKey: string,
+    input: ManualKdsTicketPrintInput,
+  ) {
+    if (!this.productionPrinting) {
+      throw new ConflictException({ code: "PRODUCTION_PRINTING_NOT_CONFIGURED" });
+    }
+    const tabId = await this.productionPrinting.ticketTabId(organizationId, unitId, ticketId);
+    const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
+    if (!printAccess.isKds) {
+      await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
+    }
+    return this.productionPrinting.manualTicketPrintAuthorized(
+      identityId,
+      organizationId,
+      unitId,
+      ticketId,
+      idempotencyKey,
+      input,
     );
   }
 
@@ -6462,6 +10490,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: TransferTabInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -6583,6 +10612,7 @@ export class PilotPosService {
     targetTabId: string,
     sourceIds: string[],
     releaseSourceTables: boolean,
+    reason?: { reasonCode: string; reasonNote?: string },
   ) {
     const target = await this.requireOpenTab(tx, organizationId, unitId, targetTabId);
     const sources = await tx
@@ -6697,6 +10727,8 @@ export class PilotPosService {
       sourceTabIds: sourceIds,
       sourceTableIds: releasedTableIds,
       tablesRemainGrouped: !releaseSourceTables,
+      reasonCode: reason?.reasonCode ?? null,
+      reasonNote: reason?.reasonNote ?? null,
     });
     return { targetTabId: target.id, sourceTabIds: sourceIds, totals };
   }
@@ -6708,6 +10740,10 @@ export class PilotPosService {
     idempotencyKey: string,
     input: MergeTabsInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [
+      input.targetTabId,
+      ...input.sourceTabIds,
+    ]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -6741,6 +10777,7 @@ export class PilotPosService {
           input.targetTabId,
           sourceIds,
           true,
+          { reasonCode: input.reasonCode, reasonNote: input.reasonNote },
         );
       },
     );
@@ -6753,12 +10790,17 @@ export class PilotPosService {
     idempotencyKey: string,
     input: TableGroupInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
-      "owner",
-      "manager",
-      "waiter",
-      "cashier",
-    ]);
+    const groupingRoles = await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:tables:reorganize",
+    );
+    const canReorganizeAny = groupingRoles.some(
+      (row) =>
+        (row.unitId === null || row.unitId === unitId) &&
+        ["owner", "manager", "cashier"].includes(row.role),
+    );
     await this.requireOperationalBilling(organizationId);
     const tableIds = [...new Set(input.tableIds)];
     if (tableIds.length !== input.tableIds.length) {
@@ -6863,6 +10905,92 @@ export class PilotPosService {
               eq(posTabs.status, "open"),
             ),
           );
+        const groupResponsibleIdentityId =
+          input.responsibleIdentityId ??
+          openTabs.find((tab) => tab.tableId === input.anchorTableId)?.responsibleIdentityId ??
+          openTabs.find((tab) => tab.responsibleIdentityId)?.responsibleIdentityId ??
+          (openTabs.length ? identityId : null);
+        if (!canReorganizeAny) {
+          const [sectionAssignment, transferAssignment, coordinatedGroup] = await Promise.all([
+            tx
+              .select({ tableId: posShiftSectionTables.tableId })
+              .from(posShiftSectionTables)
+              .innerJoin(
+                posShiftSectionStaff,
+                and(
+                  eq(posShiftSectionStaff.organizationId, posShiftSectionTables.organizationId),
+                  eq(posShiftSectionStaff.unitId, posShiftSectionTables.unitId),
+                  eq(posShiftSectionStaff.shiftId, posShiftSectionTables.shiftId),
+                  eq(posShiftSectionStaff.shiftSectionId, posShiftSectionTables.shiftSectionId),
+                ),
+              )
+              .innerJoin(
+                posOperationalShifts,
+                and(
+                  eq(posOperationalShifts.organizationId, posShiftSectionTables.organizationId),
+                  eq(posOperationalShifts.unitId, posShiftSectionTables.unitId),
+                  eq(posOperationalShifts.id, posShiftSectionTables.shiftId),
+                ),
+              )
+              .where(
+                and(
+                  eq(posShiftSectionTables.organizationId, organizationId),
+                  eq(posShiftSectionTables.unitId, unitId),
+                  inArray(posShiftSectionTables.tableId, tableIds),
+                  eq(posShiftSectionStaff.identityId, identityId),
+                  eq(posOperationalShifts.status, "active"),
+                ),
+              )
+              .limit(1),
+            tx
+              .select({ tableId: posShiftTableTransfers.tableId })
+              .from(posShiftTableTransfers)
+              .innerJoin(
+                posShiftSectionStaff,
+                and(
+                  eq(posShiftSectionStaff.organizationId, posShiftTableTransfers.organizationId),
+                  eq(posShiftSectionStaff.unitId, posShiftTableTransfers.unitId),
+                  eq(posShiftSectionStaff.shiftId, posShiftTableTransfers.shiftId),
+                  eq(
+                    posShiftSectionStaff.shiftSectionId,
+                    posShiftTableTransfers.targetShiftSectionId,
+                  ),
+                ),
+              )
+              .where(
+                and(
+                  eq(posShiftTableTransfers.organizationId, organizationId),
+                  eq(posShiftTableTransfers.unitId, unitId),
+                  inArray(posShiftTableTransfers.tableId, tableIds),
+                  isNull(posShiftTableTransfers.endedAt),
+                  gt(posShiftTableTransfers.expiresAt, new Date()),
+                  eq(posShiftSectionStaff.identityId, identityId),
+                ),
+              )
+              .limit(1),
+            currentGroupIds.length
+              ? tx
+                  .select({ id: posDiningTableGroups.id })
+                  .from(posDiningTableGroups)
+                  .where(
+                    and(
+                      eq(posDiningTableGroups.organizationId, organizationId),
+                      eq(posDiningTableGroups.unitId, unitId),
+                      inArray(posDiningTableGroups.id, currentGroupIds),
+                      eq(posDiningTableGroups.responsibleIdentityId, identityId),
+                      isNull(posDiningTableGroups.dissolvedAt),
+                    ),
+                  )
+                  .limit(1)
+              : Promise.resolve([]),
+          ]);
+          const operatesSelectedTable =
+            openTabs.some((tab) => tab.responsibleIdentityId === identityId) ||
+            Boolean(sectionAssignment[0] || transferAssignment[0] || coordinatedGroup[0]);
+          if (!operatesSelectedTable) {
+            throw new ForbiddenException({ code: "TABLE_GROUP_OUTSIDE_ASSIGNMENT" });
+          }
+        }
         let targetTabId: string | null = null;
         let mergeResult: JsonResponse | null = null;
         if (input.mode === "single_tab" && openTabs.length > 0) {
@@ -6894,6 +11022,7 @@ export class PilotPosService {
                   targetTabId,
                   sourceTabIds,
                   false,
+                  { reasonCode: input.reasonCode, reasonNote: input.reasonNote },
                 )
               : { targetTabId, sourceTabIds: [] };
           await tx
@@ -6908,18 +11037,15 @@ export class PilotPosService {
             );
         }
 
-        const responsibilityTabIds = input.responsibleIdentityId
-          ? input.mode === "single_tab"
-            ? targetTabId
-              ? [targetTabId]
-              : []
-            : openTabs.map((tab) => tab.id)
-          : [];
-        if (input.responsibleIdentityId && responsibilityTabIds.length > 0) {
+        const responsibilityTabIds =
+          groupResponsibleIdentityId && input.mode === "single_tab" && targetTabId
+            ? [targetTabId]
+            : [];
+        if (groupResponsibleIdentityId && responsibilityTabIds.length > 0) {
           await tx
             .update(posTabs)
             .set({
-              responsibleIdentityId: input.responsibleIdentityId,
+              responsibleIdentityId: groupResponsibleIdentityId,
               version: sql`${posTabs.version} + 1`,
               updatedAt: new Date(),
             })
@@ -6940,7 +11066,7 @@ export class PilotPosService {
               tabId,
               "tab.responsibility_transferred",
               {
-                to: input.responsibleIdentityId,
+                to: groupResponsibleIdentityId,
                 reason: "table_group_created",
               },
             );
@@ -6955,7 +11081,9 @@ export class PilotPosService {
             anchorTableId: input.anchorTableId,
             primaryTabId: targetTabId,
             mode: input.mode,
-            responsibleIdentityId: input.responsibleIdentityId,
+            responsibleIdentityId: groupResponsibleIdentityId,
+            reasonCode: input.reasonCode,
+            reasonNote: input.reasonNote,
             createdByIdentityId: identityId,
           })
           .returning();
@@ -6983,12 +11111,27 @@ export class PilotPosService {
             anchorTableId: input.anchorTableId,
             mode: input.mode,
             targetTabId,
-            responsibleIdentityId: input.responsibleIdentityId ?? null,
+            responsibleIdentityId: groupResponsibleIdentityId,
+            reasonCode: input.reasonCode,
+            reasonNote: input.reasonNote ?? null,
             shiftSectionIds: [
               ...new Set(
                 openTabs.flatMap((tab) => (tab.shiftSectionId ? [tab.shiftSectionId] : [])),
               ),
             ],
+          },
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "pos.table_group.created",
+          aggregateType: "table_group",
+          aggregateId: group.id,
+          payload: {
+            organizationId,
+            unitId,
+            groupId: group.id,
+            tableIds,
+            mode: input.mode,
+            reasonCode: input.reasonCode,
           },
         });
         return { group, members, mergeResult };
@@ -7240,11 +11383,18 @@ export class PilotPosService {
       movedModifierIdForSource: (sourceItemId: string, modifierId: string) => string;
     },
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [sourceTabId]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
       "cashier",
     ]);
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:printing:request",
+    );
     await this.requireOperationalBilling(organizationId);
     const requestedIds = input.items.map((item) => item.orderItemId);
     if (new Set(requestedIds).size !== requestedIds.length) {
@@ -7259,6 +11409,24 @@ export class PilotPosService {
       { sourceTabId, ...input },
       async (tx) => {
         const source = await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
+        const paymentState = await this.lockTabPaymentState(
+          tx,
+          organizationId,
+          unitId,
+          sourceTabId,
+        );
+        if (
+          paymentState.paidCents > 0 ||
+          paymentState.coveredLossCents > 0 ||
+          paymentState.reservedCents > 0
+        ) {
+          throw new ConflictException({
+            code: "TAB_SPLIT_FINANCIAL_STATE_CONFLICT",
+            message:
+              "Não é possível dividir uma comanda com pagamento, perda ou cobrança reservada.",
+            ...paymentState,
+          });
+        }
         if (input.tableId) {
           await tx.execute(
             sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${input.tableId}`}))`,
@@ -7369,6 +11537,23 @@ export class PilotPosService {
         if (items.some(({ item }) => item.status === "canceled")) {
           throw new ConflictException({ code: "CANCELED_ITEM_CANNOT_SPLIT" });
         }
+        const [doseClubItem] = await tx
+          .select({ orderItemId: doseClubRedemptions.orderItemId })
+          .from(doseClubRedemptions)
+          .where(
+            and(
+              eq(doseClubRedemptions.organizationId, organizationId),
+              eq(doseClubRedemptions.unitId, unitId),
+              inArray(doseClubRedemptions.orderItemId, requestedIds),
+            ),
+          )
+          .limit(1);
+        if (doseClubItem) {
+          throw new ConflictException({
+            code: "DOSECLUB_ITEM_CANNOT_SPLIT",
+            message: "Cancele e lance novamente a dose na comanda correta.",
+          });
+        }
         for (const requested of input.items) {
           const row = items.find(({ item }) => item.id === requested.orderItemId);
           if (!row || requested.quantity > row.item.quantity) {
@@ -7387,6 +11572,7 @@ export class PilotPosService {
             tableId: input.tableId,
             openedByIdentityId: identityId,
             operationalShiftId: source.operationalShiftId,
+            shiftSectionId: source.shiftSectionId,
             responsibleIdentityId: source.responsibleIdentityId,
             label: input.label,
             guestCount: 1,
@@ -7750,11 +11936,43 @@ export class PilotPosService {
         }
         const sourceTotals = await this.recalculateTab(tx, organizationId, unitId, sourceTabId);
         const targetTotals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+        const printInput: PrintJobInput = {
+          documentType: "partial_statement",
+          copies: input.copies ?? 1,
+          installationId: input.installationId,
+          terminalId: input.terminalId,
+          printerId: input.printerId,
+        };
+        const sourcePrintJob = await this.queuePrintJob(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          sourceTabId,
+          printInput,
+        );
+        const targetPrintJob = await this.queuePrintJob(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          target.id,
+          printInput,
+        );
         await this.recordEvent(tx, identityId, organizationId, unitId, sourceTabId, "tab.split", {
           targetTabId: target.id,
           movedItemIds,
+          printJobIds: [sourcePrintJob.id, targetPrintJob.id],
         });
-        return { sourceTabId, targetTabId: target.id, movedItemIds, sourceTotals, targetTotals };
+        return {
+          sourceTabId,
+          targetTabId: target.id,
+          printableTabIds: [sourceTabId, target.id],
+          movedItemIds,
+          sourceTotals,
+          targetTotals,
+          printJobs: [sourcePrintJob, targetPrintJob],
+        };
       },
     );
   }
@@ -7767,6 +11985,10 @@ export class PilotPosService {
     idempotencyKey: string,
     input: MoveItemsInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [
+      sourceTabId,
+      input.targetTabId,
+    ]);
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -7826,6 +12048,23 @@ export class PilotPosService {
           );
         if (items.length !== itemIds.length) {
           throw new NotFoundException({ code: "MOVE_ITEM_NOT_FOUND" });
+        }
+        const [doseClubItem] = await tx
+          .select({ orderItemId: doseClubRedemptions.orderItemId })
+          .from(doseClubRedemptions)
+          .where(
+            and(
+              eq(doseClubRedemptions.organizationId, organizationId),
+              eq(doseClubRedemptions.unitId, unitId),
+              inArray(doseClubRedemptions.orderItemId, itemIds),
+            ),
+          )
+          .limit(1);
+        if (doseClubItem) {
+          throw new ConflictException({
+            code: "DOSECLUB_ITEM_CANNOT_MOVE",
+            message: "Cancele e lance novamente a dose na comanda correta.",
+          });
         }
         for (const requested of input.items) {
           const row = items.find(({ item }) => item.id === requested.orderItemId);
@@ -7909,6 +12148,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: ServiceChargeInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedCapability(
       identityId,
       organizationId,
@@ -7958,6 +12198,7 @@ export class PilotPosService {
     idempotencyKey: string,
     input: TipInput,
   ) {
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     await this.requireScopedCapability(
       identityId,
       organizationId,
@@ -8223,6 +12464,7 @@ export class PilotPosService {
           }
         }
         const totals = await this.recalculateTab(tx, organizationId, unitId, row.tabId);
+        await this.doseClub?.markCancellationPending(tx, organizationId, unitId, itemId);
         await this.recordEvent(tx, identityId, organizationId, unitId, row.tabId, "item.canceled", {
           itemId,
           approvalId: approval.id,
@@ -8717,6 +12959,7 @@ export class PilotPosService {
             eq(posProductionStations.organizationId, organizationId),
             eq(posProductionStations.unitId, unitId),
             eq(posProductionStations.active, true),
+            inArray(posProductionStations.deliveryMode, ["kds_only", "both"]),
           ),
         )
         .orderBy(asc(posProductionStations.name), asc(posProductionStations.id)),
@@ -8831,7 +13074,7 @@ export class PilotPosService {
           eq(posDiningTables.id, posTabs.tableId),
         ),
       )
-      .where(and(...ticketWhere))
+      .where(and(...ticketWhere, inArray(posProductionStations.deliveryMode, ["kds_only", "both"])))
       .orderBy(
         desc(posKdsTickets.priority),
         sql`${posKdsTickets.dueAt} asc nulls last`,
@@ -9046,7 +13289,17 @@ export class PilotPosService {
           eq(posOrderItems.id, posKdsTicketItems.orderItemId),
         ),
       )
-      .where(and(...historicalWhere))
+      .innerJoin(
+        posProductionStations,
+        and(
+          eq(posProductionStations.organizationId, posKdsTickets.organizationId),
+          eq(posProductionStations.unitId, posKdsTickets.unitId),
+          eq(posProductionStations.id, posKdsTickets.stationId),
+        ),
+      )
+      .where(
+        and(...historicalWhere, inArray(posProductionStations.deliveryMode, ["kds_only", "both"])),
+      )
       .orderBy(desc(posKdsTicketItems.readyAt))
       .limit(1_000);
     const historyDuration = (row: (typeof historicalRows)[number]) =>
@@ -13276,6 +17529,64 @@ export class PilotPosService {
     return tab;
   }
 
+  private async resolvePrintTarget(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: Pick<PrintJobInput, "installationId" | "terminalId" | "printerId">,
+  ) {
+    const cashierActor = await this.canOperateCashier(identityId, organizationId, unitId);
+    if (!input.installationId) {
+      return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+    }
+
+    const [profile] = await tx
+      .select()
+      .from(posTerminalProfiles)
+      .where(
+        and(
+          eq(posTerminalProfiles.organizationId, organizationId),
+          eq(posTerminalProfiles.unitId, unitId),
+          eq(posTerminalProfiles.installationId, input.installationId),
+        ),
+      )
+      .limit(1);
+    if (!profile || profile.paymentMode === "disabled") {
+      return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+    }
+    if (!profile.printerId || (input.printerId && input.printerId !== profile.printerId)) {
+      return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+    }
+    if (profile.paymentMode === "cashier") {
+      if (!cashierActor) {
+        return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+      }
+      return {
+        deliveryRoute: "local" as const,
+        terminalId: input.terminalId ?? profile.installationId,
+        printerId: profile.printerId,
+      };
+    }
+    if (profile.paymentMode !== "homologated_pos" || profile.paymentStatus !== "homologated") {
+      return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+    }
+    const capability = await this.paymentCapability(
+      tx,
+      organizationId,
+      unitId,
+      profile.installationId,
+    );
+    if (!capability.available) {
+      return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
+    }
+    return {
+      deliveryRoute: "local" as const,
+      terminalId: input.terminalId ?? profile.installationId,
+      printerId: profile.printerId,
+    };
+  }
+
   private async queuePrintJob(
     tx: Transaction,
     identityId: string,
@@ -13283,31 +17594,96 @@ export class PilotPosService {
     unitId: string,
     tabId: string,
     input: PrintJobInput,
+    splitPart?: {
+      id: string;
+      splitId: string;
+      partNumber: number;
+      partCount: number;
+      amountCents: number;
+      balanceSnapshotCents: number;
+      method: string;
+    },
   ) {
     const tab = await this.requireTab(tx, organizationId, unitId, tabId);
+    const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, input);
     if (input.documentType === "final_receipt" && tab.status !== "closed") {
       throw new ConflictException({
         code: "FINAL_RECEIPT_REQUIRES_CLOSED_TAB",
         message: "O comprovante final só pode ser emitido após o encerramento da comanda.",
       });
     }
-    const payload = await this.buildPrintDocumentPayload(tx, organizationId, unitId, tab);
+    if (input.serviceCallId) {
+      const [call] = await tx
+        .select({
+          id: posServiceCalls.id,
+          tabId: posServiceCalls.tabId,
+          tableId: posServiceCalls.tableId,
+          kind: posServiceCalls.kind,
+          status: posServiceCalls.status,
+        })
+        .from(posServiceCalls)
+        .where(
+          and(
+            eq(posServiceCalls.organizationId, organizationId),
+            eq(posServiceCalls.unitId, unitId),
+            eq(posServiceCalls.id, input.serviceCallId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!call) throw new NotFoundException({ code: "SERVICE_CALL_NOT_FOUND" });
+      if (
+        call.kind !== "bill" ||
+        call.status === "resolved" ||
+        call.tabId !== tabId ||
+        call.tableId !== tab.tableId
+      ) {
+        throw new ConflictException({ code: "PRINT_SERVICE_CALL_MISMATCH" });
+      }
+    }
+    const basePayload = await this.buildPrintDocumentPayload(tx, organizationId, unitId, tab);
+    const payload = splitPart
+      ? {
+          ...basePayload,
+          split: {
+            splitId: splitPart.splitId,
+            partNumber: splitPart.partNumber,
+            partCount: splitPart.partCount,
+            amountCents: splitPart.amountCents,
+            balanceSnapshotCents: splitPart.balanceSnapshotCents,
+            method: splitPart.method,
+          },
+        }
+      : basePayload;
     const [printJob] = await tx
       .insert(posPrintJobs)
       .values({
         organizationId,
         unitId,
         tabId,
+        serviceCallId: input.serviceCallId,
+        splitPartId: splitPart?.id,
         documentType: input.documentType,
         copies: input.copies,
-        terminalId: input.terminalId,
-        printerId: input.printerId,
-        payload,
+        terminalId: target.terminalId,
+        printerId: target.printerId,
+        payload: payload as unknown as Record<string, unknown>,
         requestedByIdentityId: identityId,
         reason: input.reason,
       })
       .returning();
     if (!printJob) throw new Error("Print job insert did not return a row");
+    if (input.serviceCallId) {
+      await tx
+        .update(posServiceCalls)
+        .set({
+          status: "acknowledged",
+          acknowledgedByIdentityId: identityId,
+          acknowledgedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(posServiceCalls.id, input.serviceCallId));
+    }
     await this.recordEvent(
       tx,
       identityId,
@@ -13321,10 +17697,11 @@ export class PilotPosService {
         copies: printJob.copies,
         terminalId: printJob.terminalId,
         printerId: printJob.printerId,
+        deliveryRoute: target.deliveryRoute,
       },
       { entityType: "print_job", entityId: printJob.id },
     );
-    return printJob;
+    return { ...printJob, deliveryRoute: target.deliveryRoute };
   }
 
   private async buildPrintDocumentPayload(
@@ -13332,12 +17709,20 @@ export class PilotPosService {
     organizationId: string,
     unitId: string,
     tab: typeof posTabs.$inferSelect,
-  ): Promise<Record<string, unknown>> {
-    const [table, items, payments, establishment] = await Promise.all([
+  ): Promise<PrintDocumentPayloadV2> {
+    const [table, items, payments, establishment, responsible, shiftSection] = await Promise.all([
       tab.tableId
         ? tx
-            .select({ label: posDiningTables.label })
+            .select({ label: posDiningTables.label, areaName: posDiningRooms.name })
             .from(posDiningTables)
+            .innerJoin(
+              posDiningRooms,
+              and(
+                eq(posDiningRooms.organizationId, posDiningTables.organizationId),
+                eq(posDiningRooms.unitId, posDiningTables.unitId),
+                eq(posDiningRooms.id, posDiningTables.roomId),
+              ),
+            )
             .where(
               and(
                 eq(posDiningTables.organizationId, organizationId),
@@ -13362,8 +17747,6 @@ export class PilotPosService {
           status: posOrderItems.status,
           seatNumber: posOrderItems.seatNumber,
           course: posOrderItems.course,
-          allergyNote: posOrderItems.allergyNote,
-          notes: posOrderItems.notes,
         })
         .from(posOrderItems)
         .innerJoin(
@@ -13386,9 +17769,8 @@ export class PilotPosService {
           id: posTabPayments.id,
           method: posTabPayments.method,
           amountCents: posTabPayments.amountCents,
-          reference: posTabPayments.reference,
           createdAt: posTabPayments.createdAt,
-          reversedCents: sql<number>`coalesce(${posPaymentReversals.amountCents}, 0)`.mapWith(
+          reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`.mapWith(
             Number,
           ),
         })
@@ -13408,11 +17790,20 @@ export class PilotPosService {
             eq(posTabPayments.unitId, unitId),
             eq(posTabPayments.tabId, tab.id),
           ),
+        )
+        .groupBy(
+          posTabPayments.id,
+          posTabPayments.method,
+          posTabPayments.amountCents,
+          posTabPayments.createdAt,
         ),
       tx
         .select({
           unitName: units.name,
+          timezone: units.timezone,
+          legalName: organizations.legalName,
           tradeName: organizations.tradeName,
+          document: organizations.document,
           branding: posCatalogBranding.config,
         })
         .from(units)
@@ -13427,6 +17818,28 @@ export class PilotPosService {
         .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
         .limit(1)
         .then((rows) => rows[0] ?? null),
+      tab.responsibleIdentityId
+        ? tx
+            .select({ id: identities.id, displayName: identities.displayName })
+            .from(identities)
+            .where(eq(identities.id, tab.responsibleIdentityId))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+      tab.shiftSectionId
+        ? tx
+            .select({ id: posShiftSections.id, name: posShiftSections.name })
+            .from(posShiftSections)
+            .where(
+              and(
+                eq(posShiftSections.organizationId, organizationId),
+                eq(posShiftSections.unitId, unitId),
+                eq(posShiftSections.id, tab.shiftSectionId),
+              ),
+            )
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
     ]);
     const itemIds = items.map((item) => item.id);
     const modifiers =
@@ -13451,32 +17864,55 @@ export class PilotPosService {
     const grossPaidCents = payments.reduce((total, payment) => total + payment.amountCents, 0);
     const reversedCents = payments.reduce((total, payment) => total + payment.reversedCents, 0);
     const paidCents = grossPaidCents - reversedCents;
+    const generatedAt = new Date();
+    const fallbackName = establishment?.tradeName ?? establishment?.unitName ?? "Estabelecimento";
+    const presentation = normalizeStoredBranding(
+      establishment?.branding,
+      fallbackName,
+    ).presentation;
+    const durationMinutes = Math.max(
+      0,
+      Math.floor(((tab.closedAt ?? generatedAt).getTime() - tab.createdAt.getTime()) / 60_000),
+    );
     return {
-      schemaVersion: 1,
-      generatedAt: new Date().toISOString(),
-      establishmentName: resolveEstablishmentName(
-        establishment?.branding,
-        establishment?.tradeName ?? establishment?.unitName ?? "Estabelecimento",
-      ),
-      tab: {
-        id: tab.id,
+      schemaVersion: 2,
+      generatedAt: generatedAt.toISOString(),
+      establishment: {
+        displayName: presentation.displayName,
+        legalName: establishment?.legalName ?? fallbackName,
+        document: establishment?.document ?? null,
+        address: presentation.address,
+        phone: presentation.phone,
+        openingHours: presentation.openingHours,
+        timezone: establishment?.timezone ?? "America/Sao_Paulo",
+        logoUrl: presentation.logoUrl,
+      },
+      context: {
+        tabId: tab.id,
         label:
           table?.label ??
           tab.label ??
           (tab.displayNumber ? `Balcão #${tab.displayNumber}` : `Comanda ${tab.id.slice(0, 6)}`),
         displayNumber: tab.displayNumber,
+        tableLabel: table?.label ?? null,
+        areaName: table?.areaName ?? null,
+        squareName: shiftSection?.name ?? null,
+        waiterDisplayName: responsible?.displayName ?? null,
         fulfillmentType: tab.fulfillmentType,
-        customerName: tab.customerName,
-        customerPhone: tab.customerPhone,
         guestCount: tab.guestCount,
         status: tab.status,
         openedAt: tab.createdAt.toISOString(),
         closedAt: tab.closedAt?.toISOString() ?? null,
+        durationMinutes,
       },
       totals: {
         subtotalCents: tab.subtotalCents,
         discountCents: tab.discountCents,
         serviceChargeCents: tab.serviceChargeCents,
+        serviceChargeBasisPoints: tab.serviceChargeBasisPoints,
+        serviceChargeOptional: tab.serviceChargeBasisPoints > 0,
+        suggestedTotalCents: tab.totalCents,
+        serviceTaxNotice: presentation.serviceTaxNotice,
         tipCents: tab.tipCents,
         totalCents: tab.totalCents,
         grossPaidCents,
@@ -13484,14 +17920,21 @@ export class PilotPosService {
         paidCents,
         remainingCents: Math.max(0, tab.totalCents - paidCents),
       },
-      items,
-      modifiers,
-      payments: payments.map((payment) => ({
-        ...payment,
-        netAmountCents: payment.amountCents - payment.reversedCents,
-        financialStatus: payment.reversedCents > 0 ? "reversed" : "posted",
-        createdAt: payment.createdAt.toISOString(),
+      items: items.map((item) => ({
+        ...item,
+        modifiers: modifiers
+          .filter((modifier) => modifier.orderItemId === item.id)
+          .map(({ orderItemId: _orderItemId, ...modifier }) => modifier),
       })),
+      payments: payments
+        .map((payment) => ({
+          id: payment.id,
+          method: payment.method,
+          amountCents: payment.amountCents - payment.reversedCents,
+          financialStatus: "posted" as const,
+          createdAt: payment.createdAt.toISOString(),
+        }))
+        .filter((payment) => payment.amountCents > 0),
     };
   }
 
@@ -13549,6 +17992,7 @@ export class PilotPosService {
           eq(posOrderItems.organizationId, organizationId),
           eq(posOrderItems.unitId, unitId),
           eq(posOrders.tabId, tabId),
+          or(ne(posOrders.source, "qr_table"), ne(posOrders.status, "draft")),
         ),
       );
     const totals = tabTotals(
@@ -13715,6 +18159,158 @@ export class PilotPosService {
       )
       .limit(1);
     return Boolean(incident);
+  }
+
+  private async earnLoyaltyForClosedTab(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    paidCents: number,
+    closedAt: Date,
+  ) {
+    const [link] = await tx
+      .select({ customerId: posTabCustomerLinks.customerId })
+      .from(posTabCustomerLinks)
+      .where(
+        and(
+          eq(posTabCustomerLinks.organizationId, organizationId),
+          eq(posTabCustomerLinks.unitId, unitId),
+          eq(posTabCustomerLinks.tabId, tabId),
+        ),
+      )
+      .limit(1);
+    if (!link) return null;
+    const [program] = await tx
+      .select()
+      .from(loyaltyPrograms)
+      .where(
+        and(eq(loyaltyPrograms.organizationId, organizationId), eq(loyaltyPrograms.active, true)),
+      )
+      .limit(1);
+    if (!program) return null;
+    const amount = loyaltyEarn(
+      program.mode,
+      Number(program.rate),
+      paidCents,
+      program.minimumOrderCents,
+    );
+    if (amount <= 0) return null;
+    const idempotencyKey = `pos-tab-close:${tabId}:${closedAt.toISOString()}`;
+    const [entry] = await tx
+      .insert(loyaltyLedger)
+      .values({
+        organizationId,
+        unitId,
+        programId: program.id,
+        customerId: link.customerId,
+        sourceRef: tabId,
+        type: "earn",
+        amount,
+        description: "Crédito automático pelo atendimento encerrado",
+        idempotencyKey,
+        requestFingerprint: requestHash("loyalty.earn.tab", {
+          organizationId,
+          unitId,
+          tabId,
+          customerId: link.customerId,
+          paidCents,
+          programId: program.id,
+          amount,
+        }),
+        expiresAt: program.expiresAfterDays
+          ? new Date(closedAt.getTime() + program.expiresAfterDays * 86_400_000)
+          : null,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (!entry) return null;
+    await tx.insert(auditEvents).values({
+      organizationId,
+      unitId,
+      actorIdentityId,
+      action: "growth.loyalty.earned",
+      entityType: "growth_loyalty_entry",
+      entityId: entry.id,
+      metadata: { tabId, customerId: link.customerId, paidCents, amount },
+    });
+    await tx.insert(outboxEvents).values({
+      topic: "growth.loyalty_earned",
+      aggregateType: "growth_loyalty_entry",
+      aggregateId: entry.id,
+      payload: { organizationId, unitId, tabId, customerId: link.customerId, amount },
+    });
+    return entry;
+  }
+
+  private async reverseLoyaltyForReopenedTab(
+    tx: Transaction,
+    actorIdentityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    const [earned] = await tx
+      .select()
+      .from(loyaltyLedger)
+      .where(
+        and(
+          eq(loyaltyLedger.organizationId, organizationId),
+          eq(loyaltyLedger.unitId, unitId),
+          eq(loyaltyLedger.sourceRef, tabId),
+          eq(loyaltyLedger.type, "earn"),
+          sql`not exists (
+            select 1 from growth_loyalty_ledger reversal
+            where reversal.organization_id = ${organizationId}
+              and reversal.reversal_of_id = ${loyaltyLedger.id}
+          )`,
+        ),
+      )
+      .orderBy(desc(loyaltyLedger.createdAt))
+      .limit(1)
+      .for("update");
+    if (!earned) return null;
+    const [reversal] = await tx
+      .insert(loyaltyLedger)
+      .values({
+        organizationId,
+        unitId,
+        programId: earned.programId,
+        customerId: earned.customerId,
+        sourceRef: tabId,
+        type: "reverse",
+        amount: -earned.amount,
+        description: "Estorno automático pela reabertura do atendimento",
+        idempotencyKey: `pos-tab-reopen:${tabId}:${earned.id}`,
+        requestFingerprint: requestHash("loyalty.reverse.tab", { tabId, entryId: earned.id }),
+        reversalOfId: earned.id,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (!reversal) return null;
+    await tx.insert(auditEvents).values({
+      organizationId,
+      unitId,
+      actorIdentityId,
+      action: "growth.loyalty.reversed",
+      entityType: "growth_loyalty_entry",
+      entityId: reversal.id,
+      metadata: { tabId, customerId: earned.customerId, reversalOfId: earned.id },
+    });
+    await tx.insert(outboxEvents).values({
+      topic: "growth.loyalty_reversed",
+      aggregateType: "growth_loyalty_entry",
+      aggregateId: reversal.id,
+      payload: {
+        organizationId,
+        unitId,
+        tabId,
+        customerId: earned.customerId,
+        reversalOfId: earned.id,
+      },
+    });
+    return reversal;
   }
 
   private async recordEvent(

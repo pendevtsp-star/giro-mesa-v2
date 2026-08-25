@@ -37,3 +37,11 @@ export function promisedAtToIso(date: string, time: string) {
   }
   return parsed.toISOString();
 }
+
+export function quickOrderPromisedAtToIso(date: string, time: string, now = Date.now()) {
+  const promisedAt = promisedAtToIso(date, time);
+  if (promisedAt && new Date(promisedAt).getTime() < now - 60_000) {
+    throw new Error("O prazo precisa ser agora ou no futuro.");
+  }
+  return promisedAt;
+}

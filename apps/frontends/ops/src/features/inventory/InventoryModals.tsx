@@ -10,6 +10,7 @@ import type {
   InventoryReviewRequest,
   InventoryTransfer,
   ProductionBatch,
+  ReturnableCustody,
   ReturnableMovement,
   ReturnablePosition,
   StockLocation,
@@ -1118,6 +1119,7 @@ export function ReturnableConferenceModal({
   items,
   locations,
   positions,
+  custodies,
   onClose,
   onSubmit,
 }: {
@@ -1126,8 +1128,11 @@ export function ReturnableConferenceModal({
   items: InventoryItem[];
   locations: StockLocation[];
   positions: ReturnablePosition[];
+  custodies: ReturnableCustody[];
   onClose: () => void;
   onSubmit: (body: {
+    issueMovementId?: string;
+    orderId?: string;
     inventoryItemId: string;
     locationId: string;
     quantity: string;
@@ -1135,6 +1140,7 @@ export function ReturnableConferenceModal({
   }) => Promise<unknown>;
 }) {
   const [itemId, setItemId] = useState("");
+  const [issueMovementId, setIssueMovementId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
@@ -1143,19 +1149,49 @@ export function ReturnableConferenceModal({
       candidate.inventoryItemId === itemId &&
       (!candidate.locationId || candidate.locationId === locationId),
   );
+  const selectedCustody = custodies.find((custody) => custody.id === issueMovementId);
   return (
     <Modal isOpen={open} onClose={onClose} title="Conferir vasilhames">
       <form
         className="gm-form-stack"
         onSubmit={(event) => {
           event.preventDefault();
-          void onSubmit({ inventoryItemId: itemId, locationId, quantity, reason: reason.trim() });
+          void onSubmit({
+            issueMovementId: selectedCustody?.id,
+            orderId: selectedCustody?.orderId ?? undefined,
+            inventoryItemId: itemId,
+            locationId,
+            quantity,
+            reason: reason.trim(),
+          });
         }}
       >
         <p className="inventory-context-note">
           Informe apenas o que retornou agora. O previsto não compõe o saldo físico até esta
           confirmação.
         </p>
+        {custodies.length > 0 && (
+          <Label className="gm-form-field">
+            <span>Custódia de origem</span>
+            <NativeSelect
+              onChange={(event) => {
+                const custody = custodies.find((candidate) => candidate.id === event.target.value);
+                setIssueMovementId(event.target.value);
+                if (custody) setItemId(custody.inventoryItemId);
+              }}
+              required
+              value={issueMovementId}
+            >
+              <option value="">Selecione</option>
+              {custodies.map((custody) => (
+                <option key={custody.id} value={custody.id}>
+                  {custody.counterpartyName || `Pedido ${custody.orderId?.slice(0, 8) ?? "—"}`} ·{" "}
+                  {custody.openQuantity.toLocaleString("pt-BR")} aberto
+                </option>
+              ))}
+            </NativeSelect>
+          </Label>
+        )}
         <Label className="gm-form-field">
           <span>Vasilhame</span>
           <NativeSelect onChange={(event) => setItemId(event.target.value)} required value={itemId}>
@@ -1219,6 +1255,7 @@ export function ReturnableConferenceModal({
           <Button
             disabled={
               busy ||
+              (custodies.length > 0 && !issueMovementId) ||
               !itemId ||
               !locationId ||
               Number(numberInput(quantity)) <= 0 ||
@@ -1257,6 +1294,7 @@ export function ReturnableIncidentModal({
     kind: "breakage" | "loss" | "suspected_theft" | "recording_error" | "other";
     quantity: string;
     reason: string;
+    evidence: string[];
   }) => Promise<unknown>;
 }) {
   const [itemId, setItemId] = useState("");
@@ -1268,6 +1306,21 @@ export function ReturnableIncidentModal({
   >("breakage");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");
+  const [evidenceText, setEvidenceText] = useState("");
+  const evidence = evidenceText
+    .split(/\r?\n/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const evidenceValid =
+    evidence.length <= 10 &&
+    evidence.every((value) => {
+      try {
+        new URL(value);
+        return true;
+      } catch {
+        return false;
+      }
+    });
   return (
     <Modal isOpen={open} onClose={onClose} title="Registrar ocorrência de vasilhame">
       <form
@@ -1283,6 +1336,7 @@ export function ReturnableIncidentModal({
             kind,
             quantity,
             reason: reason.trim(),
+            evidence,
           });
         }}
       >
@@ -1397,6 +1451,15 @@ export function ReturnableIncidentModal({
             value={reason}
           />
         </Label>
+        <Label className="gm-form-field">
+          <span>Evidências (uma URL por linha, até 10)</span>
+          <Textarea
+            aria-invalid={!evidenceValid}
+            onChange={(event) => setEvidenceText(event.target.value)}
+            placeholder="https://..."
+            value={evidenceText}
+          />
+        </Label>
         <div className="inventory-modal-actions">
           <Button onClick={onClose} variant="ghost">
             Cancelar
@@ -1407,7 +1470,8 @@ export function ReturnableIncidentModal({
               !itemId ||
               (source === "custody" ? !movementId : !locationId) ||
               Number(numberInput(quantity)) <= 0 ||
-              reason.trim().length < 5
+              reason.trim().length < 5 ||
+              !evidenceValid
             }
             type="submit"
             variant="danger"
@@ -1608,7 +1672,9 @@ export function TransferResolutionModal({
       >
         <p className="inventory-context-note">
           {transfer
-            ? `${transfer.quantity.toLocaleString("pt-BR")} unidade(s) estão em trânsito.`
+            ? `${(
+                transfer.quantity - transfer.quantityReceived - transfer.quantityDivergent
+              ).toLocaleString("pt-BR")} unidade(s) aguardam conferência.`
             : "Confira o recebimento físico antes de concluir."}
         </p>
         <Label className="gm-form-field">

@@ -24,8 +24,18 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Pur
 #else
         public string DivergenceReason { get; set; }
 #endif
+        /// <summary>The dueDate property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? DueDate { get; set; }
+#nullable restore
+#else
+        public string DueDate { get; set; }
+#endif
         /// <summary>The locationId property</summary>
         public Guid? LocationId { get; set; }
+        /// <summary>The purchaseOrderId property</summary>
+        public Guid? PurchaseOrderId { get; set; }
         /// <summary>The receivedAt property</summary>
         public DateTimeOffset? ReceivedAt { get; set; }
         /// <summary>
@@ -56,7 +66,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Pur
             {
                 { "acceptTotalDivergence", n => { AcceptTotalDivergence = n.GetBoolValue(); } },
                 { "divergenceReason", n => { DivergenceReason = n.GetStringValue(); } },
+                { "dueDate", n => { DueDate = n.GetStringValue(); } },
                 { "locationId", n => { LocationId = n.GetGuidValue(); } },
+                { "purchaseOrderId", n => { PurchaseOrderId = n.GetGuidValue(); } },
                 { "receivedAt", n => { ReceivedAt = n.GetDateTimeOffsetValue(); } },
             };
         }
@@ -69,7 +81,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Pur
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteBoolValue("acceptTotalDivergence", AcceptTotalDivergence);
             writer.WriteStringValue("divergenceReason", DivergenceReason);
+            writer.WriteStringValue("dueDate", DueDate);
             writer.WriteGuidValue("locationId", LocationId);
+            writer.WriteGuidValue("purchaseOrderId", PurchaseOrderId);
             writer.WriteDateTimeOffsetValue("receivedAt", ReceivedAt);
             writer.WriteAdditionalData(AdditionalData);
         }

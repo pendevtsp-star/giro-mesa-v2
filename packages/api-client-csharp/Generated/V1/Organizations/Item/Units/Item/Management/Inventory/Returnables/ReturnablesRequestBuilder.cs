@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Configurations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Custody;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Incidents;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Products;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.SupplierExchanges;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions.Serialization;
@@ -34,6 +35,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Invento
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Incidents.IncidentsRequestBuilder Incidents
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Incidents.IncidentsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The products property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Products.ProductsRequestBuilder Products
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.Products.ProductsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The supplierExchanges property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management.Inventory.Returnables.SupplierExchanges.SupplierExchangesRequestBuilder SupplierExchanges

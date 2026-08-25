@@ -8,7 +8,7 @@
   display: flex;
   flex-direction: column;
   inset: 0 auto 0 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 1.3rem 1rem;
   position: fixed;
   width: 252px;
@@ -70,30 +70,6 @@
 .unit-chip__signal--syncing {
   background: var(--gm-info);
 }
-.sidebar nav {
-  display: grid;
-  gap: 0.25rem;
-}
-.sidebar nav a {
-  align-items: center;
-  border-radius: 10px;
-  color: var(--gm-shell-muted);
-  display: flex;
-  font-size: 0.83rem;
-  font-weight: 670;
-  gap: 0.75rem;
-  min-height: 43px;
-  padding: 0.65rem 0.75rem;
-  text-decoration: none;
-}
-.sidebar nav a:hover {
-  background: color-mix(in srgb, var(--gm-shell-text) 6%, transparent);
-  color: var(--gm-shell-text);
-}
-.sidebar nav a.active {
-  background: var(--gm-shell-text);
-  color: var(--gm-brand-strong);
-}
 .nav-icon {
   display: grid;
   font-size: 1rem;
@@ -154,7 +130,7 @@
   font-size: 0.62rem;
   padding-left: 0.5rem;
 }
-.support-link {
+.sidebar .support-link {
   align-items: center;
   background: transparent;
   border: 0;
@@ -164,6 +140,10 @@
   font-size: 0.78rem;
   gap: 0.7rem;
   padding: 0.5rem;
+}
+.sidebar .support-link:hover {
+  background: color-mix(in srgb, var(--gm-shell-text) 12%, transparent);
+  color: var(--gm-shell-text);
 }
 .support-link .support-link__icon {
   border: 1px solid var(--gm-shell-border);
@@ -1104,8 +1084,13 @@
   display: none;
 }
 
-.sidebar--collapsed .nav-group__title {
+.sidebar--collapsed .nav-group__title,
+.sidebar--collapsed .nav-section__title {
   display: none;
+}
+.sidebar--collapsed .nav-group > .nav-group__items,
+.sidebar--collapsed .nav-section > .nav-section__items {
+  display: grid;
 }
 .sidebar--collapsed nav a {
   justify-content: center;
@@ -1156,6 +1141,13 @@
 .sidebar__toggle-btn:hover {
   background: color-mix(in srgb, var(--gm-shell-text) 12%, transparent);
   color: var(--gm-shell-text);
+}
+.sidebar__toggle-icon {
+  transform: rotate(180deg);
+  transition: transform var(--gm-duration-fast) var(--gm-ease);
+}
+.sidebar--collapsed .sidebar__toggle-icon {
+  transform: none;
 }
 .network-diagnostics-popover-box,
 .profile-popover {

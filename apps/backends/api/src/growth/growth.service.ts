@@ -2,10 +2,15 @@ import { createHmac, randomBytes, randomUUID } from "node:crypto";
 import {
   auditEvents,
   campaignDeliveries,
+  commercialPlans,
   couponRedemptions,
   coupons,
+  crmAutomationExecutions,
+  crmAutomationRules,
+  crmQuickReplies,
   customerConsents,
   customerSegments,
+  deleteWhatsAppArtifact,
   deliveryCourierAssignments,
   deliveryCourierEvents,
   deliveryCouriers,
@@ -16,28 +21,42 @@ import {
   deliveryZones,
   growthCustomers,
   growthIntegrations,
+  identities,
   inventoryTransferLines,
   inventoryTransfers,
   loyaltyLedger,
   loyaltyPrograms,
   marketingCampaigns,
   marketingOptOutTokens,
+  memberships,
   operationalCommands,
   outboxEvents,
+  posPaymentReversals,
+  posTabCustomerLinks,
+  posTabPayments,
   posTabs,
   publicApiKeys,
   publicMenus,
+  readWhatsAppArtifact,
   reservations,
+  roleBindings,
+  subscriptions,
+  trials,
   unitPriceOverrides,
   units,
   waitlistEntries,
   webhookEndpoints,
   webhookPublications,
+  whatsappConversations,
+  whatsappMessages,
+  writeWhatsAppArtifact,
 } from "@giromesa/db";
 import {
   encryptionKey,
   encryptSecret,
+  evolutionCredentialReference,
   hasPermission,
+  normalizeWhatsAppPhone,
   type OperationalCapability,
   SYSTEM_ROLES,
   type SystemRole,
@@ -67,11 +86,13 @@ import {
   lte,
   ne,
   or,
+  type SQL,
   sql,
   sum,
 } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { EvolutionGoClient, EvolutionGoError } from "./evolution-go.js";
 import {
   canTransition,
   couponDiscount,
@@ -87,11 +108,21 @@ import {
 } from "./growth.rules.js";
 import type {
   ApiKeyInput,
+  CampaignCancelInput,
   CampaignInput,
   ConsentInput,
   CouponInput,
   CouponRedemptionInput,
+  CouponUpdateInput,
+  CrmAutomationExecutionQueryInput,
+  CrmAutomationRuleInput,
+  CrmAutomationTestInput,
+  CrmQuickReplyInput,
+  CustomerArchiveInput,
   CustomerInput,
+  CustomerListQueryInput,
+  CustomerMergeInput,
+  CustomerUpdateInput,
   DeliveryAddressValidationInput,
   DeliveryCourierAssignmentInput,
   DeliveryCourierCreateInput,
@@ -105,6 +136,8 @@ import type {
   DeliveryZoneUpdateInput,
   DispatchInput,
   DoseClubInput,
+  EvolutionConfigurationInput,
+  EvolutionWebhookInput,
   LoyaltyEarnInput,
   LoyaltyProgramInput,
   LoyaltyRedeemInput,
@@ -124,6 +157,10 @@ import type {
   WaitlistTransitionInput,
   WebhookEndpointInput,
   WebhookEventInput,
+  WhatsAppConversationUpdateInput,
+  WhatsAppInboxQueryInput,
+  WhatsAppMessageInput,
+  WhatsAppMessagesQueryInput,
 } from "./growth.schemas.js";
 
 type GrowthTransaction = Parameters<Parameters<DatabaseService["db"]["transaction"]>[0]>[0];
@@ -137,12 +174,135 @@ type PublicSubmissionContext = {
   source: "public_menu";
 };
 
+type GrowthEntitlement = "basic_crm" | "advanced_crm" | "loyalty" | "campaigns";
+
+function normalizeCustomerEmail(value: string | null | undefined) {
+  return value?.trim().toLowerCase() || null;
+}
+
+function normalizeCustomerPhone(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    return `+${normalizeWhatsAppPhone(value)}`;
+  } catch {
+    throw new BadRequestException({
+      code: "CUSTOMER_PHONE_INVALID",
+      message: "Informe o telefone com DDD; números brasileiros serão salvos no padrão +55.",
+    });
+  }
+}
+
+function campaignExperimentVariant(
+  campaign: { id: string; holdoutPercentage: number; variantBContent: string | null },
+  customerId: string,
+): "control" | "a" | "b" {
+  const bucket =
+    Number.parseInt(
+      createHmac("sha256", campaign.id).update(customerId).digest("hex").slice(0, 8),
+      16,
+    ) % 100;
+  if (bucket < campaign.holdoutPercentage) return "control";
+  return campaign.variantBContent && (bucket - campaign.holdoutPercentage) % 2 === 1 ? "b" : "a";
+}
+
+function isWhatsAppOptOut(value: string) {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return [
+    "sair",
+    "pare",
+    "parar",
+    "stop",
+    "cancelar",
+    "cancelar mensagens",
+    "nao quero receber",
+    "remover meu numero",
+  ].includes(normalized);
+}
+
 @Injectable()
 export class GrowthService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
   ) {}
+
+  private async requireEntitlement(organizationId: string, entitlement: GrowthEntitlement) {
+    const [subscription] = await this.database.db
+      .select({ entitlements: commercialPlans.entitlements })
+      .from(subscriptions)
+      .innerJoin(commercialPlans, eq(commercialPlans.id, subscriptions.commercialPlanId))
+      .where(
+        and(eq(subscriptions.organizationId, organizationId), ne(subscriptions.state, "canceled")),
+      )
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(1);
+    const [trial] = subscription
+      ? []
+      : await this.database.db
+          .select({ entitlements: commercialPlans.entitlements })
+          .from(trials)
+          .innerJoin(commercialPlans, eq(commercialPlans.id, trials.commercialPlanId))
+          .where(
+            and(
+              eq(trials.organizationId, organizationId),
+              lte(trials.startsAt, new Date()),
+              gt(trials.endsAt, new Date()),
+            ),
+          )
+          .limit(1);
+    const entitlements = subscription?.entitlements ?? trial?.entitlements;
+    // ponytail: organizações legadas sem vínculo comercial continuam operando até o backfill.
+    if (!entitlements || entitlements.includes("all_growth") || entitlements.includes(entitlement))
+      return;
+    throw new ForbiddenException({
+      code: "COMMERCIAL_ENTITLEMENT_REQUIRED",
+      message: "O plano atual não inclui este recurso.",
+      entitlement,
+    });
+  }
+
+  private async assertUniqueCustomerContact(
+    organizationId: string,
+    input: { email?: string | null; phone?: string | null },
+    excludingCustomerId?: string,
+  ) {
+    const email = normalizeCustomerEmail(input.email);
+    const phone = normalizeCustomerPhone(input.phone);
+    const phoneDigits = phone?.replace(/\D/g, "") ?? "";
+    const localPhoneDigits = phoneDigits.startsWith("55") ? phoneDigits.slice(2) : phoneDigits;
+    if (!email && !phone) return;
+    const contacts = [
+      ...(email ? [eq(growthCustomers.email, email)] : []),
+      ...(phone
+        ? [
+            sql`regexp_replace(coalesce(${growthCustomers.phone}, ''), '[^0-9]', '', 'g') in (${phoneDigits}, ${localPhoneDigits})`,
+          ]
+        : []),
+    ];
+    const [duplicate] = await this.database.db
+      .select({ id: growthCustomers.id })
+      .from(growthCustomers)
+      .where(
+        and(
+          eq(growthCustomers.organizationId, organizationId),
+          isNull(growthCustomers.archivedAt),
+          excludingCustomerId ? ne(growthCustomers.id, excludingCustomerId) : undefined,
+          or(...contacts),
+        ),
+      )
+      .limit(1);
+    if (duplicate)
+      throw new ConflictException({
+        code: "CUSTOMER_CONTACT_ALREADY_EXISTS",
+        message: "Já existe um cliente ativo com este e-mail ou telefone.",
+        customerId: duplicate.id,
+      });
+  }
 
   private async requireUnitCapability(
     identityId: string,
@@ -249,6 +409,7 @@ export class GrowthService {
 
   async listCustomers(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
     return this.database.db
       .select()
       .from(growthCustomers)
@@ -258,21 +419,401 @@ export class GrowthService {
       .orderBy(asc(growthCustomers.name));
   }
 
+  async listCustomerPage(
+    identityId: string,
+    organizationId: string,
+    query: CustomerListQueryInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    if (query.unitId) await this.scope.requireUnitAccess(identityId, organizationId, query.unitId);
+    const search = query.q?.split("·", 1)[0]?.trim();
+    const searchDigits = search?.replace(/\D/g, "");
+    const where = and(
+      eq(growthCustomers.organizationId, organizationId),
+      isNull(growthCustomers.archivedAt),
+      query.unitId ? eq(growthCustomers.defaultUnitId, query.unitId) : undefined,
+      search
+        ? or(
+            ilike(growthCustomers.name, `%${search}%`),
+            ilike(growthCustomers.email, `%${search}%`),
+            searchDigits
+              ? sql`regexp_replace(coalesce(${growthCustomers.phone}, ''), '[^0-9]', '', 'g') like ${`%${searchDigits}%`}`
+              : undefined,
+          )
+        : undefined,
+    );
+    const [items, [total]] = await Promise.all([
+      this.database.db
+        .select()
+        .from(growthCustomers)
+        .where(where)
+        .orderBy(asc(growthCustomers.name), asc(growthCustomers.id))
+        .limit(query.limit)
+        .offset(query.offset),
+      this.database.db.select({ value: count() }).from(growthCustomers).where(where),
+    ]);
+    return { items, total: Number(total?.value ?? 0), limit: query.limit, offset: query.offset };
+  }
+
+  async customerDetail(identityId: string, organizationId: string, customerId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    const customer = await this.customer(organizationId, customerId);
+    const now = new Date();
+    const [
+      consents,
+      loyaltyEntries,
+      [program],
+      reservationRows,
+      waitlistRows,
+      deliveryRows,
+      campaignRows,
+      couponRows,
+      whatsappRows,
+      tabRows,
+      [paymentRow],
+      [reversalRow],
+      [noShowRow],
+      [balanceRow],
+      [visitRow],
+    ] = await Promise.all([
+      this.database.db
+        .select()
+        .from(customerConsents)
+        .where(
+          and(
+            eq(customerConsents.organizationId, organizationId),
+            eq(customerConsents.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(customerConsents.occurredAt))
+        .limit(50),
+      this.database.db
+        .select()
+        .from(loyaltyLedger)
+        .where(
+          and(
+            eq(loyaltyLedger.organizationId, organizationId),
+            eq(loyaltyLedger.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(loyaltyLedger.createdAt))
+        .limit(50),
+      this.database.db
+        .select()
+        .from(loyaltyPrograms)
+        .where(
+          and(eq(loyaltyPrograms.organizationId, organizationId), eq(loyaltyPrograms.active, true)),
+        )
+        .limit(1),
+      this.database.db
+        .select()
+        .from(reservations)
+        .where(
+          and(
+            eq(reservations.organizationId, organizationId),
+            eq(reservations.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(reservations.scheduledAt))
+        .limit(30),
+      this.database.db
+        .select()
+        .from(waitlistEntries)
+        .where(
+          and(
+            eq(waitlistEntries.organizationId, organizationId),
+            eq(waitlistEntries.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(waitlistEntries.joinedAt))
+        .limit(30),
+      this.database.db
+        .select()
+        .from(deliveryOrders)
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            eq(deliveryOrders.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(deliveryOrders.createdAt))
+        .limit(30),
+      this.database.db
+        .select({
+          campaignId: marketingCampaigns.id,
+          name: marketingCampaigns.name,
+          channel: marketingCampaigns.channel,
+          status: campaignDeliveries.status,
+          createdAt: campaignDeliveries.createdAt,
+          sentAt: campaignDeliveries.sentAt,
+        })
+        .from(campaignDeliveries)
+        .innerJoin(
+          marketingCampaigns,
+          and(
+            eq(marketingCampaigns.organizationId, campaignDeliveries.organizationId),
+            eq(marketingCampaigns.id, campaignDeliveries.campaignId),
+          ),
+        )
+        .where(
+          and(
+            eq(campaignDeliveries.organizationId, organizationId),
+            eq(campaignDeliveries.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(campaignDeliveries.createdAt))
+        .limit(30),
+      this.database.db
+        .select({
+          couponId: coupons.id,
+          code: coupons.code,
+          discountCents: couponRedemptions.discountCents,
+          redeemedAt: couponRedemptions.redeemedAt,
+        })
+        .from(couponRedemptions)
+        .innerJoin(
+          coupons,
+          and(
+            eq(coupons.organizationId, couponRedemptions.organizationId),
+            eq(coupons.id, couponRedemptions.couponId),
+          ),
+        )
+        .where(
+          and(
+            eq(couponRedemptions.organizationId, organizationId),
+            eq(couponRedemptions.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(couponRedemptions.redeemedAt))
+        .limit(30),
+      this.database.db
+        .select({
+          id: whatsappMessages.id,
+          direction: whatsappMessages.direction,
+          body: whatsappMessages.body,
+          status: whatsappMessages.status,
+          occurredAt: whatsappMessages.occurredAt,
+        })
+        .from(whatsappMessages)
+        .where(
+          and(
+            eq(whatsappMessages.organizationId, organizationId),
+            eq(whatsappMessages.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(whatsappMessages.occurredAt))
+        .limit(50),
+      this.database.db
+        .select({
+          id: posTabs.id,
+          unitId: posTabs.unitId,
+          status: posTabs.status,
+          fulfillmentType: posTabs.fulfillmentType,
+          totalCents: posTabs.totalCents,
+          createdAt: posTabs.createdAt,
+          closedAt: posTabs.closedAt,
+        })
+        .from(posTabCustomerLinks)
+        .innerJoin(
+          posTabs,
+          and(
+            eq(posTabs.organizationId, posTabCustomerLinks.organizationId),
+            eq(posTabs.unitId, posTabCustomerLinks.unitId),
+            eq(posTabs.id, posTabCustomerLinks.tabId),
+          ),
+        )
+        .where(
+          and(
+            eq(posTabCustomerLinks.organizationId, organizationId),
+            eq(posTabCustomerLinks.customerId, customerId),
+          ),
+        )
+        .orderBy(desc(posTabs.createdAt))
+        .limit(50),
+      this.database.db
+        .select({ value: sum(posTabPayments.amountCents) })
+        .from(posTabCustomerLinks)
+        .innerJoin(
+          posTabPayments,
+          and(
+            eq(posTabPayments.organizationId, posTabCustomerLinks.organizationId),
+            eq(posTabPayments.unitId, posTabCustomerLinks.unitId),
+            eq(posTabPayments.tabId, posTabCustomerLinks.tabId),
+          ),
+        )
+        .where(
+          and(
+            eq(posTabCustomerLinks.organizationId, organizationId),
+            eq(posTabCustomerLinks.customerId, customerId),
+          ),
+        ),
+      this.database.db
+        .select({ value: sum(posPaymentReversals.amountCents) })
+        .from(posTabCustomerLinks)
+        .innerJoin(
+          posTabPayments,
+          and(
+            eq(posTabPayments.organizationId, posTabCustomerLinks.organizationId),
+            eq(posTabPayments.unitId, posTabCustomerLinks.unitId),
+            eq(posTabPayments.tabId, posTabCustomerLinks.tabId),
+          ),
+        )
+        .innerJoin(
+          posPaymentReversals,
+          and(
+            eq(posPaymentReversals.organizationId, posTabPayments.organizationId),
+            eq(posPaymentReversals.unitId, posTabPayments.unitId),
+            eq(posPaymentReversals.paymentId, posTabPayments.id),
+            eq(posPaymentReversals.status, "approved"),
+          ),
+        )
+        .where(
+          and(
+            eq(posTabCustomerLinks.organizationId, organizationId),
+            eq(posTabCustomerLinks.customerId, customerId),
+          ),
+        ),
+      this.database.db.execute<{ value: number }>(sql`
+        select (
+          (select count(*) from growth_reservations
+            where organization_id = ${organizationId} and customer_id = ${customerId} and status = 'no_show') +
+          (select count(*) from growth_waitlist_entries
+            where organization_id = ${organizationId} and customer_id = ${customerId} and status = 'no_show')
+        )::int as value
+      `),
+      this.database.db
+        .select({ value: sum(loyaltyLedger.amount) })
+        .from(loyaltyLedger)
+        .where(
+          and(
+            eq(loyaltyLedger.organizationId, organizationId),
+            eq(loyaltyLedger.customerId, customerId),
+            or(isNull(loyaltyLedger.expiresAt), gt(loyaltyLedger.expiresAt, now)),
+          ),
+        ),
+      this.database.db.execute<{ visits: number; lastVisitAt: Date | string | null }>(sql`
+        select count(*)::int as visits, max(tab.closed_at) as "lastVisitAt"
+        from growth_pos_tab_customer_links link
+        inner join pos_tabs tab
+          on tab.organization_id = link.organization_id
+          and tab.unit_id = link.unit_id
+          and tab.id = link.tab_id
+        where link.organization_id = ${organizationId}
+          and link.customer_id = ${customerId}
+          and tab.status = 'closed'
+      `),
+    ]);
+    const balance = Number(balanceRow?.value ?? 0);
+    const visits = Number(visitRow?.visits ?? 0);
+    const totalSpendCents = Number(paymentRow?.value ?? 0) - Number(reversalRow?.value ?? 0);
+    const timeline = [
+      ...tabRows.map((row) => ({
+        kind: "service" as const,
+        id: row.id,
+        at: row.closedAt ?? row.createdAt,
+        status: row.status,
+        amountCents: row.totalCents,
+        label: row.fulfillmentType,
+      })),
+      ...reservationRows.map((row) => ({
+        kind: "reservation" as const,
+        id: row.id,
+        at: row.scheduledAt,
+        status: row.status,
+        label: `${row.partySize} pessoa(s)`,
+      })),
+      ...waitlistRows.map((row) => ({
+        kind: "waitlist" as const,
+        id: row.id,
+        at: row.joinedAt,
+        status: row.status,
+        label: `${row.partySize} pessoa(s)`,
+      })),
+      ...deliveryRows.map((row) => ({
+        kind: "delivery" as const,
+        id: row.id,
+        at: row.createdAt,
+        status: row.status,
+        amountCents: row.totalCents,
+        label: row.fulfillment,
+      })),
+      ...campaignRows.map((row) => ({
+        kind: "campaign" as const,
+        id: row.campaignId,
+        at: row.sentAt ?? row.createdAt,
+        status: row.status,
+        label: `${row.channel} · ${row.name}`,
+      })),
+      ...couponRows.map((row) => ({
+        kind: "coupon" as const,
+        id: row.couponId,
+        at: row.redeemedAt,
+        status: "redeemed",
+        amountCents: row.discountCents,
+        label: row.code,
+      })),
+      ...whatsappRows.map((row) => ({
+        kind: "whatsapp" as const,
+        id: row.id,
+        at: row.occurredAt,
+        status: row.status,
+        label: `${row.direction === "inbound" ? "Recebida" : "Enviada"} · ${row.body.slice(0, 80) || "mídia"}`,
+      })),
+      ...loyaltyEntries.map((row) => ({
+        kind: "loyalty" as const,
+        id: row.id,
+        at: row.createdAt,
+        status: row.type,
+        amount: row.amount,
+        label: row.description ?? row.type,
+      })),
+    ]
+      .sort((left, right) => right.at.getTime() - left.at.getTime())
+      .slice(0, 100);
+    return {
+      customer,
+      consent: {
+        email: customer.emailMarketingOptIn,
+        whatsapp: customer.whatsappMarketingOptIn,
+        history: consents,
+      },
+      metrics: {
+        visits,
+        totalSpendCents,
+        averageTicketCents: visits > 0 ? Math.round(totalSpendCents / visits) : 0,
+        lastVisitAt: visitRow?.lastVisitAt ? new Date(visitRow.lastVisitAt).toISOString() : null,
+        noShows: Number(noShowRow?.value ?? 0),
+      },
+      loyalty: { program: program ?? null, balance, entries: loyaltyEntries },
+      timeline,
+    };
+  }
+
   async createCustomer(identityId: string, organizationId: string, input: CustomerInput) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
     if (input.defaultUnitId)
       await this.scope.requireUnitAccess(identityId, organizationId, input.defaultUnitId);
     const requestFingerprint = payloadFingerprint(input);
     return this.database.db.transaction(async (tx) => {
+      // ponytail: lock por organização; trocar por chave de contato se o cadastro virar gargalo.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`growth-customer-contact:${organizationId}`}))`,
+      );
+      await this.assertUniqueCustomerContact(organizationId, input);
       const [created] = await tx
         .insert(growthCustomers)
         .values({
           organizationId,
           defaultUnitId: input.defaultUnitId ?? null,
           name: input.name,
-          email: input.email?.toLowerCase() ?? null,
-          phone: input.phone ?? null,
+          email: normalizeCustomerEmail(input.email),
+          phone: normalizeCustomerPhone(input.phone),
           birthDate: input.birthDate ?? null,
+          notes: input.notes ?? null,
+          tags: input.tags,
           idempotencyKey: `managed:${randomUUID()}`,
           requestFingerprint,
         })
@@ -294,6 +835,307 @@ export class GrowthService {
     });
   }
 
+  async updateCustomer(
+    identityId: string,
+    organizationId: string,
+    customerId: string,
+    input: CustomerUpdateInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    const customer = await this.customer(organizationId, customerId);
+    if (customer.archivedAt)
+      throw new ConflictException({
+        code: "CUSTOMER_ARCHIVED",
+        message: "Cliente arquivado não pode ser alterado.",
+      });
+    if (input.defaultUnitId)
+      await this.scope.requireUnitAccess(identityId, organizationId, input.defaultUnitId);
+    return this.database.db.transaction(async (tx) => {
+      if (input.email !== undefined || input.phone !== undefined) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`growth-customer-contact:${organizationId}`}))`,
+        );
+        await this.assertUniqueCustomerContact(
+          organizationId,
+          {
+            email: input.email === undefined ? customer.email : input.email,
+            phone: input.phone === undefined ? customer.phone : input.phone,
+          },
+          customerId,
+        );
+      }
+      const [updated] = await tx
+        .update(growthCustomers)
+        .set({
+          ...(input.defaultUnitId !== undefined ? { defaultUnitId: input.defaultUnitId } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.email !== undefined ? { email: normalizeCustomerEmail(input.email) } : {}),
+          ...(input.phone !== undefined ? { phone: normalizeCustomerPhone(input.phone) } : {}),
+          ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          ...(input.tags !== undefined ? { tags: input.tags } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, customerId),
+            isNull(growthCustomers.archivedAt),
+          ),
+        )
+        .returning();
+      if (!updated) throw new ConflictException({ code: "CUSTOMER_UPDATE_CONFLICT" });
+      await this.audit(tx, {
+        organizationId,
+        identityId,
+        action: "growth.customer.updated",
+        entityType: "growth_customer",
+        entityId: customerId,
+        metadata: { fields: Object.keys(input).sort() },
+      });
+      return updated;
+    });
+  }
+
+  async archiveCustomer(
+    identityId: string,
+    organizationId: string,
+    customerId: string,
+    input: CustomerArchiveInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    await this.customer(organizationId, customerId);
+    const [openTab] = await this.database.db
+      .select({ id: posTabs.id })
+      .from(posTabCustomerLinks)
+      .innerJoin(
+        posTabs,
+        and(
+          eq(posTabs.organizationId, posTabCustomerLinks.organizationId),
+          eq(posTabs.unitId, posTabCustomerLinks.unitId),
+          eq(posTabs.id, posTabCustomerLinks.tabId),
+        ),
+      )
+      .where(
+        and(
+          eq(posTabCustomerLinks.organizationId, organizationId),
+          eq(posTabCustomerLinks.customerId, customerId),
+          eq(posTabs.status, "open"),
+        ),
+      )
+      .limit(1);
+    if (openTab)
+      throw new ConflictException({
+        code: "CUSTOMER_HAS_OPEN_TAB",
+        message: "Encerre a comanda vinculada antes de arquivar o cliente.",
+        tabId: openTab.id,
+      });
+    return this.database.db.transaction(async (tx) => {
+      const [archived] = await tx
+        .update(growthCustomers)
+        .set({
+          archivedAt: new Date(),
+          marketingOptIn: false,
+          emailMarketingOptIn: false,
+          whatsappMarketingOptIn: false,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, customerId),
+            isNull(growthCustomers.archivedAt),
+          ),
+        )
+        .returning();
+      if (!archived) return { archived: true, duplicate: true };
+      await this.audit(tx, {
+        organizationId,
+        identityId,
+        action: "growth.customer.archived",
+        entityType: "growth_customer",
+        entityId: customerId,
+        metadata: { reason: input.reason },
+      });
+      return { archived: true, duplicate: false, customer: archived };
+    });
+  }
+
+  async mergeCustomer(
+    identityId: string,
+    organizationId: string,
+    targetCustomerId: string,
+    input: CustomerMergeInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    if (targetCustomerId === input.sourceCustomerId)
+      throw new BadRequestException({ code: "CUSTOMER_MERGE_SAME_RECORD" });
+    return this.database.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(growthCustomers)
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            inArray(growthCustomers.id, [targetCustomerId, input.sourceCustomerId]),
+          ),
+        )
+        .for("update");
+      const target = rows.find((row) => row.id === targetCustomerId);
+      const source = rows.find((row) => row.id === input.sourceCustomerId);
+      if (!target || !source) throw new NotFoundException({ code: "CUSTOMER_NOT_FOUND" });
+      if (target.archivedAt || source.archivedAt)
+        throw new ConflictException({ code: "CUSTOMER_MERGE_ARCHIVED" });
+
+      await tx.execute(sql`
+        delete from growth_campaign_deliveries source
+        using growth_campaign_deliveries target
+        where source.organization_id = ${organizationId}
+          and source.customer_id = ${source.id}
+          and target.organization_id = source.organization_id
+          and target.campaign_id = source.campaign_id
+          and target.customer_id = ${target.id}
+      `);
+      await tx
+        .update(customerConsents)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(customerConsents.organizationId, organizationId),
+            eq(customerConsents.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(marketingOptOutTokens)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(marketingOptOutTokens.organizationId, organizationId),
+            eq(marketingOptOutTokens.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(loyaltyLedger)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(loyaltyLedger.organizationId, organizationId),
+            eq(loyaltyLedger.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(couponRedemptions)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(couponRedemptions.organizationId, organizationId),
+            eq(couponRedemptions.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(campaignDeliveries)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(campaignDeliveries.organizationId, organizationId),
+            eq(campaignDeliveries.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(reservations)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(reservations.organizationId, organizationId),
+            eq(reservations.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(waitlistEntries)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(waitlistEntries.organizationId, organizationId),
+            eq(waitlistEntries.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(deliveryOrders)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            eq(deliveryOrders.customerId, source.id),
+          ),
+        );
+      await tx
+        .update(posTabCustomerLinks)
+        .set({ customerId: target.id })
+        .where(
+          and(
+            eq(posTabCustomerLinks.organizationId, organizationId),
+            eq(posTabCustomerLinks.customerId, source.id),
+          ),
+        );
+      const now = new Date();
+      await tx
+        .update(growthCustomers)
+        .set({
+          email: null,
+          phone: null,
+          marketingOptIn: false,
+          emailMarketingOptIn: false,
+          whatsappMarketingOptIn: false,
+          archivedAt: now,
+          mergedIntoCustomerId: target.id,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, source.id),
+          ),
+        );
+      const [merged] = await tx
+        .update(growthCustomers)
+        .set({
+          email: target.email ?? source.email,
+          phone: target.phone ?? source.phone,
+          birthDate: target.birthDate ?? source.birthDate,
+          notes: target.notes ?? source.notes,
+          tags: [...new Set([...target.tags, ...source.tags])],
+          emailMarketingOptIn: target.emailMarketingOptIn || source.emailMarketingOptIn,
+          whatsappMarketingOptIn: target.whatsappMarketingOptIn || source.whatsappMarketingOptIn,
+          marketingOptIn:
+            target.emailMarketingOptIn ||
+            source.emailMarketingOptIn ||
+            target.whatsappMarketingOptIn ||
+            source.whatsappMarketingOptIn,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, target.id),
+          ),
+        )
+        .returning();
+      if (!merged) throw new ConflictException({ code: "CUSTOMER_MERGE_CONFLICT" });
+      await this.audit(tx, {
+        organizationId,
+        identityId,
+        action: "growth.customer.merged",
+        entityType: "growth_customer",
+        entityId: target.id,
+        metadata: { sourceCustomerId: source.id, reason: input.reason },
+      });
+      return { customer: merged, mergedCustomerId: source.id };
+    });
+  }
+
   async recordConsent(
     identityId: string,
     organizationId: string,
@@ -301,16 +1143,46 @@ export class GrowthService {
     input: ConsentInput,
   ) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
-    const customer = await this.customer(organizationId, customerId);
+    await this.requireEntitlement(organizationId, "basic_crm");
     return this.database.db.transaction(async (tx) => {
+      const [customer] = await tx
+        .select()
+        .from(growthCustomers)
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, customerId),
+            isNull(growthCustomers.archivedAt),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!customer)
+        throw new NotFoundException({
+          code: "CUSTOMER_NOT_FOUND",
+          message: "Cliente não encontrado.",
+        });
       const [consent] = await tx
         .insert(customerConsents)
         .values({ organizationId, customerId, actorIdentityId: identityId, ...input })
         .returning();
       if (!consent) throw new Error("CONSENT_INSERT_FAILED");
+      const emailMarketingOptIn =
+        input.channel === "email" || input.channel === "all"
+          ? marketingOptInAfter(input.decision)
+          : customer.emailMarketingOptIn;
+      const whatsappMarketingOptIn =
+        input.channel === "whatsapp" || input.channel === "all"
+          ? marketingOptInAfter(input.decision)
+          : customer.whatsappMarketingOptIn;
       await tx
         .update(growthCustomers)
-        .set({ marketingOptIn: marketingOptInAfter(input.decision), updatedAt: new Date() })
+        .set({
+          marketingOptIn: emailMarketingOptIn || whatsappMarketingOptIn,
+          emailMarketingOptIn,
+          whatsappMarketingOptIn,
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(growthCustomers.organizationId, organizationId),
@@ -341,6 +1213,7 @@ export class GrowthService {
 
   async issueOptOutToken(identityId: string, organizationId: string, customerId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
     await this.customer(organizationId, customerId);
     const token = randomBytes(32).toString("base64url");
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
@@ -394,7 +1267,12 @@ export class GrowthService {
       if (!claimed) return { optedOut: true, alreadyProcessed: true };
       const [customer] = await tx
         .update(growthCustomers)
-        .set({ marketingOptIn: false, updatedAt: new Date() })
+        .set({
+          marketingOptIn: false,
+          emailMarketingOptIn: false,
+          whatsappMarketingOptIn: false,
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(growthCustomers.organizationId, entry.organizationId),
@@ -435,6 +1313,7 @@ export class GrowthService {
     input: LoyaltyProgramInput,
   ) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "loyalty");
     return this.database.db.transaction(async (tx) => {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`growth-loyalty:${organizationId}`}))`,
@@ -473,8 +1352,21 @@ export class GrowthService {
     });
   }
 
+  async loyaltyProgram(identityId: string, organizationId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "loyalty");
+    const [program] = await this.database.db
+      .select()
+      .from(loyaltyPrograms)
+      .where(eq(loyaltyPrograms.organizationId, organizationId))
+      .orderBy(desc(loyaltyPrograms.createdAt))
+      .limit(1);
+    return program ?? null;
+  }
+
   async loyaltyBalance(identityId: string, organizationId: string, customerId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "loyalty");
     await this.customer(organizationId, customerId);
     const [row] = await this.database.db
       .select({ balance: sum(loyaltyLedger.amount) })
@@ -491,6 +1383,7 @@ export class GrowthService {
 
   async earnLoyalty(identityId: string, organizationId: string, input: LoyaltyEarnInput) {
     await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    await this.requireEntitlement(organizationId, "loyalty");
     await this.customer(organizationId, input.customerId);
     const [program] = await this.database.db
       .select()
@@ -604,6 +1497,7 @@ export class GrowthService {
 
   async redeemLoyalty(identityId: string, organizationId: string, input: LoyaltyRedeemInput) {
     await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    await this.requireEntitlement(organizationId, "loyalty");
     await this.customer(organizationId, input.customerId);
     const [program] = await this.database.db
       .select()
@@ -695,6 +1589,7 @@ export class GrowthService {
     input: LoyaltyReverseInput,
   ) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "loyalty");
     return this.database.db.transaction(async (tx) => {
       const [original] = await tx
         .select()
@@ -761,6 +1656,7 @@ export class GrowthService {
 
   async listCoupons(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
     return this.database.db
       .select()
       .from(coupons)
@@ -769,6 +1665,7 @@ export class GrowthService {
 
   async createCoupon(identityId: string, organizationId: string, input: CouponInput) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
     if (input.unitId) await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
     for (const unitId of input.unitIds)
       await this.scope.requireUnitAccess(identityId, organizationId, unitId);
@@ -804,6 +1701,68 @@ export class GrowthService {
     });
   }
 
+  async updateCoupon(
+    identityId: string,
+    organizationId: string,
+    couponId: string,
+    input: CouponUpdateInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
+    const [current] = await this.database.db
+      .select()
+      .from(coupons)
+      .where(and(eq(coupons.organizationId, organizationId), eq(coupons.id, couponId)))
+      .limit(1);
+    if (!current) throw new NotFoundException({ code: "COUPON_NOT_FOUND" });
+    for (const unitId of input.unitIds ?? [])
+      await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    const nextType = input.type ?? current.type;
+    const nextValue = input.value ?? current.value;
+    const nextValidFrom = input.validFrom ?? current.validFrom;
+    const nextValidUntil = input.validUntil === undefined ? current.validUntil : input.validUntil;
+    if (nextType === "percentage" && nextValue > 10_000)
+      throw new BadRequestException({ code: "COUPON_PERCENTAGE_INVALID" });
+    if (nextValidUntil && nextValidUntil <= nextValidFrom)
+      throw new BadRequestException({ code: "COUPON_INTERVAL_INVALID" });
+    return this.database.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(coupons)
+        .set({
+          ...(input.code !== undefined ? { code: input.code.toUpperCase() } : {}),
+          ...(input.type !== undefined ? { type: input.type } : {}),
+          ...(input.value !== undefined ? { value: input.value } : {}),
+          ...(input.minimumOrderCents !== undefined
+            ? { minimumOrderCents: input.minimumOrderCents }
+            : {}),
+          ...(input.maximumDiscountCents !== undefined
+            ? { maximumDiscountCents: input.maximumDiscountCents }
+            : {}),
+          ...(input.validFrom !== undefined ? { validFrom: input.validFrom } : {}),
+          ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
+          ...(input.channels !== undefined ? { channels: input.channels } : {}),
+          ...(input.unitIds !== undefined ? { unitIds: input.unitIds } : {}),
+          ...(input.perCustomerLimit !== undefined
+            ? { perCustomerLimit: input.perCustomerLimit }
+            : {}),
+          ...(input.active !== undefined ? { active: input.active } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(coupons.organizationId, organizationId), eq(coupons.id, couponId)))
+        .returning();
+      if (!updated) throw new ConflictException({ code: "COUPON_UPDATE_CONFLICT" });
+      await this.audit(tx, {
+        organizationId,
+        identityId,
+        action: "growth.coupon.updated",
+        entityType: "growth_coupon",
+        entityId: couponId,
+        metadata: { fields: Object.keys(input).sort() },
+      });
+      return updated;
+    });
+  }
+
   async validatePublicCoupon(slug: string, input: PublicCouponValidationInput) {
     const scope = await this.publicMenuScope(slug);
     const [coupon] = await this.database.db
@@ -834,7 +1793,7 @@ export class GrowthService {
 
   async redeemCoupon(identityId: string, organizationId: string, input: CouponRedemptionInput) {
     await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
-    if (input.customerId) await this.customer(organizationId, input.customerId);
+    await this.requireEntitlement(organizationId, "campaigns");
     const [tab] = await this.database.db
       .select({ id: posTabs.id, totalCents: posTabs.totalCents })
       .from(posTabs)
@@ -852,6 +1811,24 @@ export class GrowthService {
         code: "COUPON_OPERATIONAL_TAB_NOT_FOUND",
         message: "O cupom exige uma comanda operacional aberta e persistida.",
       });
+    const [link] = await this.database.db
+      .select({ customerId: posTabCustomerLinks.customerId })
+      .from(posTabCustomerLinks)
+      .where(
+        and(
+          eq(posTabCustomerLinks.organizationId, organizationId),
+          eq(posTabCustomerLinks.unitId, input.unitId),
+          eq(posTabCustomerLinks.tabId, input.orderRef),
+        ),
+      )
+      .limit(1);
+    if (input.customerId && link && input.customerId !== link.customerId)
+      throw new ConflictException({
+        code: "COUPON_CUSTOMER_MISMATCH",
+        message: "A comanda está vinculada a outro cliente.",
+      });
+    const customerId = input.customerId ?? link?.customerId;
+    if (customerId) await this.customer(organizationId, customerId);
     const [coupon] = await this.database.db
       .select()
       .from(coupons)
@@ -891,15 +1868,15 @@ export class GrowthService {
         message: "Pedido abaixo do mínimo.",
       });
     const requestFingerprint = payloadFingerprint({
-      input,
+      input: { ...input, customerId },
       couponId: coupon.id,
       operationalTotalCents: tab.totalCents,
       discountCents,
     });
     const [inserted] = await this.database.db.transaction(async (tx) => {
-      if (input.customerId) {
+      if (customerId) {
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtext(${`growth-coupon:${organizationId}:${coupon.id}:${input.customerId}`}))`,
+          sql`select pg_advisory_xact_lock(hashtext(${`growth-coupon:${organizationId}:${coupon.id}:${customerId}`}))`,
         );
         const [usage] = await tx
           .select({ total: count() })
@@ -908,7 +1885,7 @@ export class GrowthService {
             and(
               eq(couponRedemptions.organizationId, organizationId),
               eq(couponRedemptions.couponId, coupon.id),
-              eq(couponRedemptions.customerId, input.customerId),
+              eq(couponRedemptions.customerId, customerId),
               ne(couponRedemptions.idempotencyKey, input.idempotencyKey),
             ),
           );
@@ -924,7 +1901,7 @@ export class GrowthService {
           organizationId,
           unitId: input.unitId,
           couponId: coupon.id,
-          customerId: input.customerId ?? null,
+          customerId: customerId ?? null,
           orderRef: input.orderRef,
           discountCents,
           idempotencyKey: input.idempotencyKey,
@@ -974,6 +1951,7 @@ export class GrowthService {
 
   async createSegment(identityId: string, organizationId: string, input: SegmentInput) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "advanced_crm");
     return this.database.db.transaction(async (tx) => {
       const [segment] = await tx
         .insert(customerSegments)
@@ -994,6 +1972,7 @@ export class GrowthService {
 
   async listSegments(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "advanced_crm");
     return this.database.db
       .select()
       .from(customerSegments)
@@ -1002,6 +1981,7 @@ export class GrowthService {
 
   async createCampaign(identityId: string, organizationId: string, input: CampaignInput) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
     if (input.unitId) await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
     if (input.segmentId) {
       const [segment] = await this.database.db
@@ -1032,6 +2012,9 @@ export class GrowthService {
           channel: input.channel,
           subject: input.subject ?? null,
           content: input.content,
+          variantBContent: input.variantBContent ?? null,
+          attributionWindowDays: input.attributionWindowDays,
+          holdoutPercentage: input.holdoutPercentage,
           createdByIdentityId: identityId,
         })
         .returning();
@@ -1058,6 +2041,7 @@ export class GrowthService {
 
   async listCampaigns(identityId: string, organizationId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
     return this.database.db
       .select()
       .from(marketingCampaigns)
@@ -1065,8 +2049,159 @@ export class GrowthService {
       .orderBy(desc(marketingCampaigns.createdAt));
   }
 
-  private providerReady(channel: "email" | "whatsapp") {
-    const prefix = channel === "email" ? "EMAIL" : "WHATSAPP";
+  private async campaignAudience(campaign: typeof marketingCampaigns.$inferSelect) {
+    let filter: Record<string, unknown> = { kind: "marketing_opt_in" };
+    if (campaign.segmentId) {
+      const [segment] = await this.database.db
+        .select()
+        .from(customerSegments)
+        .where(
+          and(
+            eq(customerSegments.organizationId, campaign.organizationId),
+            eq(customerSegments.id, campaign.segmentId),
+            eq(customerSegments.active, true),
+          ),
+        )
+        .limit(1);
+      if (!segment)
+        throw new NotFoundException({
+          code: "SEGMENT_NOT_FOUND",
+          message: "Segmento não encontrado.",
+        });
+      filter = segment.filters;
+    }
+    const kind = typeof filter.kind === "string" ? filter.kind : "marketing_opt_in";
+    let behaviorFilter: SQL | undefined;
+    if (kind === "birthday_month") {
+      behaviorFilter = sql`substring(${growthCustomers.birthDate}, 6, 2)::int = ${Number(filter.month)}`;
+    } else if (kind === "inactive_days") {
+      const cutoff = new Date(Date.now() - Number(filter.days) * 24 * 60 * 60 * 1000);
+      behaviorFilter = sql`not exists (
+        select 1 from growth_pos_tab_customer_links links
+        inner join pos_tabs tabs
+          on tabs.organization_id = links.organization_id
+         and tabs.unit_id = links.unit_id
+         and tabs.id = links.tab_id
+        where links.organization_id = ${campaign.organizationId}
+          and links.customer_id = ${growthCustomers.id}
+          and tabs.status = 'closed'
+          and tabs.closed_at >= ${cutoff}
+      )`;
+    } else if (kind === "minimum_visits") {
+      behaviorFilter = sql`(
+        select count(*) from growth_pos_tab_customer_links links
+        inner join pos_tabs tabs
+          on tabs.organization_id = links.organization_id
+         and tabs.unit_id = links.unit_id
+         and tabs.id = links.tab_id
+        where links.organization_id = ${campaign.organizationId}
+          and links.customer_id = ${growthCustomers.id}
+          and tabs.status = 'closed'
+      ) >= ${Number(filter.visits)}`;
+    } else if (kind === "minimum_spend_cents") {
+      behaviorFilter = sql`(
+        coalesce((
+          select sum(payments.amount_cents) from growth_pos_tab_customer_links links
+          inner join pos_tab_payments payments
+            on payments.organization_id = links.organization_id
+           and payments.unit_id = links.unit_id
+           and payments.tab_id = links.tab_id
+          where links.organization_id = ${campaign.organizationId}
+            and links.customer_id = ${growthCustomers.id}
+        ), 0) - coalesce((
+          select sum(reversals.amount_cents) from growth_pos_tab_customer_links links
+          inner join pos_tab_payments payments
+            on payments.organization_id = links.organization_id
+           and payments.unit_id = links.unit_id
+           and payments.tab_id = links.tab_id
+          inner join pos_payment_reversals reversals
+            on reversals.organization_id = payments.organization_id
+           and reversals.unit_id = payments.unit_id
+           and reversals.payment_id = payments.id
+           and reversals.status = 'approved'
+        where links.organization_id = ${campaign.organizationId}
+          and links.customer_id = ${growthCustomers.id}
+        ), 0)
+      ) >= ${Number(filter.amountCents)}`;
+    } else if (kind === "no_show_count") {
+      behaviorFilter = sql`(
+        (select count(*) from growth_reservations reservations
+          where reservations.organization_id = ${campaign.organizationId}
+            and reservations.customer_id = ${growthCustomers.id}
+            and reservations.status = 'no_show') +
+        (select count(*) from growth_waitlist_entries waitlist
+          where waitlist.organization_id = ${campaign.organizationId}
+            and waitlist.customer_id = ${growthCustomers.id}
+            and waitlist.status = 'no_show')
+      ) >= ${Number(filter.count)}`;
+    }
+    const where = and(
+      eq(growthCustomers.organizationId, campaign.organizationId),
+      isNull(growthCustomers.archivedAt),
+      campaign.channel === "email"
+        ? and(eq(growthCustomers.emailMarketingOptIn, true), isNotNull(growthCustomers.email))
+        : and(eq(growthCustomers.whatsappMarketingOptIn, true), isNotNull(growthCustomers.phone)),
+      campaign.unitId
+        ? or(
+            eq(growthCustomers.defaultUnitId, campaign.unitId),
+            sql`exists (
+              select 1 from growth_pos_tab_customer_links links
+              where links.organization_id = ${campaign.organizationId}
+                and links.unit_id = ${campaign.unitId}
+                and links.customer_id = ${growthCustomers.id}
+            )`,
+          )
+        : undefined,
+      behaviorFilter,
+    );
+    const [recipients, [eligible], [active]] = await Promise.all([
+      this.database.db
+        .select()
+        .from(growthCustomers)
+        .where(where)
+        .orderBy(asc(growthCustomers.id))
+        .limit(501),
+      this.database.db.select({ value: count() }).from(growthCustomers).where(where),
+      this.database.db
+        .select({ value: count() })
+        .from(growthCustomers)
+        .where(
+          and(
+            eq(growthCustomers.organizationId, campaign.organizationId),
+            isNull(growthCustomers.archivedAt),
+          ),
+        ),
+    ]);
+    return {
+      filter,
+      recipients,
+      eligible: Number(eligible?.value ?? 0),
+      activeCustomers: Number(active?.value ?? 0),
+    };
+  }
+
+  private async providerReady(
+    channel: "email" | "whatsapp",
+    organizationId: string,
+    unitId: string | null,
+  ) {
+    if (channel === "whatsapp") {
+      if (process.env.WHATSAPP_PROVIDER_ENABLED !== "true") return false;
+      const [integration] = await this.database.db
+        .select({ id: growthIntegrations.id })
+        .from(growthIntegrations)
+        .where(
+          and(
+            eq(growthIntegrations.organizationId, organizationId),
+            unitId ? eq(growthIntegrations.unitId, unitId) : undefined,
+            eq(growthIntegrations.provider, "evolution_go"),
+            eq(growthIntegrations.status, "ready"),
+          ),
+        )
+        .limit(1);
+      return Boolean(integration);
+    }
+    const prefix = "EMAIL";
     return (
       process.env[`${prefix}_PROVIDER_ENABLED`] === "true" &&
       Boolean(process.env[`${prefix}_PROVIDER_CREDENTIAL_REFERENCE`])
@@ -1075,6 +2210,7 @@ export class GrowthService {
 
   async queueCampaign(identityId: string, organizationId: string, campaignId: string) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
     const [campaign] = await this.database.db
       .select()
       .from(marketingCampaigns)
@@ -1092,8 +2228,34 @@ export class GrowthService {
       });
     if (["queued", "sending", "sent"].includes(campaign.status))
       return { status: campaign.status, duplicate: true, queuedRecipients: 0 };
-    if (!this.providerReady(campaign.channel)) {
-      await this.database.db.transaction(async (tx) => {
+    if (campaign.status === "canceled")
+      throw new ConflictException({
+        code: "CAMPAIGN_CANCELED",
+        message: "Campanha cancelada não pode ser enfileirada.",
+      });
+    if (!(await this.providerReady(campaign.channel, organizationId, campaign.unitId))) {
+      const providerCode =
+        campaign.channel === "whatsapp" ? "EVOLUTION_NOT_LOGGED_IN" : "PROVIDER_NOT_CONFIGURED";
+      const blocked = await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`growth-campaign:${organizationId}:${campaignId}`}))`,
+        );
+        const [current] = await tx
+          .select({ status: marketingCampaigns.status })
+          .from(marketingCampaigns)
+          .where(
+            and(
+              eq(marketingCampaigns.organizationId, organizationId),
+              eq(marketingCampaigns.id, campaignId),
+            ),
+          )
+          .for("update")
+          .limit(1);
+        if (!current) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+        if (current.status === "canceled")
+          throw new ConflictException({ code: "CAMPAIGN_CANCELED" });
+        if (current.status === "blocked") return false;
+        if (["queued", "sending", "sent"].includes(current.status)) return false;
         await tx
           .update(marketingCampaigns)
           .set({ status: "blocked", updatedAt: new Date() })
@@ -1110,7 +2272,7 @@ export class GrowthService {
           action: "growth.campaign.blocked",
           entityType: "growth_campaign",
           entityId: campaign.id,
-          metadata: { code: "PROVIDER_NOT_CONFIGURED", channel: campaign.channel },
+          metadata: { code: providerCode, channel: campaign.channel },
         });
         if (campaign.unitId)
           await this.outbox(tx, "growth.campaign_blocked", "growth_campaign", campaign.id, {
@@ -1118,63 +2280,52 @@ export class GrowthService {
             unitId: campaign.unitId,
             campaignId: campaign.id,
             status: "blocked",
-            code: "PROVIDER_NOT_CONFIGURED",
+            code: providerCode,
           });
+        return true;
       });
-      return { status: "blocked", code: "PROVIDER_NOT_CONFIGURED", queuedRecipients: 0 };
+      return {
+        status: "blocked",
+        code: providerCode,
+        duplicate: !blocked,
+        queuedRecipients: 0,
+      };
     }
-    let filter: Record<string, unknown> = { kind: "marketing_opt_in" };
-    if (campaign.segmentId) {
-      const [segment] = await this.database.db
-        .select()
-        .from(customerSegments)
-        .where(
-          and(
-            eq(customerSegments.organizationId, organizationId),
-            eq(customerSegments.id, campaign.segmentId),
-            eq(customerSegments.active, true),
-          ),
-        )
-        .limit(1);
-      if (!segment)
-        throw new NotFoundException({
-          code: "SEGMENT_NOT_FOUND",
-          message: "Segmento não encontrado.",
-        });
-      filter = segment.filters;
-    }
-    const candidates = await this.database.db
-      .select()
-      .from(growthCustomers)
-      .where(
-        and(
-          eq(growthCustomers.organizationId, organizationId),
-          eq(growthCustomers.marketingOptIn, true),
-          isNull(growthCustomers.archivedAt),
-        ),
-      )
-      .orderBy(asc(growthCustomers.id))
-      .limit(501);
-    if (candidates.length > 500)
+    const audience = await this.campaignAudience(campaign);
+    if (audience.eligible > 500)
       throw new BadRequestException({
         code: "CAMPAIGN_RECIPIENT_LIMIT",
         message: "A campanha excede o limite operacional de 500 destinatários por lote.",
       });
-    const month = filter.kind === "birthday_month" ? Number(filter.month) : null;
-    const recipients = candidates.filter((customer) => {
-      if (campaign.channel === "email" && !customer.email) return false;
-      if (campaign.channel === "whatsapp" && !customer.phone) return false;
-      if (month && Number(customer.birthDate?.slice(5, 7)) !== month) return false;
-      return true;
-    });
-    const outboxEncryption = encryptionKey(
-      process.env.OUTBOX_ENCRYPTION_KEY,
-      "OUTBOX_ENCRYPTION_KEY",
-    );
-    const queuedRecipients = await this.database.db.transaction(async (tx) => {
+    const recipients = audience.recipients;
+    const outboxEncryption = recipients.length
+      ? encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY")
+      : null;
+    const queueResult = await this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`growth-campaign:${organizationId}:${campaignId}`}))`,
+      );
+      const [current] = await tx
+        .select({ status: marketingCampaigns.status })
+        .from(marketingCampaigns)
+        .where(
+          and(
+            eq(marketingCampaigns.organizationId, organizationId),
+            eq(marketingCampaigns.id, campaignId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!current) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+      if (["queued", "sending", "sent"].includes(current.status))
+        return { status: current.status, duplicate: true, queuedRecipients: 0 };
+      if (current.status === "canceled") throw new ConflictException({ code: "CAMPAIGN_CANCELED" });
       let queued = 0;
+      let heldOut = 0;
       for (const customer of recipients) {
+        if (!outboxEncryption) throw new Error("CAMPAIGN_ENCRYPTION_KEY_UNAVAILABLE");
         const deliveryIdempotency = `${campaign.id}:${customer.id}`;
+        const experimentVariant = campaignExperimentVariant(campaign, customer.id);
         const [delivery] = await tx
           .insert(campaignDeliveries)
           .values({
@@ -1182,10 +2333,16 @@ export class GrowthService {
             campaignId: campaign.id,
             customerId: customer.id,
             idempotencyKey: deliveryIdempotency,
+            experimentVariant,
+            status: experimentVariant === "control" ? "holdout" : "pending",
           })
           .onConflictDoNothing()
           .returning();
         if (!delivery) continue;
+        if (experimentVariant === "control") {
+          heldOut += 1;
+          continue;
+        }
         queued += 1;
         const optOutToken = randomBytes(32).toString("base64url");
         const optOutExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
@@ -1238,7 +2395,11 @@ export class GrowthService {
         action: "growth.campaign.queued",
         entityType: "growth_campaign",
         entityId: campaign.id,
-        metadata: { queuedRecipients: queued, channel: campaign.channel },
+        metadata: {
+          queuedRecipients: queued,
+          heldOutRecipients: heldOut,
+          channel: campaign.channel,
+        },
       });
       if (campaign.unitId)
         await this.outbox(
@@ -1252,15 +2413,232 @@ export class GrowthService {
             campaignId: campaign.id,
             status: resultingStatus,
             queuedRecipients: queued,
+            heldOutRecipients: heldOut,
           },
         );
-      return queued;
+      return {
+        status: resultingStatus,
+        duplicate: false,
+        queuedRecipients: queued,
+        heldOutRecipients: heldOut,
+      };
     });
+    return queueResult;
+  }
+
+  async previewCampaign(identityId: string, organizationId: string, campaignId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
+    const [campaign] = await this.database.db
+      .select()
+      .from(marketingCampaigns)
+      .where(
+        and(
+          eq(marketingCampaigns.organizationId, organizationId),
+          eq(marketingCampaigns.id, campaignId),
+        ),
+      )
+      .limit(1);
+    if (!campaign) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+    const audience = await this.campaignAudience(campaign);
+    const providerReady = await this.providerReady(
+      campaign.channel,
+      organizationId,
+      campaign.unitId,
+    );
     return {
-      status: queuedRecipients === 0 ? "sent" : "queued",
-      duplicate: false,
-      queuedRecipients,
+      campaignId,
+      channel: campaign.channel,
+      filter: audience.filter,
+      activeCustomers: audience.activeCustomers,
+      eligibleRecipients: audience.eligible,
+      excludedRecipients: Math.max(0, audience.activeCustomers - audience.eligible),
+      recipientLimit: 500,
+      exceedsRecipientLimit: audience.eligible > 500,
+      provider: {
+        ready: providerReady,
+        unavailableCode: providerReady
+          ? null
+          : campaign.channel === "whatsapp"
+            ? "EVOLUTION_NOT_LOGGED_IN"
+            : "PROVIDER_NOT_CONFIGURED",
+      },
     };
+  }
+
+  async campaignDeliverySummary(identityId: string, organizationId: string, campaignId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
+    const [campaign] = await this.database.db
+      .select()
+      .from(marketingCampaigns)
+      .where(
+        and(
+          eq(marketingCampaigns.organizationId, organizationId),
+          eq(marketingCampaigns.id, campaignId),
+        ),
+      )
+      .limit(1);
+    if (!campaign) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+    const [counts, deliveries, [attribution], experiments] = await Promise.all([
+      this.database.db
+        .select({ status: campaignDeliveries.status, total: count() })
+        .from(campaignDeliveries)
+        .where(
+          and(
+            eq(campaignDeliveries.organizationId, organizationId),
+            eq(campaignDeliveries.campaignId, campaignId),
+          ),
+        )
+        .groupBy(campaignDeliveries.status),
+      this.database.db
+        .select({
+          id: campaignDeliveries.id,
+          customerId: campaignDeliveries.customerId,
+          customerName: growthCustomers.name,
+          status: campaignDeliveries.status,
+          experimentVariant: campaignDeliveries.experimentVariant,
+          errorCode: campaignDeliveries.errorCode,
+          sentAt: campaignDeliveries.sentAt,
+          deliveredAt: campaignDeliveries.deliveredAt,
+          readAt: campaignDeliveries.readAt,
+          repliedAt: campaignDeliveries.repliedAt,
+          attributedOrderRef: campaignDeliveries.attributedOrderRef,
+          attributedCouponRedemptionId: campaignDeliveries.attributedCouponRedemptionId,
+          attributedRevenueCents: campaignDeliveries.attributedRevenueCents,
+          createdAt: campaignDeliveries.createdAt,
+        })
+        .from(campaignDeliveries)
+        .innerJoin(
+          growthCustomers,
+          and(
+            eq(growthCustomers.organizationId, campaignDeliveries.organizationId),
+            eq(growthCustomers.id, campaignDeliveries.customerId),
+          ),
+        )
+        .where(
+          and(
+            eq(campaignDeliveries.organizationId, organizationId),
+            eq(campaignDeliveries.campaignId, campaignId),
+          ),
+        )
+        .orderBy(desc(campaignDeliveries.createdAt))
+        .limit(100),
+      this.database.db.execute<{
+        delivered: number;
+        read: number;
+        replied: number;
+        orders: number;
+        coupons: number;
+        revenueCents: number;
+      }>(sql`
+        select count(delivered_at)::int as delivered,
+               count(read_at)::int as read,
+               count(replied_at)::int as replied,
+               count(attributed_order_ref)::int as orders,
+               count(attributed_coupon_redemption_id)::int as coupons,
+               coalesce(sum(attributed_revenue_cents), 0)::int as "revenueCents"
+        from growth_campaign_deliveries
+        where organization_id = ${organizationId}
+          and campaign_id = ${campaignId}
+      `),
+      this.database.db.execute<{
+        variant: string;
+        recipients: number;
+        delivered: number;
+        read: number;
+        replied: number;
+        orders: number;
+        revenueCents: number;
+      }>(sql`
+        select experiment_variant as variant,
+               count(*)::int as recipients,
+               count(delivered_at)::int as delivered,
+               count(read_at)::int as read,
+               count(replied_at)::int as replied,
+               count(attributed_order_ref)::int as orders,
+               coalesce(sum(attributed_revenue_cents), 0)::int as "revenueCents"
+        from growth_campaign_deliveries
+        where organization_id = ${organizationId}
+          and campaign_id = ${campaignId}
+        group by experiment_variant
+        order by experiment_variant
+      `),
+    ]);
+    return {
+      campaign,
+      counts: Object.fromEntries(counts.map((row) => [row.status, Number(row.total)])),
+      attribution: attribution ?? {
+        delivered: 0,
+        read: 0,
+        replied: 0,
+        orders: 0,
+        coupons: 0,
+        revenueCents: 0,
+      },
+      experiments,
+      deliveries,
+    };
+  }
+
+  async cancelCampaign(
+    identityId: string,
+    organizationId: string,
+    campaignId: string,
+    input: CampaignCancelInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "campaigns");
+    return this.database.db.transaction(async (tx) => {
+      const [campaign] = await tx
+        .select()
+        .from(marketingCampaigns)
+        .where(
+          and(
+            eq(marketingCampaigns.organizationId, organizationId),
+            eq(marketingCampaigns.id, campaignId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!campaign) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+      if (campaign.status === "canceled") return { duplicate: true, campaign };
+      if (["sending", "sent"].includes(campaign.status))
+        throw new ConflictException({
+          code: "CAMPAIGN_ALREADY_DELIVERING",
+          message: "A campanha já iniciou entregas e não pode ser cancelada com segurança.",
+        });
+      const [canceled] = await tx
+        .update(marketingCampaigns)
+        .set({ status: "canceled", updatedAt: new Date() })
+        .where(
+          and(
+            eq(marketingCampaigns.organizationId, organizationId),
+            eq(marketingCampaigns.id, campaignId),
+          ),
+        )
+        .returning();
+      await tx
+        .update(campaignDeliveries)
+        .set({ status: "skipped", errorCode: "CAMPAIGN_CANCELED", updatedAt: new Date() })
+        .where(
+          and(
+            eq(campaignDeliveries.organizationId, organizationId),
+            eq(campaignDeliveries.campaignId, campaignId),
+            inArray(campaignDeliveries.status, ["pending", "blocked"]),
+          ),
+        );
+      await this.audit(tx, {
+        organizationId,
+        unitId: campaign.unitId,
+        identityId,
+        action: "growth.campaign.canceled",
+        entityType: "growth_campaign",
+        entityId: campaignId,
+        metadata: { reason: input.reason },
+      });
+      return { duplicate: false, campaign: canceled };
+    });
   }
 
   async listReservations(
@@ -2232,7 +3610,6 @@ export class GrowthService {
 
   async createDeliveryOrder(identityId: string, organizationId: string, input: DeliveryOrderInput) {
     await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
-    if (input.customerId) await this.customer(organizationId, input.customerId);
     const [tab] = await this.database.db
       .select({ id: posTabs.id, totalCents: posTabs.totalCents })
       .from(posTabs)
@@ -2250,6 +3627,24 @@ export class GrowthService {
         code: "DELIVERY_OPERATIONAL_TAB_NOT_FOUND",
         message: "Entrega ou retirada exige uma comanda operacional aberta e persistida.",
       });
+    const [link] = await this.database.db
+      .select({ customerId: posTabCustomerLinks.customerId })
+      .from(posTabCustomerLinks)
+      .where(
+        and(
+          eq(posTabCustomerLinks.organizationId, organizationId),
+          eq(posTabCustomerLinks.unitId, input.unitId),
+          eq(posTabCustomerLinks.tabId, input.orderRef),
+        ),
+      )
+      .limit(1);
+    if (input.customerId && link && input.customerId !== link.customerId)
+      throw new ConflictException({
+        code: "DELIVERY_CUSTOMER_MISMATCH",
+        message: "A comanda está vinculada a outro cliente.",
+      });
+    const customerId = input.customerId ?? link?.customerId;
+    if (customerId) await this.customer(organizationId, customerId);
     let deliveryFeeCents = 0;
     let zoneId: string | null = null;
     let addressValidationStatus: "covered" | "unchecked" | "unavailable" = "unchecked";
@@ -2300,7 +3695,7 @@ export class GrowthService {
     }
     const totalCents = tab.totalCents + deliveryFeeCents;
     const requestFingerprint = payloadFingerprint({
-      input,
+      input: { ...input, customerId },
       zoneId,
       operationalSubtotalCents: tab.totalCents,
       deliveryFeeCents,
@@ -2312,7 +3707,7 @@ export class GrowthService {
         .values({
           organizationId,
           unitId: input.unitId,
-          customerId: input.customerId ?? null,
+          customerId: customerId ?? null,
           zoneId,
           orderRef: input.orderRef,
           fulfillment: input.fulfillment,
@@ -3409,5 +4804,1426 @@ export class GrowthService {
         warning: "Pendente de validação pelo provedor; nenhuma conexão externa foi alegada.",
       };
     });
+  }
+
+  private async evolutionIntegration(organizationId: string, unitId: string) {
+    const [integration] = await this.database.db
+      .select()
+      .from(growthIntegrations)
+      .where(
+        and(
+          eq(growthIntegrations.organizationId, organizationId),
+          eq(growthIntegrations.unitId, unitId),
+          eq(growthIntegrations.provider, "evolution_go"),
+        ),
+      )
+      .limit(1);
+    if (!integration)
+      throw new NotFoundException({
+        code: "EVOLUTION_INTEGRATION_NOT_FOUND",
+        message: "Configure a Evolution Go para esta unidade.",
+      });
+    return integration;
+  }
+
+  private evolutionView(integration: typeof growthIntegrations.$inferSelect) {
+    return {
+      id: integration.id,
+      organizationId: integration.organizationId,
+      unitId: integration.unitId,
+      provider: integration.provider,
+      status: integration.status,
+      config: integration.config,
+      configured: Boolean(integration.credentialReference),
+      updatedAt: integration.updatedAt,
+    };
+  }
+
+  async getEvolutionIntegration(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    try {
+      return this.evolutionView(await this.evolutionIntegration(organizationId, unitId));
+    } catch (error) {
+      if (error instanceof NotFoundException)
+        return {
+          provider: "evolution_go",
+          unitId,
+          status: "disabled",
+          configured: false,
+          config: {},
+        };
+      throw error;
+    }
+  }
+
+  async configureEvolution(
+    identityId: string,
+    organizationId: string,
+    input: EvolutionConfigurationInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    if (process.env.WHATSAPP_PROVIDER_ENABLED !== "true")
+      throw new ServiceUnavailableException({
+        code: "EVOLUTION_PROVIDER_DISABLED",
+        message: "A Evolution Go está desabilitada no ambiente.",
+      });
+    const integration = await this.database.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(growthIntegrations)
+        .where(
+          and(
+            eq(growthIntegrations.organizationId, organizationId),
+            eq(growthIntegrations.unitId, input.unitId),
+            eq(growthIntegrations.provider, "evolution_go"),
+          ),
+        )
+        .limit(1);
+      const config = {
+        quietHoursStart: input.quietHoursStart,
+        quietHoursEnd: input.quietHoursEnd,
+        maxMessagesPer30Days: input.maxMessagesPer30Days,
+      };
+      const [row] = existing
+        ? await tx
+            .update(growthIntegrations)
+            .set({
+              status: input.enabled ? "connecting" : "disabled",
+              config,
+              updatedAt: new Date(),
+            })
+            .where(eq(growthIntegrations.id, existing.id))
+            .returning()
+        : await tx
+            .insert(growthIntegrations)
+            .values({
+              organizationId,
+              unitId: input.unitId,
+              provider: "evolution_go",
+              status: input.enabled ? "connecting" : "disabled",
+              config,
+            })
+            .returning();
+      if (!row) throw new Error("EVOLUTION_INTEGRATION_INSERT_FAILED");
+      const client = new EvolutionGoClient(row.id, input.unitId);
+      const [secured] = await tx
+        .update(growthIntegrations)
+        .set({ credentialReference: client.credentialReference, updatedAt: new Date() })
+        .where(eq(growthIntegrations.id, row.id))
+        .returning();
+      await this.audit(tx, {
+        organizationId,
+        unitId: input.unitId,
+        identityId,
+        action: "growth.integration.evolution_go.configured",
+        entityType: "growth_integration",
+        entityId: row.id,
+        metadata: { enabled: input.enabled },
+      });
+      if (!secured) throw new Error("EVOLUTION_INTEGRATION_SECURE_REFERENCE_FAILED");
+      return secured;
+    });
+    if (!input.enabled) return this.evolutionView(integration);
+    const client = new EvolutionGoClient(integration.id, input.unitId);
+    try {
+      try {
+        await client.status();
+      } catch (error) {
+        if (!(error instanceof EvolutionGoError) || error.code !== "EVOLUTION_HTTP_401")
+          throw error;
+        await client.create();
+      }
+      await client.connect();
+      const status = await client.status();
+      const [updated] = await this.database.db
+        .update(growthIntegrations)
+        .set({
+          status: status.state,
+          config: {
+            ...integration.config,
+            connectedNumber: status.connectedNumber,
+            lastStatusAt: new Date().toISOString(),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(growthIntegrations.id, integration.id))
+        .returning();
+      return this.evolutionView(updated ?? integration);
+    } catch (error) {
+      const code =
+        error instanceof EvolutionGoError ? error.code : "EVOLUTION_CONFIGURATION_FAILED";
+      await this.database.db
+        .update(growthIntegrations)
+        .set({
+          status: "error",
+          config: { ...integration.config, lastErrorCode: code },
+          updatedAt: new Date(),
+        })
+        .where(eq(growthIntegrations.id, integration.id));
+      throw new ServiceUnavailableException({
+        code,
+        message: "A Evolution Go não concluiu a configuração.",
+      });
+    }
+  }
+
+  async evolutionStatus(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    const integration = await this.evolutionIntegration(organizationId, unitId);
+    const client = new EvolutionGoClient(integration.id, unitId);
+    try {
+      const status = await client.status();
+      const [updated] = await this.database.db
+        .update(growthIntegrations)
+        .set({
+          status: status.state,
+          config: {
+            ...integration.config,
+            connectedNumber: status.connectedNumber,
+            lastStatusAt: new Date().toISOString(),
+            lastErrorCode: null,
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(growthIntegrations.id, integration.id))
+        .returning();
+      return { ...this.evolutionView(updated ?? integration), ...status };
+    } catch (error) {
+      const code = error instanceof EvolutionGoError ? error.code : "EVOLUTION_STATUS_FAILED";
+      await this.database.db
+        .update(growthIntegrations)
+        .set({
+          status: "error",
+          config: { ...integration.config, lastErrorCode: code },
+          updatedAt: new Date(),
+        })
+        .where(eq(growthIntegrations.id, integration.id));
+      throw new ServiceUnavailableException({
+        code,
+        message: "Não foi possível consultar a Evolution Go.",
+      });
+    }
+  }
+
+  async evolutionQr(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    const integration = await this.evolutionIntegration(organizationId, unitId);
+    try {
+      return await new EvolutionGoClient(integration.id, unitId).qr();
+    } catch (error) {
+      const code = error instanceof EvolutionGoError ? error.code : "EVOLUTION_QR_FAILED";
+      throw new ServiceUnavailableException({ code, message: "Não foi possível obter o QR Code." });
+    }
+  }
+
+  async evolutionConnectionAction(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    action: "reconnect" | "logout",
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, ["owner"]);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    const integration = await this.evolutionIntegration(organizationId, unitId);
+    const client = new EvolutionGoClient(integration.id, unitId);
+    try {
+      if (action === "logout") await client.logout();
+      else await client.reconnect();
+      const status =
+        action === "logout"
+          ? { state: "disconnected" as const, ready: false, connectedNumber: null }
+          : await client.status();
+      await this.database.db.transaction(async (tx) => {
+        await tx
+          .update(growthIntegrations)
+          .set({
+            status: status.state,
+            config: { ...integration.config, connectedNumber: status.connectedNumber },
+            updatedAt: new Date(),
+          })
+          .where(eq(growthIntegrations.id, integration.id));
+        await this.audit(tx, {
+          organizationId,
+          unitId,
+          identityId,
+          action: `growth.integration.evolution_go.${action}`,
+          entityType: "growth_integration",
+          entityId: integration.id,
+        });
+      });
+      return status;
+    } catch (error) {
+      const code = error instanceof EvolutionGoError ? error.code : "EVOLUTION_ACTION_FAILED";
+      throw new ServiceUnavailableException({
+        code,
+        message: "A Evolution Go não concluiu a ação.",
+      });
+    }
+  }
+
+  async listWhatsAppInbox(
+    identityId: string,
+    organizationId: string,
+    input: WhatsAppInboxQueryInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    const position = sql<Date>`coalesce(${whatsappConversations.lastMessageAt}, ${whatsappConversations.createdAt})`;
+    const cursor = input.cursorAt
+      ? or(
+          lt(position, input.cursorAt),
+          and(eq(position, input.cursorAt), lt(whatsappConversations.id, input.cursorId ?? "")),
+        )
+      : undefined;
+    const assigned =
+      input.assignedTo === "me"
+        ? eq(whatsappConversations.assignedIdentityId, identityId)
+        : input.assignedTo === "unassigned"
+          ? isNull(whatsappConversations.assignedIdentityId)
+          : undefined;
+    const pattern = input.search
+      ? `%${input.search.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`
+      : null;
+    const rows = await this.database.db
+      .select({
+        id: whatsappConversations.id,
+        customerId: whatsappConversations.customerId,
+        customerName: growthCustomers.name,
+        phone: whatsappConversations.phone,
+        assignedIdentityId: whatsappConversations.assignedIdentityId,
+        assignedIdentityName: identities.displayName,
+        status: whatsappConversations.status,
+        priority: whatsappConversations.priority,
+        unreadCount: whatsappConversations.unreadCount,
+        slaDueAt: whatsappConversations.slaDueAt,
+        firstResponseAt: whatsappConversations.firstResponseAt,
+        closedAt: whatsappConversations.closedAt,
+        lastMessageAt: whatsappConversations.lastMessageAt,
+        lastInboundAt: whatsappConversations.lastInboundAt,
+        lastOutboundAt: whatsappConversations.lastOutboundAt,
+        createdAt: whatsappConversations.createdAt,
+        updatedAt: whatsappConversations.updatedAt,
+      })
+      .from(whatsappConversations)
+      .leftJoin(
+        growthCustomers,
+        and(
+          eq(growthCustomers.organizationId, whatsappConversations.organizationId),
+          eq(growthCustomers.id, whatsappConversations.customerId),
+        ),
+      )
+      .leftJoin(identities, eq(identities.id, whatsappConversations.assignedIdentityId))
+      .where(
+        and(
+          eq(whatsappConversations.organizationId, organizationId),
+          eq(whatsappConversations.unitId, input.unitId),
+          input.status ? eq(whatsappConversations.status, input.status) : undefined,
+          input.priority ? eq(whatsappConversations.priority, input.priority) : undefined,
+          assigned,
+          pattern
+            ? or(ilike(growthCustomers.name, pattern), ilike(whatsappConversations.phone, pattern))
+            : undefined,
+          cursor,
+        ),
+      )
+      .orderBy(desc(position), desc(whatsappConversations.id))
+      .limit(input.limit + 1);
+    const hasMore = rows.length > input.limit;
+    const items = rows.slice(0, input.limit);
+    const tail = items.at(-1);
+    return {
+      items,
+      nextCursor:
+        hasMore && tail
+          ? { at: (tail.lastMessageAt ?? tail.createdAt).toISOString(), id: tail.id }
+          : null,
+    };
+  }
+
+  async listWhatsAppMessages(
+    identityId: string,
+    organizationId: string,
+    conversationId: string,
+    input: WhatsAppMessagesQueryInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [conversation] = await this.database.db
+      .select()
+      .from(whatsappConversations)
+      .where(
+        and(
+          eq(whatsappConversations.organizationId, organizationId),
+          eq(whatsappConversations.id, conversationId),
+        ),
+      )
+      .limit(1);
+    if (!conversation) throw new NotFoundException({ code: "WHATSAPP_CONVERSATION_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, conversation.unitId);
+    const cursor = input.beforeAt
+      ? or(
+          lt(whatsappMessages.occurredAt, input.beforeAt),
+          and(
+            eq(whatsappMessages.occurredAt, input.beforeAt),
+            lt(whatsappMessages.id, input.beforeId ?? ""),
+          ),
+        )
+      : undefined;
+    const rows = await this.database.db
+      .select()
+      .from(whatsappMessages)
+      .where(
+        and(
+          eq(whatsappMessages.organizationId, organizationId),
+          eq(whatsappMessages.unitId, conversation.unitId),
+          eq(whatsappMessages.conversationId, conversation.id),
+          cursor,
+        ),
+      )
+      .orderBy(desc(whatsappMessages.occurredAt), desc(whatsappMessages.id))
+      .limit(input.limit + 1);
+    const hasMore = rows.length > input.limit;
+    const page = rows.slice(0, input.limit);
+    const tail = page.at(-1);
+    return {
+      items: page.reverse(),
+      nextCursor: hasMore && tail ? { at: tail.occurredAt.toISOString(), id: tail.id } : null,
+    };
+  }
+
+  async listWhatsAppAssignees(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    return this.database.db
+      .selectDistinct({ id: identities.id, name: identities.displayName })
+      .from(identities)
+      .innerJoin(memberships, eq(memberships.identityId, identities.id))
+      .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+      .where(
+        and(
+          eq(memberships.organizationId, organizationId),
+          eq(memberships.status, "active"),
+          isNull(identities.disabledAt),
+          or(isNull(roleBindings.unitId), eq(roleBindings.unitId, unitId)),
+          inArray(roleBindings.role, [...MANAGERS]),
+        ),
+      )
+      .orderBy(asc(identities.displayName));
+  }
+
+  async updateWhatsAppConversation(
+    identityId: string,
+    organizationId: string,
+    conversationId: string,
+    input: WhatsAppConversationUpdateInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [current] = await this.database.db
+      .select()
+      .from(whatsappConversations)
+      .where(
+        and(
+          eq(whatsappConversations.organizationId, organizationId),
+          eq(whatsappConversations.id, conversationId),
+        ),
+      )
+      .limit(1);
+    if (!current) throw new NotFoundException({ code: "WHATSAPP_CONVERSATION_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, current.unitId);
+    if (input.assignedIdentityId) {
+      const assignees = await this.listWhatsAppAssignees(
+        identityId,
+        organizationId,
+        current.unitId,
+      );
+      if (!assignees.some((assignee) => assignee.id === input.assignedIdentityId))
+        throw new BadRequestException({ code: "WHATSAPP_ASSIGNEE_INVALID" });
+    }
+    const now = new Date();
+    return this.database.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(whatsappConversations)
+        .set({
+          status: input.status,
+          priority: input.priority,
+          assignedIdentityId: input.assignedIdentityId,
+          slaDueAt:
+            input.slaMinutes === undefined
+              ? undefined
+              : input.slaMinutes === null
+                ? null
+                : new Date(now.getTime() + input.slaMinutes * 60_000),
+          closedAt:
+            input.status === "closed" ? (current.closedAt ?? now) : input.status ? null : undefined,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(whatsappConversations.id, current.id),
+            eq(whatsappConversations.updatedAt, input.expectedUpdatedAt),
+          ),
+        )
+        .returning();
+      if (!updated) throw new ConflictException({ code: "WHATSAPP_CONVERSATION_STALE" });
+      await this.audit(tx, {
+        organizationId,
+        unitId: current.unitId,
+        identityId,
+        action: "growth.whatsapp_conversation.updated",
+        entityType: "growth_whatsapp_conversation",
+        entityId: current.id,
+        metadata: {
+          status: updated.status,
+          priority: updated.priority,
+          assignedIdentityId: updated.assignedIdentityId,
+        },
+      });
+      await this.outbox(
+        tx,
+        "growth.whatsapp_conversation_updated",
+        "growth_whatsapp_conversation",
+        current.id,
+        { organizationId, unitId: current.unitId, conversationId: current.id },
+      );
+      return updated;
+    });
+  }
+
+  async whatsAppMessageMedia(
+    identityId: string,
+    organizationId: string,
+    conversationId: string,
+    messageId: string,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [message] = await this.database.db
+      .select()
+      .from(whatsappMessages)
+      .where(
+        and(
+          eq(whatsappMessages.organizationId, organizationId),
+          eq(whatsappMessages.conversationId, conversationId),
+          eq(whatsappMessages.id, messageId),
+        ),
+      )
+      .limit(1);
+    if (!message?.mediaStorageKey || !message.mediaMimeType)
+      throw new NotFoundException({ code: "WHATSAPP_MEDIA_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, message.unitId);
+    const content = await readWhatsAppArtifact(
+      process.env.MEDIA_ROOT,
+      message.mediaStorageKey,
+    ).catch(() => null);
+    if (!content) throw new NotFoundException({ code: "WHATSAPP_MEDIA_NOT_FOUND" });
+    return {
+      fileName: message.mediaFileName ?? `midia-${message.id}`,
+      mimeType: message.mediaMimeType,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      sha256: message.mediaSha256,
+    };
+  }
+
+  async markWhatsAppConversationRead(
+    identityId: string,
+    organizationId: string,
+    conversationId: string,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [conversation] = await this.database.db
+      .select()
+      .from(whatsappConversations)
+      .where(
+        and(
+          eq(whatsappConversations.organizationId, organizationId),
+          eq(whatsappConversations.id, conversationId),
+        ),
+      )
+      .limit(1);
+    if (!conversation) throw new NotFoundException({ code: "WHATSAPP_CONVERSATION_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, conversation.unitId);
+    const [updated] = await this.database.db
+      .update(whatsappConversations)
+      .set({ unreadCount: 0, updatedAt: new Date() })
+      .where(eq(whatsappConversations.id, conversation.id))
+      .returning();
+    return updated;
+  }
+
+  async sendWhatsAppMessage(
+    identityId: string,
+    organizationId: string,
+    input: WhatsAppMessageInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    const integration = await this.evolutionIntegration(organizationId, input.unitId);
+    if (integration.status !== "ready")
+      throw new ServiceUnavailableException({
+        code: "EVOLUTION_NOT_LOGGED_IN",
+        message: "Leia o QR Code antes de enviar.",
+      });
+    const [existing] = await this.database.db
+      .select()
+      .from(whatsappMessages)
+      .where(
+        and(
+          eq(whatsappMessages.organizationId, organizationId),
+          eq(whatsappMessages.unitId, input.unitId),
+          eq(whatsappMessages.idempotencyKey, input.idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return { duplicate: true, message: existing };
+    const messageId = randomUUID();
+    const mediaContent = input.media ? Buffer.from(input.media.base64, "base64") : null;
+    let artifact: { storageKey: string; sha256: string; bytes: number } | undefined;
+    try {
+      if (input.media)
+        artifact = await writeWhatsAppArtifact({
+          root: process.env.MEDIA_ROOT,
+          organizationId,
+          unitId: input.unitId,
+          messageId,
+          mimeType: input.media.mimeType,
+          content: mediaContent ?? Buffer.alloc(0),
+        });
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "WHATSAPP_MEDIA_INVALID";
+      throw new BadRequestException({ code });
+    }
+    try {
+      const result = await this.database.db.transaction(async (tx) => {
+        let conversation = input.conversationId
+          ? (
+              await tx
+                .select()
+                .from(whatsappConversations)
+                .where(
+                  and(
+                    eq(whatsappConversations.organizationId, organizationId),
+                    eq(whatsappConversations.unitId, input.unitId),
+                    eq(whatsappConversations.id, input.conversationId),
+                  ),
+                )
+                .limit(1)
+            )[0]
+          : undefined;
+        let customer = input.customerId
+          ? (
+              await tx
+                .select()
+                .from(growthCustomers)
+                .where(
+                  and(
+                    eq(growthCustomers.organizationId, organizationId),
+                    eq(growthCustomers.id, input.customerId),
+                    isNull(growthCustomers.archivedAt),
+                  ),
+                )
+                .limit(1)
+            )[0]
+          : undefined;
+        if (conversation?.customerId && !customer)
+          customer = (
+            await tx
+              .select()
+              .from(growthCustomers)
+              .where(eq(growthCustomers.id, conversation.customerId))
+              .limit(1)
+          )[0];
+        let phone = conversation?.phone;
+        if (!phone) {
+          try {
+            phone = normalizeWhatsAppPhone(input.phone ?? customer?.phone ?? "");
+          } catch {
+            throw new BadRequestException({
+              code: "CUSTOMER_PHONE_INVALID",
+              message: "Informe o telefone com DDD.",
+            });
+          }
+        }
+        if (!conversation) {
+          [conversation] = await tx
+            .insert(whatsappConversations)
+            .values({ organizationId, unitId: input.unitId, customerId: customer?.id, phone })
+            .onConflictDoUpdate({
+              target: [
+                whatsappConversations.organizationId,
+                whatsappConversations.unitId,
+                whatsappConversations.phone,
+              ],
+              set: { customerId: customer?.id, status: "open", updatedAt: new Date() },
+            })
+            .returning();
+        }
+        if (!conversation) throw new Error("WHATSAPP_CONVERSATION_UPSERT_FAILED");
+        const [message] = await tx
+          .insert(whatsappMessages)
+          .values({
+            id: messageId,
+            organizationId,
+            unitId: input.unitId,
+            conversationId: conversation.id,
+            customerId: customer?.id ?? conversation.customerId,
+            direction: "outbound",
+            contentKind: input.media
+              ? input.media.mimeType.startsWith("image/")
+                ? "image"
+                : input.media.mimeType.startsWith("audio/")
+                  ? "audio"
+                  : input.media.mimeType.startsWith("video/")
+                    ? "video"
+                    : "document"
+              : "text",
+            body: input.body,
+            mediaStorageKey: artifact?.storageKey,
+            mediaMimeType: input.media?.mimeType,
+            mediaFileName: input.media?.fileName,
+            mediaSizeBytes: artifact?.bytes,
+            mediaSha256: artifact?.sha256,
+            status: "queued",
+            idempotencyKey: input.idempotencyKey,
+          })
+          .onConflictDoNothing()
+          .returning();
+        if (!message) {
+          const [duplicate] = await tx
+            .select()
+            .from(whatsappMessages)
+            .where(
+              and(
+                eq(whatsappMessages.organizationId, organizationId),
+                eq(whatsappMessages.unitId, input.unitId),
+                eq(whatsappMessages.idempotencyKey, input.idempotencyKey),
+              ),
+            )
+            .limit(1);
+          return { duplicate: true, message: duplicate };
+        }
+        await tx
+          .update(whatsappConversations)
+          .set({
+            assignedIdentityId: conversation.assignedIdentityId ?? identityId,
+            firstResponseAt:
+              conversation.lastInboundAt && !conversation.firstResponseAt
+                ? new Date()
+                : conversation.firstResponseAt,
+            lastMessageAt: new Date(),
+            lastOutboundAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(whatsappConversations.id, conversation.id));
+        await this.outbox(
+          tx,
+          "growth.whatsapp_message_requested",
+          "growth_whatsapp_message",
+          message.id,
+          {
+            organizationId,
+            unitId: input.unitId,
+            messageId: message.id,
+            integrationId: integration.id,
+          },
+        );
+        await this.audit(tx, {
+          organizationId,
+          unitId: input.unitId,
+          identityId,
+          action: "growth.whatsapp_message.queued",
+          entityType: "growth_whatsapp_message",
+          entityId: message.id,
+          metadata: { conversationId: conversation.id, contentKind: message.contentKind },
+        });
+        return { duplicate: false, message };
+      });
+      if (result.duplicate && artifact)
+        await deleteWhatsAppArtifact(process.env.MEDIA_ROOT, artifact.storageKey);
+      return result;
+    } catch (error) {
+      if (artifact) await deleteWhatsAppArtifact(process.env.MEDIA_ROOT, artifact.storageKey);
+      throw error;
+    }
+  }
+
+  async listCrmAutomations(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    return this.database.db
+      .select()
+      .from(crmAutomationRules)
+      .where(
+        and(
+          eq(crmAutomationRules.organizationId, organizationId),
+          eq(crmAutomationRules.unitId, unitId),
+        ),
+      )
+      .orderBy(asc(crmAutomationRules.trigger));
+  }
+
+  async upsertCrmAutomation(
+    identityId: string,
+    organizationId: string,
+    input: CrmAutomationRuleInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    const [rule] = await this.database.db
+      .insert(crmAutomationRules)
+      .values({ organizationId, ...input })
+      .onConflictDoUpdate({
+        target: [
+          crmAutomationRules.organizationId,
+          crmAutomationRules.unitId,
+          crmAutomationRules.trigger,
+        ],
+        set: {
+          enabled: input.enabled,
+          delayMinutes: input.delayMinutes,
+          inactiveDays: input.inactiveDays ?? null,
+          messageTemplate: input.messageTemplate,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    if (!rule) throw new Error("CRM_AUTOMATION_UPSERT_FAILED");
+    await this.database.db.insert(auditEvents).values({
+      organizationId,
+      unitId: input.unitId,
+      actorIdentityId: identityId,
+      action: "growth.crm_automation.configured",
+      entityType: "growth_crm_automation_rule",
+      entityId: rule.id,
+      metadata: { trigger: input.trigger, enabled: input.enabled },
+    });
+    return rule;
+  }
+
+  async listCrmAutomationExecutions(
+    identityId: string,
+    organizationId: string,
+    input: CrmAutomationExecutionQueryInput,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    const cursor = input.cursorAt
+      ? or(
+          lt(crmAutomationExecutions.createdAt, input.cursorAt),
+          and(
+            eq(crmAutomationExecutions.createdAt, input.cursorAt),
+            lt(crmAutomationExecutions.id, input.cursorId ?? ""),
+          ),
+        )
+      : undefined;
+    const [rows, counts] = await Promise.all([
+      this.database.db
+        .select({
+          id: crmAutomationExecutions.id,
+          trigger: crmAutomationRules.trigger,
+          customerId: crmAutomationExecutions.customerId,
+          customerName: growthCustomers.name,
+          messageId: crmAutomationExecutions.messageId,
+          status: crmAutomationExecutions.status,
+          reason: crmAutomationExecutions.reason,
+          scheduledFor: crmAutomationExecutions.scheduledFor,
+          executedAt: crmAutomationExecutions.executedAt,
+          retryCount: crmAutomationExecutions.retryCount,
+          lastRetryAt: crmAutomationExecutions.lastRetryAt,
+          createdAt: crmAutomationExecutions.createdAt,
+        })
+        .from(crmAutomationExecutions)
+        .innerJoin(
+          crmAutomationRules,
+          and(
+            eq(crmAutomationRules.organizationId, crmAutomationExecutions.organizationId),
+            eq(crmAutomationRules.unitId, crmAutomationExecutions.unitId),
+            eq(crmAutomationRules.id, crmAutomationExecutions.ruleId),
+          ),
+        )
+        .innerJoin(
+          growthCustomers,
+          and(
+            eq(growthCustomers.organizationId, crmAutomationExecutions.organizationId),
+            eq(growthCustomers.id, crmAutomationExecutions.customerId),
+          ),
+        )
+        .where(
+          and(
+            eq(crmAutomationExecutions.organizationId, organizationId),
+            eq(crmAutomationExecutions.unitId, input.unitId),
+            input.status ? eq(crmAutomationExecutions.status, input.status) : undefined,
+            cursor,
+          ),
+        )
+        .orderBy(desc(crmAutomationExecutions.createdAt), desc(crmAutomationExecutions.id))
+        .limit(input.limit + 1),
+      this.database.db
+        .select({ status: crmAutomationExecutions.status, total: count() })
+        .from(crmAutomationExecutions)
+        .where(
+          and(
+            eq(crmAutomationExecutions.organizationId, organizationId),
+            eq(crmAutomationExecutions.unitId, input.unitId),
+          ),
+        )
+        .groupBy(crmAutomationExecutions.status),
+    ]);
+    const hasMore = rows.length > input.limit;
+    const items = rows.slice(0, input.limit);
+    const tail = items.at(-1);
+    return {
+      items,
+      summary: Object.fromEntries(counts.map((row) => [row.status, Number(row.total)])),
+      nextCursor: hasMore && tail ? { at: tail.createdAt.toISOString(), id: tail.id } : null,
+    };
+  }
+
+  async retryCrmAutomationExecution(
+    identityId: string,
+    organizationId: string,
+    executionId: string,
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [execution] = await this.database.db
+      .select({
+        execution: crmAutomationExecutions,
+        rule: crmAutomationRules,
+        customer: growthCustomers,
+      })
+      .from(crmAutomationExecutions)
+      .innerJoin(crmAutomationRules, eq(crmAutomationRules.id, crmAutomationExecutions.ruleId))
+      .innerJoin(growthCustomers, eq(growthCustomers.id, crmAutomationExecutions.customerId))
+      .where(
+        and(
+          eq(crmAutomationExecutions.organizationId, organizationId),
+          eq(crmAutomationExecutions.id, executionId),
+        ),
+      )
+      .limit(1);
+    if (!execution) throw new NotFoundException({ code: "CRM_AUTOMATION_EXECUTION_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, execution.execution.unitId);
+    if (execution.execution.status !== "failed")
+      throw new ConflictException({ code: "CRM_AUTOMATION_EXECUTION_NOT_RETRYABLE" });
+    if (!execution.customer.whatsappMarketingOptIn || !execution.customer.phone)
+      throw new ConflictException({ code: "WHATSAPP_OPT_OUT_ACTIVE" });
+    const integration = await this.evolutionIntegration(organizationId, execution.execution.unitId);
+    if (integration.status !== "ready")
+      throw new ServiceUnavailableException({ code: "EVOLUTION_NOT_LOGGED_IN" });
+    const phone = normalizeWhatsAppPhone(execution.customer.phone);
+    return this.database.db.transaction(async (tx) => {
+      const [conversation] = await tx
+        .insert(whatsappConversations)
+        .values({
+          organizationId,
+          unitId: execution.execution.unitId,
+          customerId: execution.customer.id,
+          phone,
+        })
+        .onConflictDoUpdate({
+          target: [
+            whatsappConversations.organizationId,
+            whatsappConversations.unitId,
+            whatsappConversations.phone,
+          ],
+          set: { customerId: execution.customer.id, status: "open", updatedAt: new Date() },
+        })
+        .returning();
+      if (!conversation) throw new Error("WHATSAPP_CONVERSATION_UPSERT_FAILED");
+      const retryCount = execution.execution.retryCount + 1;
+      const [message] = await tx
+        .insert(whatsappMessages)
+        .values({
+          organizationId,
+          unitId: execution.execution.unitId,
+          conversationId: conversation.id,
+          customerId: execution.customer.id,
+          direction: "outbound",
+          body: execution.rule.messageTemplate.replaceAll("{nome}", execution.customer.name),
+          status: "queued",
+          idempotencyKey: `automation-retry:${execution.execution.id}:${retryCount}`,
+        })
+        .returning();
+      if (!message) throw new Error("WHATSAPP_AUTOMATION_RETRY_INSERT_FAILED");
+      const now = new Date();
+      await tx
+        .update(crmAutomationExecutions)
+        .set({
+          messageId: message.id,
+          status: "queued",
+          reason: null,
+          executedAt: null,
+          retryCount,
+          lastRetryAt: now,
+          updatedAt: now,
+        })
+        .where(eq(crmAutomationExecutions.id, execution.execution.id));
+      await this.outbox(
+        tx,
+        "growth.whatsapp_message_requested",
+        "growth_whatsapp_message",
+        message.id,
+        {
+          organizationId,
+          unitId: execution.execution.unitId,
+          messageId: message.id,
+          integrationId: integration.id,
+        },
+      );
+      await this.audit(tx, {
+        organizationId,
+        unitId: execution.execution.unitId,
+        identityId,
+        action: "growth.crm_automation.retried",
+        entityType: "growth_crm_automation_execution",
+        entityId: execution.execution.id,
+        metadata: { retryCount, messageId: message.id },
+      });
+      return { executionId: execution.execution.id, messageId: message.id, retryCount };
+    });
+  }
+
+  async testCrmAutomation(
+    identityId: string,
+    organizationId: string,
+    ruleId: string,
+    input: CrmAutomationTestInput,
+  ) {
+    const [rule] = await this.database.db
+      .select()
+      .from(crmAutomationRules)
+      .where(
+        and(
+          eq(crmAutomationRules.organizationId, organizationId),
+          eq(crmAutomationRules.unitId, input.unitId),
+          eq(crmAutomationRules.id, ruleId),
+        ),
+      )
+      .limit(1);
+    if (!rule) throw new NotFoundException({ code: "CRM_AUTOMATION_RULE_NOT_FOUND" });
+    return this.sendWhatsAppMessage(identityId, organizationId, {
+      unitId: input.unitId,
+      phone: input.phone,
+      body: `[TESTE] ${rule.messageTemplate.replaceAll("{nome}", "Cliente")}`,
+      idempotencyKey: `automation-test:${rule.id}:${randomUUID()}`,
+    });
+  }
+
+  async listCrmQuickReplies(identityId: string, organizationId: string, unitId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    return this.database.db
+      .select()
+      .from(crmQuickReplies)
+      .where(
+        and(eq(crmQuickReplies.organizationId, organizationId), eq(crmQuickReplies.unitId, unitId)),
+      )
+      .orderBy(desc(crmQuickReplies.active), asc(crmQuickReplies.title));
+  }
+
+  async upsertCrmQuickReply(identityId: string, organizationId: string, input: CrmQuickReplyInput) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    const [reply] = input.id
+      ? await this.database.db
+          .update(crmQuickReplies)
+          .set({
+            title: input.title,
+            body: input.body,
+            active: input.active,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(crmQuickReplies.organizationId, organizationId),
+              eq(crmQuickReplies.unitId, input.unitId),
+              eq(crmQuickReplies.id, input.id),
+            ),
+          )
+          .returning()
+      : await this.database.db
+          .insert(crmQuickReplies)
+          .values({ organizationId, createdByIdentityId: identityId, ...input })
+          .returning();
+    if (!reply) throw new NotFoundException({ code: "CRM_QUICK_REPLY_NOT_FOUND" });
+    await this.database.db.insert(auditEvents).values({
+      organizationId,
+      unitId: input.unitId,
+      actorIdentityId: identityId,
+      action: "growth.crm_quick_reply.saved",
+      entityType: "growth_crm_quick_reply",
+      entityId: reply.id,
+      metadata: { active: reply.active },
+    });
+    return reply;
+  }
+
+  async deleteCrmQuickReply(identityId: string, organizationId: string, replyId: string) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const [reply] = await this.database.db
+      .select()
+      .from(crmQuickReplies)
+      .where(
+        and(eq(crmQuickReplies.organizationId, organizationId), eq(crmQuickReplies.id, replyId)),
+      )
+      .limit(1);
+    if (!reply) return { deleted: true, duplicate: true };
+    await this.scope.requireUnitAccess(identityId, organizationId, reply.unitId);
+    await this.database.db.delete(crmQuickReplies).where(eq(crmQuickReplies.id, reply.id));
+    await this.database.db.insert(auditEvents).values({
+      organizationId,
+      unitId: reply.unitId,
+      actorIdentityId: identityId,
+      action: "growth.crm_quick_reply.deleted",
+      entityType: "growth_crm_quick_reply",
+      entityId: reply.id,
+    });
+    return { deleted: true, duplicate: false };
+  }
+
+  async handleEvolutionWebhook(input: EvolutionWebhookInput) {
+    if (process.env.WHATSAPP_PROVIDER_ENABLED !== "true")
+      throw new ServiceUnavailableException({ code: "EVOLUTION_PROVIDER_DISABLED" });
+    const credentialReference = evolutionCredentialReference(input.instanceToken);
+    const [integration] = await this.database.db
+      .select()
+      .from(growthIntegrations)
+      .where(
+        and(
+          eq(growthIntegrations.provider, "evolution_go"),
+          eq(growthIntegrations.credentialReference, credentialReference),
+        ),
+      )
+      .limit(1);
+    if (!integration?.unitId)
+      throw new UnauthorizedException({ code: "EVOLUTION_WEBHOOK_TOKEN_INVALID" });
+    const unitId = integration.unitId;
+    const data = input.data;
+    const event = input.event.toLowerCase();
+    if (event === "receipt") {
+      const ids = data.MessageIDs ?? data.messageIds;
+      const status = input.state?.toLowerCase();
+      if (!Array.isArray(ids) || !["delivered", "read"].includes(status ?? ""))
+        throw new BadRequestException({ code: "EVOLUTION_WEBHOOK_INVALID" });
+      let updated = 0;
+      for (const value of ids) {
+        if (typeof value !== "string" || !value) continue;
+        const [message] = await this.database.db
+          .select()
+          .from(whatsappMessages)
+          .where(
+            and(
+              eq(whatsappMessages.organizationId, integration.organizationId),
+              eq(whatsappMessages.unitId, integration.unitId),
+              eq(whatsappMessages.providerReference, value),
+            ),
+          )
+          .limit(1);
+        if (!message) continue;
+        const isRead = status === "read";
+        const now = new Date();
+        await this.database.db.transaction(async (tx) => {
+          await tx
+            .update(whatsappMessages)
+            .set({
+              status: isRead ? "read" : message.status === "read" ? "read" : "delivered",
+              deliveredAt: message.deliveredAt ?? now,
+              readAt: isRead ? (message.readAt ?? now) : message.readAt,
+              updatedAt: now,
+            })
+            .where(eq(whatsappMessages.id, message.id));
+          if (message.campaignDeliveryId)
+            await tx
+              .update(campaignDeliveries)
+              .set({
+                deliveredAt: message.deliveredAt ?? now,
+                readAt: isRead ? now : undefined,
+                updatedAt: now,
+              })
+              .where(eq(campaignDeliveries.id, message.campaignDeliveryId));
+          await this.outbox(
+            tx,
+            "growth.whatsapp_message_status_updated",
+            "growth_whatsapp_message",
+            message.id,
+            {
+              organizationId: integration.organizationId,
+              unitId,
+              conversationId: message.conversationId,
+              status: isRead ? "read" : "delivered",
+            },
+          );
+        });
+        updated += 1;
+      }
+      return { ok: true, updated };
+    }
+    if (event !== "message")
+      throw new BadRequestException({ code: "EVOLUTION_WEBHOOK_EVENT_UNSUPPORTED" });
+    const info =
+      data.Info && typeof data.Info === "object"
+        ? (data.Info as Record<string, unknown>)
+        : data.info && typeof data.info === "object"
+          ? (data.info as Record<string, unknown>)
+          : {};
+    const rawMessage =
+      data.Message && typeof data.Message === "object"
+        ? (data.Message as Record<string, unknown>)
+        : data.message && typeof data.message === "object"
+          ? (data.message as Record<string, unknown>)
+          : {};
+    const fromMe = Boolean(info.IsFromMe ?? info.isFromMe);
+    const jid = String(info[fromMe ? "Chat" : "Sender"] ?? info.sender ?? info.chat ?? "");
+    const providerReference = String(info.ID ?? info.id ?? "").trim();
+    if (!providerReference)
+      throw new BadRequestException({ code: "EVOLUTION_MESSAGE_ID_REQUIRED" });
+    let phone: string;
+    try {
+      phone = normalizeWhatsAppPhone(jid.split("@", 1)[0] ?? "");
+    } catch {
+      throw new BadRequestException({ code: "EVOLUTION_MESSAGE_PHONE_INVALID" });
+    }
+    const extended =
+      (rawMessage.extendedTextMessage ?? rawMessage.ExtendedTextMessage) &&
+      typeof (rawMessage.extendedTextMessage ?? rawMessage.ExtendedTextMessage) === "object"
+        ? ((rawMessage.extendedTextMessage ?? rawMessage.ExtendedTextMessage) as Record<
+            string,
+            unknown
+          >)
+        : {};
+    const rawImage = rawMessage.imageMessage ?? rawMessage.ImageMessage;
+    const image =
+      rawImage && typeof rawImage === "object" ? (rawImage as Record<string, unknown>) : null;
+    const rawAudio = rawMessage.audioMessage ?? rawMessage.AudioMessage;
+    const audio =
+      rawAudio && typeof rawAudio === "object" ? (rawAudio as Record<string, unknown>) : null;
+    const rawVideo = rawMessage.videoMessage ?? rawMessage.VideoMessage;
+    const video =
+      rawVideo && typeof rawVideo === "object" ? (rawVideo as Record<string, unknown>) : null;
+    const rawDocument = rawMessage.documentMessage ?? rawMessage.DocumentMessage;
+    const document =
+      rawDocument && typeof rawDocument === "object"
+        ? (rawDocument as Record<string, unknown>)
+        : null;
+    const body = String(
+      rawMessage.conversation ??
+        rawMessage.Conversation ??
+        extended.text ??
+        image?.caption ??
+        video?.caption ??
+        document?.caption ??
+        "",
+    ).slice(0, 4096);
+    const contentKind = audio
+      ? "audio"
+      : image
+        ? "image"
+        : video
+          ? "video"
+          : document
+            ? "document"
+            : "text";
+    if (contentKind === "text" && !body)
+      throw new BadRequestException({ code: "EVOLUTION_MESSAGE_BODY_REQUIRED" });
+    const rawMedia = audio ?? image ?? video ?? document;
+    const messageId = randomUUID();
+    let mediaArtifact: { storageKey: string; sha256: string; bytes: number } | undefined;
+    let mediaMimeType: string | undefined;
+    let mediaFileName: string | undefined;
+    let mediaErrorCode: string | undefined;
+    if (rawMedia) {
+      try {
+        const encoded = await new EvolutionGoClient(integration.id, unitId).downloadMedia(
+          rawMessage,
+        );
+        const match = encoded.match(/^data:([^;,]+);base64,(.+)$/s);
+        mediaMimeType = String(rawMedia.mimetype ?? rawMedia.mimeType ?? match?.[1] ?? "");
+        mediaFileName = String(
+          rawMedia.fileName ?? rawMedia.filename ?? `midia-${providerReference}`,
+        ).slice(0, 180);
+        mediaArtifact = await writeWhatsAppArtifact({
+          root: process.env.MEDIA_ROOT,
+          organizationId: integration.organizationId,
+          unitId,
+          messageId,
+          mimeType: mediaMimeType,
+          content: Buffer.from(match?.[2] ?? encoded, "base64"),
+        });
+      } catch (error) {
+        mediaErrorCode =
+          error instanceof EvolutionGoError
+            ? error.code
+            : error instanceof Error
+              ? error.message.slice(0, 80)
+              : "WHATSAPP_MEDIA_DOWNLOAD_FAILED";
+      }
+    }
+    const rawTimestamp = info.Timestamp ?? info.timestamp;
+    const occurredAt =
+      typeof rawTimestamp === "number"
+        ? new Date(rawTimestamp * 1000)
+        : new Date(typeof rawTimestamp === "string" ? rawTimestamp : Date.now());
+    try {
+      return await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`evolution:${integration.id}:${providerReference}`}))`,
+        );
+        const [existing] = await tx
+          .select({ id: whatsappMessages.id })
+          .from(whatsappMessages)
+          .where(
+            and(
+              eq(whatsappMessages.organizationId, integration.organizationId),
+              eq(whatsappMessages.unitId, unitId),
+              eq(whatsappMessages.providerReference, providerReference),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          if (mediaArtifact)
+            await deleteWhatsAppArtifact(process.env.MEDIA_ROOT, mediaArtifact.storageKey);
+          return { ok: true, duplicate: true, messageId: existing.id };
+        }
+        const localPhone = phone.startsWith("55") ? phone.slice(2) : phone;
+        const [customer] = await tx
+          .select()
+          .from(growthCustomers)
+          .where(
+            and(
+              eq(growthCustomers.organizationId, integration.organizationId),
+              isNull(growthCustomers.archivedAt),
+              sql`regexp_replace(coalesce(${growthCustomers.phone}, ''), '[^0-9]', '', 'g') in (${phone}, ${localPhone})`,
+            ),
+          )
+          .limit(1);
+        const [conversation] = await tx
+          .insert(whatsappConversations)
+          .values({
+            organizationId: integration.organizationId,
+            unitId,
+            customerId: customer?.id,
+            phone,
+          })
+          .onConflictDoUpdate({
+            target: [
+              whatsappConversations.organizationId,
+              whatsappConversations.unitId,
+              whatsappConversations.phone,
+            ],
+            set: {
+              customerId: customer?.id,
+              status: fromMe ? undefined : "open",
+              slaDueAt: fromMe ? undefined : new Date(Date.now() + 15 * 60_000),
+              firstResponseAt: fromMe ? new Date() : null,
+              closedAt: fromMe ? undefined : null,
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+        if (!conversation) throw new Error("WHATSAPP_CONVERSATION_UPSERT_FAILED");
+        const [message] = await tx
+          .insert(whatsappMessages)
+          .values({
+            id: messageId,
+            organizationId: integration.organizationId,
+            unitId,
+            conversationId: conversation.id,
+            customerId: customer?.id,
+            direction: fromMe ? "outbound" : "inbound",
+            contentKind,
+            body,
+            mediaStorageKey: mediaArtifact?.storageKey,
+            mediaMimeType,
+            mediaFileName,
+            mediaSizeBytes: mediaArtifact?.bytes,
+            mediaSha256: mediaArtifact?.sha256,
+            mediaErrorCode,
+            status: fromMe ? "sent" : "received",
+            providerReference,
+            idempotencyKey: `provider:${providerReference}`,
+            occurredAt: Number.isNaN(occurredAt.valueOf()) ? new Date() : occurredAt,
+            sentAt: fromMe ? new Date() : null,
+          })
+          .returning();
+        if (!message) throw new Error("WHATSAPP_MESSAGE_INSERT_FAILED");
+        const now = new Date();
+        await tx
+          .update(whatsappConversations)
+          .set({
+            unreadCount: fromMe
+              ? conversation.unreadCount
+              : sql`${whatsappConversations.unreadCount} + 1`,
+            lastMessageAt: message.occurredAt,
+            lastInboundAt: fromMe ? conversation.lastInboundAt : message.occurredAt,
+            lastOutboundAt: fromMe ? message.occurredAt : conversation.lastOutboundAt,
+            slaDueAt: fromMe ? conversation.slaDueAt : new Date(Date.now() + 15 * 60_000),
+            firstResponseAt: fromMe ? (conversation.firstResponseAt ?? now) : null,
+            updatedAt: now,
+          })
+          .where(eq(whatsappConversations.id, conversation.id));
+        if (!fromMe && customer) {
+          if (isWhatsAppOptOut(body)) {
+            await tx
+              .update(growthCustomers)
+              .set({
+                whatsappMarketingOptIn: false,
+                marketingOptIn: customer.emailMarketingOptIn,
+                updatedAt: now,
+              })
+              .where(eq(growthCustomers.id, customer.id));
+            await tx.insert(customerConsents).values({
+              organizationId: integration.organizationId,
+              customerId: customer.id,
+              purpose: "marketing",
+              decision: "withdrawn",
+              channel: "whatsapp",
+              source: "whatsapp_keyword",
+              legalBasis: "consent",
+              policyVersion: "whatsapp-opt-out-v1",
+            });
+          }
+          const [delivery] = await tx.execute<{ id: string }>(sql`
+          select deliveries.id
+          from growth_campaign_deliveries deliveries
+          inner join growth_marketing_campaigns campaigns
+            on campaigns.organization_id = deliveries.organization_id
+           and campaigns.id = deliveries.campaign_id
+          where deliveries.organization_id = ${integration.organizationId}
+            and deliveries.customer_id = ${customer.id}
+            and deliveries.sent_at is not null
+            and deliveries.sent_at + (campaigns.attribution_window_days * interval '1 day') >= now()
+          order by deliveries.sent_at desc
+          limit 1
+        `);
+          if (delivery)
+            await tx
+              .update(campaignDeliveries)
+              .set({ repliedAt: now, updatedAt: now })
+              .where(eq(campaignDeliveries.id, delivery.id));
+        }
+        await this.outbox(
+          tx,
+          fromMe ? "growth.whatsapp_message_sent" : "growth.whatsapp_message_received",
+          "growth_whatsapp_message",
+          message.id,
+          {
+            organizationId: integration.organizationId,
+            unitId,
+            conversationId: conversation.id,
+            messageId: message.id,
+            contentKind,
+          },
+        );
+        return { ok: true, duplicate: false, messageId: message.id };
+      });
+    } catch (error) {
+      if (mediaArtifact)
+        await deleteWhatsAppArtifact(process.env.MEDIA_ROOT, mediaArtifact.storageKey).catch(
+          () => undefined,
+        );
+      throw error;
+    }
   }
 }

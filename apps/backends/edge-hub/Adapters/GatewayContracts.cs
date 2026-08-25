@@ -69,10 +69,12 @@ public interface IFiscalGateway
 public sealed record PrintRequest(
     string IdempotencyKey,
     string? PrinterId,
-    string Station,
+    string? Station,
     string DocumentType,
     JsonElement Payload,
-    int Copies = 1);
+    int Copies = 1,
+    string? StationId = null,
+    string? StationName = null);
 
 public sealed record PrintResult(
     bool Success,
@@ -88,7 +90,8 @@ public sealed record PrinterStatus(
     bool Available,
     bool IsDefault,
     int PaperWidthMm,
-    string? ErrorCode = null);
+    string? ErrorCode = null,
+    bool SupportsRasterGraphics = false);
 
 public interface IPrinterGateway
 {

@@ -15,12 +15,15 @@ import {
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import {
+  type Customer,
   dateTime,
   type GrowthScope,
   mutationKey,
+  parseCustomerPage,
   parseReservations,
   parseWaitlist,
   RemoteGate,
+  type RemoteState,
   useRemote,
 } from "../../growth.shared";
 import { parsePilotFloor } from "../../operations.shared";
@@ -28,6 +31,7 @@ import "./reservations.css";
 
 type SeatTarget = {
   id: string;
+  customerId: string | null;
   kind: "reservation" | "waitlist";
   guestName: string;
   guestPhone: string | null;
@@ -52,6 +56,110 @@ function elapsedMinutes(value: string) {
 function matchesArrival(query: string, name: string, phone: string | null) {
   const normalized = query.trim().toLocaleLowerCase("pt-BR");
   return !normalized || `${name} ${phone ?? ""}`.toLocaleLowerCase("pt-BR").includes(normalized);
+}
+
+function normalizeCustomerSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+export function matchingCustomers(customers: Customer[], query: string) {
+  const normalized = normalizeCustomerSearch(query.trim());
+  if (normalized.length < 2) return [];
+  const digits = query.replace(/\D/g, "");
+  return customers
+    .filter((customer) => {
+      const identity = normalizeCustomerSearch(
+        `${customer.name} ${customer.email ?? ""} ${customer.phone ?? ""}`,
+      );
+      return (
+        identity.includes(normalized) ||
+        (digits.length >= 2 && (customer.phone ?? "").replace(/\D/g, "").includes(digits))
+      );
+    })
+    .slice(0, 6);
+}
+
+function CustomerLookup({
+  id,
+  query,
+  onQueryChange,
+  onSelect,
+  onUseGuest,
+  selectedCustomer,
+  state,
+  retry,
+}: {
+  id: string;
+  query: string;
+  onQueryChange: (value: string) => void;
+  onSelect: (customer: Customer) => void;
+  onUseGuest: () => void;
+  selectedCustomer: Customer | null;
+  state: RemoteState<Customer[]>;
+  retry: () => void;
+}) {
+  const matches = state.status === "ready" ? matchingCustomers(state.data, query) : [];
+  return (
+    <div className="action-form__wide customer-lookup">
+      {selectedCustomer ? (
+        <div className="customer-selection" role="status">
+          <span>
+            <strong className="customer-selection__name">{selectedCustomer.name}</strong>
+            <small>
+              Cadastro vinculado. Nome e telefone abaixo serão salvos como snapshot desta visita.
+            </small>
+          </span>
+          <Button onClick={onUseGuest} size="sm" type="button" variant="ghost">
+            Usar convidado avulso
+          </Button>
+        </div>
+      ) : (
+        <>
+          <label htmlFor={id}>Buscar cliente cadastrado (opcional)</label>
+          <SearchField
+            aria-describedby={`${id}-status`}
+            id={id}
+            onChange={(event) => onQueryChange(event.target.value)}
+            placeholder="Nome, telefone ou e-mail"
+            value={query}
+          />
+          <div aria-live="polite" id={`${id}-status`}>
+            {state.status === "loading" && <small>Carregando cadastros…</small>}
+            {state.status === "error" && (
+              <div className="customer-lookup__status" role="alert">
+                <small>Busca indisponível. Continue como convidado avulso.</small>
+                <Button onClick={retry} size="sm" type="button" variant="ghost">
+                  Tentar novamente
+                </Button>
+              </div>
+            )}
+            {state.status === "ready" && query.trim().length >= 2 && matches.length === 0 && (
+              <small>Nenhum cadastro encontrado. Preencha os dados do convidado abaixo.</small>
+            )}
+          </div>
+          {matches.length > 0 && (
+            <ul aria-label="Clientes encontrados" className="customer-search-results">
+              {matches.map((customer) => (
+                <li key={customer.id}>
+                  <button
+                    className="customer-search-option"
+                    onClick={() => onSelect(customer)}
+                    type="button"
+                  >
+                    <strong>{customer.name}</strong>
+                    <small>{customer.phone ?? customer.email ?? "Sem contato cadastrado"}</small>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 export function suggestedWait(data: ReturnType<typeof parsePilotFloor>, partySize: number) {
@@ -155,6 +263,9 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   );
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [debouncedCustomerQuery, setDebouncedCustomerQuery] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [partySize, setPartySize] = useState(2);
@@ -171,12 +282,38 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   const reservationNameRef = useRef<HTMLInputElement>(null);
   const waitlistComposerRef = useRef<HTMLDetailsElement>(null);
   const waitlistNameRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedCustomerQuery(customerQuery.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [customerQuery]);
+  const customers = useRemote(
+    scope,
+    () =>
+      api.growth.customerPage(scope.organizationId, {
+        q: debouncedCustomerQuery || undefined,
+        limit: 20,
+      }),
+    parseCustomerPage,
+    debouncedCustomerQuery,
+  );
   const waitSuggestion =
     floor.state.status === "ready" ? suggestedWait(floor.state.data, partySize) : null;
   const capacity =
     floor.state.status === "ready" && reservations.state.status === "ready" && scheduledAt
       ? reservationCapacity(floor.state.data, reservations.state.data, scheduledAt, partySize)
       : null;
+
+  function selectCustomer(customer: Customer) {
+    setSelectedCustomer(customer);
+    setCustomerQuery("");
+    setGuestName(customer.name);
+    setGuestPhone(customer.phone ?? "");
+  }
+
+  function useGuestSnapshot() {
+    setSelectedCustomer(null);
+    setCustomerQuery("");
+  }
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -226,6 +363,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
     try {
       await api.growth.createReservation(scope.organizationId, {
         unitId: scope.unitId,
+        ...(selectedCustomer ? { customerId: selectedCustomer.id } : {}),
         guestName: guestName.trim(),
         guestPhone: guestPhone.trim() || undefined,
         partySize,
@@ -237,6 +375,8 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       setFeedback("Reserva adicionada à agenda.");
       setGuestName("");
       setGuestPhone("");
+      setSelectedCustomer(null);
+      setCustomerQuery("");
       setReservationNotes("");
       reservations.retry();
     } catch (error) {
@@ -253,6 +393,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
     try {
       await api.growth.createWaitlistEntry(scope.organizationId, {
         unitId: scope.unitId,
+        ...(selectedCustomer ? { customerId: selectedCustomer.id } : {}),
         guestName: guestName.trim(),
         guestPhone: guestPhone.trim() || undefined,
         partySize,
@@ -262,6 +403,8 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       setFeedback("Cliente adicionado à lista de espera.");
       setGuestName("");
       setGuestPhone("");
+      setSelectedCustomer(null);
+      setCustomerQuery("");
       waitlist.retry();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Não foi possível atualizar a fila.");
@@ -287,6 +430,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
           tableId: selectedTableId,
           guestCount: seatTarget.partySize,
           fulfillmentType: "dine_in",
+          ...(seatTarget.customerId ? { customerId: seatTarget.customerId } : {}),
           customerName: seatTarget.guestName,
           customerPhone: seatTarget.guestPhone ?? undefined,
           ...(seatTarget.kind === "reservation"
@@ -394,6 +538,16 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             <Icon name="plus" size={18} />
           </summary>
           <form className="action-form" onSubmit={(event) => void createReservation(event)}>
+            <CustomerLookup
+              id="reservation-customer-search"
+              onQueryChange={setCustomerQuery}
+              onSelect={selectCustomer}
+              onUseGuest={useGuestSnapshot}
+              query={customerQuery}
+              retry={customers.retry}
+              selectedCustomer={selectedCustomer}
+              state={customers.state}
+            />
             <label>
               Nome
               <Input
@@ -474,6 +628,16 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             <Icon name="plus" size={18} />
           </summary>
           <form className="action-form" onSubmit={(event) => void createWaitlistEntry(event)}>
+            <CustomerLookup
+              id="waitlist-customer-search"
+              onQueryChange={setCustomerQuery}
+              onSelect={selectCustomer}
+              onUseGuest={useGuestSnapshot}
+              query={customerQuery}
+              retry={customers.retry}
+              selectedCustomer={selectedCustomer}
+              state={customers.state}
+            />
             <label>
               Nome
               <Input
@@ -627,6 +791,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                               onClick={() =>
                                 prepareSeat({
                                   id: row.id,
+                                  customerId: row.customerId,
                                   kind: "reservation",
                                   guestName: row.guestName,
                                   guestPhone: row.guestPhone,
@@ -825,6 +990,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                               onClick={() =>
                                 prepareSeat({
                                   id: row.id,
+                                  customerId: row.customerId,
                                   kind: "waitlist",
                                   guestName: row.guestName,
                                   guestPhone: row.guestPhone,

@@ -41,6 +41,7 @@ export const profiles: Profile[] = [
     "reservations.manage",
     "growth.manage",
     "multiunit.view",
+    "billing.manage",
     "settings.manage",
   ]),
   profile("manager", "Gerente", "Turno, equipe, aprovações e exceções", [
@@ -70,6 +71,7 @@ export const profiles: Profile[] = [
     "reservations.manage",
   ]),
   profile("cashier", "Caixa", "Recebimentos, turnos e fechamento", [
+    "salon.operate",
     "counter.operate",
     "catalog.manage",
     "cash.operate",

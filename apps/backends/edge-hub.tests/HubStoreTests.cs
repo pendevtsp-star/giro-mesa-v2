@@ -44,7 +44,15 @@ public sealed class HubStoreTests : IAsyncLifetime
         var store = CreateStore();
         await store.InitializeAsync();
         var payload = JsonDocument.Parse("{\"tab\":{}}").RootElement.Clone();
-        var request = new PrintRequest("job-1:1", null, "counter", "partial_statement", payload);
+        var stationId = Guid.NewGuid().ToString();
+        var request = new PrintRequest(
+            "job-1:1",
+            null,
+            "counter",
+            "partial_statement",
+            payload,
+            StationId: stationId,
+            StationName: "Caixa principal");
 
         var first = await store.CreateOrGetPrintJobAsync(request, "hash-a");
         var replay = await store.CreateOrGetPrintJobAsync(request, "hash-a");
@@ -52,8 +60,35 @@ public sealed class HubStoreTests : IAsyncLifetime
         Assert.True(first.Inserted);
         Assert.False(replay.Inserted);
         Assert.Equal("printing", replay.Job.Status);
+        Assert.Equal(stationId, replay.Job.StationId);
+        Assert.Equal("Caixa principal", replay.Job.StationName);
+        Assert.Equal("partial_statement", replay.Job.DocumentType);
+        Assert.Single(await store.ListPrintJobsAsync("printing", 10));
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             store.CreateOrGetPrintJobAsync(request, "hash-b"));
+    }
+
+    [Fact]
+    public async Task RequiresManualConfirmationForAnInterruptedPrintAttemptAfterRestart()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var payload = JsonDocument.Parse("{\"tab\":{}}").RootElement.Clone();
+        var request = new PrintRequest("job-unknown:1", null, "counter", "partial_statement", payload);
+        var created = await store.CreateOrGetPrintJobAsync(request, "hash-unknown");
+
+        SqliteConnection.ClearAllPools();
+        var restarted = CreateStore();
+        await restarted.InitializeAsync();
+        var recovered = await restarted.GetPrintJobAsync(created.Job.Id);
+        var replay = await restarted.CreateOrGetPrintJobAsync(request, "hash-unknown");
+
+        Assert.NotNull(recovered);
+        Assert.Equal("confirmation_required", recovered.Status);
+        Assert.Equal("PRINTER_RESULT_UNKNOWN", recovered.ErrorCode);
+        Assert.NotNull(recovered.CompletedAt);
+        Assert.False(replay.Inserted);
+        Assert.Equal("confirmation_required", replay.Job.Status);
     }
 
     [Fact]

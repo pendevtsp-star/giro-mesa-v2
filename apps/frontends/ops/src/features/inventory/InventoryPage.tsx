@@ -4,6 +4,7 @@ import { api } from "../../api";
 import {
   type InterunitTransfer,
   type InventoryAsset,
+  type InventoryData,
   type InventoryItem,
   type InventoryReservation,
   type InventoryReviewRequest,
@@ -15,12 +16,14 @@ import {
   parseRecipeCatalog,
   parseReturnables,
   RemoteGate,
+  type ReturnablesData,
   records,
   requiredString,
   type StockLocation,
   useRemote,
 } from "../../management.shared";
 import { type RealtimeStatus, subscribeScopeRealtime } from "../../realtime";
+import { InventoryControls } from "./InventoryControls";
 import {
   AssetModal,
   BarcodeScanModal,
@@ -47,11 +50,28 @@ import {
   TransferResolutionModal,
 } from "./InventoryModals";
 import { type InventoryDialog, type InventoryView, InventoryWorkspace } from "./InventoryWorkspace";
+import {
+  enqueueInventoryAction,
+  type InventoryOfflineInput,
+  replayInventoryQueue,
+} from "./inventory-offline";
 import { RecipeManager } from "./RecipeManager";
+import { ReturnablesWorkspace } from "./ReturnablesWorkspace";
 
 interface Feedback {
   message: string;
   tone: "success" | "danger";
+}
+
+function mergeReturnables(inventory: InventoryData, returnables: ReturnablesData | null) {
+  if (!returnables) return inventory;
+  const { closings, pendingActions, ...returnableState } = returnables;
+  return {
+    ...inventory,
+    ...returnableState,
+    returnableClosings: closings,
+    returnablePendingActions: pendingActions,
+  } satisfies InventoryData;
 }
 
 export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
@@ -105,6 +125,17 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
     [organizationId, remote.retry, returnables.retry, unitId],
   );
 
+  useEffect(() => {
+    const replay = async () => {
+      if (!navigator.onLine) return;
+      const result = await replayInventoryQueue({ organizationId, unitId });
+      if (result.pending === 0) await remote.retry();
+    };
+    void replay();
+    window.addEventListener("online", replay);
+    return () => window.removeEventListener("online", replay);
+  }, [organizationId, remote.retry, unitId]);
+
   function closeDialog() {
     if (busy) return;
     setDialog(null);
@@ -150,27 +181,19 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
     }
   }
 
+  function queueOffline(action: InventoryOfflineInput, success: string) {
+    enqueueInventoryAction(scope, action);
+    setFeedback({ message: success, tone: "success" });
+    setDialog(null);
+    return true;
+  }
+
   return (
     <>
       <RemoteGate remote={remote}>
         {(data) => (
           <>
             <InventoryWorkspace
-              canConfirmReturnables={
-                (returnables.state.status === "ready"
-                  ? returnables.state.data.capabilities?.canConfirmReturnables
-                  : undefined) ?? ["owner", "manager", "inventory"].includes(scope.profileId)
-              }
-              canRecordReturnableIncident={
-                (returnables.state.status === "ready"
-                  ? returnables.state.data.capabilities?.canRecordReturnableIncident
-                  : undefined) ?? ["owner", "manager", "inventory"].includes(scope.profileId)
-              }
-              canApproveReturnableIncident={
-                (returnables.state.status === "ready"
-                  ? returnables.state.data.capabilities?.canApproveReturnableIncident
-                  : undefined) ?? ["owner", "manager"].includes(scope.profileId)
-              }
               canApproveInventoryRisk={
                 data.capabilities?.canApproveInventoryRisk ??
                 ["owner", "manager"].includes(scope.profileId)
@@ -178,10 +201,36 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               canResolveTransfers={data.capabilities?.canResolveTransfers ?? true}
               canManageAssets={data.capabilities?.canManageAssets ?? true}
               currentUnitId={scope.unitId}
-              data={{
-                ...data,
-                ...(returnables.state.status === "ready" ? returnables.state.data : {}),
-              }}
+              data={mergeReturnables(
+                data,
+                returnables.state.status === "ready" ? returnables.state.data : null,
+              )}
+              controls={<InventoryControls inventory={data} scope={scope} />}
+              returnablesPanel={
+                <ReturnablesWorkspace
+                  inventory={data}
+                  onEditItem={(item) => {
+                    setSelectedItem(item);
+                    setDialog("item");
+                  }}
+                  onOpenIncident={() => setDialog("returnable-incident")}
+                  onOpenSupplierExchange={() => setDialog("returnable-supplier-exchange")}
+                  onResolveSupplierExchange={(exchangeId) => {
+                    setSelectedSupplierExchangeId(exchangeId);
+                    setDialog("returnable-supplier-resolution");
+                  }}
+                  onRetry={returnables.retry}
+                  onReviewIncident={(incidentId) => {
+                    setSelectedIncidentId(incidentId);
+                    setDialog("returnable-review");
+                  }}
+                  refreshError={returnables.refreshError}
+                  scope={scope}
+                  stale={returnables.stale}
+                  state={returnables.state}
+                  updating={returnables.updating}
+                />
+              }
               onArchiveItem={(item) => {
                 if (!window.confirm(`Inativar ${item.name}? O saldo deve estar zerado.`)) return;
                 void run(
@@ -365,29 +414,51 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                         operationalKey("inventory-item"),
                       );
                     }
+                    const nextProductId =
+                      itemBody.kind === "resale" && typeof itemBody.productId === "string"
+                        ? itemBody.productId
+                        : null;
+                    const previousProductId = selectedItem?.productId ?? null;
+                    const nextContainerId =
+                      typeof returnableContainerItemId === "string"
+                        ? returnableContainerItemId
+                        : "";
+                    const previousContainerId = selectedItem?.returnableContainerItemId ?? "";
                     if (
-                      itemBody.kind === "resale" &&
-                      typeof itemBody.productId === "string" &&
-                      typeof returnableContainerItemId === "string" &&
-                      returnableContainerItemId
+                      previousProductId &&
+                      previousContainerId &&
+                      previousProductId !== nextProductId
                     ) {
                       await api.management.configureReturnable(
                         scope.organizationId,
                         scope.unitId,
                         {
-                          productId: itemBody.productId,
-                          containerInventoryItemId: returnableContainerItemId,
+                          productId: previousProductId,
+                          containerInventoryItemId: previousContainerId,
+                          quantityPerUnit: "1",
+                          depositCents: 0,
+                          active: false,
+                        },
+                        operationalKey("returnable-configuration-disable"),
+                      );
+                    }
+                    if (nextProductId && (nextContainerId || previousContainerId))
+                      await api.management.configureReturnable(
+                        scope.organizationId,
+                        scope.unitId,
+                        {
+                          productId: nextProductId,
+                          containerInventoryItemId: nextContainerId || previousContainerId,
                           quantityPerUnit:
                             typeof returnableQuantityPerUnit === "string"
                               ? returnableQuantityPerUnit
                               : "1",
                           depositCents:
                             typeof returnableDepositCents === "number" ? returnableDepositCents : 0,
-                          active: true,
+                          active: Boolean(nextContainerId),
                         },
                         operationalKey("returnable-configuration"),
                       );
-                    }
                   },
                   selectedItem ? "Item atualizado." : "Item cadastrado.",
                 )
@@ -409,33 +480,44 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               lots={data.lots}
               onClose={closeDialog}
               onSubmit={(body) =>
-                run(
-                  () =>
-                    api.management.createInventoryEvent(
-                      scope.organizationId,
-                      scope.unitId,
-                      {
-                        type: body.type,
-                        reason: body.reason,
-                        lines: body.lines.map(
-                          ({ inventoryItemId, locationId, lotId, quantity }) => ({
-                            inventoryItemId,
-                            locationId,
-                            lotId,
-                            quantity,
-                          }),
+                (() => {
+                  const eventBody = {
+                    type: body.type,
+                    reason: body.reason,
+                    lines: body.lines.map(({ inventoryItemId, locationId, lotId, quantity }) => ({
+                      inventoryItemId,
+                      locationId,
+                      lotId,
+                      quantity,
+                    })),
+                  };
+                  const key = operationalKey("inventory-event");
+                  const saved = !navigator.onLine
+                    ? Promise.resolve(
+                        queueOffline(
+                          { kind: "event", body: eventBody, idempotencyKey: key },
+                          `${body.lines.length} item(ns) guardado(s) para sincronização.`,
                         ),
-                      },
-                      operationalKey("inventory-event"),
-                    ),
-                  `${body.lines.length} item(ns) registrado(s); divergências relevantes aguardam aprovação.`,
-                ).then((saved) => {
-                  if (saved) {
-                    localStorage.removeItem(
-                      `giromesa:inventory-count:${scope.organizationId}:${scope.unitId}`,
-                    );
-                  }
-                })
+                      )
+                    : run(
+                        () =>
+                          api.management.createInventoryEvent(
+                            scope.organizationId,
+                            scope.unitId,
+                            eventBody,
+                            key,
+                          ),
+                        `${body.lines.length} item(ns) registrado(s); divergências relevantes aguardam aprovação.`,
+                      );
+                  return saved.then((completed) => {
+                    if (completed) {
+                      localStorage.removeItem(
+                        `giromesa:inventory-count:${scope.organizationId}:${scope.unitId}`,
+                      );
+                    }
+                    return completed;
+                  });
+                })()
               }
               open={dialog === "event"}
             />
@@ -446,16 +528,27 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               lots={data.lots}
               onClose={closeDialog}
               onSubmit={(body) =>
-                run(
-                  () =>
-                    api.management.transferInventoryBatch(
-                      scope.organizationId,
-                      scope.unitId,
-                      body,
-                      operationalKey("inventory-transfer-batch"),
-                    ),
-                  "Transferência enviada e aguardando conferência no destino.",
-                )
+                !navigator.onLine
+                  ? Promise.resolve(
+                      queueOffline(
+                        {
+                          kind: "transfer",
+                          body,
+                          idempotencyKey: operationalKey("inventory-transfer-batch"),
+                        },
+                        "Transferência guardada para sincronização.",
+                      ),
+                    )
+                  : run(
+                      () =>
+                        api.management.transferInventoryBatch(
+                          scope.organizationId,
+                          scope.unitId,
+                          body,
+                          operationalKey("inventory-transfer-batch"),
+                        ),
+                      "Transferência enviada e aguardando conferência no destino.",
+                    )
               }
               open={dialog === "transfer"}
             />
@@ -742,6 +835,9 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             />
             <ReturnableConferenceModal
               busy={busy}
+              custodies={
+                returnables.state.status === "ready" ? returnables.state.data.openCustodies : []
+              }
               items={data.items}
               locations={data.locations}
               onClose={closeDialog}
@@ -752,9 +848,11 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                       scope.organizationId,
                       scope.unitId,
                       {
+                        issueMovementId: body.issueMovementId,
                         containerInventoryItemId: body.inventoryItemId,
                         locationId: body.locationId,
                         quantity: body.quantity,
+                        orderId: body.orderId,
                         note: body.reason,
                       },
                       operationalKey("returnable-custody"),
@@ -791,6 +889,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                         type: body.kind,
                         quantity: body.quantity,
                         note: body.reason,
+                        evidence: body.evidence,
                       },
                       operationalKey("returnable-incident"),
                     ),

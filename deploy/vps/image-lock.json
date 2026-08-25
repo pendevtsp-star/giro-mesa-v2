@@ -1,11 +1,23 @@
 {
   "schemaVersion": 1,
   "images": {
+    "clamav": {
+      "reference": "clamav/clamav-debian@sha256:967334b92d1782e4d1314ddf903ae537d26792d21c9a39adecb8ac9757980514",
+      "upstreamRepository": "docker.io/clamav/clamav-debian",
+      "upstreamTag": "stable",
+      "provenance": "Official ClamAV multi-platform image locked by digest"
+    },
     "postgres": {
       "reference": "postgres@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193",
       "upstreamRepository": "docker.io/library/postgres",
       "upstreamTag": "17-alpine",
       "provenance": "Docker Official Image multi-platform index locked by digest"
+    },
+    "evolutionGo": {
+      "reference": "evoapicloud/evolution-go:0.7.2@sha256:6fa601464bd76d3d19ece4c48d8bb5373d025d95d45b939ae4bf0c77b03f5aaa",
+      "upstreamRepository": "docker.io/evoapicloud/evolution-go",
+      "upstreamTag": "0.7.2",
+      "provenance": "Evolution Go 0.7.2 linux amd64 image locked by digest"
     },
     "cosign": {
       "reference": "ghcr.io/sigstore/cosign/cosign@sha256:b29487e48205d875c324c79583e2806d9d269c0fa299e0861bbec023d8430c8b",

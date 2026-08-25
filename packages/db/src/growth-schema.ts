@@ -89,7 +89,12 @@ export const growthCustomers = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     birthDate: varchar("birth_date", { length: 10 }),
+    notes: varchar("notes", { length: 1000 }),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
+    emailMarketingOptIn: boolean("email_marketing_opt_in").notNull().default(false),
+    whatsappMarketingOptIn: boolean("whatsapp_marketing_opt_in").notNull().default(false),
+    mergedIntoCustomerId: uuid("merged_into_customer_id"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     ...timestamps,
   },
@@ -98,11 +103,57 @@ export const growthCustomers = pgTable(
     index("growth_customers_org_name_idx").on(table.organizationId, table.name),
     uniqueIndex("growth_customers_org_email_unique")
       .on(table.organizationId, table.email)
-      .where(sql`${table.email} is not null`),
+      .where(sql`${table.email} is not null and ${table.archivedAt} is null`),
+    index("growth_customers_org_phone_idx").on(table.organizationId, table.phone),
     foreignKey({
       name: "growth_customer_default_unit_tenant_fk",
       columns: [table.organizationId, table.defaultUnitId],
       foreignColumns: [units.organizationId, units.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "growth_customer_merge_tenant_fk",
+      columns: [table.organizationId, table.mergedIntoCustomerId],
+      foreignColumns: [table.organizationId, table.id],
+    }).onDelete("restrict"),
+    check(
+      "growth_customer_merge_archive_check",
+      sql`${table.mergedIntoCustomerId} is null or ${table.archivedAt} is not null`,
+    ),
+  ],
+);
+
+export const posTabCustomerLinks = pgTable(
+  "growth_pos_tab_customer_links",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    tabId: uuid("tab_id").notNull(),
+    customerId: uuid("customer_id").notNull(),
+    linkedByIdentityId: uuid("linked_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    linkedAt: timestamp("linked_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique("growth_pos_tab_customer_link_tab_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.tabId,
+    ),
+    index("growth_pos_tab_customer_link_customer_idx").on(
+      table.organizationId,
+      table.customerId,
+      table.linkedAt,
+    ),
+    foreignKey({
+      name: "growth_pos_tab_customer_link_tab_fk",
+      columns: [table.organizationId, table.unitId, table.tabId],
+      foreignColumns: [posTabs.organizationId, posTabs.unitId, posTabs.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_pos_tab_customer_link_customer_fk",
+      columns: [table.organizationId, table.customerId],
+      foreignColumns: [growthCustomers.organizationId, growthCustomers.id],
     }).onDelete("restrict"),
   ],
 );
@@ -368,6 +419,9 @@ export const marketingCampaigns = pgTable(
     status: campaignStatus("status").notNull().default("draft"),
     subject: varchar("subject", { length: 180 }),
     content: text("content").notNull(),
+    variantBContent: text("variant_b_content"),
+    attributionWindowDays: integer("attribution_window_days").notNull().default(7),
+    holdoutPercentage: integer("holdout_percentage").notNull().default(0),
     createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id, {
       onDelete: "set null",
     }),
@@ -378,6 +432,14 @@ export const marketingCampaigns = pgTable(
   (table) => [
     unique("growth_campaign_org_id_unique").on(table.organizationId, table.id),
     index("growth_campaign_org_status_idx").on(table.organizationId, table.status),
+    check(
+      "growth_campaign_attribution_window_check",
+      sql`${table.attributionWindowDays} between 1 and 90`,
+    ),
+    check(
+      "growth_campaign_holdout_percentage_check",
+      sql`${table.holdoutPercentage} between 0 and 50`,
+    ),
     foreignKey({
       name: "growth_campaign_unit_tenant_fk",
       columns: [table.organizationId, table.unitId],
@@ -405,16 +467,27 @@ export const campaignDeliveries = pgTable(
       .notNull()
       .references(() => growthCustomers.id),
     status: varchar("status", { length: 20 })
-      .$type<"pending" | "blocked" | "sent" | "failed" | "skipped">()
+      .$type<"pending" | "blocked" | "sent" | "failed" | "skipped" | "holdout">()
       .notNull()
       .default("pending"),
     idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
     providerReference: varchar("provider_reference", { length: 180 }),
     errorCode: varchar("error_code", { length: 80 }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    repliedAt: timestamp("replied_at", { withTimezone: true }),
+    attributedOrderRef: uuid("attributed_order_ref"),
+    attributedCouponRedemptionId: uuid("attributed_coupon_redemption_id"),
+    attributedRevenueCents: integer("attributed_revenue_cents"),
+    experimentVariant: varchar("experiment_variant", { length: 10 })
+      .$type<"control" | "a" | "b">()
+      .notNull()
+      .default("a"),
     ...timestamps,
   },
   (table) => [
+    unique("growth_campaign_delivery_org_id_unique").on(table.organizationId, table.id),
     uniqueIndex("growth_campaign_delivery_target_unique").on(
       table.organizationId,
       table.campaignId,
@@ -433,6 +506,274 @@ export const campaignDeliveries = pgTable(
       name: "growth_campaign_delivery_customer_tenant_fk",
       columns: [table.organizationId, table.customerId],
       foreignColumns: [growthCustomers.organizationId, growthCustomers.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const whatsappConversations = pgTable(
+  "growth_whatsapp_conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    customerId: uuid("customer_id"),
+    phone: varchar("phone", { length: 15 }).notNull(),
+    assignedIdentityId: uuid("assigned_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    status: varchar("status", { length: 20 })
+      .$type<"open" | "pending" | "closed">()
+      .notNull()
+      .default("open"),
+    priority: varchar("priority", { length: 12 })
+      .$type<"low" | "normal" | "high" | "urgent">()
+      .notNull()
+      .default("normal"),
+    unreadCount: integer("unread_count").notNull().default(0),
+    slaDueAt: timestamp("sla_due_at", { withTimezone: true }),
+    firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    lastInboundAt: timestamp("last_inbound_at", { withTimezone: true }),
+    lastOutboundAt: timestamp("last_outbound_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("growth_whatsapp_conversation_org_unit_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("growth_whatsapp_conversation_target_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.phone,
+    ),
+    index("growth_whatsapp_conversation_inbox_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.lastMessageAt,
+    ),
+    index("growth_whatsapp_conversation_queue_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.priority,
+      table.slaDueAt,
+    ),
+    index("growth_whatsapp_conversation_assignee_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.assignedIdentityId,
+      table.status,
+    ),
+    foreignKey({
+      name: "growth_whatsapp_conversation_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_whatsapp_conversation_customer_tenant_fk",
+      columns: [table.organizationId, table.customerId],
+      foreignColumns: [growthCustomers.organizationId, growthCustomers.id],
+    }).onDelete("restrict"),
+    check("growth_whatsapp_conversation_unread_check", sql`${table.unreadCount} >= 0`),
+  ],
+);
+
+export const whatsappMessages = pgTable(
+  "growth_whatsapp_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    conversationId: uuid("conversation_id").notNull(),
+    customerId: uuid("customer_id"),
+    campaignDeliveryId: uuid("campaign_delivery_id"),
+    direction: varchar("direction", { length: 12 }).$type<"inbound" | "outbound">().notNull(),
+    contentKind: varchar("content_kind", { length: 20 }).notNull().default("text"),
+    body: text("body").notNull(),
+    mediaStorageKey: text("media_storage_key"),
+    mediaMimeType: varchar("media_mime_type", { length: 120 }),
+    mediaFileName: varchar("media_file_name", { length: 180 }),
+    mediaSizeBytes: integer("media_size_bytes"),
+    mediaSha256: varchar("media_sha256", { length: 64 }),
+    mediaErrorCode: varchar("media_error_code", { length: 80 }),
+    status: varchar("status", { length: 20 })
+      .$type<"queued" | "sent" | "delivered" | "read" | "received" | "failed" | "suppressed">()
+      .notNull(),
+    providerReference: varchar("provider_reference", { length: 180 }),
+    idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
+    errorCode: varchar("error_code", { length: 80 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("growth_whatsapp_message_org_unit_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("growth_whatsapp_message_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("growth_whatsapp_message_provider_unique")
+      .on(table.organizationId, table.unitId, table.providerReference)
+      .where(sql`${table.providerReference} is not null`),
+    index("growth_whatsapp_message_conversation_idx").on(table.conversationId, table.occurredAt),
+    foreignKey({
+      name: "growth_whatsapp_message_conversation_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.conversationId],
+      foreignColumns: [
+        whatsappConversations.organizationId,
+        whatsappConversations.unitId,
+        whatsappConversations.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_whatsapp_message_customer_tenant_fk",
+      columns: [table.organizationId, table.customerId],
+      foreignColumns: [growthCustomers.organizationId, growthCustomers.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "growth_whatsapp_message_campaign_delivery_tenant_fk",
+      columns: [table.organizationId, table.campaignDeliveryId],
+      foreignColumns: [campaignDeliveries.organizationId, campaignDeliveries.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const crmQuickReplies = pgTable(
+  "growth_crm_quick_replies",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    title: varchar("title", { length: 80 }).notNull(),
+    body: text("body").notNull(),
+    active: boolean("active").notNull().default(true),
+    createdByIdentityId: uuid("created_by_identity_id").references(() => identities.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    unique("growth_crm_quick_reply_org_unit_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("growth_crm_quick_reply_title_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.title,
+    ),
+    foreignKey({
+      name: "growth_crm_quick_reply_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const crmAutomationRules = pgTable(
+  "growth_crm_automation_rules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    trigger: varchar("trigger", { length: 30 })
+      .$type<"birthday" | "inactive" | "post_visit" | "no_show" | "survey">()
+      .notNull(),
+    enabled: boolean("enabled").notNull().default(false),
+    delayMinutes: integer("delay_minutes").notNull().default(0),
+    inactiveDays: integer("inactive_days"),
+    messageTemplate: text("message_template").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("growth_crm_automation_rule_org_unit_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    unique("growth_crm_automation_rule_trigger_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.trigger,
+    ),
+    foreignKey({
+      name: "growth_crm_automation_rule_unit_tenant_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check("growth_crm_automation_delay_check", sql`${table.delayMinutes} between 0 and 525600`),
+    check(
+      "growth_crm_automation_inactive_check",
+      sql`${table.inactiveDays} is null or ${table.inactiveDays} between 1 and 3650`,
+    ),
+  ],
+);
+
+export const crmAutomationExecutions = pgTable(
+  "growth_crm_automation_executions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    ruleId: uuid("rule_id").notNull(),
+    customerId: uuid("customer_id").notNull(),
+    messageId: uuid("message_id"),
+    eventKey: varchar("event_key", { length: 180 }).notNull(),
+    status: varchar("status", { length: 20 })
+      .$type<"queued" | "sent" | "suppressed" | "failed">()
+      .notNull(),
+    reason: varchar("reason", { length: 80 }),
+    scheduledFor: timestamp("scheduled_for", { withTimezone: true }).notNull(),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    retryCount: integer("retry_count").notNull().default(0),
+    lastRetryAt: timestamp("last_retry_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("growth_crm_automation_execution_event_unique").on(
+      table.ruleId,
+      table.customerId,
+      table.eventKey,
+    ),
+    index("growth_crm_automation_execution_status_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.status,
+      table.scheduledFor,
+    ),
+    foreignKey({
+      name: "growth_crm_automation_execution_rule_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.ruleId],
+      foreignColumns: [
+        crmAutomationRules.organizationId,
+        crmAutomationRules.unitId,
+        crmAutomationRules.id,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_crm_automation_execution_customer_tenant_fk",
+      columns: [table.organizationId, table.customerId],
+      foreignColumns: [growthCustomers.organizationId, growthCustomers.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "growth_crm_automation_execution_message_tenant_fk",
+      columns: [table.organizationId, table.unitId, table.messageId],
+      foreignColumns: [
+        whatsappMessages.organizationId,
+        whatsappMessages.unitId,
+        whatsappMessages.id,
+      ],
     }).onDelete("restrict"),
   ],
 );

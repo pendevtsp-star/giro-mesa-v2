@@ -10,9 +10,12 @@ describe("roteamento operacional", () => {
     expect(parseRoute("#/accountant")).toBe("accountant");
     expect(parseRoute("#/waiter-settlements")).toBe("waiter-settlements");
     expect(parseRoute("#/device")).toBe("device");
+    expect(parseRoute("#/billing")).toBe("billing");
+    expect(parseRoute("#/table-qrs")).toBe("table-qrs");
     expect(parseRoute("#/settings?section=brand")).toBe("settings");
     expect(parseRoute("#/counter?display=tab-123")).toBe("counter");
     expect(parseRoute("#/unknown")).toBe("dashboard");
     expect(routeHref("kds")).toBe("#/kds");
+    expect(routeHref("table-qrs")).toBe("#/table-qrs");
   });
 });

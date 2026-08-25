@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "webVersion": "0.2.3",
+  "webVersion": "0.2.4",
   "providers": {
     "rede": {
       "enabled": false,

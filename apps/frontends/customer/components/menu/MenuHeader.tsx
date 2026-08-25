@@ -8,17 +8,31 @@ export function MenuHeader({
   branding,
   open,
   tableAuthorized,
+  tableLabel,
   onInfo,
 }: {
   hub: HubState;
   branding?: PublicMenuBranding;
   open?: boolean;
   tableAuthorized: boolean;
+  tableLabel?: string;
   onInfo: () => void;
 }) {
   return (
     <>
-      <header className="restaurant-header">
+      <header className={`restaurant-header${branding?.coverImageUrl ? " has-cover" : ""}`}>
+        {branding?.coverImageUrl && (
+          <Image
+            alt=""
+            aria-hidden="true"
+            className="restaurant-header__cover"
+            fill
+            priority
+            sizes="(max-width: 760px) 100vw, 760px"
+            src={branding.coverImageUrl}
+            unoptimized
+          />
+        )}
         <div className="restaurant-mark" aria-hidden="true">
           {branding?.logoUrl ? (
             <Image alt="" height={58} src={branding.logoUrl} unoptimized width={58} />
@@ -26,7 +40,7 @@ export function MenuHeader({
             (branding?.displayName[0] ?? "G")
           )}
         </div>
-        <div>
+        <div className="restaurant-header__content">
           <p>Cardápio digital</p>
           <h1>{branding?.displayName ?? "Cardápio da unidade"}</h1>
           <span>{branding?.slogan ?? "Consulte os dados informados pela equipe"}</span>
@@ -54,7 +68,7 @@ export function MenuHeader({
         <div>
           <strong>
             {hub === "online" && tableAuthorized
-              ? "Atendimento da mesa disponível"
+              ? `${tableLabel ?? "Mesa"} verificada`
               : hub === "checking"
                 ? "Confirmando atendimento…"
                 : tableAuthorized
@@ -70,6 +84,16 @@ export function MenuHeader({
           </small>
         </div>
       </div>
+      {(branding?.notice || branding?.address || branding?.phone || branding?.instagram) && (
+        <section className="brand-details" aria-label="Informações do estabelecimento">
+          {branding.notice && <p className="brand-notice">{branding.notice}</p>}
+          <div>
+            {branding.address && <span>{branding.address}</span>}
+            {branding.phone && <span>Telefone: {branding.phone}</span>}
+            {branding.instagram && <span>Instagram: {branding.instagram}</span>}
+          </div>
+        </section>
+      )}
     </>
   );
 }

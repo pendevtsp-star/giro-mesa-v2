@@ -9,6 +9,7 @@ export function ProductDetail({
   notes,
   quantity,
   unitPrice,
+  error,
   onClose,
   onDismiss,
   onToggleModifier,
@@ -22,6 +23,7 @@ export function ProductDetail({
   notes: string;
   quantity: number;
   unitPrice: number;
+  error?: string;
   onClose: () => void;
   onDismiss: () => void;
   onToggleModifier: (group: ModifierGroup, modifier: Modifier) => void;
@@ -30,7 +32,12 @@ export function ProductDetail({
   onAdd: () => void;
 }) {
   return (
-    <dialog className="product-dialog" ref={dialogRef} onClose={onDismiss}>
+    <dialog
+      className="product-dialog"
+      ref={dialogRef}
+      aria-labelledby="product-dialog-title"
+      onClose={onDismiss}
+    >
       {selected && (
         <div className="dialog-shell">
           <div className={`product-hero food-${selected.id}`}>
@@ -48,7 +55,7 @@ export function ProductDetail({
           </div>
           <div className="dialog-content">
             <p className="overline">{selected.category}</p>
-            <h2>{selected.name}</h2>
+            <h2 id="product-dialog-title">{selected.name}</h2>
             <p>{selected.description}</p>
             <strong className="base-price">{formatMoney(selected.priceCents)}</strong>
             {selected.modifierGroups?.map((group) => (
@@ -81,6 +88,11 @@ export function ProductDetail({
                 placeholder="Ex.: sem cebola"
               />
             </Label>
+            {error && (
+              <p className="dialog-error" role="alert">
+                {error}
+              </p>
+            )}
             <div className="add-row">
               <div className="quantity">
                 <span className="sr-only">Quantidade</span>

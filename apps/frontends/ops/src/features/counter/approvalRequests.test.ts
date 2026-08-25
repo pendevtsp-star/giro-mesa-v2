@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { counterQueueStage, sortCounterQueue } from "./CounterPage";
+import { isValidCounterPhone, parseCounterQueue } from "./CounterPage";
 import { groupDraftItemsByCourse, parseStoredCart, parseStoredIds } from "./CounterWorkspace";
 
 describe("atalhos e rascunho operacional", () => {
@@ -78,79 +78,65 @@ describe("atalhos e rascunho operacional", () => {
 });
 
 describe("etapas do balcão", () => {
-  const now = new Date("2026-08-16T18:00:00.000Z").getTime();
+  const item = {
+    id: "tab-1",
+    tableId: null,
+    operationalShiftId: null,
+    shiftSectionId: null,
+    label: "Retirada 12",
+    displayNumber: 12,
+    fulfillmentType: "pickup",
+    customerName: "Ana",
+    customerPhone: null,
+    readyNotificationConsent: false,
+    serviceNotes: null,
+    deliveryAddress: null,
+    promisedAt: null,
+    readyNotifiedAt: null,
+    responsibleIdentityId: null,
+    structuralMergeAllowed: null,
+    structuralMergeReason: null,
+    guestCount: 1,
+    version: 1,
+    status: "open",
+    serviceChargeBasisPoints: 0,
+    tipCents: 0,
+    subtotalCents: 1_000,
+    discountCents: 0,
+    serviceChargeCents: 0,
+    totalCents: 1_000,
+    queueStage: "ready",
+  };
 
-  it("prioriza atraso, prontidão, espera e encerramento", () => {
-    expect(
-      counterQueueStage(
-        {
-          status: "open",
-          totalCents: 1000,
-          promisedAt: "2026-08-16T17:59:00.000Z",
-          readyNotifiedAt: null,
-        },
-        now,
-      ),
-    ).toBe("late");
-    expect(
-      counterQueueStage(
-        {
-          status: "open",
-          totalCents: 1000,
-          promisedAt: null,
-          readyNotifiedAt: "2026-08-16T17:59:00.000Z",
-        },
-        now,
-      ),
-    ).toBe("ready");
-    expect(
-      counterQueueStage(
-        {
-          status: "open",
-          totalCents: 1000,
-          promisedAt: null,
-          readyNotifiedAt: "2026-08-16T17:50:00.000Z",
-        },
-        now,
-      ),
-    ).toBe("waiting");
-    expect(
-      counterQueueStage(
-        { status: "closed", totalCents: 1000, promisedAt: null, readyNotifiedAt: null },
-        now,
-      ),
-    ).toBe("delivered");
+  it("consome etapa, contagens e paginação autoritativas", () => {
+    const queue = parseCounterQueue({
+      items: [item],
+      counts: { all: 4, new: 1, production: 1, ready: 1, waiting: 1, delivered: 2, late: 0 },
+      pagination: { page: 1, limit: 50, total: 4, totalPages: 1 },
+    });
+
+    expect(queue.items[0]?.queueStage).toBe("ready");
+    expect(queue.counts).toMatchObject({ all: 4, delivered: 2 });
+    expect(queue.pagination).toEqual({ page: 1, limit: 50, total: 4, totalPages: 1 });
   });
 
-  it("ordena primeiro o que exige ação imediata", () => {
-    const tabs = [
-      {
-        id: "production",
-        status: "open",
-        totalCents: 1000,
-        promisedAt: null,
-        readyNotifiedAt: null,
-      },
-      {
-        id: "ready",
-        status: "open",
-        totalCents: 1000,
-        promisedAt: null,
-        readyNotifiedAt: "2026-08-16T17:59:00.000Z",
-      },
-      {
-        id: "late",
-        status: "open",
-        totalCents: 1000,
-        promisedAt: "2026-08-16T17:50:00.000Z",
-        readyNotifiedAt: null,
-      },
-    ];
+  it("rejeita etapa de fila fora do contrato", () => {
+    expect(() =>
+      parseCounterQueue({
+        items: [{ ...item, queueStage: "unknown" }],
+        counts: { all: 1, new: 0, production: 0, ready: 1, waiting: 0, delivered: 0, late: 0 },
+        pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
+      }),
+    ).toThrow("formato inesperado");
+  });
+});
 
-    expect(sortCounterQueue(tabs, now).map((tab) => tab.id)).toEqual([
-      "late",
-      "ready",
-      "production",
-    ]);
+describe("telefone da retirada", () => {
+  it("aceita o mesmo formato do backend e rejeita telefone incompleto", () => {
+    expect(isValidCounterPhone("")).toBe(true);
+    expect(isValidCounterPhone("+55 (11) 99999-9999")).toBe(true);
+    expect(isValidCounterPhone("11999999999")).toBe(true);
+    expect(isValidCounterPhone("1234")).toBe(false);
+    expect(isValidCounterPhone("11 9999 RAMAL")).toBe(false);
   });
 });

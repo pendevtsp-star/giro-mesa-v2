@@ -11,6 +11,7 @@ import {
   cashTenderConference,
   cashTransferLockOrder,
   commissionAmountFromBasisPoints,
+  financialInstallmentSchedule,
   inventoryChange,
   managementReplay,
   managementRequestHash,
@@ -27,6 +28,14 @@ import {
 import { cashShiftExportQuerySchema, closeCashShiftSchema } from "./management.schemas.js";
 
 describe("management rules", () => {
+  it("gera parcelas mensais preservando o fim do mês", () => {
+    assert.deepEqual(financialInstallmentSchedule("2026-01-31", "2026-01-31", 3, 1), [
+      { installmentNumber: 1, competenceDate: "2026-01-31", dueDate: "2026-01-31" },
+      { installmentNumber: 2, competenceDate: "2026-02-28", dueDate: "2026-02-28" },
+      { installmentNumber: 3, competenceDate: "2026-03-31", dueDate: "2026-03-31" },
+    ]);
+  });
+
   it("impede escalada de acesso e deriva expiração sem estado duplicado", () => {
     assert.equal(canGrantPersonAccessRole("manager", "waiter"), true);
     assert.equal(canGrantPersonAccessRole("manager", "finance"), false);

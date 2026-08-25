@@ -1,14 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  accountantAttachmentUploadSchema,
+  accountantRequestListQuerySchema,
+  accountantRequestSchema,
   edgeFiscalEventSchema,
   focusCompanyOnboardingSchema,
   productTaxRevisionImportSchema,
 } from "./fiscal.schemas.js";
 import {
+  accountantActorAudience,
+  assertFiscalRuntimeEnvironment,
   buildAccountingPackage,
   buildFocusCompanyInput,
   competenceBounds,
+  competenceDateAt,
+  decodeAccountantAttachment,
+  localDateAt,
+  nextFiscalDocumentStatus,
   providerStatusPayload,
 } from "./fiscal.service.js";
 import { FocusNfeClient, parseFocusCompany, parseFocusDocument } from "./focus-nfe.client.js";
@@ -16,6 +25,72 @@ import { FocusNfeClient, parseFocusCompany, parseFocusDocument } from "./focus-n
 describe("fiscal core", () => {
   it("uses a canonical first-day competence", () => {
     assert.equal(competenceBounds("2026-08").competenceDate, "2026-08-01");
+    assert.equal(
+      competenceDateAt(new Date("2026-09-01T01:00:00.000Z"), "America/Sao_Paulo"),
+      "2026-08-01",
+    );
+  });
+
+  it("never regresses terminal fiscal states", () => {
+    assert.equal(nextFiscalDocumentStatus("authorized", "processing"), "authorized");
+    assert.equal(nextFiscalDocumentStatus("authorized", "canceled"), "canceled");
+    assert.equal(nextFiscalDocumentStatus("canceled", "authorized"), "canceled");
+    assert.equal(nextFiscalDocumentStatus("processing", "rejected", "cancel_result"), "processing");
+  });
+
+  it("blocks production at the API runtime gate", () => {
+    assert.throws(
+      () => assertFiscalRuntimeEnvironment("production", "homologation"),
+      (error) =>
+        typeof error === "object" &&
+        error !== null &&
+        "getResponse" in error &&
+        (error as { getResponse: () => unknown }).getResponse() !== undefined,
+    );
+    assert.doesNotThrow(() => assertFiscalRuntimeEnvironment("production", "production"));
+  });
+
+  it("keeps accountant request storage server-owned and paginated", () => {
+    const request = accountantRequestSchema.parse({
+      competence: "2026-08",
+      title: "Conferir fechamento",
+      description: "Validar os documentos do mês.",
+      attachments: [{ name: "segredo", storageKey: "tenant/outro-arquivo" }],
+    });
+    assert.equal("attachments" in request, false);
+    assert.deepEqual(accountantRequestListQuerySchema.parse({}), { page: 1, pageSize: 25 });
+    assert.deepEqual(
+      accountantRequestListQuerySchema.parse({ overdue: "false", targetAudience: "accountant" }),
+      { overdue: false, targetAudience: "accountant", page: 1, pageSize: 25 },
+    );
+    assert.equal(
+      accountantActorAudience([{ role: "accountant", unitId: null }], "unit-1"),
+      "accountant",
+    );
+    assert.equal(
+      accountantActorAudience([{ role: "owner", unitId: null }], "unit-1"),
+      "establishment",
+    );
+    assert.equal(
+      localDateAt(new Date("2026-08-24T01:00:00.000Z"), "America/Sao_Paulo"),
+      "2026-08-23",
+    );
+  });
+
+  it("accepts only bounded accountant attachment content", () => {
+    const parsed = accountantAttachmentUploadSchema.parse({
+      fileName: "fechamento.pdf",
+      contentType: "application/pdf",
+      contentBase64: Buffer.from("%PDF-1.7\n%%EOF").toString("base64"),
+    });
+    assert.equal(decodeAccountantAttachment(parsed).storageExtension, "pdf");
+    assert.throws(() =>
+      decodeAccountantAttachment({
+        ...parsed,
+        fileName: "fechamento.png",
+        contentType: "image/png",
+      }),
+    );
   });
 
   it("totals only authorized documents in the accounting package", () => {
@@ -72,14 +147,32 @@ describe("fiscal core", () => {
     );
   });
 
-  it("rejects duplicate products in a fiscal CSV import", () => {
+  it("rejects duplicate products and incomplete IBS/CBS codes in a fiscal CSV import", () => {
     const row = {
       productId: "9f33ca16-47d7-4c9c-b212-8366c985b7d1",
       status: "active" as const,
       effectiveFrom: "2026-08-21",
-      classification: { ncm: "21069090", cfop: "5102", origin: 0 },
+      classification: {
+        ncm: "21069090",
+        cfop: "5102",
+        origin: 0,
+        csosn: "102",
+        cstPis: "49",
+        cstCofins: "49",
+      },
     };
     assert.equal(productTaxRevisionImportSchema.safeParse({ rows: [row, row] }).success, false);
+    assert.equal(
+      productTaxRevisionImportSchema.safeParse({
+        rows: [
+          {
+            ...row,
+            classification: { ...row.classification, cstIbsCbs: "000" },
+          },
+        ],
+      }).success,
+      false,
+    );
   });
 
   it("maps the unit profile to a Focus company without exposing credentials", () => {

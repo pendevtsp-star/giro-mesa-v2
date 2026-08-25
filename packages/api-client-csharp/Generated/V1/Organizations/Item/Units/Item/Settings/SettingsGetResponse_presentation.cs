@@ -28,6 +28,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_address Address { get; set; }
 #endif
+        /// <summary>The addressDetails property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails? AddressDetails { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails AddressDetails { get; set; }
+#endif
         /// <summary>The corkageFeeNotice property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -35,6 +43,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
 #nullable restore
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_corkageFeeNotice CorkageFeeNotice { get; set; }
+#endif
+        /// <summary>The coverImageUrl property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl? CoverImageUrl { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl CoverImageUrl { get; set; }
 #endif
         /// <summary>The displayName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -51,6 +67,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
 #nullable restore
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_instagram Instagram { get; set; }
+#endif
+        /// <summary>The logoThumbnailUrl property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl? LogoThumbnailUrl { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl LogoThumbnailUrl { get; set; }
 #endif
         /// <summary>The logoUrl property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -136,9 +160,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
             {
                 { "accentColor", n => { AccentColor = n.GetStringValue(); } },
                 { "address", n => { Address = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_address>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_address.CreateFromDiscriminatorValue); } },
+                { "addressDetails", n => { AddressDetails = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails.CreateFromDiscriminatorValue); } },
                 { "corkageFeeNotice", n => { CorkageFeeNotice = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_corkageFeeNotice>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_corkageFeeNotice.CreateFromDiscriminatorValue); } },
+                { "coverImageUrl", n => { CoverImageUrl = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl.CreateFromDiscriminatorValue); } },
                 { "displayName", n => { DisplayName = n.GetStringValue(); } },
                 { "instagram", n => { Instagram = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_instagram>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_instagram.CreateFromDiscriminatorValue); } },
+                { "logoThumbnailUrl", n => { LogoThumbnailUrl = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl.CreateFromDiscriminatorValue); } },
                 { "logoUrl", n => { LogoUrl = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoUrl>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoUrl.CreateFromDiscriminatorValue); } },
                 { "notice", n => { Notice = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_notice>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_notice.CreateFromDiscriminatorValue); } },
                 { "openingHours", n => { OpeningHours = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_openingHours>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_openingHours.CreateFromDiscriminatorValue); } },
@@ -158,9 +185,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("accentColor", AccentColor);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_address>("address", Address);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails>("addressDetails", AddressDetails);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_corkageFeeNotice>("corkageFeeNotice", CorkageFeeNotice);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl>("coverImageUrl", CoverImageUrl);
             writer.WriteStringValue("displayName", DisplayName);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_instagram>("instagram", Instagram);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl>("logoThumbnailUrl", LogoThumbnailUrl);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoUrl>("logoUrl", LogoUrl);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_notice>("notice", Notice);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_openingHours>("openingHours", OpeningHours);
@@ -239,6 +269,63 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
             }
         }
         /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class SettingsGetResponse_presentation_addressDetails : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1? SettingsGetResponsePresentationAddressDetailsMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1 SettingsGetResponsePresentationAddressDetailsMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember2? SettingsGetResponsePresentationAddressDetailsMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember2 SettingsGetResponsePresentationAddressDetailsMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_addressDetails();
+                result.SettingsGetResponsePresentationAddressDetailsMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1();
+                result.SettingsGetResponsePresentationAddressDetailsMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(SettingsGetResponsePresentationAddressDetailsMember1 != null || SettingsGetResponsePresentationAddressDetailsMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(SettingsGetResponsePresentationAddressDetailsMember1, SettingsGetResponsePresentationAddressDetailsMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_addressDetailsMember1>(null, SettingsGetResponsePresentationAddressDetailsMember1, SettingsGetResponsePresentationAddressDetailsMember2);
+            }
+        }
+        /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_corkageFeeNoticeMember1"/>, <see cref="string"/>
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
@@ -307,6 +394,74 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
             }
         }
         /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class SettingsGetResponse_presentation_coverImageUrl : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1? SettingsGetResponsePresentationCoverImageUrlMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1 SettingsGetResponsePresentationCoverImageUrlMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_coverImageUrl();
+                if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                else {
+                    result.SettingsGetResponsePresentationCoverImageUrlMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(SettingsGetResponsePresentationCoverImageUrlMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(SettingsGetResponsePresentationCoverImageUrlMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_coverImageUrlMember1>(null, SettingsGetResponsePresentationCoverImageUrlMember1);
+                }
+            }
+        }
+        /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_instagramMember1"/>, <see cref="string"/>
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
@@ -371,6 +526,74 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings
                 }
                 else {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_instagramMember1>(null, SettingsGetResponsePresentationInstagramMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1"/>, <see cref="string"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class SettingsGetResponse_presentation_logoThumbnailUrl : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1? SettingsGetResponsePresentationLogoThumbnailUrlMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1 SettingsGetResponsePresentationLogoThumbnailUrlMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="string"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public string? String { get; set; }
+#nullable restore
+#else
+            public string String { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation.SettingsGetResponse_presentation_logoThumbnailUrl();
+                if(parseNode.GetStringValue() is string stringValue)
+                {
+                    result.String = stringValue;
+                }
+                else {
+                    result.SettingsGetResponsePresentationLogoThumbnailUrlMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(SettingsGetResponsePresentationLogoThumbnailUrlMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(SettingsGetResponsePresentationLogoThumbnailUrlMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(String != null)
+                {
+                    writer.WriteStringValue(null, String);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SettingsGetResponse_presentation_logoThumbnailUrlMember1>(null, SettingsGetResponsePresentationLogoThumbnailUrlMember1);
                 }
             }
         }

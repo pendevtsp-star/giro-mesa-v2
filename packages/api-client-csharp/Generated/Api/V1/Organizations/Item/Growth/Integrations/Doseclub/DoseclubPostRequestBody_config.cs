@@ -9,18 +9,25 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations.Dosec
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class DoseclubPostRequestBody_config : IAdditionalDataHolder, IParsable
+    public partial class DoseclubPostRequestBody_config : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations.Doseclub.DoseclubPostRequestBody_config"/> and sets the default values.
-        /// </summary>
-        public DoseclubPostRequestBody_config()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
+        /// <summary>The apiBaseUrl property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ApiBaseUrl { get; set; }
+#nullable restore
+#else
+        public string ApiBaseUrl { get; set; }
+#endif
+        /// <summary>The clientId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ClientId { get; set; }
+#nullable restore
+#else
+        public string ClientId { get; set; }
+#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -39,6 +46,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations.Dosec
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "apiBaseUrl", n => { ApiBaseUrl = n.GetStringValue(); } },
+                { "clientId", n => { ClientId = n.GetStringValue(); } },
             };
         }
         /// <summary>
@@ -48,7 +57,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations.Dosec
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
-            writer.WriteAdditionalData(AdditionalData);
+            writer.WriteStringValue("apiBaseUrl", ApiBaseUrl);
+            writer.WriteStringValue("clientId", ClientId);
         }
     }
 }

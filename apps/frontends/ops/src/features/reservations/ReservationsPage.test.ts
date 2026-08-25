@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reservationCapacity, suggestedWait } from "./ReservationsPage";
+import { matchingCustomers, reservationCapacity, suggestedWait } from "./ReservationsPage";
 
 function floor(status: "available" | "occupied" | "needs_cleaning") {
   return {
@@ -28,5 +28,20 @@ describe("reception operational estimates", () => {
       2,
     );
     expect(capacity).toEqual({ compatible: true, remainingSeats: -1 });
+  });
+
+  it("finds a persisted customer by normalized identity and limits suggestions", () => {
+    const customers = Array.from({ length: 8 }, (_, index) => ({
+      id: `customer-${index}`,
+      name: index === 0 ? "João da Silva" : `Cliente ${index}`,
+      email: index === 0 ? "joao@example.com" : null,
+      phone: index === 0 ? "(11) 99876-5432" : "11999990000",
+      marketingOptIn: false,
+    }));
+
+    expect(matchingCustomers(customers, "joao")[0]?.id).toBe("customer-0");
+    expect(matchingCustomers(customers, "998765432")[0]?.id).toBe("customer-0");
+    expect(matchingCustomers(customers, "11")).toHaveLength(6);
+    expect(matchingCustomers(customers, "j")).toEqual([]);
   });
 });

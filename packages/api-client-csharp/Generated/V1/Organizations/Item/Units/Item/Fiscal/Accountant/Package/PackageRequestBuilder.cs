@@ -27,7 +27,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PackageRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/package", pathParameters)
+        public PackageRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/package?competence={competence}", pathParameters)
         {
         }
         /// <summary>
@@ -35,37 +35,54 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public PackageRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/package", rawUrl)
+        public PackageRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/v1/organizations/{organizationId}/units/{sourceUnit%2Did}/fiscal/accountant/package?competence={competence}", rawUrl)
         {
         }
-        /// <returns>A <see cref="Stream"/></returns>
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageGetResponse"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<Stream?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageGetResponse?> GetAsPackageGetResponseAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<Stream> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageGetResponse> GetAsPackageGetResponseAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
-            return await RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, default, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageGetResponse>(requestInfo, global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageGetResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
+        }
+        /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageResponse"/></returns>
+        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
+        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
+        [Obsolete("This method is obsolete. Use GetAsPackageGetResponseAsync instead.")]
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageResponse?> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#nullable restore
+#else
+        public async Task<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageResponse> GetAsync(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        {
+#endif
+            var requestInfo = ToGetRequestInformation(requestConfiguration);
+            return await RequestAdapter.SendAsync<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageResponse>(requestInfo, global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageResponse.CreateFromDiscriminatorValue, default, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>>? requestConfiguration = default)
         {
 #nullable restore
 #else
-        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default)
+        public RequestInformation ToGetRequestInformation(Action<RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>> requestConfiguration = default)
         {
 #endif
             var requestInfo = new RequestInformation(Method.GET, UrlTemplate, PathParameters);
             requestInfo.Configure(requestConfiguration);
+            requestInfo.Headers.TryAdd("Accept", "application/json");
             return requestInfo;
         }
         /// <summary>
@@ -77,12 +94,27 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.
         {
             return new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder(rawUrl, RequestAdapter);
         }
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        #pragma warning disable CS1591
+        public partial class PackageRequestBuilderGetQueryParameters
+        #pragma warning restore CS1591
+        {
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            [QueryParameter("competence")]
+            public string? Competence { get; set; }
+#nullable restore
+#else
+            [QueryParameter("competence")]
+            public string Competence { get; set; }
+#endif
+        }
         /// <summary>
         /// Configuration for the request such as headers, query parameters, and middleware options.
         /// </summary>
         [Obsolete("This class is deprecated. Please use the generic RequestConfiguration class generated by the generator.")]
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
-        public partial class PackageRequestBuilderGetRequestConfiguration : RequestConfiguration<DefaultQueryParameters>
+        public partial class PackageRequestBuilderGetRequestConfiguration : RequestConfiguration<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.Accountant.Package.PackageRequestBuilder.PackageRequestBuilderGetQueryParameters>
         {
         }
     }

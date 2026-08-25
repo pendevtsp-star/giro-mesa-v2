@@ -1,6 +1,6 @@
 {
   "name": "@giromesa/worker",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,11 +14,13 @@
   "dependencies": {
     "@giromesa/db": "workspace:*",
     "@giromesa/domain": "workspace:*",
-    "drizzle-orm": "0.45.2"
+    "drizzle-orm": "0.45.2",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
-    "@types/node": "24.10.13",
     "@biomejs/biome": "2.5.2",
+    "@types/node": "24.10.13",
+    "@types/web-push": "3.6.4",
     "tsx": "4.23.11",
     "typescript": "5.9.3"
   }

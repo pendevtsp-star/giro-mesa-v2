@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.ApiKeys;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Campaigns;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Coupons;
+using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Crm;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryCouriers;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders;
@@ -15,6 +16,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Segments;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Units;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Waitlist;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.WebhookEndpoints;
+using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Whatsapp;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
 using System.Collections.Generic;
@@ -43,6 +45,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Coupons.CouponsRequestBuilder Coupons
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Coupons.CouponsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The crm property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Crm.CrmRequestBuilder Crm
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Crm.CrmRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The customers property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersRequestBuilder Customers
@@ -103,6 +110,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.WebhookEndpoints.WebhookEndpointsRequestBuilder WebhookEndpoints
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.WebhookEndpoints.WebhookEndpointsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The whatsapp property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Whatsapp.WhatsappRequestBuilder Whatsapp
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Whatsapp.WhatsappRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.GrowthRequestBuilder"/> and sets the default values.

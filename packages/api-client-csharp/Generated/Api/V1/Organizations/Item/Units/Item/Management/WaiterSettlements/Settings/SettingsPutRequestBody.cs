@@ -20,6 +20,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_cancellationTreatment? CancellationTreatment { get; set; }
         /// <summary>The customPeriodStartDay property</summary>
         public int? CustomPeriodStartDay { get; set; }
+        /// <summary>The defaultServiceChargeBasisPoints property</summary>
+        public int? DefaultServiceChargeBasisPoints { get; set; }
         /// <summary>The discountTreatment property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_discountTreatment? DiscountTreatment { get; set; }
         /// <summary>The eligibleTabs property</summary>
@@ -32,6 +34,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_refundTreatment? RefundTreatment { get; set; }
         /// <summary>The serviceBase property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceBase? ServiceBase { get; set; }
+        /// <summary>The serviceChargeApplication property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceChargeApplication? ServiceChargeApplication { get; set; }
+        /// <summary>The serviceChargeEnabled property</summary>
+        public bool? ServiceChargeEnabled { get; set; }
         /// <summary>The serviceDistribution property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceDistribution? ServiceDistribution { get; set; }
         /// <summary>The serviceTeamShareBasisPoints property</summary>
@@ -40,6 +46,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_tierApplication? TierApplication { get; set; }
         /// <summary>The transferMode property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_transferMode? TransferMode { get; set; }
+        /// <summary>
+        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody"/> and sets the default values.
+        /// </summary>
+        public SettingsPutRequestBody()
+        {
+            DefaultServiceChargeBasisPoints = 0;
+            ServiceChargeApplication = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceChargeApplication.Manual;
+            ServiceChargeEnabled = false;
+        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -62,12 +77,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
                 { "attributionMode", n => { AttributionMode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_attributionMode>(); } },
                 { "cancellationTreatment", n => { CancellationTreatment = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_cancellationTreatment>(); } },
                 { "customPeriodStartDay", n => { CustomPeriodStartDay = n.GetIntValue(); } },
+                { "defaultServiceChargeBasisPoints", n => { DefaultServiceChargeBasisPoints = n.GetIntValue(); } },
                 { "discountTreatment", n => { DiscountTreatment = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_discountTreatment>(); } },
                 { "eligibleTabs", n => { EligibleTabs = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_eligibleTabs>(); } },
                 { "partnershipBase", n => { PartnershipBase = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_partnershipBase>(); } },
                 { "periodMode", n => { PeriodMode = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_periodMode>(); } },
                 { "refundTreatment", n => { RefundTreatment = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_refundTreatment>(); } },
                 { "serviceBase", n => { ServiceBase = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceBase>(); } },
+                { "serviceChargeApplication", n => { ServiceChargeApplication = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceChargeApplication>(); } },
+                { "serviceChargeEnabled", n => { ServiceChargeEnabled = n.GetBoolValue(); } },
                 { "serviceDistribution", n => { ServiceDistribution = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceDistribution>(); } },
                 { "serviceTeamShareBasisPoints", n => { ServiceTeamShareBasisPoints = n.GetIntValue(); } },
                 { "tierApplication", n => { TierApplication = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_tierApplication>(); } },
@@ -85,12 +103,15 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Wai
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_attributionMode>("attributionMode", AttributionMode);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_cancellationTreatment>("cancellationTreatment", CancellationTreatment);
             writer.WriteIntValue("customPeriodStartDay", CustomPeriodStartDay);
+            writer.WriteIntValue("defaultServiceChargeBasisPoints", DefaultServiceChargeBasisPoints);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_discountTreatment>("discountTreatment", DiscountTreatment);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_eligibleTabs>("eligibleTabs", EligibleTabs);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_partnershipBase>("partnershipBase", PartnershipBase);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_periodMode>("periodMode", PeriodMode);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_refundTreatment>("refundTreatment", RefundTreatment);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceBase>("serviceBase", ServiceBase);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceChargeApplication>("serviceChargeApplication", ServiceChargeApplication);
+            writer.WriteBoolValue("serviceChargeEnabled", ServiceChargeEnabled);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_serviceDistribution>("serviceDistribution", ServiceDistribution);
             writer.WriteIntValue("serviceTeamShareBasisPoints", ServiceTeamShareBasisPoints);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.WaiterSettlements.Settings.SettingsPutRequestBody_tierApplication>("tierApplication", TierApplication);

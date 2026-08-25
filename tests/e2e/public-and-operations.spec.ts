@@ -69,7 +69,7 @@ test("contact form posts consent to the internal commercial API", async ({ page 
       status: 201,
       contentType: "application/json",
       headers: { "Access-Control-Allow-Origin": "http://localhost:3110" },
-      body: "{}",
+      body: JSON.stringify({ id: "lead-e2e", createdAt: "2026-08-25T12:00:00.000Z" }),
     });
   });
   await page.goto("http://localhost:3110/contato");

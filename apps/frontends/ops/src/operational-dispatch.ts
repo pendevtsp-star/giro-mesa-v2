@@ -343,26 +343,47 @@ async function performPilotMutation(
         data.body as { tableId: string; reason: string },
         id,
       );
-    case "merge-tabs":
+    case "merge-tabs": {
+      const body = data.body as {
+        targetTabId: string;
+        sourceTabIds: string[];
+        reasonCode?:
+          | "large_party"
+          | "sit_together"
+          | "accessibility"
+          | "operational_reorganization"
+          | "other";
+        reasonNote?: string;
+      };
       return api.pilot.mergeTabs(
         scope.organizationId,
         scope.unitId,
-        data.body as { targetTabId: string; sourceTabIds: string[] },
+        { ...body, reasonCode: body.reasonCode ?? "operational_reorganization" },
         id,
       );
-    case "group-tables":
+    }
+    case "group-tables": {
+      const body = data.body as {
+        tableIds: string[];
+        anchorTableId: string;
+        mode: "physical_only" | "single_tab";
+        targetTabId?: string;
+        responsibleIdentityId?: string;
+        reasonCode?:
+          | "large_party"
+          | "sit_together"
+          | "accessibility"
+          | "operational_reorganization"
+          | "other";
+        reasonNote?: string;
+      };
       return api.pilot.groupTables(
         scope.organizationId,
         scope.unitId,
-        data.body as {
-          tableIds: string[];
-          anchorTableId: string;
-          mode: "physical_only" | "single_tab";
-          targetTabId?: string;
-          responsibleIdentityId?: string;
-        },
+        { ...body, reasonCode: body.reasonCode ?? "operational_reorganization" },
         id,
       );
+    }
     case "detach-table-group":
       return api.pilot.detachTableGroup(
         scope.organizationId,

@@ -21,6 +21,8 @@ import {
   managementCashTransfers,
   managementCommissionRules,
   managementCommissions,
+  managementFinanceApprovalRequests,
+  managementFinanceSettings,
   managementIdempotency,
   managementInterunitTransferLines,
   managementInterunitTransferReceipts,
@@ -29,15 +31,20 @@ import {
   managementInventoryClosingLines,
   managementInventoryClosings,
   managementInventoryCountSchedules,
+  managementInventoryCountSessionLines,
+  managementInventoryCountSessions,
   managementInventoryEventLines,
   managementInventoryEvents,
   managementInventoryIssueRoutes,
   managementInventoryItems,
+  managementInventoryLotHolds,
   managementInventoryLots,
   managementInventoryMovements,
   managementInventoryReservations,
   managementInventoryReviewRequests,
+  managementInventorySectorPolicies,
   managementInventorySupplierAliases,
+  managementInventoryTemperatureReadings,
   managementInventoryTransferReceipts,
   managementInventoryTransfers,
   managementNfeImportLines,
@@ -49,6 +56,7 @@ import {
   managementPersonAccess,
   managementProductionBatches,
   managementProductionBatchInputs,
+  managementProductReturnableClassifications,
   managementProductReturnables,
   managementPurchaseOrderItems,
   managementPurchaseOrders,
@@ -60,8 +68,13 @@ import {
   managementRecipeVersions,
   managementReconciliationEntries,
   managementReconciliationImports,
+  managementReturnableCustodyHandoffs,
   managementReturnableCustodyMovements,
+  managementReturnableDepositChargeLines,
+  managementReturnableDepositCharges,
+  managementReturnableDepositReconciliations,
   managementReturnableIncidents,
+  managementReturnablePolicies,
   managementReturnableSupplierExchanges,
   managementSchedules,
   managementStockBalances,
@@ -126,14 +139,33 @@ import { TerminalSessionService } from "../auth/terminal-session.service.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
+  dynamicSectorReplenishment,
+  inventoryConfidence,
+  productionVariance,
+  temperatureStatus,
+} from "./management.inventory-controls.rules.js";
+import type {
+  BlindCountReviewInput,
+  BlindCountStartInput,
+  BlindCountSubmitInput,
+  InventoryLotHoldInput,
+  InventoryLotHoldReleaseInput,
+  InventorySectorPolicyInput,
+  InventoryTemperatureInput,
+  ReturnableDepositCancelInput,
+  ReturnableDepositChargeInput,
+  ReturnableDepositReconcileInput,
+  ReturnablePolicyInput,
+} from "./management.inventory-controls.schemas.js";
+import {
   assertIncidentTransition,
   assessInventoryRisk,
+  classifyInventoryAbc,
   cycleCountPolicy,
   forecastInventoryDemand,
   NfeParseError,
   parseNfe,
   replenishmentSuggestion,
-  returnableAging,
   suggestNfeLineMatch,
   supplierPerformance,
 } from "./management.inventory-rules.js";
@@ -146,6 +178,7 @@ import {
   cashTenderConference,
   cashTransferLockOrder,
   commissionAmountFromBasisPoints,
+  financialInstallmentSchedule,
   inventoryChange,
   managementReplay,
   managementRequestHash,
@@ -174,12 +207,22 @@ import type {
   CashShiftHistoryQuery,
   CashShiftReviewInput,
   CashTerminalUpdateInput,
+  CashTransferDecisionInput,
   CashTransferInput,
   ClockOutInput,
   CloseCashShiftInput,
   CommissionInput,
   CommissionRuleInput,
   CommissionTransitionInput,
+  FinanceApprovalDecisionInput,
+  FinanceApprovalRequestInput,
+  FinanceEntryCancelInput,
+  FinanceEntryUpdateInput,
+  FinanceExportQuery,
+  FinanceListQuery,
+  FinancePaymentReversalInput,
+  FinanceReconciliationResolutionInput,
+  FinanceSettingsInput,
   FinancialPaymentInput,
   InterunitTransferCancellationInput,
   InterunitTransferInput,
@@ -220,6 +263,7 @@ import type {
   ProductionBatchCancellationInput,
   ProductionBatchCompletionInput,
   ProductionBatchInput,
+  ProductReturnableClassificationInput,
   ProductReturnableInput,
   PunchLocationInput,
   PurchaseInvoiceConfirmInput,
@@ -236,7 +280,9 @@ import type {
   RecipeConfigurationInput,
   ReconciliationInput,
   ReportPeriodInput,
+  ReturnableCustodyConfirmBulkInput,
   ReturnableCustodyConfirmInput,
+  ReturnableCustodyHandoffInput,
   ReturnableIncidentInput,
   ReturnableIncidentReviewInput,
   ReturnableSupplierExchangeInput,
@@ -278,6 +324,16 @@ const DEFAULT_CASH_SETTINGS = {
   discrepancyCriticalThresholdCents: 1_000,
   maxShiftMinutes: 720,
 } as const;
+const DEFAULT_FINANCE_SETTINGS = {
+  paymentApprovalThresholdCents: null as number | null,
+  requireDistinctApprover: true,
+  dueSoonDays: 7,
+} as const;
+const DEFAULT_RETURNABLE_POLICY = {
+  depositMode: "disabled" as const,
+  defaultDueDays: 7,
+  returnableClosePolicy: "warn" as const,
+};
 const CASH_PAYMENT_METHODS = [
   "cash",
   "pix",
@@ -1743,7 +1799,7 @@ export class ManagementService {
     return { movementId, cashShiftId, type: input.type, amountCents: input.amountCents };
   }
 
-  private async executeCashTransfer(
+  private async requestCashTransfer(
     tx: Transaction,
     actorIdentityId: string,
     organizationId: string,
@@ -1764,6 +1820,12 @@ export class ManagementService {
         code: "CASH_TRANSFER_SAME_REGISTER",
         message: "Origem e destino devem ser gavetas diferentes.",
       });
+    if (fromShift.currentResponsibleIdentityId === toShift.currentResponsibleIdentityId)
+      throw new ConflictException({
+        code: "CASH_TRANSFER_DISTINCT_RESPONSIBLES_REQUIRED",
+        message:
+          "A origem e o destino precisam ter responsáveis diferentes para confirmar a custódia.",
+      });
     const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, fromShift.id);
     assertCashDrawerDebit(
       fromShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
@@ -1781,47 +1843,16 @@ export class ManagementService {
       amountCents: input.amountCents,
       reason: input.reason,
       transferredByIdentityId: actorIdentityId,
+      status: "pending",
       occurredAt,
       idempotencyKey,
     });
-    await tx.insert(managementCashEntries).values([
-      {
-        organizationId,
-        unitId,
-        cashShiftId: fromShift.id,
-        direction: "out",
-        entryType: "transfer_out",
-        paymentMethod: null,
-        affectsDrawer: true,
-        amountCents: input.amountCents,
-        sourceType: "cash_transfer_out",
-        sourceId: transferId,
-        description: input.reason,
-        actorIdentityId,
-        occurredAt,
-      },
-      {
-        organizationId,
-        unitId,
-        cashShiftId: toShift.id,
-        direction: "in",
-        entryType: "transfer_in",
-        paymentMethod: null,
-        affectsDrawer: true,
-        amountCents: input.amountCents,
-        sourceType: "cash_transfer_in",
-        sourceId: transferId,
-        description: input.reason,
-        actorIdentityId,
-        occurredAt,
-      },
-    ]);
     await this.record(
       tx,
       actorIdentityId,
       organizationId,
       unitId,
-      "management.cash.transferred",
+      "management.cash-transfer.requested",
       "cash_transfer",
       transferId,
       {
@@ -1833,6 +1864,7 @@ export class ManagementService {
     );
     return {
       transferId,
+      status: "awaiting_destination" as const,
       fromCashShiftId: fromShift.id,
       toCashShiftId: toShift.id,
       amountCents: input.amountCents,
@@ -2410,6 +2442,9 @@ export class ManagementService {
       sourceId: string;
       actorIdentityId: string;
       occurredAt?: Date;
+      allowHeldLotAdjustment?: boolean;
+      excludeReservationId?: string;
+      excludeReservationSource?: { type: string; id: string };
     },
   ) {
     const item = await this.requireInventoryItem(tx, organizationId, unitId, input.inventoryItemId);
@@ -2459,6 +2494,85 @@ export class ManagementService {
     if (!balance) throw new ConflictException("Não foi possível bloquear o saldo.");
     const previousMilli = quantityToMilli(balance.quantity);
     const resultingMilli = previousMilli + input.quantityDeltaMilli;
+    if (input.quantityDeltaMilli < 0) {
+      const [[reservation], [held]] = await Promise.all([
+        tx
+          .select({
+            quantity:
+              sql<string>`coalesce(sum(${managementInventoryReservations.quantity}), 0)`.mapWith(
+                String,
+              ),
+          })
+          .from(managementInventoryReservations)
+          .where(
+            and(
+              eq(managementInventoryReservations.organizationId, organizationId),
+              eq(managementInventoryReservations.unitId, unitId),
+              eq(managementInventoryReservations.locationId, input.locationId),
+              eq(managementInventoryReservations.inventoryItemId, item.id),
+              eq(managementInventoryReservations.status, "active"),
+              input.excludeReservationId
+                ? ne(managementInventoryReservations.id, input.excludeReservationId)
+                : undefined,
+              input.excludeReservationSource
+                ? or(
+                    ne(
+                      managementInventoryReservations.sourceType,
+                      input.excludeReservationSource.type,
+                    ),
+                    ne(managementInventoryReservations.sourceId, input.excludeReservationSource.id),
+                  )
+                : undefined,
+              or(
+                isNull(managementInventoryReservations.expiresAt),
+                sql`${managementInventoryReservations.expiresAt} > now()`,
+              ),
+            ),
+          ),
+        tx
+          .select({
+            quantity: sql<string>`coalesce(sum(${managementInventoryLots.quantity}), 0)`.mapWith(
+              String,
+            ),
+          })
+          .from(managementInventoryLots)
+          .innerJoin(
+            managementInventoryLotHolds,
+            and(
+              eq(
+                managementInventoryLotHolds.organizationId,
+                managementInventoryLots.organizationId,
+              ),
+              eq(managementInventoryLotHolds.unitId, managementInventoryLots.unitId),
+              eq(managementInventoryLotHolds.lotId, managementInventoryLots.id),
+              eq(managementInventoryLotHolds.status, "active"),
+            ),
+          )
+          .where(
+            and(
+              eq(managementInventoryLots.organizationId, organizationId),
+              eq(managementInventoryLots.unitId, unitId),
+              eq(managementInventoryLots.locationId, input.locationId),
+              eq(managementInventoryLots.inventoryItemId, item.id),
+              eq(managementInventoryLots.active, true),
+            ),
+          ),
+      ]);
+      const reservedMilli = quantityToMilli(reservation?.quantity ?? "0");
+      const blockedMilli = input.allowHeldLotAdjustment
+        ? 0
+        : quantityToMilli(held?.quantity ?? "0");
+      if (resultingMilli < reservedMilli + blockedMilli)
+        throw new ConflictException({
+          code: "INVENTORY_RESERVED_STOCK_BLOCKED",
+          message: "A operação consumiria quantidade reservada ou em quarentena.",
+          reservedQuantity: milliToQuantity(reservedMilli),
+          blockedQuantity: milliToQuantity(blockedMilli),
+          availableQuantity: milliToQuantity(
+            Math.max(previousMilli - reservedMilli - blockedMilli, 0),
+          ),
+        });
+    }
     if (resultingMilli < 0 && !item.allowNegative)
       throw new ConflictException({
         code: "NEGATIVE_STOCK_BLOCKED",
@@ -2487,6 +2601,8 @@ export class ManagementService {
           code: "INVENTORY_LOT_NOT_FOUND",
           message: "Lote ativo não encontrado para este item e local.",
         });
+      if (input.quantityDeltaMilli < 0 && !input.allowHeldLotAdjustment)
+        await this.assertInventoryLotAvailable(tx, organizationId, unitId, input.lotId);
       const resultingLotMilli = quantityToMilli(lot.quantity) + input.quantityDeltaMilli;
       if (resultingLotMilli < 0)
         throw new ConflictException({
@@ -2538,6 +2654,31 @@ export class ManagementService {
     return { previousMilli, resultingMilli, averageCostCents };
   }
 
+  private async assertInventoryLotAvailable(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    lotId: string,
+  ) {
+    const [hold] = await tx
+      .select({ id: managementInventoryLotHolds.id })
+      .from(managementInventoryLotHolds)
+      .where(
+        and(
+          eq(managementInventoryLotHolds.organizationId, organizationId),
+          eq(managementInventoryLotHolds.unitId, unitId),
+          eq(managementInventoryLotHolds.lotId, lotId),
+          eq(managementInventoryLotHolds.status, "active"),
+        ),
+      )
+      .limit(1);
+    if (hold)
+      throw new ConflictException({
+        code: "INVENTORY_LOT_HELD",
+        message: "O lote está em quarentena e não pode sair do estoque.",
+      });
+  }
+
   private async inventoryPlanningSnapshot(
     identityId: string,
     organizationId: string,
@@ -2564,6 +2705,7 @@ export class ManagementService {
     const since = new Date(Date.now() - 56 * 86_400_000);
     const [
       reservations,
+      reservationTotals,
       countSchedules,
       productionBatches,
       productionInputs,
@@ -2592,6 +2734,27 @@ export class ManagementService {
         )
         .orderBy(desc(managementInventoryReservations.createdAt))
         .limit(300),
+      this.database.db
+        .select({
+          inventoryItemId: managementInventoryReservations.inventoryItemId,
+          quantity:
+            sql<string>`coalesce(sum(${managementInventoryReservations.quantity}), 0)`.mapWith(
+              String,
+            ),
+        })
+        .from(managementInventoryReservations)
+        .where(
+          and(
+            eq(managementInventoryReservations.organizationId, organizationId),
+            eq(managementInventoryReservations.unitId, unitId),
+            eq(managementInventoryReservations.status, "active"),
+            or(
+              isNull(managementInventoryReservations.expiresAt),
+              sql`${managementInventoryReservations.expiresAt} > now()`,
+            ),
+          ),
+        )
+        .groupBy(managementInventoryReservations.inventoryItemId),
       this.database.db
         .select()
         .from(managementInventoryCountSchedules)
@@ -2804,17 +2967,12 @@ export class ManagementService {
         )
         .orderBy(managementStockLocations.name),
     ]);
-    const activeReservations = reservations.filter(
-      (reservation) =>
-        reservation.status === "active" &&
-        (!reservation.expiresAt || reservation.expiresAt.getTime() > Date.now()),
-    );
-    const reservedByItem = new Map<string, number>();
-    for (const reservation of activeReservations)
-      reservedByItem.set(
+    const reservedByItem = new Map(
+      reservationTotals.map((reservation) => [
         reservation.inventoryItemId,
-        (reservedByItem.get(reservation.inventoryItemId) ?? 0) + Number(reservation.quantity),
-      );
+        Number(reservation.quantity),
+      ]),
+    );
     const balanceByItem = new Map<string, number>();
     for (const balance of balances)
       balanceByItem.set(
@@ -2915,6 +3073,8 @@ export class ManagementService {
       locations,
       items,
       balances,
+      activeReservationTotals,
+      blockedLotTotals,
       lots,
       movements,
       automationRows,
@@ -2954,6 +3114,57 @@ export class ManagementService {
             eq(managementStockBalances.unitId, unitId),
           ),
         ),
+      this.database.db
+        .select({
+          inventoryItemId: managementInventoryReservations.inventoryItemId,
+          locationId: managementInventoryReservations.locationId,
+          quantity:
+            sql<string>`coalesce(sum(${managementInventoryReservations.quantity}), 0)`.mapWith(
+              String,
+            ),
+        })
+        .from(managementInventoryReservations)
+        .where(
+          and(
+            eq(managementInventoryReservations.organizationId, organizationId),
+            eq(managementInventoryReservations.unitId, unitId),
+            eq(managementInventoryReservations.status, "active"),
+            or(
+              isNull(managementInventoryReservations.expiresAt),
+              sql`${managementInventoryReservations.expiresAt} > now()`,
+            ),
+          ),
+        )
+        .groupBy(
+          managementInventoryReservations.inventoryItemId,
+          managementInventoryReservations.locationId,
+        ),
+      this.database.db
+        .select({
+          inventoryItemId: managementInventoryLots.inventoryItemId,
+          locationId: managementInventoryLots.locationId,
+          quantity: sql<string>`coalesce(sum(${managementInventoryLots.quantity}), 0)`.mapWith(
+            String,
+          ),
+        })
+        .from(managementInventoryLots)
+        .innerJoin(
+          managementInventoryLotHolds,
+          and(
+            eq(managementInventoryLotHolds.organizationId, managementInventoryLots.organizationId),
+            eq(managementInventoryLotHolds.unitId, managementInventoryLots.unitId),
+            eq(managementInventoryLotHolds.lotId, managementInventoryLots.id),
+            eq(managementInventoryLotHolds.status, "active"),
+          ),
+        )
+        .where(
+          and(
+            eq(managementInventoryLots.organizationId, organizationId),
+            eq(managementInventoryLots.unitId, unitId),
+            eq(managementInventoryLots.active, true),
+          ),
+        )
+        .groupBy(managementInventoryLots.inventoryItemId, managementInventoryLots.locationId),
       this.database.db
         .select()
         .from(managementInventoryLots)
@@ -3060,10 +3271,13 @@ export class ManagementService {
           and(
             eq(managementInventoryTransfers.organizationId, organizationId),
             eq(managementInventoryTransfers.unitId, unitId),
+            or(
+              inArray(managementInventoryTransfers.status, ["in_transit", "partially_received"]),
+              gte(managementInventoryTransfers.createdAt, new Date(Date.now() - 30 * 86_400_000)),
+            ),
           ),
         )
-        .orderBy(desc(managementInventoryTransfers.createdAt))
-        .limit(100),
+        .orderBy(desc(managementInventoryTransfers.createdAt)),
       this.database.db
         .select()
         .from(managementInventoryTransferReceipts)
@@ -3203,7 +3417,6 @@ export class ManagementService {
       );
       const current = Number(targetBalance?.quantity ?? 0);
       const target = Number(setting.targetQuantity);
-      if (current >= Number(setting.minimumQuantity) || target <= current) return [];
       const source = balances
         .filter(
           (balance) =>
@@ -3219,7 +3432,45 @@ export class ManagementService {
         })
         .sort((left, right) => right.surplus - left.surplus)[0];
       if (!source || source.surplus <= 0) return [];
-      const suggestedQuantity = Math.min(target - current, source.surplus);
+      const item = items.find((candidate) => candidate.id === setting.inventoryItemId);
+      const forecast = planning.forecasts.find(
+        (candidate) => candidate.inventoryItemId === setting.inventoryItemId,
+      );
+      const servesSales = Boolean(
+        item?.productId &&
+          issueRoutes.some(
+            (route) =>
+              route.productId === item.productId && route.locationId === setting.locationId,
+          ),
+      );
+      const inbound = transfers
+        .filter(
+          (transfer) =>
+            transfer.inventoryItemId === setting.inventoryItemId &&
+            transfer.destinationLocationId === setting.locationId &&
+            ["in_transit", "partially_received"].includes(transfer.status),
+        )
+        .reduce(
+          (total, transfer) =>
+            total +
+            Number(transfer.quantity) -
+            Number(transfer.quantityReceived) -
+            Number(transfer.quantityDivergent),
+          0,
+        );
+      const suggestedQuantity = dynamicSectorReplenishment({
+        current,
+        inbound,
+        minimum: Number(setting.minimumQuantity),
+        configuredTarget: target,
+        dailyDemand:
+          servesSales && forecast
+            ? Number(forecast.expectedDemand) / Math.max(1, forecast.horizonDays)
+            : 0,
+        coverageDays: Math.max(1, Math.min(item?.leadTimeDays ?? 1, 7)),
+        sourceSurplus: source.surplus,
+      });
+      if (suggestedQuantity <= 0) return [];
       return [
         {
           inventoryItemId: setting.inventoryItemId,
@@ -3263,19 +3514,28 @@ export class ManagementService {
         };
       }),
       balances: balances.map((balance) => {
-        const reservedQuantity = planning.reservations
-          .filter(
+        const reservedQuantity = Number(
+          activeReservationTotals.find(
             (reservation) =>
-              reservation.status === "active" &&
               reservation.inventoryItemId === balance.inventoryItemId &&
-              reservation.locationId === balance.locationId &&
-              (!reservation.expiresAt || reservation.expiresAt.getTime() > Date.now()),
-          )
-          .reduce((total, reservation) => total + Number(reservation.quantity), 0);
+              reservation.locationId === balance.locationId,
+          )?.quantity ?? 0,
+        );
+        const blockedQuantity = Number(
+          blockedLotTotals.find(
+            (blocked) =>
+              blocked.inventoryItemId === balance.inventoryItemId &&
+              blocked.locationId === balance.locationId,
+          )?.quantity ?? 0,
+        );
         return {
           ...balance,
           reservedQuantity: reservedQuantity.toFixed(3),
-          availableQuantity: (Number(balance.quantity) - reservedQuantity).toFixed(3),
+          blockedQuantity: blockedQuantity.toFixed(3),
+          availableQuantity: Math.max(
+            Number(balance.quantity) - reservedQuantity - blockedQuantity,
+            0,
+          ).toFixed(3),
         };
       }),
       lots,
@@ -3430,58 +3690,1582 @@ export class ManagementService {
     };
   }
 
-  async returnablesDashboard(identityId: string, organizationId: string, unitId: string) {
+  async inventoryControlsDashboard(identityId: string, organizationId: string, unitId: string) {
+    const role = await this.requireRole(identityId, organizationId, unitId, [
+      ...INVENTORY_ROLES,
+      "finance",
+    ]);
+    const since = new Date(Date.now() - 90 * 86_400_000);
+    const recentSessionIds = this.database.db
+      .select({ id: managementInventoryCountSessions.id })
+      .from(managementInventoryCountSessions)
+      .where(
+        and(
+          eq(managementInventoryCountSessions.organizationId, organizationId),
+          eq(managementInventoryCountSessions.unitId, unitId),
+        ),
+      )
+      .orderBy(desc(managementInventoryCountSessions.createdAt))
+      .limit(100);
+    const [
+      policies,
+      sessions,
+      lines,
+      countMetrics,
+      holds,
+      readings,
+      transfers,
+      movementMetrics,
+      productionBatches,
+      items,
+      custodyExposureRows,
+      returnableConfigurations,
+      depositCharges,
+      returnablePolicyRows,
+      planning,
+      integrityAudits,
+    ] = await Promise.all([
+      this.database.db
+        .select()
+        .from(managementInventorySectorPolicies)
+        .where(
+          and(
+            eq(managementInventorySectorPolicies.organizationId, organizationId),
+            eq(managementInventorySectorPolicies.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementInventoryCountSessions)
+        .where(
+          and(
+            eq(managementInventoryCountSessions.organizationId, organizationId),
+            eq(managementInventoryCountSessions.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementInventoryCountSessions.createdAt))
+        .limit(100),
+      this.database.db
+        .select()
+        .from(managementInventoryCountSessionLines)
+        .where(
+          and(
+            eq(managementInventoryCountSessionLines.organizationId, organizationId),
+            eq(managementInventoryCountSessionLines.unitId, unitId),
+            inArray(managementInventoryCountSessionLines.sessionId, recentSessionIds),
+          ),
+        )
+        .orderBy(managementInventoryCountSessionLines.createdAt),
+      this.database.db
+        .select({
+          countedExpected: sql<string>`coalesce(sum(${managementInventoryCountSessionLines.expectedQuantity}), 0)`,
+          countAbsoluteDifference: sql<string>`coalesce(sum(abs(${managementInventoryCountSessionLines.differenceQuantity})), 0)`,
+        })
+        .from(managementInventoryCountSessionLines)
+        .innerJoin(
+          managementInventoryCountSessions,
+          and(
+            eq(managementInventoryCountSessions.id, managementInventoryCountSessionLines.sessionId),
+            eq(
+              managementInventoryCountSessions.organizationId,
+              managementInventoryCountSessionLines.organizationId,
+            ),
+            eq(
+              managementInventoryCountSessions.unitId,
+              managementInventoryCountSessionLines.unitId,
+            ),
+          ),
+        )
+        .where(
+          and(
+            eq(managementInventoryCountSessionLines.organizationId, organizationId),
+            eq(managementInventoryCountSessionLines.unitId, unitId),
+            eq(managementInventoryCountSessions.status, "approved"),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementInventoryLotHolds)
+        .where(
+          and(
+            eq(managementInventoryLotHolds.organizationId, organizationId),
+            eq(managementInventoryLotHolds.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementInventoryLotHolds.createdAt))
+        .limit(300),
+      this.database.db
+        .select()
+        .from(managementInventoryTemperatureReadings)
+        .where(
+          and(
+            eq(managementInventoryTemperatureReadings.organizationId, organizationId),
+            eq(managementInventoryTemperatureReadings.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementInventoryTemperatureReadings.occurredAt))
+        .limit(500),
+      this.database.db
+        .select()
+        .from(managementInventoryTransfers)
+        .where(
+          and(
+            eq(managementInventoryTransfers.organizationId, organizationId),
+            eq(managementInventoryTransfers.unitId, unitId),
+            gte(managementInventoryTransfers.createdAt, since),
+          ),
+        ),
+      this.database.db
+        .select({
+          outbound: sql<string>`coalesce(sum(case when ${managementInventoryMovements.quantityDelta} < 0 then abs(${managementInventoryMovements.quantityDelta}) else 0 end), 0)`,
+          losses: sql<string>`coalesce(sum(case when ${managementInventoryMovements.type} = 'loss' then abs(${managementInventoryMovements.quantityDelta}) else 0 end), 0)`,
+        })
+        .from(managementInventoryMovements)
+        .where(
+          and(
+            eq(managementInventoryMovements.organizationId, organizationId),
+            eq(managementInventoryMovements.unitId, unitId),
+            gte(managementInventoryMovements.occurredAt, since),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementProductionBatches)
+        .where(
+          and(
+            eq(managementProductionBatches.organizationId, organizationId),
+            eq(managementProductionBatches.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementProductionBatches.createdAt))
+        .limit(200),
+      this.database.db
+        .select()
+        .from(managementInventoryItems)
+        .where(
+          and(
+            eq(managementInventoryItems.organizationId, organizationId),
+            eq(managementInventoryItems.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select({
+          orderId: managementReturnableCustodyMovements.orderId,
+          containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
+          quantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
+        })
+        .from(managementReturnableCustodyMovements)
+        .where(
+          and(
+            eq(managementReturnableCustodyMovements.organizationId, organizationId),
+            eq(managementReturnableCustodyMovements.unitId, unitId),
+            isNotNull(managementReturnableCustodyMovements.orderId),
+          ),
+        )
+        .groupBy(
+          managementReturnableCustodyMovements.orderId,
+          managementReturnableCustodyMovements.containerInventoryItemId,
+        ),
+      this.database.db
+        .select()
+        .from(managementProductReturnables)
+        .where(
+          and(
+            eq(managementProductReturnables.organizationId, organizationId),
+            eq(managementProductReturnables.unitId, unitId),
+            eq(managementProductReturnables.active, true),
+          ),
+        ),
+      this.database.db
+        .select()
+        .from(managementReturnableDepositCharges)
+        .where(
+          and(
+            eq(managementReturnableDepositCharges.organizationId, organizationId),
+            eq(managementReturnableDepositCharges.unitId, unitId),
+          ),
+        )
+        .orderBy(desc(managementReturnableDepositCharges.createdAt))
+        .limit(300),
+      this.database.db
+        .select({ depositMode: managementReturnablePolicies.depositMode })
+        .from(managementReturnablePolicies)
+        .where(
+          and(
+            eq(managementReturnablePolicies.organizationId, organizationId),
+            eq(managementReturnablePolicies.unitId, unitId),
+          ),
+        )
+        .limit(1),
+      this.inventoryPlanningSnapshot(identityId, organizationId, unitId),
+      this.database.db
+        .select({ metadata: auditEvents.metadata, occurredAt: auditEvents.occurredAt })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.organizationId, organizationId),
+            eq(auditEvents.unitId, unitId),
+            eq(auditEvents.action, "management.inventory.integrity_checked"),
+          ),
+        )
+        .orderBy(desc(auditEvents.occurredAt))
+        .limit(1),
+    ]);
+
+    const countedExpected = Number(countMetrics[0]?.countedExpected ?? 0);
+    const countAbsoluteDifference = Number(countMetrics[0]?.countAbsoluteDifference ?? 0);
+    const transferred = transfers.reduce((total, transfer) => total + Number(transfer.quantity), 0);
+    const transferDivergent = transfers.reduce(
+      (total, transfer) => total + Number(transfer.quantityDivergent),
+      0,
+    );
+    const outbound = Number(movementMetrics[0]?.outbound ?? 0);
+    const losses = Number(movementMetrics[0]?.losses ?? 0);
+    const confidence = inventoryConfidence({
+      countedExpected,
+      countAbsoluteDifference,
+      transferred,
+      transferDivergent,
+      outbound,
+      losses,
+    });
+
+    const depositByContainer = new Map(
+      returnableConfigurations.map((configuration) => [
+        configuration.containerInventoryItemId,
+        configuration.depositCents,
+      ]),
+    );
+    const exposureByOrder = new Map<string, { quantity: number; amountCents: number }>();
+    for (const exposure of custodyExposureRows) {
+      if (!exposure.orderId) continue;
+      const current = exposureByOrder.get(exposure.orderId) ?? { quantity: 0, amountCents: 0 };
+      const delta = Number(exposure.quantity);
+      current.quantity += delta;
+      current.amountCents += Math.round(
+        delta * (depositByContainer.get(exposure.containerInventoryItemId) ?? 0),
+      );
+      exposureByOrder.set(exposure.orderId, current);
+    }
+
+    const itemById = new Map(items.map((item) => [item.id, item]));
+    const activeHolds = holds.filter((hold) => hold.status === "active");
+    const criticalReadings = readings.filter((reading) => reading.status === "critical");
+    const overdueTransfers = transfers.filter(
+      (transfer) =>
+        ["in_transit", "partially_received"].includes(transfer.status) &&
+        transfer.deadlineAt.getTime() < Date.now(),
+    );
+    const latestIntegrity = integrityAudits[0];
+    const integrityMismatchCount = Number(latestIntegrity?.metadata.mismatchCount ?? 0);
+    return {
+      policies,
+      countSessions: sessions.map((session) => ({
+        ...session,
+        lines: lines
+          .filter((line) => line.sessionId === session.id)
+          .map((line) => ({
+            ...line,
+            expectedQuantity: session.status === "open" ? null : line.expectedQuantity,
+            differenceQuantity: session.status === "open" ? null : line.differenceQuantity,
+          })),
+      })),
+      lotHolds: holds,
+      temperatureReadings: readings,
+      confidence,
+      anomalies: [
+        ...(latestIntegrity && integrityMismatchCount > 0
+          ? [
+              {
+                id: `integrity:${latestIntegrity.occurredAt.toISOString()}`,
+                kind: "integrity_mismatch" as const,
+                severity: "high" as const,
+                locationId: null,
+                detail: `${integrityMismatchCount} inconsistência(s) detectada(s) na verificação diária.`,
+                occurredAt: latestIntegrity.occurredAt,
+              },
+            ]
+          : []),
+        ...overdueTransfers.map((transfer) => ({
+          id: `transfer:${transfer.id}`,
+          kind: "overdue_transfer" as const,
+          severity: "high" as const,
+          locationId: transfer.destinationLocationId,
+          detail: "Transferência interna fora do SLA.",
+          occurredAt: transfer.deadlineAt,
+        })),
+        ...criticalReadings.slice(0, 20).map((reading) => ({
+          id: `temperature:${reading.id}`,
+          kind: "critical_temperature" as const,
+          severity: "high" as const,
+          locationId: reading.locationId,
+          detail: `Temperatura crítica: ${(reading.celsiusMilli / 1_000).toLocaleString("pt-BR")} °C.`,
+          occurredAt: reading.occurredAt,
+        })),
+        ...activeHolds.map((hold) => ({
+          id: `hold:${hold.id}`,
+          kind: "quarantined_lot" as const,
+          severity: "medium" as const,
+          locationId: null,
+          detail: hold.reason,
+          occurredAt: hold.createdAt,
+        })),
+      ],
+      purchaseSuggestions: planning.forecasts
+        .filter((forecast) => Number(forecast.suggestedPurchaseQuantity) > 0)
+        .map((forecast) => {
+          const item = itemById.get(forecast.inventoryItemId);
+          return {
+            ...forecast,
+            inventoryItemName: item?.name ?? "Item",
+            preferredSupplierId: item?.preferredSupplierId ?? null,
+            leadTimeDays: item?.leadTimeDays ?? 0,
+          };
+        }),
+      productionVariances: productionBatches
+        .filter((batch) => batch.status === "completed")
+        .map((batch) => ({
+          productionBatchId: batch.id,
+          inventoryItemId: batch.outputInventoryItemId,
+          plannedQuantity: batch.plannedQuantity,
+          actualQuantity: batch.actualQuantity,
+          variancePercent: productionVariance(
+            Number(batch.plannedQuantity),
+            batch.actualQuantity === null ? null : Number(batch.actualQuantity),
+          ),
+        })),
+      returnableDepositMode:
+        returnablePolicyRows[0]?.depositMode ?? DEFAULT_RETURNABLE_POLICY.depositMode,
+      returnableDepositExposures: [...exposureByOrder]
+        .filter(([, exposure]) => exposure.quantity > 0 && exposure.amountCents > 0)
+        .map(([orderId, exposure]) => ({
+          orderId,
+          ...exposure,
+          charge: depositCharges.find(
+            (charge) => charge.orderId === orderId && charge.status === "charged",
+          ),
+        })),
+      depositCharges,
+      capabilities: {
+        canReviewCount: role === "owner" || role === "manager",
+        canReleaseLot: role === "owner" || role === "manager",
+        canChargeDeposit: role === "owner" || role === "manager" || role === "finance",
+      },
+    };
+  }
+
+  async configureInventorySectorPolicy(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    locationId: string,
+    input: InventorySectorPolicyInput,
+  ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    const [location] = await this.database.db
+      .select({ id: managementStockLocations.id })
+      .from(managementStockLocations)
+      .where(
+        and(
+          eq(managementStockLocations.organizationId, organizationId),
+          eq(managementStockLocations.unitId, unitId),
+          eq(managementStockLocations.id, locationId),
+          eq(managementStockLocations.active, true),
+        ),
+      )
+      .limit(1);
+    if (!location) throw new NotFoundException({ code: "STOCK_LOCATION_NOT_FOUND" });
+    return this.database.db.transaction(async (tx) => {
+      const [policy] = await tx
+        .insert(managementInventorySectorPolicies)
+        .values({
+          organizationId,
+          unitId,
+          locationId,
+          blindCountRequired: input.blindCountRequired,
+          requireDistinctCountReviewer: input.requireDistinctCountReviewer,
+          scanRequired: input.scanRequired,
+          offlineAllowed: input.offlineAllowed,
+          temperatureMinMilli:
+            input.temperatureMinimumCelsius === null
+              ? null
+              : Math.round(input.temperatureMinimumCelsius * 1_000),
+          temperatureMaxMilli:
+            input.temperatureMaximumCelsius === null
+              ? null
+              : Math.round(input.temperatureMaximumCelsius * 1_000),
+          updatedByIdentityId: identityId,
+        })
+        .onConflictDoUpdate({
+          target: [
+            managementInventorySectorPolicies.organizationId,
+            managementInventorySectorPolicies.unitId,
+            managementInventorySectorPolicies.locationId,
+          ],
+          set: {
+            blindCountRequired: input.blindCountRequired,
+            requireDistinctCountReviewer: input.requireDistinctCountReviewer,
+            scanRequired: input.scanRequired,
+            offlineAllowed: input.offlineAllowed,
+            temperatureMinMilli:
+              input.temperatureMinimumCelsius === null
+                ? null
+                : Math.round(input.temperatureMinimumCelsius * 1_000),
+            temperatureMaxMilli:
+              input.temperatureMaximumCelsius === null
+                ? null
+                : Math.round(input.temperatureMaximumCelsius * 1_000),
+            updatedByIdentityId: identityId,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      if (!policy) throw new Error("Inventory sector policy was not persisted");
+      await this.record(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        "management.inventory.sector-policy.configured",
+        "inventory_sector_policy",
+        locationId,
+        { policy },
+      );
+      return policy;
+    });
+  }
+
+  async startBlindInventoryCount(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: BlindCountStartInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-blind-count.start",
+      input,
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`inventory-count:${organizationId}:${unitId}:${input.locationId}`}, 0))`,
+        );
+        const [activeSession] = await tx
+          .select({ id: managementInventoryCountSessions.id })
+          .from(managementInventoryCountSessions)
+          .where(
+            and(
+              eq(managementInventoryCountSessions.organizationId, organizationId),
+              eq(managementInventoryCountSessions.unitId, unitId),
+              eq(managementInventoryCountSessions.locationId, input.locationId),
+              inArray(managementInventoryCountSessions.status, ["open", "submitted"]),
+            ),
+          )
+          .limit(1);
+        if (activeSession)
+          throw new ConflictException({
+            code: "INVENTORY_COUNT_LOCATION_BUSY",
+            message: "O setor ja possui uma contagem em andamento.",
+            sessionId: activeSession.id,
+          });
+        const [location] = await tx
+          .select({ id: managementStockLocations.id })
+          .from(managementStockLocations)
+          .where(
+            and(
+              eq(managementStockLocations.organizationId, organizationId),
+              eq(managementStockLocations.unitId, unitId),
+              eq(managementStockLocations.id, input.locationId),
+              eq(managementStockLocations.active, true),
+            ),
+          )
+          .limit(1);
+        if (!location) throw new NotFoundException({ code: "STOCK_LOCATION_NOT_FOUND" });
+        const selectedSchedules = input.scheduleIds
+          ? await tx
+              .select()
+              .from(managementInventoryCountSchedules)
+              .where(
+                and(
+                  eq(managementInventoryCountSchedules.organizationId, organizationId),
+                  eq(managementInventoryCountSchedules.unitId, unitId),
+                  eq(managementInventoryCountSchedules.locationId, input.locationId),
+                  eq(managementInventoryCountSchedules.active, true),
+                  inArray(managementInventoryCountSchedules.id, input.scheduleIds),
+                ),
+              )
+          : [];
+        if (input.scheduleIds && selectedSchedules.length !== input.scheduleIds.length)
+          throw new BadRequestException({ code: "INVENTORY_COUNT_SCHEDULE_INVALID" });
+        const scheduledItemIds = selectedSchedules.map((schedule) => schedule.inventoryItemId);
+        const [items, balances, lots] = await Promise.all([
+          tx
+            .select({ id: managementInventoryItems.id })
+            .from(managementInventoryItems)
+            .where(
+              and(
+                eq(managementInventoryItems.organizationId, organizationId),
+                eq(managementInventoryItems.unitId, unitId),
+                eq(managementInventoryItems.active, true),
+                scheduledItemIds.length
+                  ? inArray(managementInventoryItems.id, scheduledItemIds)
+                  : undefined,
+              ),
+            ),
+          tx
+            .select()
+            .from(managementStockBalances)
+            .where(
+              and(
+                eq(managementStockBalances.organizationId, organizationId),
+                eq(managementStockBalances.unitId, unitId),
+                eq(managementStockBalances.locationId, input.locationId),
+              ),
+            ),
+          tx
+            .select()
+            .from(managementInventoryLots)
+            .where(
+              and(
+                eq(managementInventoryLots.organizationId, organizationId),
+                eq(managementInventoryLots.unitId, unitId),
+                eq(managementInventoryLots.locationId, input.locationId),
+                eq(managementInventoryLots.active, true),
+              ),
+            ),
+        ]);
+        if (items.length > 2_000)
+          throw new BadRequestException({ code: "INVENTORY_COUNT_TOO_LARGE" });
+        const sessionId = randomUUID();
+        await tx.insert(managementInventoryCountSessions).values({
+          id: sessionId,
+          organizationId,
+          unitId,
+          locationId: input.locationId,
+          shiftReference: input.shiftReference,
+          reason: input.reason,
+          idempotencyKey,
+          startedByIdentityId: identityId,
+        });
+        type CountLineInsert = typeof managementInventoryCountSessionLines.$inferInsert;
+        const countLines = items.flatMap<CountLineInsert>((item) => {
+          const balance = balances.find((candidate) => candidate.inventoryItemId === item.id);
+          const itemLots = lots.filter((lot) => lot.inventoryItemId === item.id);
+          if (itemLots.length)
+            return itemLots.map((lot) => ({
+              organizationId,
+              unitId,
+              sessionId,
+              inventoryItemId: item.id,
+              lotId: lot.id,
+              expectedQuantity: lot.quantity,
+              expectedBalanceVersion: balance?.version ?? 1,
+            }));
+          return [
+            {
+              organizationId,
+              unitId,
+              sessionId,
+              inventoryItemId: item.id,
+              lotId: null,
+              expectedQuantity: balance?.quantity ?? "0",
+              expectedBalanceVersion: balance?.version ?? 1,
+            },
+          ];
+        });
+        if (countLines.length > 2_000)
+          throw new BadRequestException({ code: "INVENTORY_COUNT_TOO_LARGE" });
+        if (!countLines.length)
+          throw new BadRequestException({
+            code: "INVENTORY_COUNT_EMPTY",
+            message: "O setor nao possui itens para a contagem selecionada.",
+          });
+        const createdLines = await tx
+          .insert(managementInventoryCountSessionLines)
+          .values(countLines)
+          .returning({
+            id: managementInventoryCountSessionLines.id,
+            inventoryItemId: managementInventoryCountSessionLines.inventoryItemId,
+            lotId: managementInventoryCountSessionLines.lotId,
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.blind-count-started",
+          "inventory_count_session",
+          sessionId,
+          {
+            locationId: input.locationId,
+            lineCount: createdLines.length,
+            scheduleIds: input.scheduleIds ?? [],
+          },
+        );
+        return { id: sessionId, status: "open", lines: createdLines };
+      },
+    );
+  }
+
+  async submitBlindInventoryCount(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    sessionId: string,
+    idempotencyKey: string,
+    input: BlindCountSubmitInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-blind-count.submit",
+      { sessionId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_inventory_count_sessions where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${sessionId}::uuid for update`,
+        );
+        const [session] = await tx
+          .select()
+          .from(managementInventoryCountSessions)
+          .where(
+            and(
+              eq(managementInventoryCountSessions.organizationId, organizationId),
+              eq(managementInventoryCountSessions.unitId, unitId),
+              eq(managementInventoryCountSessions.id, sessionId),
+            ),
+          )
+          .limit(1);
+        if (!session) throw new NotFoundException({ code: "INVENTORY_COUNT_NOT_FOUND" });
+        if (session.status !== "open")
+          throw new ConflictException({ code: "INVENTORY_COUNT_ALREADY_SUBMITTED" });
+        if (session.startedByIdentityId !== identityId)
+          throw new ForbiddenException({ code: "INVENTORY_COUNT_SUBMITTER_MISMATCH" });
+        const sessionLines = await tx
+          .select()
+          .from(managementInventoryCountSessionLines)
+          .where(eq(managementInventoryCountSessionLines.sessionId, sessionId));
+        if (
+          sessionLines.length !== input.lines.length ||
+          input.lines.some(
+            (line) => !sessionLines.some((candidate) => candidate.id === line.lineId),
+          )
+        )
+          throw new BadRequestException({ code: "INVENTORY_COUNT_LINES_INCOMPLETE" });
+        for (const line of input.lines) {
+          const current = sessionLines.find((candidate) => candidate.id === line.lineId);
+          if (!current) continue;
+          const countedMilli = quantityToMilli(line.countedQuantity);
+          const expectedMilli = quantityToMilli(current.expectedQuantity);
+          await tx
+            .update(managementInventoryCountSessionLines)
+            .set({
+              countedQuantity: milliToQuantity(countedMilli),
+              differenceQuantity: milliToQuantity(countedMilli - expectedMilli),
+              updatedAt: new Date(),
+            })
+            .where(eq(managementInventoryCountSessionLines.id, line.lineId));
+        }
+        const capturedAt = input.capturedAt ? new Date(input.capturedAt) : new Date();
+        if (capturedAt.getTime() > Date.now() + 5 * 60_000)
+          throw new BadRequestException({ code: "INVENTORY_COUNT_CAPTURED_AT_INVALID" });
+        await tx
+          .update(managementInventoryCountSessions)
+          .set({ status: "submitted", submittedAt: capturedAt, updatedAt: new Date() })
+          .where(eq(managementInventoryCountSessions.id, sessionId));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.blind-count-submitted",
+          "inventory_count_session",
+          sessionId,
+          { offline: input.offline, capturedAt: capturedAt.toISOString() },
+        );
+        return { id: sessionId, status: "submitted" };
+      },
+    );
+  }
+
+  async reviewBlindInventoryCount(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    sessionId: string,
+    idempotencyKey: string,
+    input: BlindCountReviewInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-blind-count.review",
+      { sessionId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_inventory_count_sessions where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${sessionId}::uuid for update`,
+        );
+        const [session] = await tx
+          .select()
+          .from(managementInventoryCountSessions)
+          .where(
+            and(
+              eq(managementInventoryCountSessions.organizationId, organizationId),
+              eq(managementInventoryCountSessions.unitId, unitId),
+              eq(managementInventoryCountSessions.id, sessionId),
+            ),
+          )
+          .limit(1);
+        if (!session) throw new NotFoundException({ code: "INVENTORY_COUNT_NOT_FOUND" });
+        if (session.status !== "submitted")
+          throw new ConflictException({ code: "INVENTORY_COUNT_NOT_PENDING_REVIEW" });
+        const [policy] = await tx
+          .select()
+          .from(managementInventorySectorPolicies)
+          .where(
+            and(
+              eq(managementInventorySectorPolicies.organizationId, organizationId),
+              eq(managementInventorySectorPolicies.unitId, unitId),
+              eq(managementInventorySectorPolicies.locationId, session.locationId),
+            ),
+          )
+          .limit(1);
+        if (
+          (policy?.requireDistinctCountReviewer ?? true) &&
+          session.startedByIdentityId === identityId
+        )
+          throw new ForbiddenException({ code: "INVENTORY_COUNT_DUAL_CONTROL_REQUIRED" });
+        const sessionLines = await tx
+          .select()
+          .from(managementInventoryCountSessionLines)
+          .where(eq(managementInventoryCountSessionLines.sessionId, sessionId));
+        if (input.decision === "approved") {
+          const countedItemIds = [...new Set(sessionLines.map((line) => line.inventoryItemId))];
+          const currentBalances = await tx
+            .select({
+              inventoryItemId: managementStockBalances.inventoryItemId,
+              version: managementStockBalances.version,
+            })
+            .from(managementStockBalances)
+            .where(
+              and(
+                eq(managementStockBalances.organizationId, organizationId),
+                eq(managementStockBalances.unitId, unitId),
+                eq(managementStockBalances.locationId, session.locationId),
+                inArray(managementStockBalances.inventoryItemId, countedItemIds),
+              ),
+            );
+          const versionByItem = new Map(
+            currentBalances.map((balance) => [balance.inventoryItemId, balance.version]),
+          );
+          const staleLine = sessionLines.find(
+            (line) =>
+              (versionByItem.get(line.inventoryItemId) ?? 1) !== line.expectedBalanceVersion,
+          );
+          if (staleLine)
+            throw new ConflictException({
+              code: "INVENTORY_COUNT_STALE_BALANCE",
+              message:
+                "O saldo mudou durante a contagem. Reabra a contagem para evitar ajuste incorreto.",
+              inventoryItemId: staleLine.inventoryItemId,
+            });
+          for (const line of sessionLines) {
+            const differenceMilli = quantityToMilli(line.differenceQuantity ?? "0");
+            if (differenceMilli === 0) continue;
+            await this.applyStockMovement(tx, organizationId, unitId, {
+              locationId: session.locationId,
+              inventoryItemId: line.inventoryItemId,
+              lotId: line.lotId,
+              quantityDeltaMilli: differenceMilli,
+              type: "blind_count",
+              sourceType: "inventory_count_session_line",
+              sourceId: line.id,
+              actorIdentityId: identityId,
+              allowHeldLotAdjustment: true,
+            });
+          }
+          await tx
+            .update(managementInventoryCountSchedules)
+            .set({
+              lastCountedAt: new Date(),
+              nextDueAt: sql`now() + (${managementInventoryCountSchedules.frequencyDays} * interval '1 day')`,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(managementInventoryCountSchedules.organizationId, organizationId),
+                eq(managementInventoryCountSchedules.unitId, unitId),
+                eq(managementInventoryCountSchedules.locationId, session.locationId),
+                inArray(managementInventoryCountSchedules.inventoryItemId, countedItemIds),
+              ),
+            );
+        }
+        await tx
+          .update(managementInventoryCountSessions)
+          .set({
+            status: input.decision,
+            reviewedByIdentityId: identityId,
+            reviewedAt: new Date(),
+            reviewNote: input.note,
+            updatedAt: new Date(),
+          })
+          .where(eq(managementInventoryCountSessions.id, sessionId));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          `management.inventory.blind-count-${input.decision}`,
+          "inventory_count_session",
+          sessionId,
+          { note: input.note },
+        );
+        return { id: sessionId, status: input.decision };
+      },
+    );
+  }
+
+  async recordInventoryTemperature(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: InventoryTemperatureInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-temperature.record",
+      input,
+      async (tx) => {
+        const [policy] = await tx
+          .select()
+          .from(managementInventorySectorPolicies)
+          .where(
+            and(
+              eq(managementInventorySectorPolicies.organizationId, organizationId),
+              eq(managementInventorySectorPolicies.unitId, unitId),
+              eq(managementInventorySectorPolicies.locationId, input.locationId),
+            ),
+          )
+          .limit(1);
+        if (policy?.temperatureMinMilli == null || policy.temperatureMaxMilli == null)
+          throw new BadRequestException({
+            code: "INVENTORY_TEMPERATURE_RANGE_NOT_CONFIGURED",
+            message: "Configure a faixa de temperatura do setor antes da leitura.",
+          });
+        const celsiusMilli = Math.round(input.celsius * 1_000);
+        const status = temperatureStatus(
+          celsiusMilli,
+          policy.temperatureMinMilli,
+          policy.temperatureMaxMilli,
+        );
+        const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
+        if (occurredAt.getTime() > Date.now() + 5 * 60_000)
+          throw new BadRequestException({ code: "INVENTORY_TEMPERATURE_OCCURRED_AT_INVALID" });
+        const [reading] = await tx
+          .insert(managementInventoryTemperatureReadings)
+          .values({
+            organizationId,
+            unitId,
+            locationId: input.locationId,
+            celsiusMilli,
+            minimumMilliAtCapture: policy.temperatureMinMilli,
+            maximumMilliAtCapture: policy.temperatureMaxMilli,
+            status,
+            source: input.source,
+            note: input.note,
+            idempotencyKey,
+            recordedByIdentityId: identityId,
+            occurredAt,
+          })
+          .returning();
+        if (!reading) throw new ConflictException({ code: "INVENTORY_TEMPERATURE_NOT_RECORDED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.temperature-recorded",
+          "inventory_temperature_reading",
+          reading.id,
+          { locationId: input.locationId, status, celsiusMilli },
+        );
+        return reading;
+      },
+    );
+  }
+
+  async holdInventoryLot(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    lotId: string,
+    idempotencyKey: string,
+    input: InventoryLotHoldInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-lot.hold",
+      { lotId, ...input },
+      async (tx) => {
+        const [lot] = await tx
+          .select({ id: managementInventoryLots.id })
+          .from(managementInventoryLots)
+          .where(
+            and(
+              eq(managementInventoryLots.organizationId, organizationId),
+              eq(managementInventoryLots.unitId, unitId),
+              eq(managementInventoryLots.id, lotId),
+              eq(managementInventoryLots.active, true),
+            ),
+          )
+          .limit(1);
+        if (!lot) throw new NotFoundException({ code: "INVENTORY_LOT_NOT_FOUND" });
+        const [hold] = await tx
+          .insert(managementInventoryLotHolds)
+          .values({
+            organizationId,
+            unitId,
+            lotId,
+            reason: input.reason,
+            evidence: input.evidence,
+            idempotencyKey,
+            createdByIdentityId: identityId,
+          })
+          .returning();
+        if (!hold) throw new ConflictException({ code: "INVENTORY_LOT_HOLD_NOT_CREATED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.lot-held",
+          "inventory_lot_hold",
+          hold.id,
+          { lotId, reason: input.reason },
+        );
+        return hold;
+      },
+    );
+  }
+
+  async releaseInventoryLot(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    lotId: string,
+    holdId: string,
+    idempotencyKey: string,
+    input: InventoryLotHoldReleaseInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "inventory-lot.release",
+      { lotId, holdId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_inventory_lot_holds where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${holdId}::uuid for update`,
+        );
+        const [hold] = await tx
+          .update(managementInventoryLotHolds)
+          .set({
+            status: "released",
+            releasedByIdentityId: identityId,
+            releasedAt: new Date(),
+            releaseReason: input.reason,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(managementInventoryLotHolds.organizationId, organizationId),
+              eq(managementInventoryLotHolds.unitId, unitId),
+              eq(managementInventoryLotHolds.id, holdId),
+              eq(managementInventoryLotHolds.lotId, lotId),
+              eq(managementInventoryLotHolds.status, "active"),
+            ),
+          )
+          .returning();
+        if (!hold) throw new ConflictException({ code: "INVENTORY_LOT_HOLD_NOT_ACTIVE" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.inventory.lot-released",
+          "inventory_lot_hold",
+          holdId,
+          { lotId, reason: input.reason },
+        );
+        return hold;
+      },
+    );
+  }
+
+  async returnablePolicy(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "inventory",
+      "finance",
+    ] as const);
+    const [policy] = await this.database.db
+      .select()
+      .from(managementReturnablePolicies)
+      .where(
+        and(
+          eq(managementReturnablePolicies.organizationId, organizationId),
+          eq(managementReturnablePolicies.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    return policy ?? { organizationId, unitId, ...DEFAULT_RETURNABLE_POLICY, updatedAt: null };
+  }
+
+  async configureReturnablePolicy(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReturnablePolicyInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner", "manager"] as const);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-policy.configure",
+      input,
+      async (tx) => {
+        const [policy] = await tx
+          .insert(managementReturnablePolicies)
+          .values({
+            organizationId,
+            unitId,
+            depositMode: input.depositMode,
+            defaultDueDays: input.defaultDueDays,
+            returnableClosePolicy: input.returnableClosePolicy,
+            updatedByIdentityId: identityId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              managementReturnablePolicies.organizationId,
+              managementReturnablePolicies.unitId,
+            ],
+            set: {
+              depositMode: input.depositMode,
+              defaultDueDays: input.defaultDueDays,
+              returnableClosePolicy: input.returnableClosePolicy,
+              updatedByIdentityId: identityId,
+              updatedAt: new Date(),
+            },
+          })
+          .returning();
+        if (!policy) throw new ConflictException({ code: "RETURNABLE_POLICY_CONFLICT" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-policy.configured",
+          "returnable_policy",
+          unitId,
+          input,
+        );
+        return policy;
+      },
+    );
+  }
+
+  async chargeReturnableDeposit(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReturnableDepositChargeInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-deposit.charge",
+      input,
+      async (tx) => {
+        await this.requireOrder(tx, organizationId, unitId, input.orderId);
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`returnable-deposit:${organizationId}:${unitId}:${input.orderId}`}, 0))`,
+        );
+        const [policy] = await tx
+          .select()
+          .from(managementReturnablePolicies)
+          .where(
+            and(
+              eq(managementReturnablePolicies.organizationId, organizationId),
+              eq(managementReturnablePolicies.unitId, unitId),
+            ),
+          )
+          .limit(1);
+        const effectivePolicy = policy ?? DEFAULT_RETURNABLE_POLICY;
+        if (effectivePolicy.depositMode !== "manual")
+          throw new ConflictException({
+            code: "RETURNABLE_DEPOSIT_DISABLED",
+            message: "A caução de retornáveis está desativada nesta unidade.",
+          });
+        const [activeCharge] = await tx
+          .select({ id: managementReturnableDepositCharges.id })
+          .from(managementReturnableDepositCharges)
+          .where(
+            and(
+              eq(managementReturnableDepositCharges.organizationId, organizationId),
+              eq(managementReturnableDepositCharges.unitId, unitId),
+              eq(managementReturnableDepositCharges.orderId, input.orderId),
+              eq(managementReturnableDepositCharges.status, "charged"),
+            ),
+          )
+          .limit(1);
+        if (activeCharge)
+          throw new ConflictException({ code: "RETURNABLE_DEPOSIT_ALREADY_CHARGED" });
+        const openIssues = await tx.execute<{
+          issueMovementId: string;
+          containerInventoryItemId: string;
+          outstandingQuantity: string;
+          depositCentsSnapshot: number;
+        }>(sql`
+          select issue.id as "issueMovementId",
+                 issue.container_inventory_item_id as "containerInventoryItemId",
+                 issue.quantity_delta + coalesce(settlement.settled, 0) as "outstandingQuantity",
+                 coalesce(nullif(issue.context->>'depositCents', '')::integer, 0) as "depositCentsSnapshot"
+          from management_returnable_custody_movements issue
+          left join lateral (
+            select sum(child.quantity_delta) as settled
+            from management_returnable_custody_movements child
+            where child.organization_id = issue.organization_id
+              and child.unit_id = issue.unit_id
+              and child.parent_movement_id = issue.id
+          ) settlement on true
+          where issue.organization_id = ${organizationId}::uuid
+            and issue.unit_id = ${unitId}::uuid
+            and issue.order_id = ${input.orderId}::uuid
+            and issue.type = 'issue'
+            and issue.quantity_delta + coalesce(settlement.settled, 0) > 0
+          order by issue.id
+          for update of issue
+        `);
+        const chargeLines = [...openIssues]
+          .filter((issue) => issue.depositCentsSnapshot > 0)
+          .map((issue) => ({
+            ...issue,
+            amountCents: Math.round(Number(issue.outstandingQuantity) * issue.depositCentsSnapshot),
+          }))
+          .filter((line) => line.amountCents > 0);
+        const amountCents = chargeLines.reduce((total, line) => total + line.amountCents, 0);
+        if (amountCents <= 0)
+          throw new ConflictException({
+            code: "RETURNABLE_DEPOSIT_NOT_DUE",
+            message: "A comanda não possui caução pendente de retornáveis.",
+          });
+        const today = new Date().toISOString().slice(0, 10);
+        const defaultDueDate = new Date();
+        defaultDueDate.setUTCDate(defaultDueDate.getUTCDate() + effectivePolicy.defaultDueDays);
+        const dueDate = input.dueDate ?? defaultDueDate.toISOString().slice(0, 10);
+        if (dueDate < today)
+          throw new BadRequestException({ code: "RETURNABLE_DEPOSIT_DUE_DATE_INVALID" });
+        const receivableId = randomUUID();
+        const chargeId = randomUUID();
+        await tx.insert(managementAccountsReceivable).values({
+          id: receivableId,
+          organizationId,
+          unitId,
+          sourceOrderId: input.orderId,
+          description: "Caução de vasilhames não devolvidos",
+          amountCents,
+          competenceDate: today,
+          dueDate,
+          idempotencyKey: `returnable-deposit:${idempotencyKey}`,
+        });
+        await tx.insert(managementReceivableLines).values({
+          organizationId,
+          unitId,
+          receivableId,
+          description: "Caução de vasilhames não devolvidos",
+          revenueCents: amountCents,
+        });
+        await tx.insert(managementReturnableDepositCharges).values({
+          id: chargeId,
+          organizationId,
+          unitId,
+          orderId: input.orderId,
+          receivableId,
+          amountCents,
+          idempotencyKey,
+          chargedByIdentityId: identityId,
+        });
+        await tx.insert(managementReturnableDepositChargeLines).values(
+          chargeLines.map((line) => ({
+            organizationId,
+            unitId,
+            chargeId,
+            issueMovementId: line.issueMovementId,
+            containerInventoryItemId: line.containerInventoryItemId,
+            outstandingQuantityAtCharge: line.outstandingQuantity,
+            depositCentsSnapshot: line.depositCentsSnapshot,
+            amountCents: line.amountCents,
+          })),
+        );
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-deposit.charged",
+          "returnable_deposit_charge",
+          chargeId,
+          {
+            orderId: input.orderId,
+            receivableId,
+            amountCents,
+            dueDate,
+            issueMovementIds: chargeLines.map((line) => line.issueMovementId),
+          },
+        );
+        return {
+          id: chargeId,
+          receivableId,
+          amountCents,
+          dueDate,
+          status: "charged",
+          lines: chargeLines,
+        };
+      },
+    );
+  }
+
+  async cancelReturnableDepositCharge(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    chargeId: string,
+    idempotencyKey: string,
+    input: ReturnableDepositCancelInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-deposit.cancel",
+      { chargeId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_returnable_deposit_charges where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${chargeId}::uuid for update`,
+        );
+        const [charge] = await tx
+          .select()
+          .from(managementReturnableDepositCharges)
+          .where(
+            and(
+              eq(managementReturnableDepositCharges.organizationId, organizationId),
+              eq(managementReturnableDepositCharges.unitId, unitId),
+              eq(managementReturnableDepositCharges.id, chargeId),
+              eq(managementReturnableDepositCharges.status, "charged"),
+            ),
+          )
+          .limit(1);
+        if (!charge) throw new ConflictException({ code: "RETURNABLE_DEPOSIT_NOT_ACTIVE" });
+        const [receivable] = await tx
+          .select()
+          .from(managementAccountsReceivable)
+          .where(eq(managementAccountsReceivable.id, charge.receivableId))
+          .limit(1);
+        if (!receivable || receivable.receivedCents > 0)
+          throw new ConflictException({
+            code: "RETURNABLE_DEPOSIT_ALREADY_RECEIVED",
+            message: "A caução já recebeu pagamento e exige estorno financeiro.",
+          });
+        await tx
+          .update(managementAccountsReceivable)
+          .set({ status: "canceled", version: receivable.version + 1, updatedAt: new Date() })
+          .where(eq(managementAccountsReceivable.id, charge.receivableId));
+        const [canceled] = await tx
+          .update(managementReturnableDepositCharges)
+          .set({
+            status: "canceled",
+            canceledByIdentityId: identityId,
+            canceledAt: new Date(),
+            cancellationReason: input.reason,
+            updatedAt: new Date(),
+          })
+          .where(eq(managementReturnableDepositCharges.id, chargeId))
+          .returning();
+        if (!canceled) throw new ConflictException({ code: "RETURNABLE_DEPOSIT_CANCEL_CONFLICT" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-deposit.canceled",
+          "returnable_deposit_charge",
+          chargeId,
+          { reason: input.reason, receivableId: charge.receivableId },
+        );
+        return canceled;
+      },
+    );
+  }
+
+  async reconcileReturnableDepositCharge(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    chargeId: string,
+    idempotencyKey: string,
+    input: ReturnableDepositReconcileInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-deposit.reconcile",
+      { chargeId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_returnable_deposit_charges where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${chargeId}::uuid for update`,
+        );
+        const [charge] = await tx
+          .select()
+          .from(managementReturnableDepositCharges)
+          .where(
+            and(
+              eq(managementReturnableDepositCharges.organizationId, organizationId),
+              eq(managementReturnableDepositCharges.unitId, unitId),
+              eq(managementReturnableDepositCharges.id, chargeId),
+              eq(managementReturnableDepositCharges.status, "charged"),
+            ),
+          )
+          .limit(1);
+        if (!charge) throw new ConflictException({ code: "RETURNABLE_DEPOSIT_NOT_ACTIVE" });
+        await tx.execute(
+          sql`select id from management_accounts_receivable where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${charge.receivableId}::uuid for update`,
+        );
+        const [receivable] = await tx
+          .select()
+          .from(managementAccountsReceivable)
+          .where(
+            and(
+              eq(managementAccountsReceivable.organizationId, organizationId),
+              eq(managementAccountsReceivable.unitId, unitId),
+              eq(managementAccountsReceivable.id, charge.receivableId),
+            ),
+          )
+          .limit(1);
+        if (!receivable)
+          throw new ConflictException({ code: "RETURNABLE_DEPOSIT_RECEIVABLE_NOT_FOUND" });
+        const refundableLines = await tx.execute<{
+          issueMovementId: string;
+          returnedQuantity: string;
+          depositCentsSnapshot: number;
+          refundableCents: number;
+        }>(sql`
+          select line.issue_movement_id as "issueMovementId",
+                 least(line.outstanding_quantity_at_charge, coalesce(returned.returned_quantity, 0)) as "returnedQuantity",
+                 line.deposit_cents_snapshot as "depositCentsSnapshot",
+                 round(least(line.outstanding_quantity_at_charge, coalesce(returned.returned_quantity, 0)) * line.deposit_cents_snapshot)::integer as "refundableCents"
+          from management_returnable_deposit_charge_lines line
+          inner join management_returnable_deposit_charges charge
+            on charge.organization_id = line.organization_id
+           and charge.unit_id = line.unit_id
+           and charge.id = line.charge_id
+          left join lateral (
+            select sum(-child.quantity_delta) as returned_quantity
+            from management_returnable_custody_movements child
+            where child.organization_id = line.organization_id
+              and child.unit_id = line.unit_id
+              and child.parent_movement_id = line.issue_movement_id
+              and child.type = 'return'
+              and child.created_at >= charge.created_at
+          ) returned on true
+          where line.organization_id = ${organizationId}::uuid
+            and line.unit_id = ${unitId}::uuid
+            and line.charge_id = ${chargeId}::uuid
+          order by line.issue_movement_id
+        `);
+        const [{ reconciledCents = 0 } = {}] = await tx
+          .select({
+            reconciledCents:
+              sql<number>`coalesce(sum(${managementReturnableDepositReconciliations.amountCents}), 0)`.mapWith(
+                Number,
+              ),
+          })
+          .from(managementReturnableDepositReconciliations)
+          .where(
+            and(
+              eq(managementReturnableDepositReconciliations.organizationId, organizationId),
+              eq(managementReturnableDepositReconciliations.unitId, unitId),
+              eq(managementReturnableDepositReconciliations.chargeId, chargeId),
+            ),
+          );
+        const refundableCents = [...refundableLines].reduce(
+          (total, line) => total + Number(line.refundableCents),
+          0,
+        );
+        const amountCents = Math.max(0, refundableCents - Number(reconciledCents));
+        if (amountCents <= 0)
+          throw new ConflictException({
+            code: "RETURNABLE_DEPOSIT_RECONCILIATION_NOT_DUE",
+            message: "Não há devolução de caução pendente para esta cobrança.",
+          });
+        const reconciliationStatus =
+          receivable.receivedCents > 0 ? "formal_reversal_required" : "applied";
+        const [reconciliation] = await tx
+          .insert(managementReturnableDepositReconciliations)
+          .values({
+            organizationId,
+            unitId,
+            chargeId,
+            amountCents,
+            status: reconciliationStatus,
+            reason: input.reason,
+            idempotencyKey,
+            actorIdentityId: identityId,
+          })
+          .returning();
+        if (!reconciliation)
+          throw new ConflictException({ code: "RETURNABLE_DEPOSIT_RECONCILIATION_CONFLICT" });
+        if (reconciliationStatus === "formal_reversal_required") {
+          await this.record(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            "management.returnable-deposit.formal-reversal-required",
+            "returnable_deposit_charge",
+            chargeId,
+            {
+              amountCents,
+              receivableId: charge.receivableId,
+              receivedCents: receivable.receivedCents,
+            },
+          );
+          return {
+            ...reconciliation,
+            receivableId: charge.receivableId,
+            receivedCents: receivable.receivedCents,
+          };
+        }
+        const remainingAmountCents = Math.max(0, receivable.amountCents - amountCents);
+        await tx
+          .update(managementAccountsReceivable)
+          .set({
+            amountCents: remainingAmountCents,
+            status: remainingAmountCents === 0 ? "canceled" : receivable.status,
+            version: receivable.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(managementAccountsReceivable.organizationId, organizationId),
+              eq(managementAccountsReceivable.unitId, unitId),
+              eq(managementAccountsReceivable.id, charge.receivableId),
+            ),
+          );
+        await tx
+          .update(managementReceivableLines)
+          .set({ revenueCents: remainingAmountCents })
+          .where(
+            and(
+              eq(managementReceivableLines.organizationId, organizationId),
+              eq(managementReceivableLines.unitId, unitId),
+              eq(managementReceivableLines.receivableId, charge.receivableId),
+            ),
+          );
+        if (remainingAmountCents === 0) {
+          await tx
+            .update(managementReturnableDepositCharges)
+            .set({
+              status: "canceled",
+              canceledByIdentityId: identityId,
+              canceledAt: new Date(),
+              cancellationReason: input.reason,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(managementReturnableDepositCharges.organizationId, organizationId),
+                eq(managementReturnableDepositCharges.unitId, unitId),
+                eq(managementReturnableDepositCharges.id, chargeId),
+              ),
+            );
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-deposit.reconciled",
+          "returnable_deposit_charge",
+          chargeId,
+          { amountCents, remainingAmountCents, receivableId: charge.receivableId },
+        );
+        return { ...reconciliation, receivableId: charge.receivableId, remainingAmountCents };
+      },
+    );
+  }
+
+  async returnablesDashboard(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "inventory",
+      "finance",
+    ] as const);
     const scope = and(
       eq(managementProductReturnables.organizationId, organizationId),
       eq(managementProductReturnables.unitId, unitId),
     );
     const [
       configurations,
-      custody,
-      custodyByLocation,
       recentMovements,
       incidents,
-      physical,
       physicalByLocation,
       fullProductBalances,
       supplierExchanges,
       lossIndicators,
       roleRows,
-      agingMovements,
+      openCustodyResult,
+      policyRows,
+      classifications,
+      resaleProducts,
+      containerItems,
+      approvedLosses,
+      latestApprovedCounts,
     ] = await Promise.all([
       this.database.db.select().from(managementProductReturnables).where(scope),
-      this.database.db
-        .select({
-          containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
-          expectedQuantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
-        })
-        .from(managementReturnableCustodyMovements)
-        .where(
-          and(
-            eq(managementReturnableCustodyMovements.organizationId, organizationId),
-            eq(managementReturnableCustodyMovements.unitId, unitId),
-          ),
-        )
-        .groupBy(managementReturnableCustodyMovements.containerInventoryItemId),
-      this.database.db
-        .select({
-          containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
-          locationId: managementReturnableCustodyMovements.locationId,
-          expectedQuantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
-        })
-        .from(managementReturnableCustodyMovements)
-        .where(
-          and(
-            eq(managementReturnableCustodyMovements.organizationId, organizationId),
-            eq(managementReturnableCustodyMovements.unitId, unitId),
-            sql`${managementReturnableCustodyMovements.locationId} is not null`,
-          ),
-        )
-        .groupBy(
-          managementReturnableCustodyMovements.containerInventoryItemId,
-          managementReturnableCustodyMovements.locationId,
-        ),
       this.database.db
         .select()
         .from(managementReturnableCustodyMovements)
@@ -3504,24 +5288,6 @@ export class ManagementService {
         )
         .orderBy(desc(managementReturnableIncidents.occurredAt))
         .limit(100),
-      this.database.db
-        .select({
-          containerInventoryItemId: managementStockBalances.inventoryItemId,
-          physicalQuantity: sql<string>`coalesce(sum(${managementStockBalances.quantity}), 0)`,
-        })
-        .from(managementStockBalances)
-        .innerJoin(
-          managementInventoryItems,
-          eq(managementStockBalances.inventoryItemId, managementInventoryItems.id),
-        )
-        .where(
-          and(
-            eq(managementStockBalances.organizationId, organizationId),
-            eq(managementStockBalances.unitId, unitId),
-            eq(managementInventoryItems.kind, "returnable_container"),
-          ),
-        )
-        .groupBy(managementStockBalances.inventoryItemId),
       this.database.db
         .select({
           containerInventoryItemId: managementStockBalances.inventoryItemId,
@@ -3567,8 +5333,7 @@ export class ManagementService {
             eq(managementReturnableSupplierExchanges.unitId, unitId),
           ),
         )
-        .orderBy(desc(managementReturnableSupplierExchanges.sentAt))
-        .limit(100),
+        .orderBy(desc(managementReturnableSupplierExchanges.sentAt)),
       this.database.db
         .select({
           type: managementReturnableIncidents.type,
@@ -3594,35 +5359,189 @@ export class ManagementService {
         "owner",
         "manager",
         "inventory",
+        "finance",
       ]),
+      this.database.db.execute<{
+        issueMovementId: string;
+        containerInventoryItemId: string;
+        locationId: string | null;
+        orderId: string | null;
+        orderCode: string | null;
+        tableLabel: string | null;
+        orderItemId: string | null;
+        responsibleIdentityId: string | null;
+        responsibleName: string | null;
+        counterpartyName: string | null;
+        dueAt: Date | null;
+        occurredAt: Date;
+        issuedQuantity: string;
+        returnedQuantity: string;
+        incidentQuantity: string;
+        outstandingQuantity: string;
+        depositCentsSnapshot: number;
+        handoffToIdentityId: string | null;
+        handoffToShiftReference: string | null;
+        handoffAt: Date | null;
+      }>(sql`
+        select issue.id as "issueMovementId",
+               issue.container_inventory_item_id as "containerInventoryItemId",
+               issue.location_id as "locationId",
+               issue.order_id as "orderId",
+               case when issue.order_id is null then null else concat('#', right(issue.order_id::text, 6)) end as "orderCode",
+               coalesce(tab.label, case when tab.display_number is null then null else concat('Comanda ', tab.display_number) end) as "tableLabel",
+               issue.order_item_id as "orderItemId",
+               coalesce(handoff.to_identity_id, issue.responsible_identity_id) as "responsibleIdentityId",
+               responsible.display_name as "responsibleName",
+               issue.counterparty_name as "counterpartyName",
+               issue.due_at as "dueAt",
+               issue.occurred_at as "occurredAt",
+               issue.quantity_delta as "issuedQuantity",
+               coalesce(settlement.returned_quantity, 0) as "returnedQuantity",
+               coalesce(settlement.incident_quantity, 0) as "incidentQuantity",
+               issue.quantity_delta + coalesce(settlement.settled_quantity, 0) as "outstandingQuantity",
+               coalesce(nullif(issue.context->>'depositCents', '')::integer, 0) as "depositCentsSnapshot",
+               handoff.to_identity_id as "handoffToIdentityId",
+               handoff.to_shift_reference as "handoffToShiftReference",
+               handoff.occurred_at as "handoffAt"
+        from management_returnable_custody_movements issue
+        left join pos_orders order_row
+          on order_row.organization_id = issue.organization_id
+         and order_row.unit_id = issue.unit_id
+         and order_row.id = issue.order_id
+        left join pos_tabs tab
+          on tab.organization_id = order_row.organization_id
+         and tab.unit_id = order_row.unit_id
+         and tab.id = order_row.tab_id
+        left join lateral (
+          select coalesce(sum(child.quantity_delta), 0) as settled_quantity,
+                 coalesce(sum(-child.quantity_delta) filter (where child.type = 'return'), 0) as returned_quantity,
+                 coalesce(sum(-child.quantity_delta) filter (where child.type = 'incident'), 0) as incident_quantity
+          from management_returnable_custody_movements child
+          where child.organization_id = issue.organization_id
+            and child.unit_id = issue.unit_id
+            and child.parent_movement_id = issue.id
+        ) settlement on true
+        left join lateral (
+          select custody_handoff.to_identity_id,
+                 custody_handoff.to_shift_reference,
+                 custody_handoff.occurred_at
+          from management_returnable_custody_handoffs custody_handoff
+          where custody_handoff.organization_id = issue.organization_id
+            and custody_handoff.unit_id = issue.unit_id
+            and custody_handoff.issue_movement_id = issue.id
+          order by custody_handoff.occurred_at desc, custody_handoff.id desc
+          limit 1
+        ) handoff on true
+        left join identities responsible
+          on responsible.id = coalesce(handoff.to_identity_id, issue.responsible_identity_id)
+        where issue.organization_id = ${organizationId}::uuid
+          and issue.unit_id = ${unitId}::uuid
+          and issue.type = 'issue'
+          and issue.quantity_delta + coalesce(settlement.settled_quantity, 0) > 0
+        order by coalesce(issue.due_at, issue.occurred_at), issue.occurred_at, issue.id
+      `),
       this.database.db
-        .select({
-          containerInventoryItemId: managementReturnableCustodyMovements.containerInventoryItemId,
-          quantityDelta: managementReturnableCustodyMovements.quantityDelta,
-          context: managementReturnableCustodyMovements.context,
-          occurredAt: managementReturnableCustodyMovements.occurredAt,
-        })
-        .from(managementReturnableCustodyMovements)
+        .select()
+        .from(managementReturnablePolicies)
         .where(
           and(
-            eq(managementReturnableCustodyMovements.organizationId, organizationId),
-            eq(managementReturnableCustodyMovements.unitId, unitId),
+            eq(managementReturnablePolicies.organizationId, organizationId),
+            eq(managementReturnablePolicies.unitId, unitId),
           ),
         )
-        .orderBy(managementReturnableCustodyMovements.occurredAt)
-        .limit(10_000),
+        .limit(1),
+      this.database.db
+        .select()
+        .from(managementProductReturnableClassifications)
+        .where(
+          and(
+            eq(managementProductReturnableClassifications.organizationId, organizationId),
+            eq(managementProductReturnableClassifications.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select({
+          productId: posProducts.id,
+          productName: posProducts.name,
+          inventoryItemId: managementInventoryItems.id,
+        })
+        .from(managementInventoryItems)
+        .innerJoin(
+          posProducts,
+          and(
+            eq(posProducts.organizationId, managementInventoryItems.organizationId),
+            eq(posProducts.id, managementInventoryItems.productId),
+          ),
+        )
+        .where(
+          and(
+            eq(managementInventoryItems.organizationId, organizationId),
+            eq(managementInventoryItems.unitId, unitId),
+            eq(managementInventoryItems.kind, "resale"),
+            eq(managementInventoryItems.active, true),
+            eq(posProducts.active, true),
+          ),
+        ),
+      this.database.db
+        .select({ id: managementInventoryItems.id, active: managementInventoryItems.active })
+        .from(managementInventoryItems)
+        .where(
+          and(
+            eq(managementInventoryItems.organizationId, organizationId),
+            eq(managementInventoryItems.unitId, unitId),
+            eq(managementInventoryItems.kind, "returnable_container"),
+          ),
+        ),
+      this.database.db
+        .select({
+          containerInventoryItemId: managementReturnableIncidents.containerInventoryItemId,
+          locationId: managementReturnableIncidents.locationId,
+          quantity: sql<string>`coalesce(sum(${managementReturnableIncidents.quantity}), 0)`,
+        })
+        .from(managementReturnableIncidents)
+        .where(
+          and(
+            eq(managementReturnableIncidents.organizationId, organizationId),
+            eq(managementReturnableIncidents.unitId, unitId),
+            eq(managementReturnableIncidents.status, "approved"),
+          ),
+        )
+        .groupBy(
+          managementReturnableIncidents.containerInventoryItemId,
+          managementReturnableIncidents.locationId,
+        ),
+      this.database.db.execute<{
+        containerInventoryItemId: string;
+        locationId: string;
+        lastCountedAt: Date;
+        lastCountDifferenceQuantity: string;
+      }>(sql`
+        select distinct on (line.inventory_item_id, session.location_id)
+               line.inventory_item_id as "containerInventoryItemId",
+               session.location_id as "locationId",
+               session.reviewed_at as "lastCountedAt",
+               coalesce(line.difference_quantity, 0) as "lastCountDifferenceQuantity"
+        from management_inventory_count_session_lines line
+        inner join management_inventory_count_sessions session
+          on session.organization_id = line.organization_id
+         and session.unit_id = line.unit_id
+         and session.id = line.session_id
+        inner join management_inventory_items item
+          on item.organization_id = line.organization_id
+         and item.unit_id = line.unit_id
+         and item.id = line.inventory_item_id
+        where line.organization_id = ${organizationId}::uuid
+          and line.unit_id = ${unitId}::uuid
+          and session.status = 'approved'
+          and item.kind = 'returnable_container'
+        order by line.inventory_item_id, session.location_id, session.reviewed_at desc, session.id desc
+      `),
     ]);
     const roles = new Set(
       roleRows.filter((row) => row.unitId === null || row.unitId === unitId).map((row) => row.role),
     );
-    const expectedByContainer = new Map(
-      custody.map((row) => [row.containerInventoryItemId, row.expectedQuantity]),
-    );
-    const physicalByContainer = new Map(
-      physical.map((row) => [row.containerInventoryItemId, row.physicalQuantity]),
-    );
     const configurationsByProduct = new Map<string, typeof configurations>();
-    for (const configuration of configurations)
+    for (const configuration of configurations.filter((row) => row.active))
       configurationsByProduct.set(configuration.productId, [
         ...(configurationsByProduct.get(configuration.productId) ?? []),
         configuration,
@@ -3639,77 +5558,277 @@ export class ManagementService {
         );
       }
     }
-    const agingByContainer = new Map(
-      [...new Set(agingMovements.map((movement) => movement.containerInventoryItemId))].map(
-        (containerInventoryItemId) => [
-          containerInventoryItemId,
-          returnableAging(
-            agingMovements
-              .filter((movement) => movement.containerInventoryItemId === containerInventoryItemId)
-              .map((movement) => ({
-                quantityDelta: Number(movement.quantityDelta),
-                occurredAt: movement.occurredAt,
-                depositCents: Number(movement.context.depositCents ?? 0),
-              })),
-          ),
-        ],
-      ),
+    const custodyInbox = [...openCustodyResult].map((custody) => {
+      const occurredAt =
+        custody.occurredAt instanceof Date
+          ? custody.occurredAt
+          : new Date(String(custody.occurredAt));
+      const handoffAt = custody.handoffAt
+        ? custody.handoffAt instanceof Date
+          ? custody.handoffAt
+          : new Date(String(custody.handoffAt))
+        : null;
+      return {
+        issueMovementId: custody.issueMovementId,
+        orderId: custody.orderId,
+        orderCode: custody.orderCode,
+        tableLabel: custody.tableLabel,
+        responsibleIdentityId: custody.responsibleIdentityId,
+        responsibleName: custody.responsibleName,
+        locationId: custody.locationId,
+        inventoryItemId: custody.containerInventoryItemId,
+        issuedQuantity: custody.issuedQuantity,
+        returnedQuantity: custody.returnedQuantity,
+        incidentQuantity: custody.incidentQuantity,
+        outstandingQuantity: custody.outstandingQuantity,
+        dueAt: custody.dueAt,
+        oldestOutstandingAt: occurredAt,
+        ageDays: Math.max(0, Math.floor((Date.now() - occurredAt.getTime()) / 86_400_000)),
+        depositExposureCents: Math.round(
+          Number(custody.outstandingQuantity) * custody.depositCentsSnapshot,
+        ),
+        ...(custody.handoffToIdentityId && handoffAt
+          ? {
+              handoff: {
+                toIdentityId: custody.handoffToIdentityId,
+                toIdentityName: custody.responsibleName,
+                toShiftReference: custody.handoffToShiftReference,
+                at: handoffAt,
+              },
+            }
+          : {}),
+      };
+    });
+    type ReconciliationBucket = {
+      containerInventoryItemId: string;
+      locationId: string | null;
+      fullEquivalentQuantity: number;
+      emptyPhysicalQuantity: number;
+      openCustodyQuantity: number;
+      supplierInTransitQuantity: number;
+      approvedLossQuantity: number;
+      lastCountedAt: Date | null;
+      lastCountDifferenceQuantity: number;
+    };
+    const byLocationMap = new Map<string, ReconciliationBucket>();
+    const bucket = (containerInventoryItemId: string, locationId: string | null) => {
+      const key = `${containerInventoryItemId}:${locationId ?? "unassigned"}`;
+      const current = byLocationMap.get(key) ?? {
+        containerInventoryItemId,
+        locationId,
+        fullEquivalentQuantity: 0,
+        emptyPhysicalQuantity: 0,
+        openCustodyQuantity: 0,
+        supplierInTransitQuantity: 0,
+        approvedLossQuantity: 0,
+        lastCountedAt: null,
+        lastCountDifferenceQuantity: 0,
+      };
+      byLocationMap.set(key, current);
+      return current;
+    };
+    for (const [key, quantity] of fullContainers) {
+      const [containerInventoryItemId, locationId] = key.split(":");
+      if (containerInventoryItemId && locationId)
+        bucket(containerInventoryItemId, locationId).fullEquivalentQuantity += quantity;
+    }
+    for (const row of physicalByLocation)
+      bucket(row.containerInventoryItemId, row.locationId).emptyPhysicalQuantity += Number(
+        row.physicalQuantity,
+      );
+    for (const custody of custodyInbox)
+      bucket(custody.inventoryItemId, custody.locationId).openCustodyQuantity += Number(
+        custody.outstandingQuantity,
+      );
+    for (const exchange of supplierExchanges.filter((row) => row.status === "in_transit"))
+      bucket(exchange.containerInventoryItemId, exchange.locationId).supplierInTransitQuantity +=
+        Number(exchange.quantity);
+    for (const loss of approvedLosses)
+      bucket(loss.containerInventoryItemId, loss.locationId).approvedLossQuantity += Number(
+        loss.quantity,
+      );
+    for (const count of latestApprovedCounts) {
+      const current = bucket(count.containerInventoryItemId, count.locationId);
+      current.lastCountedAt =
+        count.lastCountedAt instanceof Date
+          ? count.lastCountedAt
+          : new Date(String(count.lastCountedAt));
+      current.lastCountDifferenceQuantity = Number(count.lastCountDifferenceQuantity);
+    }
+    const byLocation = [...byLocationMap.values()].map((row) => ({
+      ...row,
+      fullEquivalentQuantity: row.fullEquivalentQuantity.toFixed(3),
+      emptyPhysicalQuantity: row.emptyPhysicalQuantity.toFixed(3),
+      openCustodyQuantity: row.openCustodyQuantity.toFixed(3),
+      supplierInTransitQuantity: row.supplierInTransitQuantity.toFixed(3),
+      approvedLossQuantity: row.approvedLossQuantity.toFixed(3),
+      lastCountedAt: row.lastCountedAt,
+      lastCountDifferenceQuantity: row.lastCountDifferenceQuantity.toFixed(3),
+      explainableBalanceQuantity: (
+        row.fullEquivalentQuantity +
+        row.emptyPhysicalQuantity +
+        row.openCustodyQuantity +
+        row.supplierInTransitQuantity +
+        row.approvedLossQuantity
+      ).toFixed(3),
+    }));
+    const totalsMap = new Map<string, ReconciliationBucket>();
+    for (const row of byLocationMap.values()) {
+      const total = totalsMap.get(row.containerInventoryItemId) ?? {
+        containerInventoryItemId: row.containerInventoryItemId,
+        locationId: null,
+        fullEquivalentQuantity: 0,
+        emptyPhysicalQuantity: 0,
+        openCustodyQuantity: 0,
+        supplierInTransitQuantity: 0,
+        approvedLossQuantity: 0,
+        lastCountedAt: null,
+        lastCountDifferenceQuantity: 0,
+      };
+      total.fullEquivalentQuantity += row.fullEquivalentQuantity;
+      total.emptyPhysicalQuantity += row.emptyPhysicalQuantity;
+      total.openCustodyQuantity += row.openCustodyQuantity;
+      total.supplierInTransitQuantity += row.supplierInTransitQuantity;
+      total.approvedLossQuantity += row.approvedLossQuantity;
+      total.lastCountDifferenceQuantity += row.lastCountDifferenceQuantity;
+      if (
+        row.lastCountedAt &&
+        (!total.lastCountedAt || row.lastCountedAt.getTime() > total.lastCountedAt.getTime())
+      )
+        total.lastCountedAt = row.lastCountedAt;
+      totalsMap.set(row.containerInventoryItemId, total);
+    }
+    const totals = [...totalsMap.values()].map((row) => ({
+      containerInventoryItemId: row.containerInventoryItemId,
+      fullEquivalentQuantity: row.fullEquivalentQuantity.toFixed(3),
+      emptyPhysicalQuantity: row.emptyPhysicalQuantity.toFixed(3),
+      openCustodyQuantity: row.openCustodyQuantity.toFixed(3),
+      supplierInTransitQuantity: row.supplierInTransitQuantity.toFixed(3),
+      approvedLossQuantity: row.approvedLossQuantity.toFixed(3),
+      lastCountedAt: row.lastCountedAt,
+      recentCountDifferenceQuantity: row.lastCountDifferenceQuantity.toFixed(3),
+      explainableBalanceQuantity: (
+        row.fullEquivalentQuantity +
+        row.emptyPhysicalQuantity +
+        row.openCustodyQuantity +
+        row.supplierInTransitQuantity +
+        row.approvedLossQuantity
+      ).toFixed(3),
+    }));
+    const activeConfigurationByProduct = new Map(
+      configurations.filter((row) => row.active).map((row) => [row.productId, row]),
     );
+    const classificationByProduct = new Map(
+      classifications.map((row) => [row.productId, row.status]),
+    );
+    const activeContainerIds = new Set(
+      containerItems.filter((item) => item.active).map((item) => item.id),
+    );
+    const uniqueResaleProducts = [
+      ...new Map(resaleProducts.map((row) => [row.productId, row])).values(),
+    ];
+    const classificationStatus = uniqueResaleProducts.map((product) => {
+      const configuration = activeConfigurationByProduct.get(product.productId);
+      const persistedStatus = classificationByProduct.get(product.productId);
+      const status = persistedStatus ?? (configuration ? "returnable" : "undecided");
+      return {
+        productId: product.productId,
+        productName: product.productName,
+        status,
+        activeLink: configuration
+          ? {
+              containerInventoryItemId: configuration.containerInventoryItemId,
+              quantityPerUnit: configuration.quantityPerUnit,
+              depositCents: configuration.depositCents,
+              containerActive: activeContainerIds.has(configuration.containerInventoryItemId),
+            }
+          : null,
+      };
+    });
+    const policy = policyRows[0] ?? {
+      organizationId,
+      unitId,
+      ...DEFAULT_RETURNABLE_POLICY,
+      updatedAt: null,
+    };
+    const configurationHealth = {
+      undecidedProductIds: classificationStatus
+        .filter((row) => row.status === "undecided")
+        .map((row) => row.productId),
+      unlinkedReturnableProductIds: classificationStatus
+        .filter((row) => row.status === "returnable" && !row.activeLink)
+        .map((row) => row.productId),
+      missingDepositValueProductIds:
+        policy.depositMode === "manual"
+          ? classificationStatus
+              .filter(
+                (row) =>
+                  row.status === "returnable" &&
+                  row.activeLink !== null &&
+                  row.activeLink.depositCents <= 0,
+              )
+              .map((row) => row.productId)
+          : [],
+      inactiveContainerLinkProductIds: classificationStatus
+        .filter((row) => row.activeLink !== null && !row.activeLink.containerActive)
+        .map((row) => row.productId),
+    };
     const containerIds = new Set([
       ...configurations.map((row) => row.containerInventoryItemId),
-      ...expectedByContainer.keys(),
-      ...physicalByContainer.keys(),
+      ...totalsMap.keys(),
     ]);
     return {
       configurations,
-      returnables: [...containerIds].map((containerInventoryItemId) => {
-        const expectedQuantity = expectedByContainer.get(containerInventoryItemId) ?? "0.000";
-        const aging = agingByContainer.get(containerInventoryItemId);
-        return {
-          containerInventoryItemId,
-          locationId: null,
-          expectedQuantity,
-          physicalQuantity: physicalByContainer.get(containerInventoryItemId) ?? "0.000",
-          divergenceQuantity: milliToQuantity(
-            quantityToMilli(physicalByContainer.get(containerInventoryItemId) ?? "0") -
-              quantityToMilli(expectedQuantity),
-          ),
-          oldestOutstandingAt: aging?.oldestOutstandingAt ?? null,
-          ageDays: aging?.ageDays ?? 0,
-          depositExposureCents: aging?.depositExposureCents ?? 0,
-          updatedAt:
-            recentMovements.find(
-              (movement) => movement.containerInventoryItemId === containerInventoryItemId,
-            )?.occurredAt ?? null,
-        };
-      }),
+      policy,
+      returnables: [...containerIds].map(
+        (containerInventoryItemId) =>
+          totals.find((row) => row.containerInventoryItemId === containerInventoryItemId) ?? {
+            containerInventoryItemId,
+            fullEquivalentQuantity: "0.000",
+            emptyPhysicalQuantity: "0.000",
+            openCustodyQuantity: "0.000",
+            supplierInTransitQuantity: "0.000",
+            approvedLossQuantity: "0.000",
+            explainableBalanceQuantity: "0.000",
+          },
+      ),
       recentMovements,
+      openCustodies: custodyInbox,
+      custodyInbox,
       incidents,
       physicalByLocation,
-      custodyByLocation,
-      custodySummary: [...expectedByContainer].map(
-        ([containerInventoryItemId, expectedQuantity]) => ({
-          containerInventoryItemId,
-          expectedQuantity,
-          ...(agingByContainer.get(containerInventoryItemId) ?? {
-            oldestOutstandingAt: null,
-            ageDays: 0,
-            depositExposureCents: 0,
-          }),
-        }),
-      ),
+      custodyByLocation: byLocation
+        .filter((row) => Number(row.openCustodyQuantity) > 0)
+        .map((row) => ({
+          containerInventoryItemId: row.containerInventoryItemId,
+          locationId: row.locationId,
+          openCustodyQuantity: row.openCustodyQuantity,
+        })),
+      custodySummary: totals.map((row) => ({
+        containerInventoryItemId: row.containerInventoryItemId,
+        openCustodyQuantity: row.openCustodyQuantity,
+        depositExposureCents: custodyInbox
+          .filter((custody) => custody.inventoryItemId === row.containerInventoryItemId)
+          .reduce((total, custody) => total + custody.depositExposureCents, 0),
+      })),
       fullContainersByLocation: [...fullContainers].map(([key, quantity]) => {
         const [containerInventoryItemId, locationId] = key.split(":");
         return { containerInventoryItemId, locationId, quantity: quantity.toFixed(3) };
       }),
-      supplierExchanges,
+      supplierExchanges: supplierExchanges.slice(0, 100),
       lossIndicators,
+      reconciliation: { totals, byLocation },
+      classificationStatus,
+      configurationHealth,
       capabilities: {
         canConfigure: roles.has("owner") || roles.has("manager") || roles.has("inventory"),
         canConfirmReturnables: roles.has("owner") || roles.has("manager") || roles.has("inventory"),
         canRecordReturnableIncident:
           roles.has("owner") || roles.has("manager") || roles.has("inventory"),
         canApproveReturnableIncident: roles.has("owner") || roles.has("manager"),
+        canHandoffCustody: roles.has("owner") || roles.has("manager") || roles.has("inventory"),
+        canConfigurePolicy: roles.has("owner") || roles.has("manager"),
+        canManageDeposit: roles.has("owner") || roles.has("manager") || roles.has("finance"),
       },
     };
   }
@@ -3766,6 +5885,25 @@ export class ManagementService {
           .returning();
         if (!configuration)
           throw new ConflictException("Não foi possível configurar o retornável.");
+        if (input.active) {
+          await tx
+            .insert(managementProductReturnableClassifications)
+            .values({
+              organizationId,
+              unitId,
+              productId: input.productId,
+              status: "returnable",
+              updatedByIdentityId: identityId,
+            })
+            .onConflictDoUpdate({
+              target: [
+                managementProductReturnableClassifications.organizationId,
+                managementProductReturnableClassifications.unitId,
+                managementProductReturnableClassifications.productId,
+              ],
+              set: { status: "returnable", updatedByIdentityId: identityId, updatedAt: new Date() },
+            });
+        }
         await this.record(
           tx,
           identityId,
@@ -3779,6 +5917,172 @@ export class ManagementService {
         return configuration;
       },
     );
+  }
+
+  async classifyProductReturnable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    productId: string,
+    idempotencyKey: string,
+    input: ProductReturnableClassificationInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "product-returnable.classify",
+      { productId, ...input },
+      async (tx) => {
+        await this.requireProduct(tx, organizationId, productId);
+        const [classification] = await tx
+          .insert(managementProductReturnableClassifications)
+          .values({
+            organizationId,
+            unitId,
+            productId,
+            status: input.status,
+            updatedByIdentityId: identityId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              managementProductReturnableClassifications.organizationId,
+              managementProductReturnableClassifications.unitId,
+              managementProductReturnableClassifications.productId,
+            ],
+            set: { status: input.status, updatedByIdentityId: identityId, updatedAt: new Date() },
+          })
+          .returning();
+        if (!classification)
+          throw new ConflictException({ code: "RETURNABLE_CLASSIFICATION_CONFLICT" });
+        if (input.status === "non_returnable") {
+          await tx
+            .update(managementProductReturnables)
+            .set({ active: false, updatedAt: new Date() })
+            .where(
+              and(
+                eq(managementProductReturnables.organizationId, organizationId),
+                eq(managementProductReturnables.unitId, unitId),
+                eq(managementProductReturnables.productId, productId),
+                eq(managementProductReturnables.active, true),
+              ),
+            );
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.product-returnable.classified",
+          "product",
+          productId,
+          { status: input.status, linksDeactivated: input.status === "non_returnable" },
+        );
+        return classification;
+      },
+    );
+  }
+
+  private async confirmReturnableCustodyMovement(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: {
+      issueMovementId: string;
+      containerInventoryItemId?: string;
+      locationId: string;
+      quantity: string | number;
+      note?: string;
+    },
+  ) {
+    await tx.execute(
+      sql`select id from management_returnable_custody_movements where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.issueMovementId}::uuid for update`,
+    );
+    const [issue] = await tx
+      .select()
+      .from(managementReturnableCustodyMovements)
+      .where(
+        and(
+          eq(managementReturnableCustodyMovements.organizationId, organizationId),
+          eq(managementReturnableCustodyMovements.unitId, unitId),
+          eq(managementReturnableCustodyMovements.id, input.issueMovementId),
+          eq(managementReturnableCustodyMovements.type, "issue"),
+        ),
+      )
+      .limit(1);
+    if (!issue) throw new NotFoundException({ code: "RETURNABLE_CUSTODY_ISSUE_NOT_FOUND" });
+    if (
+      input.containerInventoryItemId &&
+      issue.containerInventoryItemId !== input.containerInventoryItemId
+    )
+      throw new ConflictException({ code: "RETURNABLE_CUSTODY_CONTAINER_MISMATCH" });
+    await this.requireInventoryItem(tx, organizationId, unitId, issue.containerInventoryItemId, [
+      "returnable_container",
+    ]);
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`returnable-custody:${organizationId}:${unitId}:${issue.id}`}, 0))`,
+    );
+    const [summary] = await tx
+      .select({
+        quantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
+      })
+      .from(managementReturnableCustodyMovements)
+      .where(
+        and(
+          eq(managementReturnableCustodyMovements.organizationId, organizationId),
+          eq(managementReturnableCustodyMovements.unitId, unitId),
+          eq(managementReturnableCustodyMovements.parentMovementId, issue.id),
+        ),
+      );
+    const quantityMilli = quantityToMilli(input.quantity);
+    const availableMilli =
+      quantityToMilli(issue.quantityDelta) + quantityToMilli(summary?.quantity ?? "0");
+    if (quantityMilli > availableMilli)
+      throw new ConflictException({
+        code: "RETURNABLE_RETURN_EXCEEDS_CUSTODY",
+        message: "O retorno confirmado excede a custódia aberta desta emissão.",
+      });
+    const movementId = randomUUID();
+    await tx.insert(managementReturnableCustodyMovements).values({
+      id: movementId,
+      organizationId,
+      unitId,
+      containerInventoryItemId: issue.containerInventoryItemId,
+      locationId: input.locationId,
+      type: "return",
+      quantityDelta: milliToQuantity(-quantityMilli),
+      orderId: issue.orderId,
+      orderItemId: issue.orderItemId,
+      parentMovementId: issue.id,
+      responsibleIdentityId: issue.responsibleIdentityId,
+      counterpartyName: issue.counterpartyName,
+      dueAt: issue.dueAt,
+      sourceType: "employee_confirmation",
+      sourceId: movementId,
+      idempotencyKey: `custody-return:${movementId}`,
+      actorIdentityId: identityId,
+      context: { note: input.note ?? null, originLocationId: issue.locationId },
+    });
+    await this.applyStockMovement(tx, organizationId, unitId, {
+      locationId: input.locationId,
+      inventoryItemId: issue.containerInventoryItemId,
+      quantityDeltaMilli: quantityMilli,
+      type: "returnable_return",
+      sourceType: "returnable_custody_movement",
+      sourceId: movementId,
+      actorIdentityId: identityId,
+    });
+    return {
+      movementId,
+      issueMovementId: issue.id,
+      containerInventoryItemId: issue.containerInventoryItemId,
+      orderId: issue.orderId,
+      status: "confirmed" as const,
+      quantity: milliToQuantity(quantityMilli),
+    };
   }
 
   async confirmReturnableCustody(
@@ -3797,64 +6101,13 @@ export class ManagementService {
       "returnable-custody.confirm",
       input,
       async (tx) => {
-        await this.requireInventoryItem(
+        const confirmed = await this.confirmReturnableCustodyMovement(
           tx,
+          identityId,
           organizationId,
           unitId,
-          input.containerInventoryItemId,
-          ["returnable_container"],
+          input,
         );
-        if (input.orderId) await this.requireOrder(tx, organizationId, unitId, input.orderId);
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`returnable-custody:${organizationId}:${unitId}:${input.containerInventoryItemId}`}, 0))`,
-        );
-        const filters = [
-          eq(managementReturnableCustodyMovements.organizationId, organizationId),
-          eq(managementReturnableCustodyMovements.unitId, unitId),
-          eq(
-            managementReturnableCustodyMovements.containerInventoryItemId,
-            input.containerInventoryItemId,
-          ),
-        ];
-        if (input.orderId)
-          filters.push(eq(managementReturnableCustodyMovements.orderId, input.orderId));
-        const [summary] = await tx
-          .select({
-            quantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
-          })
-          .from(managementReturnableCustodyMovements)
-          .where(and(...filters));
-        const quantityMilli = quantityToMilli(input.quantity);
-        if (quantityMilli > quantityToMilli(summary?.quantity ?? "0"))
-          throw new ConflictException({
-            code: "RETURNABLE_RETURN_EXCEEDS_CUSTODY",
-            message: "O retorno confirmado excede a custódia prevista.",
-          });
-        const movementId = randomUUID();
-        await tx.insert(managementReturnableCustodyMovements).values({
-          id: movementId,
-          organizationId,
-          unitId,
-          containerInventoryItemId: input.containerInventoryItemId,
-          locationId: input.locationId,
-          type: "return",
-          quantityDelta: milliToQuantity(-quantityMilli),
-          orderId: input.orderId,
-          sourceType: "employee_confirmation",
-          sourceId: movementId,
-          idempotencyKey,
-          actorIdentityId: identityId,
-          context: { note: input.note ?? null },
-        });
-        await this.applyStockMovement(tx, organizationId, unitId, {
-          locationId: input.locationId,
-          inventoryItemId: input.containerInventoryItemId,
-          quantityDeltaMilli: quantityMilli,
-          type: "returnable_return",
-          sourceType: "returnable_custody_movement",
-          sourceId: movementId,
-          actorIdentityId: identityId,
-        });
         await this.record(
           tx,
           identityId,
@@ -3862,10 +6115,173 @@ export class ManagementService {
           unitId,
           "management.returnable-custody.confirmed",
           "returnable_custody_movement",
-          movementId,
-          { quantity: milliToQuantity(quantityMilli), orderId: input.orderId ?? null },
+          confirmed.movementId,
+          confirmed,
         );
-        return { movementId, status: "confirmed", quantity: milliToQuantity(quantityMilli) };
+        return confirmed;
+      },
+    );
+  }
+
+  async confirmReturnableCustodyBulk(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReturnableCustodyConfirmBulkInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-custody.confirm-bulk",
+      input,
+      async (tx) => {
+        const confirmed = [];
+        for (const line of [...input.lines].sort((a, b) =>
+          a.issueMovementId.localeCompare(b.issueMovementId),
+        )) {
+          confirmed.push(
+            await this.confirmReturnableCustodyMovement(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              line,
+            ),
+          );
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-custody.bulk-confirmed",
+          "returnable_custody_batch",
+          randomUUID(),
+          { movementIds: confirmed.map((row) => row.movementId), lineCount: confirmed.length },
+        );
+        return { status: "confirmed" as const, lines: confirmed };
+      },
+    );
+  }
+
+  async handoffReturnableCustodies(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ReturnableCustodyHandoffInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "returnable-custody.handoff",
+      input,
+      async (tx) => {
+        const [responsible] = await tx
+          .select({ identityId: managementPeople.identityId, name: managementPeople.name })
+          .from(managementPeople)
+          .where(
+            and(
+              eq(managementPeople.organizationId, organizationId),
+              eq(managementPeople.unitId, unitId),
+              eq(managementPeople.identityId, input.toIdentityId),
+              eq(managementPeople.active, true),
+            ),
+          )
+          .limit(1);
+        if (!responsible)
+          throw new NotFoundException({ code: "RETURNABLE_HANDOFF_RESPONSIBLE_NOT_FOUND" });
+        const handoffs = [];
+        const issueIds = [...input.issueMovementIds].sort();
+        for (const [index, issueMovementId] of issueIds.entries()) {
+          await tx.execute(
+            sql`select id from management_returnable_custody_movements where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${issueMovementId}::uuid for update`,
+          );
+          const [issue] = await tx
+            .select()
+            .from(managementReturnableCustodyMovements)
+            .where(
+              and(
+                eq(managementReturnableCustodyMovements.organizationId, organizationId),
+                eq(managementReturnableCustodyMovements.unitId, unitId),
+                eq(managementReturnableCustodyMovements.id, issueMovementId),
+                eq(managementReturnableCustodyMovements.type, "issue"),
+              ),
+            )
+            .limit(1);
+          if (!issue) throw new NotFoundException({ code: "RETURNABLE_CUSTODY_ISSUE_NOT_FOUND" });
+          const [settlement] = await tx
+            .select({
+              quantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
+            })
+            .from(managementReturnableCustodyMovements)
+            .where(
+              and(
+                eq(managementReturnableCustodyMovements.organizationId, organizationId),
+                eq(managementReturnableCustodyMovements.unitId, unitId),
+                eq(managementReturnableCustodyMovements.parentMovementId, issue.id),
+              ),
+            );
+          if (
+            quantityToMilli(issue.quantityDelta) + quantityToMilli(settlement?.quantity ?? "0") <=
+            0
+          )
+            throw new ConflictException({ code: "RETURNABLE_CUSTODY_ALREADY_SETTLED" });
+          const [latest] = await tx
+            .select()
+            .from(managementReturnableCustodyHandoffs)
+            .where(
+              and(
+                eq(managementReturnableCustodyHandoffs.organizationId, organizationId),
+                eq(managementReturnableCustodyHandoffs.unitId, unitId),
+                eq(managementReturnableCustodyHandoffs.issueMovementId, issue.id),
+              ),
+            )
+            .orderBy(desc(managementReturnableCustodyHandoffs.occurredAt))
+            .limit(1);
+          const fromIdentityId = latest?.toIdentityId ?? issue.responsibleIdentityId;
+          if (fromIdentityId === input.toIdentityId)
+            throw new ConflictException({ code: "RETURNABLE_CUSTODY_ALREADY_ASSIGNED" });
+          const [handoff] = await tx
+            .insert(managementReturnableCustodyHandoffs)
+            .values({
+              organizationId,
+              unitId,
+              issueMovementId: issue.id,
+              fromIdentityId,
+              toIdentityId: input.toIdentityId,
+              fromShiftReference:
+                latest?.toShiftReference ??
+                (typeof issue.context.shiftReference === "string"
+                  ? issue.context.shiftReference
+                  : null),
+              toShiftReference: input.toShiftReference,
+              note: input.note,
+              idempotencyKey: `handoff:${idempotencyKey.slice(0, 120)}:${index}`,
+              actorIdentityId: identityId,
+            })
+            .returning();
+          if (!handoff) throw new ConflictException({ code: "RETURNABLE_HANDOFF_CONFLICT" });
+          handoffs.push({ ...handoff, toIdentityName: responsible.name });
+        }
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.returnable-custody.handed-off",
+          "returnable_custody_handoff",
+          handoffs[0]?.id ?? randomUUID(),
+          { issueMovementIds: issueIds, toIdentityId: input.toIdentityId },
+        );
+        return { status: "handed_off" as const, handoffs };
       },
     );
   }
@@ -4054,6 +6470,7 @@ export class ManagementService {
             .select({
               containerInventoryItemId:
                 managementReturnableCustodyMovements.containerInventoryItemId,
+              type: managementReturnableCustodyMovements.type,
             })
             .from(managementReturnableCustodyMovements)
             .where(
@@ -4064,7 +6481,10 @@ export class ManagementService {
               ),
             )
             .limit(1);
-          if (!movement || movement.containerInventoryItemId !== input.containerInventoryItemId)
+          if (
+            movement?.type !== "issue" ||
+            movement.containerInventoryItemId !== input.containerInventoryItemId
+          )
             throw new NotFoundException({
               code: "RETURNABLE_CUSTODY_NOT_FOUND",
               message: "Custódia não encontrada para este vasilhame.",
@@ -4175,6 +6595,9 @@ export class ManagementService {
         if (input.decision === "approved") {
           const quantityMilli = quantityToMilli(incident.quantity);
           if (incident.custodyMovementId) {
+            await tx.execute(
+              sql`select id from management_returnable_custody_movements where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${incident.custodyMovementId}::uuid for update`,
+            );
             const [custody] = await tx
               .select()
               .from(managementReturnableCustodyMovements)
@@ -4184,29 +6607,23 @@ export class ManagementService {
             await tx.execute(
               sql`select pg_advisory_xact_lock(hashtextextended(${`returnable-custody:${organizationId}:${unitId}:${incident.containerInventoryItemId}`}, 0))`,
             );
+            if (custody.type !== "issue")
+              throw new ConflictException("A referência vinculada não é uma emissão de custódia.");
             const custodyFilters = [
               eq(managementReturnableCustodyMovements.organizationId, organizationId),
               eq(managementReturnableCustodyMovements.unitId, unitId),
-              eq(
-                managementReturnableCustodyMovements.containerInventoryItemId,
-                incident.containerInventoryItemId,
-              ),
+              eq(managementReturnableCustodyMovements.parentMovementId, custody.id),
             ];
-            if (custody.orderId)
-              custodyFilters.push(
-                eq(managementReturnableCustodyMovements.orderId, custody.orderId),
-              );
-            if (custody.orderItemId)
-              custodyFilters.push(
-                eq(managementReturnableCustodyMovements.orderItemId, custody.orderItemId),
-              );
             const [pending] = await tx
               .select({
                 quantity: sql<string>`coalesce(sum(${managementReturnableCustodyMovements.quantityDelta}), 0)`,
               })
               .from(managementReturnableCustodyMovements)
               .where(and(...custodyFilters));
-            if (quantityMilli > quantityToMilli(pending?.quantity ?? "0"))
+            if (
+              quantityMilli >
+              quantityToMilli(custody.quantityDelta) + quantityToMilli(pending?.quantity ?? "0")
+            )
               throw new ConflictException({
                 code: "RETURNABLE_INCIDENT_EXCEEDS_CUSTODY",
                 message: "A quantidade da intercorrência excede a custódia pendente.",
@@ -4220,6 +6637,10 @@ export class ManagementService {
               quantityDelta: milliToQuantity(-quantityMilli),
               orderId: custody.orderId,
               orderItemId: custody.orderItemId,
+              parentMovementId: custody.id,
+              responsibleIdentityId: custody.responsibleIdentityId,
+              counterpartyName: custody.counterpartyName,
+              dueAt: custody.dueAt,
               sourceType: "returnable_incident",
               sourceId: incident.id,
               idempotencyKey,
@@ -5150,6 +7571,7 @@ export class ManagementService {
             sourceType: "inventory_reservation",
             sourceId: reservation.id,
             actorIdentityId: identityId,
+            excludeReservationId: reservation.id,
           });
         const now = new Date();
         const [updated] = await tx
@@ -5192,7 +7614,14 @@ export class ManagementService {
       "inventory-cycle-plan.generate",
       {},
       async (tx) => {
-        const [balances, movementCounts, expiryRows, existing] = await Promise.all([
+        const [
+          balances,
+          movementCounts,
+          annualConsumptionRows,
+          divergenceRows,
+          expiryRows,
+          existing,
+        ] = await Promise.all([
           tx
             .select()
             .from(managementStockBalances)
@@ -5225,6 +7654,72 @@ export class ManagementService {
             ),
           tx
             .select({
+              inventoryItemId: managementInventoryMovements.inventoryItemId,
+              locationId: managementInventoryMovements.locationId,
+              consumptionValueCents:
+                sql<number>`coalesce(sum(abs(${managementInventoryMovements.quantityDelta}) * coalesce(${managementInventoryMovements.unitCostCents}, 0)) filter (where ${managementInventoryMovements.quantityDelta} < 0), 0)`.mapWith(
+                  Number,
+                ),
+            })
+            .from(managementInventoryMovements)
+            .where(
+              and(
+                eq(managementInventoryMovements.organizationId, organizationId),
+                eq(managementInventoryMovements.unitId, unitId),
+                gte(
+                  managementInventoryMovements.occurredAt,
+                  new Date(Date.now() - 365 * 86_400_000),
+                ),
+              ),
+            )
+            .groupBy(
+              managementInventoryMovements.inventoryItemId,
+              managementInventoryMovements.locationId,
+            ),
+          tx
+            .select({
+              inventoryItemId: managementInventoryCountSessionLines.inventoryItemId,
+              locationId: managementInventoryCountSessions.locationId,
+              divergencePercent:
+                sql<number>`coalesce(sum(abs(${managementInventoryCountSessionLines.differenceQuantity})) * 100 / nullif(sum(abs(${managementInventoryCountSessionLines.expectedQuantity})), 0), 0)`.mapWith(
+                  Number,
+                ),
+            })
+            .from(managementInventoryCountSessionLines)
+            .innerJoin(
+              managementInventoryCountSessions,
+              and(
+                eq(
+                  managementInventoryCountSessionLines.organizationId,
+                  managementInventoryCountSessions.organizationId,
+                ),
+                eq(
+                  managementInventoryCountSessionLines.unitId,
+                  managementInventoryCountSessions.unitId,
+                ),
+                eq(
+                  managementInventoryCountSessionLines.sessionId,
+                  managementInventoryCountSessions.id,
+                ),
+              ),
+            )
+            .where(
+              and(
+                eq(managementInventoryCountSessionLines.organizationId, organizationId),
+                eq(managementInventoryCountSessionLines.unitId, unitId),
+                eq(managementInventoryCountSessions.status, "approved"),
+                gte(
+                  managementInventoryCountSessions.reviewedAt,
+                  new Date(Date.now() - 180 * 86_400_000),
+                ),
+              ),
+            )
+            .groupBy(
+              managementInventoryCountSessionLines.inventoryItemId,
+              managementInventoryCountSessions.locationId,
+            ),
+          tx
+            .select({
               inventoryItemId: managementInventoryLots.inventoryItemId,
               locationId: managementInventoryLots.locationId,
               expiresAt: sql<Date | null>`min(${managementInventoryLots.expiresAt})`,
@@ -5250,6 +7745,18 @@ export class ManagementService {
             ),
         ]);
         const now = new Date();
+        const abcByKey = classifyInventoryAbc(
+          balances.map((balance) => {
+            const key = `${balance.inventoryItemId}:${balance.locationId}`;
+            return {
+              key,
+              consumptionValueCents:
+                annualConsumptionRows.find(
+                  (row) => `${row.inventoryItemId}:${row.locationId}` === key,
+                )?.consumptionValueCents ?? 0,
+            };
+          }),
+        );
         const planned = [];
         for (const balance of balances) {
           const key = `${balance.inventoryItemId}:${balance.locationId}`;
@@ -5260,13 +7767,16 @@ export class ManagementService {
             (row) => `${row.inventoryItemId}:${row.locationId}` === key,
           )?.expiresAt;
           const policy = cycleCountPolicy({
+            classification: abcByKey.get(key) ?? "C",
             inventoryValueCents: Math.round(
               Math.abs(Number(balance.quantity)) * (balance.averageCostCents ?? 0),
             ),
             movementCount90Days:
               movementCounts.find((row) => `${row.inventoryItemId}:${row.locationId}` === key)
                 ?.count ?? 0,
-            divergencePercent: 0,
+            divergencePercent:
+              divergenceRows.find((row) => `${row.inventoryItemId}:${row.locationId}` === key)
+                ?.divergencePercent ?? 0,
             expiresWithinDays: expiry
               ? Math.ceil((expiry.getTime() - now.getTime()) / 86_400_000)
               : null,
@@ -5504,6 +8014,7 @@ export class ManagementService {
             sourceType: "production_batch_input",
             sourceId: line.id,
             actorIdentityId: identityId,
+            excludeReservationSource: { type: "production_batch", id: batch.id },
           });
           totalCostCents += Math.round(
             (actualMilli * (line.unitCostCents ?? movement.averageCostCents ?? 0)) / 1_000,
@@ -6085,7 +8596,7 @@ export class ManagementService {
             code: "INVENTORY_PERIOD_ALREADY_CLOSED",
             message: "Este periodo ja possui um fechamento imutavel.",
           });
-        const [balances, reservations] = await Promise.all([
+        const [balances, reservations, transfersInTransit] = await Promise.all([
           tx
             .select()
             .from(managementStockBalances)
@@ -6125,29 +8636,88 @@ export class ManagementService {
               managementInventoryReservations.inventoryItemId,
               managementInventoryReservations.locationId,
             ),
+          tx
+            .select({
+              destinationLocationId: managementInventoryTransfers.destinationLocationId,
+              inventoryItemId: managementInventoryTransfers.inventoryItemId,
+              quantity: managementInventoryTransfers.quantity,
+              quantityDivergent: managementInventoryTransfers.quantityDivergent,
+              quantityReceived: managementInventoryTransfers.quantityReceived,
+              unitCostCents: managementInventoryTransfers.unitCostCents,
+            })
+            .from(managementInventoryTransfers)
+            .where(
+              and(
+                eq(managementInventoryTransfers.organizationId, organizationId),
+                eq(managementInventoryTransfers.unitId, unitId),
+                inArray(managementInventoryTransfers.status, ["in_transit", "partially_received"]),
+                input.locationId
+                  ? eq(managementInventoryTransfers.destinationLocationId, input.locationId)
+                  : undefined,
+              ),
+            ),
         ]);
         const closingId = randomUUID();
-        const lines = balances.map((balance) => {
+        const transitByKey = new Map<
+          string,
+          { quantityMilli: number; valueCents: number; unitCostCents: number | null }
+        >();
+        for (const transfer of transfersInTransit) {
+          const remainingMilli = Math.max(
+            0,
+            quantityToMilli(transfer.quantity) -
+              quantityToMilli(transfer.quantityReceived) -
+              quantityToMilli(transfer.quantityDivergent),
+          );
+          if (remainingMilli === 0) continue;
+          const key = `${transfer.destinationLocationId}:${transfer.inventoryItemId}`;
+          const current = transitByKey.get(key) ?? {
+            quantityMilli: 0,
+            valueCents: 0,
+            unitCostCents: transfer.unitCostCents,
+          };
+          current.quantityMilli += remainingMilli;
+          current.valueCents += Math.round(
+            (remainingMilli * (transfer.unitCostCents ?? 0)) / 1_000,
+          );
+          if (current.unitCostCents !== transfer.unitCostCents) current.unitCostCents = null;
+          transitByKey.set(key, current);
+        }
+        const balanceByKey = new Map(
+          balances.map((balance) => [`${balance.locationId}:${balance.inventoryItemId}`, balance]),
+        );
+        const lineKeys = new Set([...balanceByKey.keys(), ...transitByKey.keys()]);
+        const lines = [...lineKeys].map((key) => {
+          const balance = balanceByKey.get(key);
+          const [locationId = "", inventoryItemId = ""] = key.split(":");
+          const transit = transitByKey.get(key);
           const reserved =
             reservations.find(
-              (row) =>
-                row.inventoryItemId === balance.inventoryItemId &&
-                row.locationId === balance.locationId,
+              (row) => row.inventoryItemId === inventoryItemId && row.locationId === locationId,
             )?.quantity ?? "0";
+          const physicalValueCents = Math.round(
+            Number(balance?.quantity ?? 0) * (balance?.averageCostCents ?? 0),
+          );
           return {
             id: randomUUID(),
             organizationId,
             unitId,
             closingId,
-            inventoryItemId: balance.inventoryItemId,
-            locationId: balance.locationId,
-            quantity: balance.quantity,
+            inventoryItemId,
+            locationId,
+            quantity: balance?.quantity ?? "0",
             reservedQuantity: reserved,
-            averageCostCents: balance.averageCostCents,
-            valueCents: Math.round(Number(balance.quantity) * (balance.averageCostCents ?? 0)),
+            averageCostCents: balance?.averageCostCents ?? transit?.unitCostCents ?? null,
+            inTransitQuantity: milliToQuantity(transit?.quantityMilli ?? 0),
+            inTransitValueCents: transit?.valueCents ?? 0,
+            valueCents: physicalValueCents + (transit?.valueCents ?? 0),
           };
         });
         const totalValueCents = lines.reduce((total, line) => total + line.valueCents, 0);
+        const totalInTransitValueCents = lines.reduce(
+          (total, line) => total + line.inTransitValueCents,
+          0,
+        );
         const totalReservedValueCents = lines.reduce(
           (total, line) =>
             total + Math.round(Number(line.reservedQuantity) * (line.averageCostCents ?? 0)),
@@ -6164,6 +8734,7 @@ export class ManagementService {
             period,
             totalValueCents,
             totalReservedValueCents,
+            totalInTransitValueCents,
             lineCount: lines.length,
             notes: input.notes,
             idempotencyKey,
@@ -6185,6 +8756,7 @@ export class ManagementService {
             locationId: input.locationId ?? null,
             shiftReference: input.shiftReference ?? null,
             totalValueCents,
+            totalInTransitValueCents,
             lineCount: lines.length,
           },
         );
@@ -6944,6 +9516,8 @@ export class ManagementService {
                 message: "Lote não encontrado para este insumo e local.",
               });
             const lotChange = inventoryChange(lot.quantity, input.type, line.quantity, false);
+            if (quantityToMilli(lotChange.quantityDelta) < 0)
+              await this.assertInventoryLotAvailable(tx, organizationId, unitId, lot.id);
             const resultingBalanceMilli =
               quantityToMilli(balance.quantity) + quantityToMilli(lotChange.quantityDelta);
             if (resultingBalanceMilli < 0)
@@ -7311,6 +9885,7 @@ export class ManagementService {
               sourceLotId: line.lotId,
               eventId,
               quantity: String(line.quantity),
+              unitCostCents: movement.averageCostCents,
               reason: input.reason,
               deadlineAt: new Date(Date.now() + destination.transferSlaMinutes * 60_000),
               idempotencyKey: `${idempotencyKey.slice(0, 90)}:${index + 1}:${batchId}`,
@@ -7347,223 +9922,32 @@ export class ManagementService {
     idempotencyKey: string,
     input: InventoryTransferInput,
   ) {
-    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
-    return this.idempotent(
+    const batch = await this.transferInventoryBatch(
       identityId,
       organizationId,
       unitId,
       idempotencyKey,
-      "inventory-transfer",
-      input,
-      async (tx) => {
-        const [item, locations] = await Promise.all([
-          tx
-            .select({ id: managementInventoryItems.id })
-            .from(managementInventoryItems)
-            .where(
-              and(
-                eq(managementInventoryItems.organizationId, organizationId),
-                eq(managementInventoryItems.unitId, unitId),
-                eq(managementInventoryItems.id, input.inventoryItemId),
-                eq(managementInventoryItems.active, true),
-              ),
-            )
-            .limit(1),
-          tx
-            .select({ id: managementStockLocations.id })
-            .from(managementStockLocations)
-            .where(
-              and(
-                eq(managementStockLocations.organizationId, organizationId),
-                eq(managementStockLocations.unitId, unitId),
-                eq(managementStockLocations.active, true),
-                inArray(managementStockLocations.id, [
-                  input.sourceLocationId,
-                  input.destinationLocationId,
-                ]),
-              ),
-            ),
-        ]);
-        if (!item[0] || locations.length !== 2)
-          throw new NotFoundException({
-            code: "INVENTORY_TRANSFER_SCOPE_INVALID",
-            message: "Insumo, origem ou destino não pertence a esta unidade.",
-          });
-
-        await tx
-          .insert(managementStockBalances)
-          .values([
-            {
-              organizationId,
-              unitId,
-              locationId: input.sourceLocationId,
-              inventoryItemId: input.inventoryItemId,
-            },
-            {
-              organizationId,
-              unitId,
-              locationId: input.destinationLocationId,
-              inventoryItemId: input.inventoryItemId,
-            },
-          ])
-          .onConflictDoNothing();
-        await tx.execute(
-          sql`select id from management_stock_balances where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and inventory_item_id=${input.inventoryItemId}::uuid and location_id in (${input.sourceLocationId}::uuid, ${input.destinationLocationId}::uuid) order by id for update`,
-        );
-        const balances = await tx
-          .select()
-          .from(managementStockBalances)
-          .where(
-            and(
-              eq(managementStockBalances.organizationId, organizationId),
-              eq(managementStockBalances.unitId, unitId),
-              eq(managementStockBalances.inventoryItemId, input.inventoryItemId),
-              inArray(managementStockBalances.locationId, [
-                input.sourceLocationId,
-                input.destinationLocationId,
-              ]),
-            ),
-          );
-        const source = balances.find((balance) => balance.locationId === input.sourceLocationId);
-        const destination = balances.find(
-          (balance) => balance.locationId === input.destinationLocationId,
-        );
-        if (!source || !destination)
-          throw new ConflictException({
-            code: "BALANCE_LOCK_FAILED",
-            message: "Não foi possível bloquear os saldos da transferência.",
-          });
-        const quantityMilli = quantityToMilli(input.quantity);
-        const sourceMilli = quantityToMilli(source.quantity, "sourceQuantity");
-        if (sourceMilli < quantityMilli)
-          throw new ConflictException({
-            code: "INSUFFICIENT_STOCK",
-            message: "O local de origem não possui saldo suficiente.",
-          });
-
-        let sourceLotId: string | null = null;
-        if (input.lotId) {
-          await tx.execute(
-            sql`select id from management_inventory_lots where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.lotId}::uuid for update`,
-          );
-          const [lot] = await tx
-            .select()
-            .from(managementInventoryLots)
-            .where(
-              and(
-                eq(managementInventoryLots.organizationId, organizationId),
-                eq(managementInventoryLots.unitId, unitId),
-                eq(managementInventoryLots.id, input.lotId),
-                eq(managementInventoryLots.locationId, input.sourceLocationId),
-                eq(managementInventoryLots.inventoryItemId, input.inventoryItemId),
-                eq(managementInventoryLots.active, true),
-              ),
-            )
-            .limit(1);
-          if (!lot || quantityToMilli(lot.quantity) < quantityMilli)
-            throw new ConflictException({
-              code: "INVENTORY_LOT_INSUFFICIENT",
-              message: "O lote selecionado não possui quantidade suficiente.",
-            });
-          sourceLotId = lot.id;
-          await tx
-            .update(managementInventoryLots)
-            .set({
-              quantity: milliToQuantity(quantityToMilli(lot.quantity) - quantityMilli),
-              updatedAt: new Date(),
-            })
-            .where(eq(managementInventoryLots.id, lot.id));
-        } else {
-          const trackedLots = await tx
-            .select({ id: managementInventoryLots.id })
-            .from(managementInventoryLots)
-            .where(
-              and(
-                eq(managementInventoryLots.organizationId, organizationId),
-                eq(managementInventoryLots.unitId, unitId),
-                eq(managementInventoryLots.locationId, input.sourceLocationId),
-                eq(managementInventoryLots.inventoryItemId, input.inventoryItemId),
-                eq(managementInventoryLots.active, true),
-                ne(managementInventoryLots.quantity, "0"),
-              ),
-            )
-            .limit(1);
-          if (trackedLots.length)
-            throw new BadRequestException({
-              code: "INVENTORY_LOT_REQUIRED",
-              message: "Selecione o lote para transferir este insumo.",
-            });
-        }
-
-        const sourceResult = milliToQuantity(sourceMilli - quantityMilli);
-        await tx
-          .update(managementStockBalances)
-          .set({ quantity: sourceResult, version: source.version + 1, updatedAt: new Date() })
-          .where(eq(managementStockBalances.id, source.id));
-        const eventId = randomUUID();
-        await tx.insert(managementInventoryEvents).values({
-          id: eventId,
-          organizationId,
-          unitId,
-          type: "transfer",
-          reason: input.reason,
-          idempotencyKey,
-          actorIdentityId: identityId,
-        });
-        const sourceLineId = randomUUID();
-        await tx.insert(managementInventoryEventLines).values({
-          id: sourceLineId,
-          organizationId,
-          unitId,
-          eventId,
-          locationId: input.sourceLocationId,
-          inventoryItemId: input.inventoryItemId,
-          lotId: sourceLotId,
-          previousQuantity: source.quantity,
-          quantityDelta: milliToQuantity(-quantityMilli),
-          resultingQuantity: sourceResult,
-        });
-        await tx.insert(managementInventoryMovements).values({
-          organizationId,
-          unitId,
-          locationId: input.sourceLocationId,
-          inventoryItemId: input.inventoryItemId,
-          lotId: sourceLotId,
-          type: "transfer_out",
-          quantityDelta: milliToQuantity(-quantityMilli),
-          unitCostCents: source.averageCostCents,
-          sourceType: "inventory_event_line",
-          sourceId: sourceLineId,
-          actorIdentityId: identityId,
-        });
-        const transferId = randomUUID();
-        await tx.insert(managementInventoryTransfers).values({
-          id: transferId,
-          organizationId,
-          unitId,
-          inventoryItemId: input.inventoryItemId,
-          sourceLocationId: input.sourceLocationId,
-          destinationLocationId: input.destinationLocationId,
-          sourceLotId,
-          eventId,
-          quantity: milliToQuantity(quantityMilli),
-          reason: input.reason,
-          idempotencyKey,
-          sentByIdentityId: identityId,
-        });
-        await this.record(
-          tx,
-          identityId,
-          organizationId,
-          unitId,
-          "management.inventory.transfer-dispatched",
-          "inventory_transfer",
-          transferId,
-          { eventId, inventoryItemId: input.inventoryItemId, quantity: input.quantity },
-        );
-        return { transferId, eventId, sourceResult, status: "in_transit" };
+      {
+        sourceLocationId: input.sourceLocationId,
+        destinationLocationId: input.destinationLocationId,
+        reason: input.reason,
+        lines: [
+          {
+            inventoryItemId: input.inventoryItemId,
+            quantity: input.quantity,
+            lotId: input.lotId,
+          },
+        ],
       },
     );
+    const transfer = batch.transfers[0];
+    if (!transfer) throw new ConflictException("Nao foi possivel criar a transferencia.");
+    return {
+      transferId: transfer.id,
+      eventId: batch.eventId,
+      sourceResult: null,
+      status: batch.status,
+    };
   }
 
   async resolveInventoryTransfer(
@@ -7658,46 +10042,8 @@ export class ManagementService {
           input.decision === "received"
             ? transfer.destinationLocationId
             : transfer.sourceLocationId;
-        await tx.execute(
-          sql`select id from management_stock_balances where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and location_id=${targetLocationId}::uuid and inventory_item_id=${transfer.inventoryItemId}::uuid for update`,
-        );
-        const [targetRows, sourceRows] = await Promise.all([
-          tx
-            .select()
-            .from(managementStockBalances)
-            .where(
-              and(
-                eq(managementStockBalances.organizationId, organizationId),
-                eq(managementStockBalances.unitId, unitId),
-                eq(managementStockBalances.locationId, targetLocationId),
-                eq(managementStockBalances.inventoryItemId, transfer.inventoryItemId),
-              ),
-            )
-            .limit(1),
-          tx
-            .select({ averageCostCents: managementStockBalances.averageCostCents })
-            .from(managementStockBalances)
-            .where(
-              and(
-                eq(managementStockBalances.organizationId, organizationId),
-                eq(managementStockBalances.unitId, unitId),
-                eq(managementStockBalances.locationId, transfer.sourceLocationId),
-                eq(managementStockBalances.inventoryItemId, transfer.inventoryItemId),
-              ),
-            )
-            .limit(1),
-        ]);
-        const targetBalance = targetRows[0];
-        const sourceBalance = sourceRows[0];
-        if (!targetBalance)
-          throw new ConflictException({
-            code: "BALANCE_LOCK_FAILED",
-            message: "Não foi possível bloquear o saldo da transferência.",
-          });
-        const resultingQuantity = milliToQuantity(
-          quantityToMilli(targetBalance.quantity) + stockDeltaMilli,
-        );
         let resolvedLotId: string | null = null;
+        let transferUnitCostCents = transfer.unitCostCents;
         if (transfer.sourceLotId && stockDeltaMilli > 0) {
           const [sourceLot] = await tx
             .select()
@@ -7707,8 +10053,9 @@ export class ManagementService {
           if (!sourceLot)
             throw new ConflictException({
               code: "INVENTORY_TRANSFER_LOT_MISSING",
-              message: "O lote de origem da transferência não está mais disponível.",
+              message: "O lote de origem da transferencia nao esta mais disponivel.",
             });
+          transferUnitCostCents ??= sourceLot.unitCostCents;
           if (input.decision === "received") {
             const [destinationLot] = await tx
               .insert(managementInventoryLots)
@@ -7719,8 +10066,8 @@ export class ManagementService {
                 inventoryItemId: transfer.inventoryItemId,
                 batchCode: sourceLot.batchCode,
                 expiresAt: sourceLot.expiresAt,
-                quantity: milliToQuantity(stockDeltaMilli),
-                unitCostCents: sourceLot.unitCostCents,
+                quantity: "0",
+                unitCostCents: transferUnitCostCents,
               })
               .onConflictDoUpdate({
                 target: [
@@ -7731,39 +10078,31 @@ export class ManagementService {
                   managementInventoryLots.batchCode,
                 ],
                 set: {
-                  quantity: sql`${managementInventoryLots.quantity} + ${milliToQuantity(stockDeltaMilli)}::numeric`,
                   active: true,
+                  expiresAt: sourceLot.expiresAt,
+                  unitCostCents: transferUnitCostCents,
                   updatedAt: new Date(),
                 },
               })
               .returning({ id: managementInventoryLots.id });
             resolvedLotId = destinationLot?.id ?? null;
           } else {
-            await tx
-              .update(managementInventoryLots)
-              .set({
-                quantity: sql`${managementInventoryLots.quantity} + ${milliToQuantity(stockDeltaMilli)}::numeric`,
-                active: true,
-                updatedAt: new Date(),
-              })
-              .where(eq(managementInventoryLots.id, transfer.sourceLotId));
             resolvedLotId = transfer.sourceLotId;
           }
         }
         if (stockDeltaMilli > 0) {
-          await tx
-            .update(managementStockBalances)
-            .set({
-              quantity: resultingQuantity,
-              averageCostCents:
-                input.decision === "received"
-                  ? (sourceBalance?.averageCostCents ?? targetBalance.averageCostCents)
-                  : targetBalance.averageCostCents,
-              version: targetBalance.version + 1,
-              updatedAt: new Date(),
-            })
-            .where(eq(managementStockBalances.id, targetBalance.id));
           const lineId = randomUUID();
+          const movement = await this.applyStockMovement(tx, organizationId, unitId, {
+            locationId: targetLocationId,
+            inventoryItemId: transfer.inventoryItemId,
+            lotId: resolvedLotId,
+            quantityDeltaMilli: stockDeltaMilli,
+            unitCostCents: transferUnitCostCents,
+            type: input.decision === "received" ? "transfer_in" : "transfer_canceled",
+            sourceType: "inventory_event_line",
+            sourceId: lineId,
+            actorIdentityId: identityId,
+          });
           await tx.insert(managementInventoryEventLines).values({
             id: lineId,
             organizationId,
@@ -7772,24 +10111,12 @@ export class ManagementService {
             locationId: targetLocationId,
             inventoryItemId: transfer.inventoryItemId,
             lotId: resolvedLotId,
-            previousQuantity: targetBalance.quantity,
+            previousQuantity: milliToQuantity(movement.previousMilli),
             quantityDelta: milliToQuantity(stockDeltaMilli),
-            resultingQuantity,
-          });
-          await tx.insert(managementInventoryMovements).values({
-            organizationId,
-            unitId,
-            locationId: targetLocationId,
-            inventoryItemId: transfer.inventoryItemId,
-            lotId: resolvedLotId,
-            type: input.decision === "received" ? "transfer_in" : "transfer_canceled",
-            quantityDelta: milliToQuantity(stockDeltaMilli),
-            unitCostCents: sourceBalance?.averageCostCents ?? targetBalance.averageCostCents,
-            sourceType: "inventory_event_line",
-            sourceId: lineId,
-            actorIdentityId: identityId,
+            resultingQuantity: milliToQuantity(movement.resultingMilli),
           });
         }
+
         const now = new Date();
         const nextReceivedMilli = quantityToMilli(transfer.quantityReceived) + receivedMilli;
         const nextDivergentMilli = quantityToMilli(transfer.quantityDivergent) + divergentMilli;
@@ -8103,6 +10430,9 @@ export class ManagementService {
         contentHash: parsed.contentHash,
       },
       async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`management-nfe-import:${parsed.accessKey}`}))`,
+        );
         const [unit] = await tx
           .select({
             legalEntityId: units.legalEntityId,
@@ -8150,30 +10480,37 @@ export class ManagementService {
         const [duplicate] = await tx
           .select({
             id: managementNfeImports.id,
+            organizationId: managementNfeImports.organizationId,
+            unitId: managementNfeImports.unitId,
             accessKey: managementNfeImports.accessKey,
             xmlSha256: managementNfeImports.xmlSha256,
           })
           .from(managementNfeImports)
           .where(
-            and(
-              eq(managementNfeImports.organizationId, organizationId),
-              eq(managementNfeImports.unitId, unitId),
-              or(
-                eq(managementNfeImports.accessKey, parsed.accessKey),
+            or(
+              eq(managementNfeImports.accessKey, parsed.accessKey),
+              and(
+                eq(managementNfeImports.organizationId, organizationId),
+                eq(managementNfeImports.unitId, unitId),
                 eq(managementNfeImports.xmlSha256, parsed.contentHash),
               ),
             ),
           )
           .limit(1);
-        if (duplicate)
+        if (duplicate) {
+          const sameScope =
+            duplicate.organizationId === organizationId && duplicate.unitId === unitId;
           throw new ConflictException({
             code:
               duplicate.accessKey === parsed.accessKey
                 ? "NFE_ACCESS_KEY_DUPLICATE"
                 : "NFE_CONTENT_DUPLICATE",
-            message: "Esta NF-e já foi importada nesta unidade.",
-            importId: duplicate.id,
+            message: sameScope
+              ? "Esta NF-e já foi importada nesta unidade."
+              : "Esta NF-e já foi importada.",
+            ...(sameScope ? { importId: duplicate.id } : {}),
           });
+        }
         const [aliases, inventoryItems] = await Promise.all([
           tx
             .select({
@@ -8445,12 +10782,19 @@ export class ManagementService {
         if (!nfeImport)
           throw new NotFoundException({
             code: "NFE_IMPORT_NOT_FOUND",
-            message: "Importação não encontrada.",
+            message: "Importacao nao encontrada.",
           });
         if (nfeImport.status !== "ready")
           throw new ConflictException({
             code: "NFE_IMPORT_NOT_READY",
             message: "Revise todas as linhas antes de confirmar.",
+          });
+        const parsed = parseNfe(nfeImport.xmlContent);
+        const issuedAt = parsed.issuedAt;
+        if (input.dueDate < issuedAt)
+          throw new BadRequestException({
+            code: "NFE_DUE_DATE_INVALID",
+            message: "O vencimento nao pode ser anterior a emissao da NF-e.",
           });
         const lines = await tx
           .select()
@@ -8475,44 +10819,30 @@ export class ManagementService {
         )
           throw new ConflictException({
             code: "NFE_IMPORT_LINES_INVALID",
-            message: "A NF-e possui linhas pendentes, sem item ou com custo inválido.",
+            message: "A NF-e possui linhas pendentes, sem item ou com custo invalido.",
+          });
+        if (input.purchaseOrderId && accepted.some((line) => line.status === "new"))
+          throw new ConflictException({
+            code: "NFE_PURCHASE_ORDER_NEW_ITEM",
+            message: "Cadastre os itens novos antes de vincular a NF-e a um pedido existente.",
           });
         const lineTotalCents = accepted.reduce((sum, line) => sum + line.totalCents, 0);
-        const divergenceCents = (nfeImport.totalCents ?? lineTotalCents) - lineTotalCents;
+        const invoiceTotalCents = nfeImport.totalCents ?? lineTotalCents;
+        const divergenceCents = invoiceTotalCents - lineTotalCents;
         if (divergenceCents !== 0 && !input.acceptTotalDivergence)
           throw new ConflictException({
             code: "NFE_TOTAL_DIVERGENCE",
             message:
               "O total dos produtos diverge do total da NF-e. Revise frete, impostos e descontos.",
-            totalCents: nfeImport.totalCents,
+            totalCents: invoiceTotalCents,
             lineTotalCents,
             divergenceCents,
           });
-        const purchaseOrderId = randomUUID();
-        const receiptId = randomUUID();
-        const receivedAt = input.receivedAt ? new Date(input.receivedAt) : new Date();
-        await tx.insert(managementPurchaseOrders).values({
-          id: purchaseOrderId,
-          organizationId,
-          unitId,
-          supplierId: nfeImport.supplierId,
-          status: "approved",
-          totalCents: lineTotalCents,
-          idempotencyKey,
-          approvedAt: new Date(),
-          approvedByIdentityId: identityId,
-        });
-        await tx.insert(managementPurchaseReceipts).values({
-          id: receiptId,
-          organizationId,
-          unitId,
-          purchaseOrderId,
-          supplierId: nfeImport.supplierId,
-          totalCents: lineTotalCents,
-          idempotencyKey,
-          receivedByIdentityId: identityId,
-          receivedAt,
-        });
+        const resolvedLines: Array<{
+          line: (typeof accepted)[number];
+          inventoryItemId: string;
+          stockUnit: string;
+        }> = [];
         for (const line of accepted) {
           let inventoryItemId = line.inventoryItemId;
           if (line.status === "new") {
@@ -8547,7 +10877,11 @@ export class ManagementService {
               .set({ inventoryItemId, updatedAt: new Date() })
               .where(eq(managementNfeImportLines.id, line.id));
           }
-          if (!inventoryItemId) throw new ConflictException("A linha não possui item de estoque.");
+          if (!inventoryItemId)
+            throw new ConflictException({
+              code: "NFE_LINE_ITEM_REQUIRED",
+              message: "A linha nao possui item de estoque.",
+            });
           const item = await this.requireInventoryItem(tx, organizationId, unitId, inventoryItemId);
           await tx
             .insert(managementInventorySupplierAliases)
@@ -8579,44 +10913,182 @@ export class ManagementService {
                 updatedAt: new Date(),
               },
             });
-          const conversion = purchaseStockConversion(
-            line.quantity,
-            line.purchaseToStockFactor,
-            line.unitCostCents,
+          resolvedLines.push({ line, inventoryItemId, stockUnit: item.unit });
+        }
+
+        let purchaseOrderId = input.purchaseOrderId ?? randomUUID();
+        let orderVersion = 1;
+        let orderItems: Array<typeof managementPurchaseOrderItems.$inferSelect>;
+        if (input.purchaseOrderId) {
+          await tx.execute(
+            sql`select id from management_purchase_orders where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.purchaseOrderId}::uuid for update`,
           );
-          const orderItemId = randomUUID();
-          const receiptLineId = randomUUID();
-          await tx.insert(managementPurchaseOrderItems).values({
-            id: orderItemId,
+          const [order] = await tx
+            .select()
+            .from(managementPurchaseOrders)
+            .where(
+              and(
+                eq(managementPurchaseOrders.organizationId, organizationId),
+                eq(managementPurchaseOrders.unitId, unitId),
+                eq(managementPurchaseOrders.id, input.purchaseOrderId),
+              ),
+            )
+            .limit(1);
+          if (!order)
+            throw new NotFoundException({
+              code: "PURCHASE_ORDER_NOT_FOUND",
+              message: "Pedido de compra nao encontrado.",
+            });
+          if (order.supplierId !== nfeImport.supplierId)
+            throw new ConflictException({
+              code: "NFE_PURCHASE_ORDER_SUPPLIER_MISMATCH",
+              message: "O fornecedor da NF-e diverge do pedido selecionado.",
+            });
+          if (order.status !== "approved")
+            throw new ConflictException({
+              code: "NFE_PURCHASE_ORDER_NOT_RECEIVABLE",
+              message: "Somente um pedido aprovado e ainda nao recebido pode ser vinculado.",
+            });
+          const [invoice] = await tx
+            .select({ id: managementSupplierInvoices.id })
+            .from(managementSupplierInvoices)
+            .where(
+              and(
+                eq(managementSupplierInvoices.organizationId, organizationId),
+                eq(managementSupplierInvoices.unitId, unitId),
+                eq(managementSupplierInvoices.purchaseOrderId, order.id),
+              ),
+            )
+            .limit(1);
+          if (invoice)
+            throw new ConflictException({
+              code: "NFE_PURCHASE_ORDER_ALREADY_INVOICED",
+              message: "O pedido selecionado ja possui fatura.",
+            });
+          orderItems = await tx
+            .select()
+            .from(managementPurchaseOrderItems)
+            .where(
+              and(
+                eq(managementPurchaseOrderItems.organizationId, organizationId),
+                eq(managementPurchaseOrderItems.unitId, unitId),
+                eq(managementPurchaseOrderItems.purchaseOrderId, order.id),
+              ),
+            );
+          if (
+            orderItems.length !== resolvedLines.length ||
+            new Set(orderItems.map((item) => item.inventoryItemId)).size !== orderItems.length
+          )
+            throw new ConflictException({
+              code: "NFE_PURCHASE_ORDER_LINES_MISMATCH",
+              message: "As linhas da NF-e nao correspondem integralmente ao pedido.",
+            });
+          for (const resolved of resolvedLines) {
+            const orderItem = orderItems.find(
+              (candidate) => candidate.inventoryItemId === resolved.inventoryItemId,
+            );
+            const remainingMilli = orderItem
+              ? quantityToMilli(orderItem.quantity) - quantityToMilli(orderItem.receivedQuantity)
+              : -1;
+            if (!orderItem || remainingMilli !== quantityToMilli(resolved.line.quantity))
+              throw new ConflictException({
+                code: "NFE_PURCHASE_ORDER_QUANTITY_MISMATCH",
+                message: "A quantidade da NF-e diverge do saldo integral do pedido.",
+                inventoryItemId: resolved.inventoryItemId,
+              });
+          }
+          purchaseOrderId = order.id;
+          orderVersion = order.version;
+        } else {
+          await tx.insert(managementPurchaseOrders).values({
+            id: purchaseOrderId,
+            organizationId,
+            unitId,
+            supplierId: nfeImport.supplierId,
+            status: "approved",
+            totalCents: lineTotalCents,
+            idempotencyKey: `nfe-order:${idempotencyKey.slice(0, 150)}`,
+            approvedAt: new Date(),
+            approvedByIdentityId: identityId,
+          });
+          orderItems = resolvedLines.map(({ line, inventoryItemId, stockUnit }) => ({
+            id: randomUUID(),
             organizationId,
             unitId,
             purchaseOrderId,
             inventoryItemId,
             quantity: line.quantity,
-            receivedQuantity: line.quantity,
+            receivedQuantity: "0",
             unitCostCents: line.unitCostCents,
             totalCents: line.totalCents,
             purchaseUnit: line.purchaseUnit,
-            stockUnit: item.unit,
+            stockUnit,
             purchaseToStockFactor: line.purchaseToStockFactor,
-          });
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }));
+          await tx.insert(managementPurchaseOrderItems).values(orderItems);
+        }
+
+        const orderItemByInventory = new Map(
+          orderItems.map((item) => [item.inventoryItemId, item]),
+        );
+        const receiptId = randomUUID();
+        const receivedAt = input.receivedAt ? new Date(input.receivedAt) : new Date();
+        const receiptTotalCents = resolvedLines.reduce((total, resolved) => {
+          const orderItem = orderItemByInventory.get(resolved.inventoryItemId);
+          return (
+            total +
+            (orderItem
+              ? purchaseStockConversion(
+                  resolved.line.quantity,
+                  orderItem.purchaseToStockFactor,
+                  orderItem.unitCostCents,
+                ).totalCents
+              : 0)
+          );
+        }, 0);
+        await tx.insert(managementPurchaseReceipts).values({
+          id: receiptId,
+          organizationId,
+          unitId,
+          purchaseOrderId,
+          supplierId: nfeImport.supplierId,
+          totalCents: receiptTotalCents,
+          idempotencyKey: `nfe-receipt:${idempotencyKey.slice(0, 148)}`,
+          receivedByIdentityId: identityId,
+          receivedAt,
+        });
+        for (const resolved of resolvedLines) {
+          const orderItem = orderItemByInventory.get(resolved.inventoryItemId);
+          if (!orderItem)
+            throw new ConflictException({
+              code: "NFE_PURCHASE_ORDER_LINE_NOT_FOUND",
+              message: "A linha da NF-e nao foi encontrada no pedido.",
+            });
+          const conversion = purchaseStockConversion(
+            resolved.line.quantity,
+            orderItem.purchaseToStockFactor,
+            orderItem.unitCostCents,
+          );
+          const receiptLineId = randomUUID();
           await tx.insert(managementPurchaseReceiptLines).values({
             id: receiptLineId,
             organizationId,
             unitId,
             receiptId,
-            purchaseOrderItemId: orderItemId,
-            inventoryItemId,
+            purchaseOrderItemId: orderItem.id,
+            inventoryItemId: resolved.inventoryItemId,
             locationId: input.locationId,
-            quantity: line.quantity,
+            quantity: resolved.line.quantity,
             stockQuantity: conversion.stockQuantity,
-            unitCostCents: line.unitCostCents,
+            unitCostCents: orderItem.unitCostCents,
             stockUnitCostCents: conversion.stockUnitCostCents,
-            totalCents: line.totalCents,
+            totalCents: conversion.totalCents,
           });
           await this.applyStockMovement(tx, organizationId, unitId, {
             locationId: input.locationId,
-            inventoryItemId,
+            inventoryItemId: resolved.inventoryItemId,
             quantityDeltaMilli: conversion.stockMilli,
             unitCostCents: conversion.stockUnitCostCents,
             type: "purchase_receipt",
@@ -8625,11 +11097,87 @@ export class ManagementService {
             actorIdentityId: identityId,
             occurredAt: receivedAt,
           });
+          await tx
+            .update(managementPurchaseOrderItems)
+            .set({
+              receivedQuantity: resolved.line.quantity,
+              updatedAt: new Date(),
+            })
+            .where(eq(managementPurchaseOrderItems.id, orderItem.id));
         }
         await tx
           .update(managementPurchaseOrders)
-          .set({ status: "received", version: 2, updatedAt: new Date() })
+          .set({ status: "received", version: orderVersion + 1, updatedAt: new Date() })
           .where(eq(managementPurchaseOrders.id, purchaseOrderId));
+
+        const invoiceId = randomUUID();
+        await tx.insert(managementSupplierInvoices).values({
+          id: invoiceId,
+          organizationId,
+          unitId,
+          purchaseOrderId,
+          supplierId: nfeImport.supplierId,
+          documentNumber: nfeImport.documentNumber ?? parsed.documentNumber,
+          normalizedDocumentNumber: normalizeBusinessDocument(
+            nfeImport.documentNumber ?? parsed.documentNumber,
+          ),
+          accessKey: nfeImport.accessKey,
+          xmlContent: nfeImport.xmlContent,
+          series: parsed.series,
+          model: parsed.model,
+          taxTotalCents: parsed.taxTotalCents,
+          totalCents: invoiceTotalCents,
+          competenceDate: issuedAt,
+          dueDate: input.dueDate,
+          issuedAt,
+          toleranceCents: 0,
+          idempotencyKey: `nfe-invoice:${idempotencyKey.slice(0, 148)}`,
+        });
+        await tx.insert(managementSupplierInvoiceLines).values(
+          resolvedLines.map((resolved) => {
+            const orderItem = orderItemByInventory.get(resolved.inventoryItemId);
+            if (!orderItem)
+              throw new ConflictException({
+                code: "NFE_PURCHASE_ORDER_LINE_NOT_FOUND",
+              });
+            return {
+              organizationId,
+              unitId,
+              invoiceId,
+              purchaseOrderItemId: orderItem.id,
+              inventoryItemId: resolved.inventoryItemId,
+              quantity: resolved.line.quantity,
+              unitCostCents: resolved.line.unitCostCents,
+              totalCents: resolved.line.totalCents,
+            };
+          }),
+        );
+        const [invoice] = await tx
+          .select()
+          .from(managementSupplierInvoices)
+          .where(eq(managementSupplierInvoices.id, invoiceId))
+          .limit(1);
+        if (!invoice)
+          throw new ConflictException({
+            code: "NFE_SUPPLIER_INVOICE_CREATE_FAILED",
+            message: "Nao foi possivel registrar a fatura da NF-e.",
+          });
+        const reconciliation = await this.invoiceReconciliation(
+          tx,
+          organizationId,
+          unitId,
+          invoice,
+          0,
+        );
+        await tx
+          .update(managementSupplierInvoices)
+          .set({
+            status: reconciliation.status,
+            reconciliation,
+            reconciledAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(managementSupplierInvoices.id, invoiceId));
         await tx
           .update(managementNfeImports)
           .set({
@@ -8639,6 +11187,9 @@ export class ManagementService {
             confirmedAt: new Date(),
             metadata: {
               ...(nfeImport.metadata ?? {}),
+              receiptId,
+              invoiceId,
+              reconciliationStatus: reconciliation.status,
               lineTotalCents,
               divergenceCents,
               divergenceAccepted: input.acceptTotalDivergence,
@@ -8655,13 +11206,22 @@ export class ManagementService {
           "management.nfe-import.confirmed",
           "nfe_import",
           importId,
-          { purchaseOrderId, receiptId, lineTotalCents, divergenceCents },
+          {
+            purchaseOrderId,
+            receiptId,
+            invoiceId,
+            reconciliationStatus: reconciliation.status,
+            lineTotalCents,
+            divergenceCents,
+          },
         );
         return {
           importId,
           status: "confirmed",
           purchaseOrderId,
           receiptId,
+          invoiceId,
+          reconciliation,
           lineTotalCents,
           divergenceCents,
         };
@@ -8795,6 +11355,7 @@ export class ManagementService {
           humanNumber: created?.humanNumber ?? null,
           code: created?.humanNumber ? `PUR-${String(created.humanNumber).padStart(6, "0")}` : null,
           status: "draft",
+          version: 1,
           totalCents,
         };
       },
@@ -10931,6 +13492,293 @@ export class ManagementService {
     };
   }
 
+  private async loadFinanceSettings(organizationId: string, unitId: string) {
+    const [settings] = await this.database.db
+      .select()
+      .from(managementFinanceSettings)
+      .where(
+        and(
+          eq(managementFinanceSettings.organizationId, organizationId),
+          eq(managementFinanceSettings.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    return settings ?? DEFAULT_FINANCE_SETTINGS;
+  }
+
+  async financeSettings(identityId: string, organizationId: string, unitId: string) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.loadFinanceSettings(organizationId, unitId);
+  }
+
+  async updateFinanceSettings(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: FinanceSettingsInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-settings-update",
+      input,
+      async (tx) => {
+        const [settings] = await tx
+          .insert(managementFinanceSettings)
+          .values({ organizationId, unitId, ...input, updatedByIdentityId: identityId })
+          .onConflictDoUpdate({
+            target: [managementFinanceSettings.organizationId, managementFinanceSettings.unitId],
+            set: { ...input, updatedByIdentityId: identityId, updatedAt: new Date() },
+          })
+          .returning();
+        if (!settings) {
+          throw new ServiceUnavailableException("Configurações financeiras não foram persistidas");
+        }
+        const persistedSettings = settings;
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.finance-settings.updated",
+          "finance_settings",
+          unitId,
+          input,
+        );
+        return persistedSettings;
+      },
+    );
+  }
+
+  private async requireApprovedFinancePayment(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    direction: "payable" | "receivable",
+    entryId: string,
+    input: FinancialPaymentInput,
+  ) {
+    const [settings] = await tx
+      .select()
+      .from(managementFinanceSettings)
+      .where(
+        and(
+          eq(managementFinanceSettings.organizationId, organizationId),
+          eq(managementFinanceSettings.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    const threshold = settings?.paymentApprovalThresholdCents;
+    if (threshold === null || threshold === undefined || input.amountCents < threshold) return null;
+    if (!input.approvalRequestId)
+      throw new ConflictException({
+        code: "FINANCE_APPROVAL_REQUIRED",
+        message: "Este valor exige aprovação antes da liquidação.",
+        thresholdCents: threshold,
+      });
+    await tx.execute(
+      sql`select id from management_finance_approval_requests where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${input.approvalRequestId}::uuid for update`,
+    );
+    const [approval] = await tx
+      .select()
+      .from(managementFinanceApprovalRequests)
+      .where(
+        and(
+          eq(managementFinanceApprovalRequests.organizationId, organizationId),
+          eq(managementFinanceApprovalRequests.unitId, unitId),
+          eq(managementFinanceApprovalRequests.id, input.approvalRequestId),
+        ),
+      )
+      .limit(1);
+    const matchesEntry =
+      approval?.direction === direction &&
+      (direction === "payable"
+        ? approval.payableId === entryId
+        : approval.receivableId === entryId);
+    if (
+      approval?.status !== "approved" ||
+      !matchesEntry ||
+      approval.amountCents !== input.amountCents ||
+      approval.method !== input.method ||
+      (approval.reference ?? undefined) !== input.reference ||
+      (approval.cashRegisterId ?? undefined) !== input.cashRegisterId
+    )
+      throw new ConflictException({
+        code: "FINANCE_APPROVAL_INVALID",
+        message: "A aprovação não corresponde a esta liquidação.",
+      });
+    return approval;
+  }
+
+  async requestFinanceApproval(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: FinanceApprovalRequestInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    const settings = await this.loadFinanceSettings(organizationId, unitId);
+    if (
+      settings.paymentApprovalThresholdCents === null ||
+      input.amountCents < settings.paymentApprovalThresholdCents
+    )
+      throw new BadRequestException({
+        code: "FINANCE_APPROVAL_NOT_REQUIRED",
+        message: "Este valor não exige aprovação.",
+      });
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-approval-request",
+      input,
+      async (tx) => {
+        const target =
+          input.direction === "payable" ? managementAccountsPayable : managementAccountsReceivable;
+        const settledColumn =
+          input.direction === "payable"
+            ? managementAccountsPayable.paidCents
+            : managementAccountsReceivable.receivedCents;
+        const [entry] = await tx
+          .select({
+            id: target.id,
+            status: target.status,
+            amountCents: target.amountCents,
+            settledCents: settledColumn,
+          })
+          .from(target)
+          .where(
+            and(
+              eq(target.organizationId, organizationId),
+              eq(target.unitId, unitId),
+              eq(target.id, input.entryId),
+            ),
+          )
+          .limit(1);
+        if (
+          !entry ||
+          entry.status === "canceled" ||
+          entry.amountCents - entry.settledCents < input.amountCents
+        )
+          throw new ConflictException({
+            code: "FINANCE_ENTRY_NOT_SETTLEABLE",
+            message: "A conta não possui saldo suficiente para esta solicitação.",
+          });
+        const id = randomUUID();
+        await tx.insert(managementFinanceApprovalRequests).values({
+          id,
+          organizationId,
+          unitId,
+          direction: input.direction,
+          payableId: input.direction === "payable" ? input.entryId : null,
+          receivableId: input.direction === "receivable" ? input.entryId : null,
+          amountCents: input.amountCents,
+          method: input.method,
+          reference: input.reference,
+          cashRegisterId: input.cashRegisterId,
+          occurredAt: input.occurredAt ? new Date(input.occurredAt) : null,
+          idempotencyKey,
+          requestedByIdentityId: identityId,
+        });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.finance.approval-requested",
+          "finance_approval",
+          id,
+          input,
+        );
+        return { approvalRequestId: id, status: "pending" };
+      },
+    );
+  }
+
+  async decideFinanceApproval(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    approvalRequestId: string,
+    idempotencyKey: string,
+    input: FinanceApprovalDecisionInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-approval-decision",
+      { approvalRequestId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_finance_approval_requests where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${approvalRequestId}::uuid for update`,
+        );
+        const [approval] = await tx
+          .select()
+          .from(managementFinanceApprovalRequests)
+          .where(
+            and(
+              eq(managementFinanceApprovalRequests.organizationId, organizationId),
+              eq(managementFinanceApprovalRequests.unitId, unitId),
+              eq(managementFinanceApprovalRequests.id, approvalRequestId),
+            ),
+          )
+          .limit(1);
+        if (!approval) throw new NotFoundException({ code: "FINANCE_APPROVAL_NOT_FOUND" });
+        if (approval.status !== "pending")
+          throw new ConflictException({ code: "FINANCE_APPROVAL_ALREADY_DECIDED" });
+        const [settings] = await tx
+          .select()
+          .from(managementFinanceSettings)
+          .where(
+            and(
+              eq(managementFinanceSettings.organizationId, organizationId),
+              eq(managementFinanceSettings.unitId, unitId),
+            ),
+          )
+          .limit(1);
+        if (
+          (settings?.requireDistinctApprover ?? DEFAULT_FINANCE_SETTINGS.requireDistinctApprover) &&
+          approval.requestedByIdentityId === identityId
+        )
+          throw new ForbiddenException({
+            code: "FINANCE_DISTINCT_APPROVER_REQUIRED",
+            message: "Outra pessoa deve decidir esta solicitação.",
+          });
+        const status = input.decision === "approve" ? "approved" : "rejected";
+        await tx
+          .update(managementFinanceApprovalRequests)
+          .set({
+            status,
+            decidedByIdentityId: identityId,
+            decidedAt: new Date(),
+            decisionNote: input.note,
+            updatedAt: new Date(),
+          })
+          .where(eq(managementFinanceApprovalRequests.id, approval.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          `management.finance.approval-${status}`,
+          "finance_approval",
+          approval.id,
+          input,
+        );
+        return { approvalRequestId: approval.id, status };
+      },
+    );
+  }
+
   async createPayable(
     identityId: string,
     organizationId: string,
@@ -10965,10 +13813,28 @@ export class ManagementService {
               message: "Fornecedor não encontrado nesta unidade.",
             });
         }
-        const id = randomUUID();
-        await tx
-          .insert(managementAccountsPayable)
-          .values({ id, organizationId, unitId, ...input, idempotencyKey });
+        const { recurrence, ...entry } = input;
+        const schedule = financialInstallmentSchedule(
+          input.competenceDate,
+          input.dueDate,
+          recurrence?.installments,
+          recurrence?.intervalMonths,
+        );
+        const recurrenceGroupId = schedule.length > 1 ? randomUUID() : null;
+        const payableId = randomUUID();
+        const payableRows = schedule.map((installment, index) => ({
+          id: index === 0 ? payableId : randomUUID(),
+          organizationId,
+          unitId,
+          ...entry,
+          ...installment,
+          recurrenceGroupId,
+          installmentCount: schedule.length,
+          idempotencyKey: schedule.length === 1 ? idempotencyKey : `${idempotencyKey}:${index + 1}`,
+          createdByIdentityId: identityId,
+        }));
+        const payableIds = payableRows.map((row) => row.id);
+        await tx.insert(managementAccountsPayable).values(payableRows);
         await this.record(
           tx,
           identityId,
@@ -10976,10 +13842,16 @@ export class ManagementService {
           unitId,
           "management.payable.created",
           "payable",
-          id,
-          { amountCents: input.amountCents },
+          recurrenceGroupId ?? payableId,
+          { amountCents: input.amountCents, installmentCount: schedule.length, payableIds },
         );
-        return { payableId: id, status: "open", amountCents: input.amountCents };
+        return {
+          payableId,
+          payableIds,
+          installmentCount: schedule.length,
+          status: "open",
+          amountCents: input.amountCents,
+        };
       },
     );
   }
@@ -11027,6 +13899,14 @@ export class ManagementService {
             code: "PAYABLE_NOT_OPEN",
             message: "A conta não aceita pagamentos.",
           });
+        const approval = await this.requireApprovedFinancePayment(
+          tx,
+          organizationId,
+          unitId,
+          "payable",
+          payable.id,
+          input,
+        );
         const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
           cashRegisterId: input.cashRegisterId,
         });
@@ -11083,6 +13963,16 @@ export class ManagementService {
             updatedAt: new Date(),
           })
           .where(eq(managementAccountsPayable.id, payable.id));
+        if (approval)
+          await tx
+            .update(managementFinanceApprovalRequests)
+            .set({
+              status: "executed",
+              executedPaymentId: paymentId,
+              executedAt: occurredAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(managementFinanceApprovalRequests.id, approval.id));
         await this.record(
           tx,
           identityId,
@@ -11130,29 +14020,47 @@ export class ManagementService {
           await this.requireOrder(tx, organizationId, unitId, input.sourceOrderId);
         for (const line of input.lines)
           if (line.productId) await this.requireProduct(tx, organizationId, line.productId);
-        const id = randomUUID();
-        await tx.insert(managementAccountsReceivable).values({
-          id,
+        const schedule = financialInstallmentSchedule(
+          input.competenceDate,
+          input.dueDate,
+          input.recurrence?.installments,
+          input.recurrence?.intervalMonths,
+        );
+        const recurrenceGroupId = schedule.length > 1 ? randomUUID() : null;
+        const receivableId = randomUUID();
+        const receivableRows = schedule.map((installment, index) => ({
+          id: index === 0 ? receivableId : randomUUID(),
           organizationId,
           unitId,
           sourceOrderId: input.sourceOrderId,
           description: input.description,
+          category: input.category,
+          costCenter: input.costCenter,
+          documentNumber: input.documentNumber,
+          notes: input.notes,
+          attachments: input.attachments,
           amountCents: input.amountCents,
-          competenceDate: input.competenceDate,
-          dueDate: input.dueDate,
-          idempotencyKey,
-        });
+          ...installment,
+          recurrenceGroupId,
+          installmentCount: schedule.length,
+          idempotencyKey: schedule.length === 1 ? idempotencyKey : `${idempotencyKey}:${index + 1}`,
+          createdByIdentityId: identityId,
+        }));
+        const receivableIds = receivableRows.map((row) => row.id);
+        await tx.insert(managementAccountsReceivable).values(receivableRows);
         if (input.lines.length > 0)
           await tx.insert(managementReceivableLines).values(
-            input.lines.map((line) => ({
-              organizationId,
-              unitId,
-              receivableId: id,
-              productId: line.productId,
-              description: line.description,
-              revenueCents: line.revenueCents,
-              costCents: line.costCents ?? null,
-            })),
+            receivableIds.flatMap((receivableId) =>
+              input.lines.map((line) => ({
+                organizationId,
+                unitId,
+                receivableId,
+                productId: line.productId,
+                description: line.description,
+                revenueCents: line.revenueCents,
+                costCents: line.costCents ?? null,
+              })),
+            ),
           );
         await this.record(
           tx,
@@ -11161,10 +14069,21 @@ export class ManagementService {
           unitId,
           "management.receivable.created",
           "receivable",
-          id,
-          { amountCents: input.amountCents, sourceOrderId: input.sourceOrderId ?? null },
+          recurrenceGroupId ?? receivableId,
+          {
+            amountCents: input.amountCents,
+            sourceOrderId: input.sourceOrderId ?? null,
+            installmentCount: schedule.length,
+            receivableIds,
+          },
         );
-        return { receivableId: id, status: "open", amountCents: input.amountCents };
+        return {
+          receivableId,
+          receivableIds,
+          installmentCount: schedule.length,
+          status: "open",
+          amountCents: input.amountCents,
+        };
       },
     );
   }
@@ -11212,6 +14131,14 @@ export class ManagementService {
             code: "RECEIVABLE_NOT_OPEN",
             message: "A conta não aceita recebimentos.",
           });
+        const approval = await this.requireApprovedFinancePayment(
+          tx,
+          organizationId,
+          unitId,
+          "receivable",
+          receivable.id,
+          input,
+        );
         const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
           cashShiftId: input.cashShiftId,
           cashRegisterId: input.cashRegisterId,
@@ -11267,6 +14194,16 @@ export class ManagementService {
             updatedAt: new Date(),
           })
           .where(eq(managementAccountsReceivable.id, receivable.id));
+        if (approval)
+          await tx
+            .update(managementFinanceApprovalRequests)
+            .set({
+              status: "executed",
+              executedPaymentId: paymentId,
+              executedAt: occurredAt,
+              updatedAt: new Date(),
+            })
+            .where(eq(managementFinanceApprovalRequests.id, approval.id));
         await this.record(
           tx,
           identityId,
@@ -11288,58 +14225,672 @@ export class ManagementService {
     );
   }
 
-  async financeDashboard(identityId: string, organizationId: string, unitId: string) {
-    await this.requireRole(identityId, organizationId, unitId, [...FINANCE_ROLES, "cashier"]);
+  async updatePayable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    payableId: string,
+    idempotencyKey: string,
+    input: FinanceEntryUpdateInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-payable-update",
+      { payableId, ...input },
+      async (tx) => {
+        const { version, ...changes } = input;
+        const [updated] = await tx
+          .update(managementAccountsPayable)
+          .set({ ...changes, version: version + 1, updatedAt: new Date() })
+          .where(
+            and(
+              eq(managementAccountsPayable.organizationId, organizationId),
+              eq(managementAccountsPayable.unitId, unitId),
+              eq(managementAccountsPayable.id, payableId),
+              eq(managementAccountsPayable.version, version),
+              eq(managementAccountsPayable.status, "open"),
+              eq(managementAccountsPayable.paidCents, 0),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new ConflictException({
+            code: "FINANCE_ENTRY_VERSION_CONFLICT",
+            message: "A conta foi alterada ou já possui liquidação. Atualize a agenda.",
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.payable.updated",
+          "payable",
+          payableId,
+          input,
+        );
+        return updated;
+      },
+    );
+  }
+
+  async updateReceivable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    receivableId: string,
+    idempotencyKey: string,
+    input: FinanceEntryUpdateInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-receivable-update",
+      { receivableId, ...input },
+      async (tx) => {
+        const { version, supplierId: _supplierId, ...changes } = input;
+        const [updated] = await tx
+          .update(managementAccountsReceivable)
+          .set({ ...changes, version: version + 1, updatedAt: new Date() })
+          .where(
+            and(
+              eq(managementAccountsReceivable.organizationId, organizationId),
+              eq(managementAccountsReceivable.unitId, unitId),
+              eq(managementAccountsReceivable.id, receivableId),
+              eq(managementAccountsReceivable.version, version),
+              eq(managementAccountsReceivable.status, "open"),
+              eq(managementAccountsReceivable.receivedCents, 0),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new ConflictException({
+            code: "FINANCE_ENTRY_VERSION_CONFLICT",
+            message: "A conta foi alterada ou já possui liquidação. Atualize a agenda.",
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.receivable.updated",
+          "receivable",
+          receivableId,
+          input,
+        );
+        return updated;
+      },
+    );
+  }
+
+  async cancelPayable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    payableId: string,
+    idempotencyKey: string,
+    input: FinanceEntryCancelInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-payable-cancel",
+      { payableId, ...input },
+      async (tx) => {
+        const [updated] = await tx
+          .update(managementAccountsPayable)
+          .set({
+            status: "canceled",
+            canceledByIdentityId: identityId,
+            canceledAt: new Date(),
+            cancellationReason: input.reason,
+            version: input.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(managementAccountsPayable.organizationId, organizationId),
+              eq(managementAccountsPayable.unitId, unitId),
+              eq(managementAccountsPayable.id, payableId),
+              eq(managementAccountsPayable.version, input.version),
+              eq(managementAccountsPayable.status, "open"),
+              eq(managementAccountsPayable.paidCents, 0),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new ConflictException({
+            code: "FINANCE_ENTRY_NOT_CANCELABLE",
+            message: "A conta foi alterada ou já possui liquidação.",
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.payable.canceled",
+          "payable",
+          payableId,
+          input,
+        );
+        return updated;
+      },
+    );
+  }
+
+  async cancelReceivable(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    receivableId: string,
+    idempotencyKey: string,
+    input: FinanceEntryCancelInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-receivable-cancel",
+      { receivableId, ...input },
+      async (tx) => {
+        const [updated] = await tx
+          .update(managementAccountsReceivable)
+          .set({
+            status: "canceled",
+            canceledByIdentityId: identityId,
+            canceledAt: new Date(),
+            cancellationReason: input.reason,
+            version: input.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(managementAccountsReceivable.organizationId, organizationId),
+              eq(managementAccountsReceivable.unitId, unitId),
+              eq(managementAccountsReceivable.id, receivableId),
+              eq(managementAccountsReceivable.version, input.version),
+              eq(managementAccountsReceivable.status, "open"),
+              eq(managementAccountsReceivable.receivedCents, 0),
+            ),
+          )
+          .returning();
+        if (!updated)
+          throw new ConflictException({
+            code: "FINANCE_ENTRY_NOT_CANCELABLE",
+            message: "A conta foi alterada ou já possui liquidação.",
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.receivable.canceled",
+          "receivable",
+          receivableId,
+          input,
+        );
+        return updated;
+      },
+    );
+  }
+
+  async reversePayablePayment(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    paymentId: string,
+    idempotencyKey: string,
+    input: FinancePaymentReversalInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "payable-payment-reversal",
+      { paymentId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_payable_payments where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${paymentId}::uuid for update`,
+        );
+        const [payment] = await tx
+          .select()
+          .from(managementPayablePayments)
+          .where(
+            and(
+              eq(managementPayablePayments.organizationId, organizationId),
+              eq(managementPayablePayments.unitId, unitId),
+              eq(managementPayablePayments.id, paymentId),
+            ),
+          )
+          .limit(1);
+        if (!payment) throw new NotFoundException({ code: "PAYABLE_PAYMENT_NOT_FOUND" });
+        if (payment.status !== "posted")
+          throw new ConflictException({ code: "FINANCE_PAYMENT_ALREADY_REVERSED" });
+        await tx.execute(
+          sql`select id from management_accounts_payable where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${payment.payableId}::uuid for update`,
+        );
+        const [payable] = await tx
+          .select()
+          .from(managementAccountsPayable)
+          .where(eq(managementAccountsPayable.id, payment.payableId))
+          .limit(1);
+        if (!payable) throw new NotFoundException({ code: "PAYABLE_NOT_FOUND" });
+        const nextPaidCents = payable.paidCents - payment.amountCents;
+        const [originalCashEntry] = await tx
+          .select()
+          .from(managementCashEntries)
+          .where(
+            and(
+              eq(managementCashEntries.organizationId, organizationId),
+              eq(managementCashEntries.unitId, unitId),
+              eq(managementCashEntries.sourceType, "payable_payment"),
+              eq(managementCashEntries.sourceId, payment.id),
+            ),
+          )
+          .limit(1);
+        const cashShift = originalCashEntry
+          ? await this.lockOpenCashShift(tx, organizationId, unitId, {
+              cashRegisterId: input.cashRegisterId,
+            })
+          : null;
+        if (originalCashEntry?.affectsDrawer && !cashShift)
+          throw new BadRequestException({
+            code: "CASH_SHIFT_REQUIRED",
+            message: "O estorno em dinheiro exige um caixa aberto.",
+          });
+        const reversedAt = new Date();
+        await tx
+          .update(managementPayablePayments)
+          .set({
+            status: "reversed",
+            reversedByIdentityId: identityId,
+            reversedAt,
+            reversalReason: input.reason,
+            updatedAt: reversedAt,
+          })
+          .where(eq(managementPayablePayments.id, payment.id));
+        await tx
+          .update(managementAccountsPayable)
+          .set({
+            paidCents: nextPaidCents,
+            status: nextPaidCents === 0 ? "open" : "partially_paid",
+            version: payable.version + 1,
+            updatedAt: reversedAt,
+          })
+          .where(eq(managementAccountsPayable.id, payable.id));
+        if (cashShift && originalCashEntry)
+          await tx.insert(managementCashEntries).values({
+            organizationId,
+            unitId,
+            cashShiftId: cashShift.id,
+            direction: "in",
+            entryType: "reversal",
+            paymentMethod: payment.method,
+            affectsDrawer: originalCashEntry.affectsDrawer,
+            amountCents: payment.amountCents,
+            sourceType: "payable_payment_reversal",
+            sourceId: randomUUID(),
+            description: `Estorno: ${payable.description}`,
+            actorIdentityId: identityId,
+            occurredAt: reversedAt,
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.payable-payment.reversed",
+          "payable_payment",
+          payment.id,
+          { reason: input.reason },
+        );
+        return { paymentId, status: "reversed", payableId: payable.id, paidCents: nextPaidCents };
+      },
+    );
+  }
+
+  async reverseReceivablePayment(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    paymentId: string,
+    idempotencyKey: string,
+    input: FinancePaymentReversalInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "receivable-payment-reversal",
+      { paymentId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_receivable_payments where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${paymentId}::uuid for update`,
+        );
+        const [payment] = await tx
+          .select()
+          .from(managementReceivablePayments)
+          .where(
+            and(
+              eq(managementReceivablePayments.organizationId, organizationId),
+              eq(managementReceivablePayments.unitId, unitId),
+              eq(managementReceivablePayments.id, paymentId),
+            ),
+          )
+          .limit(1);
+        if (!payment) throw new NotFoundException({ code: "RECEIVABLE_PAYMENT_NOT_FOUND" });
+        if (payment.status !== "posted")
+          throw new ConflictException({ code: "FINANCE_PAYMENT_ALREADY_REVERSED" });
+        await tx.execute(
+          sql`select id from management_accounts_receivable where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${payment.receivableId}::uuid for update`,
+        );
+        const [receivable] = await tx
+          .select()
+          .from(managementAccountsReceivable)
+          .where(eq(managementAccountsReceivable.id, payment.receivableId))
+          .limit(1);
+        if (!receivable) throw new NotFoundException({ code: "RECEIVABLE_NOT_FOUND" });
+        const nextReceivedCents = receivable.receivedCents - payment.amountCents;
+        const [originalCashEntry] = await tx
+          .select()
+          .from(managementCashEntries)
+          .where(
+            and(
+              eq(managementCashEntries.organizationId, organizationId),
+              eq(managementCashEntries.unitId, unitId),
+              eq(managementCashEntries.sourceType, "receivable_payment"),
+              eq(managementCashEntries.sourceId, payment.id),
+            ),
+          )
+          .limit(1);
+        const cashShift = originalCashEntry
+          ? await this.lockOpenCashShift(tx, organizationId, unitId, {
+              cashRegisterId: input.cashRegisterId,
+            })
+          : null;
+        if (originalCashEntry?.affectsDrawer && !cashShift)
+          throw new BadRequestException({
+            code: "CASH_SHIFT_REQUIRED",
+            message: "O estorno em dinheiro exige um caixa aberto.",
+          });
+        const reversedAt = new Date();
+        await tx
+          .update(managementReceivablePayments)
+          .set({
+            status: "reversed",
+            reversedByIdentityId: identityId,
+            reversedAt,
+            reversalReason: input.reason,
+            updatedAt: reversedAt,
+          })
+          .where(eq(managementReceivablePayments.id, payment.id));
+        await tx
+          .update(managementAccountsReceivable)
+          .set({
+            receivedCents: nextReceivedCents,
+            status: nextReceivedCents === 0 ? "open" : "partially_received",
+            version: receivable.version + 1,
+            updatedAt: reversedAt,
+          })
+          .where(eq(managementAccountsReceivable.id, receivable.id));
+        if (cashShift && originalCashEntry)
+          await tx.insert(managementCashEntries).values({
+            organizationId,
+            unitId,
+            cashShiftId: cashShift.id,
+            direction: "out",
+            entryType: "reversal",
+            paymentMethod: payment.method,
+            affectsDrawer: originalCashEntry.affectsDrawer,
+            amountCents: payment.amountCents,
+            sourceType: "receivable_payment_reversal",
+            sourceId: randomUUID(),
+            description: `Estorno: ${receivable.description}`,
+            actorIdentityId: identityId,
+            occurredAt: reversedAt,
+          });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.receivable-payment.reversed",
+          "receivable_payment",
+          payment.id,
+          { reason: input.reason },
+        );
+        return {
+          paymentId,
+          status: "reversed",
+          receivableId: receivable.id,
+          receivedCents: nextReceivedCents,
+        };
+      },
+    );
+  }
+
+  async financeDashboard(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: FinanceListQuery = {
+      direction: "all",
+      status: "all",
+      search: "",
+      page: 1,
+      pageSize: 25,
+    },
+  ) {
+    const role = await this.requireRole(identityId, organizationId, unitId, [
+      ...FINANCE_ROLES,
+      "cashier",
+    ]);
+    const settings = await this.loadFinanceSettings(organizationId, unitId);
+    const [unit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: unit?.timezone ?? "America/Sao_Paulo",
+    }).format(new Date());
+    const dueSoon = new Date(`${today}T00:00:00.000Z`);
+    dueSoon.setUTCDate(dueSoon.getUTCDate() + settings.dueSoonDays);
+    const dueSoonDate = dueSoon.toISOString().slice(0, 10);
+    const statusCondition = (
+      direction: "payable" | "receivable",
+      statusColumn:
+        | typeof managementAccountsPayable.status
+        | typeof managementAccountsReceivable.status,
+      dueDateColumn:
+        | typeof managementAccountsPayable.dueDate
+        | typeof managementAccountsReceivable.dueDate,
+    ) => {
+      if (query.status === "open") return eq(statusColumn, "open");
+      if (query.status === "partial")
+        return direction === "payable"
+          ? eq(managementAccountsPayable.status, "partially_paid")
+          : eq(managementAccountsReceivable.status, "partially_received");
+      if (query.status === "settled")
+        return direction === "payable"
+          ? eq(managementAccountsPayable.status, "paid")
+          : eq(managementAccountsReceivable.status, "received");
+      if (query.status === "canceled") return eq(statusColumn, "canceled");
+      if (query.status === "overdue")
+        return and(
+          direction === "payable"
+            ? inArray(managementAccountsPayable.status, ["open", "partially_paid"])
+            : inArray(managementAccountsReceivable.status, ["open", "partially_received"]),
+          lt(dueDateColumn, today),
+        );
+      if (query.status === "due_soon")
+        return and(
+          direction === "payable"
+            ? inArray(managementAccountsPayable.status, ["open", "partially_paid"])
+            : inArray(managementAccountsReceivable.status, ["open", "partially_received"]),
+          gte(dueDateColumn, today),
+          lte(dueDateColumn, dueSoonDate),
+        );
+      return undefined;
+    };
+    const payableWhere = and(
+      eq(managementAccountsPayable.organizationId, organizationId),
+      eq(managementAccountsPayable.unitId, unitId),
+      query.search
+        ? or(
+            ilike(managementAccountsPayable.description, `%${query.search}%`),
+            ilike(managementAccountsPayable.documentNumber, `%${query.search}%`),
+            ilike(managementAccountsPayable.category, `%${query.search}%`),
+            ilike(managementAccountsPayable.costCenter, `%${query.search}%`),
+          )
+        : undefined,
+      query.from ? gte(managementAccountsPayable.dueDate, query.from) : undefined,
+      query.to ? lte(managementAccountsPayable.dueDate, query.to) : undefined,
+      statusCondition(
+        "payable",
+        managementAccountsPayable.status,
+        managementAccountsPayable.dueDate,
+      ),
+    );
+    const receivableWhere = and(
+      eq(managementAccountsReceivable.organizationId, organizationId),
+      eq(managementAccountsReceivable.unitId, unitId),
+      query.search
+        ? or(
+            ilike(managementAccountsReceivable.description, `%${query.search}%`),
+            ilike(managementAccountsReceivable.documentNumber, `%${query.search}%`),
+            ilike(managementAccountsReceivable.category, `%${query.search}%`),
+            ilike(managementAccountsReceivable.costCenter, `%${query.search}%`),
+          )
+        : undefined,
+      query.from ? gte(managementAccountsReceivable.dueDate, query.from) : undefined,
+      query.to ? lte(managementAccountsReceivable.dueDate, query.to) : undefined,
+      statusCondition(
+        "receivable",
+        managementAccountsReceivable.status,
+        managementAccountsReceivable.dueDate,
+      ),
+    );
+    const fetchLimit = query.page * query.pageSize;
+    const includePayables = query.direction !== "receivable";
+    const includeReceivables = query.direction !== "payable";
+    const [payableRows, receivableRows, payableCountRows, receivableCountRows] = await Promise.all([
+      includePayables
+        ? this.database.db
+            .select({
+              ...getTableColumns(managementAccountsPayable),
+              supplierName: managementSuppliers.name,
+            })
+            .from(managementAccountsPayable)
+            .leftJoin(
+              managementSuppliers,
+              and(
+                eq(managementSuppliers.organizationId, managementAccountsPayable.organizationId),
+                eq(managementSuppliers.unitId, managementAccountsPayable.unitId),
+                eq(managementSuppliers.id, managementAccountsPayable.supplierId),
+              ),
+            )
+            .where(payableWhere)
+            .orderBy(managementAccountsPayable.dueDate, managementAccountsPayable.id)
+            .limit(fetchLimit)
+        : Promise.resolve([]),
+      includeReceivables
+        ? this.database.db
+            .select()
+            .from(managementAccountsReceivable)
+            .where(receivableWhere)
+            .orderBy(managementAccountsReceivable.dueDate, managementAccountsReceivable.id)
+            .limit(fetchLimit)
+        : Promise.resolve([]),
+      includePayables
+        ? this.database.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(managementAccountsPayable)
+            .where(payableWhere)
+        : Promise.resolve([{ count: 0 }]),
+      includeReceivables
+        ? this.database.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(managementAccountsReceivable)
+            .where(receivableWhere)
+        : Promise.resolve([{ count: 0 }]),
+    ]);
+    const entries = [
+      ...payableRows.map((entry) => ({
+        ...entry,
+        direction: "payable" as const,
+        settledCents: entry.paidCents,
+      })),
+      ...receivableRows.map((entry) => ({
+        ...entry,
+        direction: "receivable" as const,
+        settledCents: entry.receivedCents,
+        supplierName: null,
+      })),
+    ]
+      .sort(
+        (left, right) =>
+          left.dueDate.localeCompare(right.dueDate) || left.id.localeCompare(right.id),
+      )
+      .slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
+    const payableIds = entries
+      .filter((entry) => entry.direction === "payable")
+      .map((entry) => entry.id);
+    const receivableIds = entries
+      .filter((entry) => entry.direction === "receivable")
+      .map((entry) => entry.id);
     const [
-      payables,
       payablePayments,
-      receivables,
       receivablePayments,
       reconciliationImports,
       reconciliationEntries,
+      approvals,
+      payableSummary,
+      receivableSummary,
+      payableProjection,
+      receivableProjection,
     ] = await Promise.all([
-      this.database.db
-        .select()
-        .from(managementAccountsPayable)
-        .where(
-          and(
-            eq(managementAccountsPayable.organizationId, organizationId),
-            eq(managementAccountsPayable.unitId, unitId),
-          ),
-        )
-        .orderBy(managementAccountsPayable.dueDate),
-      this.database.db
-        .select()
-        .from(managementPayablePayments)
-        .where(
-          and(
-            eq(managementPayablePayments.organizationId, organizationId),
-            eq(managementPayablePayments.unitId, unitId),
-          ),
-        )
-        .orderBy(desc(managementPayablePayments.paidAt))
-        .limit(500),
-      this.database.db
-        .select()
-        .from(managementAccountsReceivable)
-        .where(
-          and(
-            eq(managementAccountsReceivable.organizationId, organizationId),
-            eq(managementAccountsReceivable.unitId, unitId),
-          ),
-        )
-        .orderBy(managementAccountsReceivable.dueDate),
-      this.database.db
-        .select()
-        .from(managementReceivablePayments)
-        .where(
-          and(
-            eq(managementReceivablePayments.organizationId, organizationId),
-            eq(managementReceivablePayments.unitId, unitId),
-          ),
-        )
-        .orderBy(desc(managementReceivablePayments.receivedAt))
-        .limit(500),
+      payableIds.length
+        ? this.database.db
+            .select()
+            .from(managementPayablePayments)
+            .where(
+              and(
+                eq(managementPayablePayments.organizationId, organizationId),
+                eq(managementPayablePayments.unitId, unitId),
+                inArray(managementPayablePayments.payableId, payableIds),
+              ),
+            )
+            .orderBy(desc(managementPayablePayments.paidAt))
+        : Promise.resolve([]),
+      receivableIds.length
+        ? this.database.db
+            .select()
+            .from(managementReceivablePayments)
+            .where(
+              and(
+                eq(managementReceivablePayments.organizationId, organizationId),
+                eq(managementReceivablePayments.unitId, unitId),
+                inArray(managementReceivablePayments.receivableId, receivableIds),
+              ),
+            )
+            .orderBy(desc(managementReceivablePayments.receivedAt))
+        : Promise.resolve([]),
       this.database.db
         .select()
         .from(managementReconciliationImports)
@@ -11350,7 +14901,7 @@ export class ManagementService {
           ),
         )
         .orderBy(desc(managementReconciliationImports.importedAt))
-        .limit(100),
+        .limit(20),
       this.database.db
         .select()
         .from(managementReconciliationEntries)
@@ -11361,15 +14912,148 @@ export class ManagementService {
           ),
         )
         .orderBy(desc(managementReconciliationEntries.createdAt))
-        .limit(1_000),
+        .limit(100),
+      this.database.db
+        .select()
+        .from(managementFinanceApprovalRequests)
+        .where(
+          and(
+            eq(managementFinanceApprovalRequests.organizationId, organizationId),
+            eq(managementFinanceApprovalRequests.unitId, unitId),
+            inArray(managementFinanceApprovalRequests.status, ["pending", "approved"]),
+          ),
+        )
+        .orderBy(desc(managementFinanceApprovalRequests.createdAt))
+        .limit(100),
+      this.database.db
+        .select({
+          pendingCents: sql<number>`coalesce(sum(${managementAccountsPayable.amountCents} - ${managementAccountsPayable.paidCents}) filter (where ${managementAccountsPayable.status} in ('open','partially_paid')), 0)::int`,
+          overdueCount: sql<number>`count(*) filter (where ${managementAccountsPayable.status} in ('open','partially_paid') and ${managementAccountsPayable.dueDate} < ${today})::int`,
+          dueTodayCount: sql<number>`count(*) filter (where ${managementAccountsPayable.status} in ('open','partially_paid') and ${managementAccountsPayable.dueDate} = ${today})::int`,
+          dueSoonCount: sql<number>`count(*) filter (where ${managementAccountsPayable.status} in ('open','partially_paid') and ${managementAccountsPayable.dueDate} > ${today} and ${managementAccountsPayable.dueDate} <= ${dueSoonDate})::int`,
+        })
+        .from(managementAccountsPayable)
+        .where(
+          and(
+            eq(managementAccountsPayable.organizationId, organizationId),
+            eq(managementAccountsPayable.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select({
+          pendingCents: sql<number>`coalesce(sum(${managementAccountsReceivable.amountCents} - ${managementAccountsReceivable.receivedCents}) filter (where ${managementAccountsReceivable.status} in ('open','partially_received')), 0)::int`,
+          overdueCount: sql<number>`count(*) filter (where ${managementAccountsReceivable.status} in ('open','partially_received') and ${managementAccountsReceivable.dueDate} < ${today})::int`,
+          dueTodayCount: sql<number>`count(*) filter (where ${managementAccountsReceivable.status} in ('open','partially_received') and ${managementAccountsReceivable.dueDate} = ${today})::int`,
+          dueSoonCount: sql<number>`count(*) filter (where ${managementAccountsReceivable.status} in ('open','partially_received') and ${managementAccountsReceivable.dueDate} > ${today} and ${managementAccountsReceivable.dueDate} <= ${dueSoonDate})::int`,
+        })
+        .from(managementAccountsReceivable)
+        .where(
+          and(
+            eq(managementAccountsReceivable.organizationId, organizationId),
+            eq(managementAccountsReceivable.unitId, unitId),
+          ),
+        ),
+      this.database.db
+        .select({
+          date: managementAccountsPayable.dueDate,
+          amountCents: sql<number>`sum(${managementAccountsPayable.amountCents} - ${managementAccountsPayable.paidCents})::int`,
+        })
+        .from(managementAccountsPayable)
+        .where(
+          and(
+            eq(managementAccountsPayable.organizationId, organizationId),
+            eq(managementAccountsPayable.unitId, unitId),
+            inArray(managementAccountsPayable.status, ["open", "partially_paid"]),
+            gte(managementAccountsPayable.dueDate, today),
+          ),
+        )
+        .groupBy(managementAccountsPayable.dueDate)
+        .orderBy(managementAccountsPayable.dueDate)
+        .limit(90),
+      this.database.db
+        .select({
+          date: managementAccountsReceivable.dueDate,
+          amountCents: sql<number>`sum(${managementAccountsReceivable.amountCents} - ${managementAccountsReceivable.receivedCents})::int`,
+        })
+        .from(managementAccountsReceivable)
+        .where(
+          and(
+            eq(managementAccountsReceivable.organizationId, organizationId),
+            eq(managementAccountsReceivable.unitId, unitId),
+            inArray(managementAccountsReceivable.status, ["open", "partially_received"]),
+            gte(managementAccountsReceivable.dueDate, today),
+          ),
+        )
+        .groupBy(managementAccountsReceivable.dueDate)
+        .orderBy(managementAccountsReceivable.dueDate)
+        .limit(90),
     ]);
+    const projectionByDate = new Map<string, { payableCents: number; receivableCents: number }>();
+    for (const row of payableProjection)
+      projectionByDate.set(row.date, {
+        payableCents: Number(row.amountCents),
+        receivableCents: projectionByDate.get(row.date)?.receivableCents ?? 0,
+      });
+    for (const row of receivableProjection)
+      projectionByDate.set(row.date, {
+        payableCents: projectionByDate.get(row.date)?.payableCents ?? 0,
+        receivableCents: Number(row.amountCents),
+      });
+    let projectedBalanceCents = 0;
+    const projection = [...projectionByDate.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, values]) => {
+        projectedBalanceCents += values.receivableCents - values.payableCents;
+        return { date, ...values, balanceCents: projectedBalanceCents };
+      });
+    const total =
+      Number(payableCountRows[0]?.count ?? 0) + Number(receivableCountRows[0]?.count ?? 0);
     return {
-      payables,
+      entries,
+      payables: entries
+        .filter((entry) => entry.direction === "payable")
+        .map((entry) => ({ ...entry, paidCents: entry.settledCents })),
       payablePayments,
-      receivables,
+      receivables: entries
+        .filter((entry) => entry.direction === "receivable")
+        .map((entry) => ({ ...entry, receivedCents: entry.settledCents })),
       receivablePayments,
       reconciliationImports,
       reconciliationEntries,
+      approvals,
+      settings,
+      summary: {
+        payableCents: Number(payableSummary[0]?.pendingCents ?? 0),
+        receivableCents: Number(receivableSummary[0]?.pendingCents ?? 0),
+        projectedBalanceCents:
+          Number(receivableSummary[0]?.pendingCents ?? 0) -
+          Number(payableSummary[0]?.pendingCents ?? 0),
+        overdueCount:
+          Number(payableSummary[0]?.overdueCount ?? 0) +
+          Number(receivableSummary[0]?.overdueCount ?? 0),
+        dueTodayCount:
+          Number(payableSummary[0]?.dueTodayCount ?? 0) +
+          Number(receivableSummary[0]?.dueTodayCount ?? 0),
+        dueSoonCount:
+          Number(payableSummary[0]?.dueSoonCount ?? 0) +
+          Number(receivableSummary[0]?.dueSoonCount ?? 0),
+        unresolvedReconciliations: reconciliationEntries.filter((entry) =>
+          ["unmatched", "divergent"].includes(entry.status),
+        ).length,
+      },
+      projection,
+      pagination: {
+        page: query.page,
+        pageSize: query.pageSize,
+        total,
+        pageCount: Math.ceil(total / query.pageSize),
+      },
+      capabilities: {
+        canManage: role !== "cashier",
+        canConfigure: role === "owner" || role === "manager",
+        canApprove: role !== "cashier",
+        canOperateCash: role === "owner" || role === "manager" || role === "cashier",
+      },
     };
   }
 
@@ -11766,7 +15450,7 @@ export class ManagementService {
             requestedAt: approval?.requestedAt.toISOString(),
           };
         }
-        return this.executeCashTransfer(
+        return this.requestCashTransfer(
           tx,
           identityId,
           organizationId,
@@ -11774,6 +15458,145 @@ export class ManagementService {
           idempotencyKey,
           input,
         );
+      },
+    );
+  }
+
+  async decideCashTransfer(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    cashTransferId: string,
+    idempotencyKey: string,
+    input: CashTransferDecisionInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, CASH_OPERATE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "cash-transfer-decision",
+      { cashTransferId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_cash_transfers where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${cashTransferId}::uuid for update`,
+        );
+        const [transfer] = await tx
+          .select()
+          .from(managementCashTransfers)
+          .where(
+            and(
+              eq(managementCashTransfers.organizationId, organizationId),
+              eq(managementCashTransfers.unitId, unitId),
+              eq(managementCashTransfers.id, cashTransferId),
+            ),
+          )
+          .limit(1);
+        if (!transfer)
+          throw new NotFoundException({
+            code: "CASH_TRANSFER_NOT_FOUND",
+            message: "Transferência não encontrada nesta unidade.",
+          });
+        if (transfer.status !== "pending")
+          throw new ConflictException({
+            code: "CASH_TRANSFER_ALREADY_DECIDED",
+            message: "Esta transferência já foi decidida.",
+          });
+
+        const lockOrder = cashTransferLockOrder(transfer.fromCashShiftId, transfer.toCashShiftId);
+        const lockedShifts = [];
+        for (const cashShiftId of lockOrder)
+          lockedShifts.push(await this.lockCashShiftById(tx, organizationId, unitId, cashShiftId));
+        const fromShift = lockedShifts.find((shift) => shift.id === transfer.fromCashShiftId);
+        const toShift = lockedShifts.find((shift) => shift.id === transfer.toCashShiftId);
+        if (!fromShift || !toShift)
+          throw new ConflictException({ code: "CASH_TRANSFER_SHIFT_LOCK_FAILED" });
+        if (
+          toShift.currentResponsibleIdentityId !== identityId ||
+          transfer.transferredByIdentityId === identityId
+        )
+          throw new ForbiddenException({
+            code: "CASH_TRANSFER_DESTINATION_RESPONSIBLE_REQUIRED",
+            message:
+              "Somente o responsável atual pela gaveta de destino pode decidir a transferência.",
+          });
+
+        const decidedAt = new Date();
+        if (input.decision === "accept") {
+          const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, fromShift.id);
+          assertCashDrawerDebit(
+            fromShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
+            transfer.amountCents,
+          );
+          await tx.insert(managementCashEntries).values([
+            {
+              organizationId,
+              unitId,
+              cashShiftId: fromShift.id,
+              direction: "out",
+              entryType: "transfer_out",
+              paymentMethod: null,
+              affectsDrawer: true,
+              amountCents: transfer.amountCents,
+              sourceType: "cash_transfer_out",
+              sourceId: transfer.id,
+              description: transfer.reason,
+              actorIdentityId: identityId,
+              occurredAt: decidedAt,
+            },
+            {
+              organizationId,
+              unitId,
+              cashShiftId: toShift.id,
+              direction: "in",
+              entryType: "transfer_in",
+              paymentMethod: null,
+              affectsDrawer: true,
+              amountCents: transfer.amountCents,
+              sourceType: "cash_transfer_in",
+              sourceId: transfer.id,
+              description: transfer.reason,
+              actorIdentityId: identityId,
+              occurredAt: decidedAt,
+            },
+          ]);
+        }
+        const status = input.decision === "accept" ? ("accepted" as const) : ("rejected" as const);
+        await tx
+          .update(managementCashTransfers)
+          .set({
+            status,
+            decidedByIdentityId: identityId,
+            decisionNote: input.note ?? null,
+            decidedAt,
+            updatedAt: decidedAt,
+          })
+          .where(eq(managementCashTransfers.id, transfer.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          `management.cash-transfer.${status}`,
+          "cash_transfer",
+          transfer.id,
+          {
+            fromCashShiftId: transfer.fromCashShiftId,
+            toCashShiftId: transfer.toCashShiftId,
+            amountCents: transfer.amountCents,
+            requestedByIdentityId: transfer.transferredByIdentityId,
+            note: input.note,
+          },
+        );
+        return {
+          transferId: transfer.id,
+          status,
+          fromCashShiftId: transfer.fromCashShiftId,
+          toCashShiftId: transfer.toCashShiftId,
+          amountCents: transfer.amountCents,
+          decidedAt: decidedAt.toISOString(),
+        };
       },
     );
   }
@@ -11797,6 +15620,41 @@ export class ManagementService {
       async (tx) => {
         const shift = await this.lockOpenCashShift(tx, organizationId, unitId, { cashShiftId });
         if (!shift) throw new ConflictException({ code: "CASH_SHIFT_CLOSED" });
+        const [pendingApproval] = await tx
+          .select({ id: managementCashApprovalRequests.id })
+          .from(managementCashApprovalRequests)
+          .where(
+            and(
+              eq(managementCashApprovalRequests.organizationId, organizationId),
+              eq(managementCashApprovalRequests.unitId, unitId),
+              eq(managementCashApprovalRequests.status, "pending"),
+              or(
+                eq(managementCashApprovalRequests.cashShiftId, cashShiftId),
+                eq(managementCashApprovalRequests.targetCashShiftId, cashShiftId),
+              ),
+            ),
+          )
+          .limit(1);
+        const [pendingTransfer] = await tx
+          .select({ id: managementCashTransfers.id })
+          .from(managementCashTransfers)
+          .where(
+            and(
+              eq(managementCashTransfers.organizationId, organizationId),
+              eq(managementCashTransfers.unitId, unitId),
+              eq(managementCashTransfers.status, "pending"),
+              or(
+                eq(managementCashTransfers.fromCashShiftId, cashShiftId),
+                eq(managementCashTransfers.toCashShiftId, cashShiftId),
+              ),
+            ),
+          )
+          .limit(1);
+        if (pendingApproval || pendingTransfer)
+          throw new ConflictException({
+            code: "CASH_SHIFT_PENDING_DECISIONS",
+            message: "Decida as aprovações e transferências pendentes antes de fechar o caixa.",
+          });
         const entries = await tx
           .select({
             direction: managementCashEntries.direction,
@@ -11825,14 +15683,17 @@ export class ManagementService {
           if (
             !entry.paymentMethod ||
             entry.paymentMethod === "cash" ||
-            entry.direction !== "in" ||
             !CASH_PAYMENT_METHODS.includes(
               entry.paymentMethod as (typeof CASH_PAYMENT_METHODS)[number],
             )
           )
             continue;
           const method = entry.paymentMethod as (typeof CASH_PAYMENT_METHODS)[number];
-          expectedByMethod.set(method, (expectedByMethod.get(method) ?? 0) + entry.amountCents);
+          expectedByMethod.set(
+            method,
+            (expectedByMethod.get(method) ?? 0) +
+              (entry.direction === "in" ? entry.amountCents : -entry.amountCents),
+          );
         }
         const observations =
           input.tenderCounts ??
@@ -12257,9 +16118,9 @@ export class ManagementService {
           if (approval.kind === "transfer") {
             if (!approval.targetCashShiftId)
               throw new ConflictException({ code: "CASH_APPROVAL_TARGET_MISSING" });
-            const executed = await this.executeCashTransfer(
+            const executed = await this.requestCashTransfer(
               tx,
-              identityId,
+              approval.requestedByIdentityId,
               organizationId,
               unitId,
               executionKey,
@@ -12427,6 +16288,7 @@ export class ManagementService {
       terminals,
       tenderCounts,
       approvals,
+      pendingTransfers,
       adjustments,
       operators,
       settings,
@@ -12539,6 +16401,18 @@ export class ManagementService {
           ),
         )
         .orderBy(asc(managementCashApprovalRequests.createdAt))
+        .limit(200),
+      this.database.db
+        .select()
+        .from(managementCashTransfers)
+        .where(
+          and(
+            eq(managementCashTransfers.organizationId, organizationId),
+            eq(managementCashTransfers.unitId, unitId),
+            eq(managementCashTransfers.status, "pending"),
+          ),
+        )
+        .orderBy(asc(managementCashTransfers.occurredAt))
         .limit(200),
       this.database.db
         .select()
@@ -12660,6 +16534,7 @@ export class ManagementService {
       ]),
       ...entries.map((entry) => entry.actorIdentityId),
       ...approvals.map((approval) => approval.requestedByIdentityId),
+      ...pendingTransfers.map((transfer) => transfer.transferredByIdentityId),
       ...adjustments.map((adjustment) => adjustment.actorIdentityId),
     ].filter((id): id is string => id !== null);
     const identityRows =
@@ -12671,6 +16546,7 @@ export class ManagementService {
             .where(inArray(identities.id, [...new Set(identityIds)]));
     const names = new Map(identityRows.map((identity) => [identity.id, identity.name]));
     const registerNames = new Map(registers.map((register) => [register.id, register.name]));
+    const shiftsById = new Map(shifts.map((shift) => [shift.id, shift]));
     const openShiftByRegister = new Map(
       shifts
         .filter((shift) => shift.status === "open")
@@ -12731,6 +16607,12 @@ export class ManagementService {
         severity: "warning" as const,
         message: "Operação de caixa aguardando aprovação.",
         cashShiftId: approval.cashShiftId,
+      })),
+      ...pendingTransfers.map((transfer) => ({
+        code: "CASH_TRANSFER_PENDING",
+        severity: "warning" as const,
+        message: "Transferência entre gavetas aguardando aceite do destino.",
+        cashShiftId: transfer.toCashShiftId,
       })),
     ];
     return {
@@ -12820,6 +16702,28 @@ export class ManagementService {
         status: approval.status,
         requestedAt: approval.createdAt,
       })),
+      pendingTransfers: pendingTransfers.map((transfer) => {
+        const fromShift = shiftsById.get(transfer.fromCashShiftId);
+        const toShift = shiftsById.get(transfer.toCashShiftId);
+        return {
+          id: transfer.id,
+          fromCashShiftId: transfer.fromCashShiftId,
+          toCashShiftId: transfer.toCashShiftId,
+          fromCashRegisterName: fromShift
+            ? (registerNames.get(fromShift.cashRegisterId) ?? "Gaveta de origem")
+            : "Gaveta de origem",
+          toCashRegisterName: toShift
+            ? (registerNames.get(toShift.cashRegisterId) ?? "Gaveta de destino")
+            : "Gaveta de destino",
+          amountCents: transfer.amountCents,
+          reason: transfer.reason,
+          requestedByName: names.get(transfer.transferredByIdentityId) ?? "Usuário",
+          requestedAt: transfer.occurredAt,
+          canDecide:
+            toShift?.currentResponsibleIdentityId === identityId &&
+            transfer.transferredByIdentityId !== identityId,
+        };
+      }),
       adjustments: adjustments.map((adjustment) => ({
         id: adjustment.id,
         cashRegisterId: adjustment.cashRegisterId,
@@ -13247,7 +17151,7 @@ export class ManagementService {
               ? managementPayablePayments
               : managementReceivablePayments;
           const [payment] = await tx
-            .select({ id: table.id })
+            .select({ id: table.id, status: table.status })
             .from(table)
             .where(
               and(
@@ -13257,10 +17161,10 @@ export class ManagementService {
               ),
             )
             .limit(1);
-          if (!payment) {
+          if (payment?.status !== "posted") {
             throw new NotFoundException({
               code: "RECONCILIATION_PAYMENT_NOT_FOUND",
-              message: "Pagamento interno não encontrado nesta unidade.",
+              message: "Liquidação ativa não encontrada nesta unidade.",
             });
           }
         }
@@ -13302,6 +17206,140 @@ export class ManagementService {
         };
       },
     );
+  }
+
+  async resolveFinanceReconciliation(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    reconciliationEntryId: string,
+    idempotencyKey: string,
+    input: FinanceReconciliationResolutionInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-reconciliation-resolve",
+      { reconciliationEntryId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select id from management_reconciliation_entries where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${reconciliationEntryId}::uuid for update`,
+        );
+        const [entry] = await tx
+          .select()
+          .from(managementReconciliationEntries)
+          .where(
+            and(
+              eq(managementReconciliationEntries.organizationId, organizationId),
+              eq(managementReconciliationEntries.unitId, unitId),
+              eq(managementReconciliationEntries.id, reconciliationEntryId),
+            ),
+          )
+          .limit(1);
+        if (!entry) throw new NotFoundException({ code: "RECONCILIATION_ENTRY_NOT_FOUND" });
+        if (
+          entry.version !== input.version ||
+          (entry.status !== "unmatched" && entry.status !== "divergent")
+        )
+          throw new ConflictException({
+            code: "RECONCILIATION_VERSION_CONFLICT",
+            message: "A divergência já foi alterada. Atualize a conciliação.",
+          });
+        const paymentTable =
+          input.paymentDirection === "payable"
+            ? managementPayablePayments
+            : managementReceivablePayments;
+        const [payment] = await tx
+          .select({ id: paymentTable.id })
+          .from(paymentTable)
+          .where(
+            and(
+              eq(paymentTable.organizationId, organizationId),
+              eq(paymentTable.unitId, unitId),
+              eq(paymentTable.id, input.paymentId),
+              eq(paymentTable.status, "posted"),
+            ),
+          )
+          .limit(1);
+        if (!payment)
+          throw new NotFoundException({
+            code: "RECONCILIATION_PAYMENT_NOT_FOUND",
+            message: "Pagamento ativo não encontrado nesta unidade.",
+          });
+        await tx
+          .update(managementReconciliationEntries)
+          .set({
+            paymentDirection: input.paymentDirection,
+            paymentId: input.paymentId,
+            status: "resolved",
+            resolutionNote: input.note,
+            resolvedByIdentityId: identityId,
+            resolvedAt: new Date(),
+            version: input.version + 1,
+            updatedAt: new Date(),
+          })
+          .where(eq(managementReconciliationEntries.id, entry.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.reconciliation.resolved",
+          "reconciliation_entry",
+          entry.id,
+          input,
+        );
+        return { reconciliationEntryId: entry.id, status: "resolved", version: input.version + 1 };
+      },
+    );
+  }
+
+  async exportFinance(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    query: FinanceExportQuery,
+  ) {
+    const { format, ...filters } = query;
+    const items: Array<Record<string, string | number>> = [];
+    let page = 1;
+    let pageCount = 1;
+    do {
+      const result = await this.financeDashboard(identityId, organizationId, unitId, {
+        ...filters,
+        page,
+        pageSize: 100,
+      });
+      items.push(
+        ...result.entries.map((entry) => ({
+          tipo: entry.direction === "payable" ? "A pagar" : "A receber",
+          descricao: entry.description,
+          categoria: entry.category ?? "",
+          centro_custo: entry.costCenter ?? "",
+          documento: entry.documentNumber ?? "",
+          competencia: entry.competenceDate,
+          vencimento: entry.dueDate,
+          status: entry.status,
+          valor_centavos: entry.amountCents,
+          liquidado_centavos: entry.settledCents,
+          saldo_centavos: entry.amountCents - entry.settledCents,
+        })),
+      );
+      pageCount = result.pagination.pageCount;
+      page += 1;
+    } while (page <= pageCount && items.length < 10_000);
+    const artifact = buildReportArtifact(format, items, "Agenda financeira");
+    return {
+      filename: `agenda-financeira-${new Date().toISOString().slice(0, 10)}.${artifact.extension}`,
+      content: artifact.content,
+      contentEncoding: artifact.contentEncoding,
+      mimeType: artifact.mimeType,
+      sha256: artifact.sha256,
+      truncated: items.length >= 10_000,
+    };
   }
 
   async reports(
@@ -13357,6 +17395,7 @@ export class ManagementService {
           and(
             eq(managementPayablePayments.organizationId, organizationId),
             eq(managementPayablePayments.unitId, unitId),
+            eq(managementPayablePayments.status, "posted"),
             gte(payablePaymentDate, period.from),
             lte(payablePaymentDate, period.to),
           ),
@@ -13371,6 +17410,7 @@ export class ManagementService {
           and(
             eq(managementReceivablePayments.organizationId, organizationId),
             eq(managementReceivablePayments.unitId, unitId),
+            eq(managementReceivablePayments.status, "posted"),
             gte(receivablePaymentDate, period.from),
             lte(receivablePaymentDate, period.to),
           ),

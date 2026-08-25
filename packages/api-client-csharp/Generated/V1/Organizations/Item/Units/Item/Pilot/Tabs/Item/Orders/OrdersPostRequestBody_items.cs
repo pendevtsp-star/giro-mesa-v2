@@ -24,6 +24,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Or
 #endif
         /// <summary>The course property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course? Course { get; set; }
+        /// <summary>The doseClub property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_doseClub? DoseClub { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_doseClub DoseClub { get; set; }
+#endif
         /// <summary>The modifierOptionIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -73,6 +81,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Or
             {
                 { "allergyNote", n => { AllergyNote = n.GetStringValue(); } },
                 { "course", n => { Course = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course>(); } },
+                { "doseClub", n => { DoseClub = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_doseClub>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_doseClub.CreateFromDiscriminatorValue); } },
                 { "modifierOptionIds", n => { ModifierOptionIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "notes", n => { Notes = n.GetStringValue(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
@@ -89,6 +98,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Or
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("allergyNote", AllergyNote);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_course>("course", Course);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders.OrdersPostRequestBody_items_doseClub>("doseClub", DoseClub);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("modifierOptionIds", ModifierOptionIds);
             writer.WriteStringValue("notes", Notes);
             writer.WriteGuidValue("productId", ProductId);

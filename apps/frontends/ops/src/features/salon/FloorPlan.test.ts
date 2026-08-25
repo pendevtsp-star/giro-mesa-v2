@@ -4,6 +4,10 @@ import {
   buildJoinedShiftLayout,
   type FloorPlanItem,
   fitFloorPlanViewport,
+  floorPlanDensity,
+  floorPlanKeyboardMovement,
+  floorPlanPlacementAllowed,
+  floorPlanRectanglesOverlap,
   parseFloorPlanViewport,
   resolveFloorPlanFullscreenTarget,
   zoomFloorPlanViewport,
@@ -74,6 +78,54 @@ describe("floor plan layout", () => {
     );
 
     expect(layout.positions["table-1"]).not.toEqual(layout.positions["table-2"]);
+  });
+
+  it("uses rotated geometry and allows tables to touch without overlapping", () => {
+    expect(
+      floorPlanRectanglesOverlap(
+        { x: 100, y: 100, width: 120, height: 60, rotation: 45 },
+        { x: 150, y: 100, width: 120, height: 60, rotation: -45 },
+      ),
+    ).toBe(true);
+    expect(
+      floorPlanRectanglesOverlap(
+        { x: 50, y: 50, width: 40, height: 40, rotation: 0 },
+        { x: 90, y: 50, width: 40, height: 40, rotation: 0 },
+      ),
+    ).toBe(false);
+  });
+
+  it("blocks a rotated table at barriers and outside room limits", () => {
+    const room = [
+      { x: 0, y: 0 },
+      { x: 300, y: 0 },
+      { x: 300, y: 240 },
+      { x: 0, y: 240 },
+    ];
+    const barrier = [{ x: 150, y: 120, width: 20, height: 140, rotation: 25 }];
+
+    expect(
+      floorPlanPlacementAllowed(
+        { x: 145, y: 120, width: 90, height: 55, rotation: 35 },
+        room,
+        [],
+        barrier,
+      ),
+    ).toBe(false);
+    expect(
+      floorPlanPlacementAllowed(
+        { x: 32, y: 28, width: 70, height: 50, rotation: 45 },
+        room,
+        [],
+        [],
+      ),
+    ).toBe(false);
+  });
+
+  it("maps keyboard arrows to the same ten-unit editor grid", () => {
+    expect(floorPlanKeyboardMovement("ArrowRight")).toEqual({ x: 10, y: 0 });
+    expect(floorPlanKeyboardMovement("ArrowUp")).toEqual({ x: 0, y: -10 });
+    expect(floorPlanKeyboardMovement("Enter")).toBeNull();
   });
 
   it("reflows legacy room polygons that occupy the same physical space", () => {
@@ -153,6 +205,13 @@ describe("floor plan layout", () => {
     expect(viewport.x).toBeGreaterThanOrEqual(0);
     expect(parseFloorPlanViewport(JSON.stringify(viewport))).toEqual(viewport);
     expect(parseFloorPlanViewport('{"x":"wrong"}')).toBeNull();
+  });
+
+  it("reduces visual detail predictably on large operational floors", () => {
+    expect(floorPlanDensity(120)).toBe("normal");
+    expect(floorPlanDensity(121)).toBe("dense");
+    expect(floorPlanDensity(300)).toBe("dense");
+    expect(floorPlanDensity(500)).toBe("very-dense");
   });
 
   it("expands the complete salon operation shell instead of only the SVG plan", () => {

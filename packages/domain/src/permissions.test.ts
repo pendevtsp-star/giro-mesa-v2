@@ -96,4 +96,15 @@ describe("operational capabilities", () => {
     assert.equal(hasPermission("busser", "orders:write"), false);
     assert.equal(hasPermission("busser", "operations:payments:record"), false);
   });
+
+  it("lets KDS operators request production prints without managing printer configuration", () => {
+    assert.equal(hasPermission("kds", "operations:printing:request"), true);
+    assert.equal(hasPermission("kds", "operations:printing:manage"), false);
+  });
+});
+
+describe("accounting permissions", () => {
+  it("lets managers open the accountant package they can navigate to", () => {
+    assert.equal(hasPermission("manager", "accounting:exports:read"), true);
+  });
 });

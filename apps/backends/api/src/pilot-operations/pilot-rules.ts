@@ -5,12 +5,57 @@ import { BadRequestException, ConflictException } from "@nestjs/common";
 export type KdsState = "pending" | "preparing" | "ready" | "done" | "canceled";
 export type KdsServiceMode = "full_service" | "quick_service" | "bar" | "hybrid";
 export type KdsCourse = "anytime" | "starter" | "main" | "dessert";
-export type PrintJobState = "queued" | "printing" | "printed" | "failed";
+export type PrintJobState = "queued" | "printing" | "confirmation_required" | "printed" | "failed";
 export type AvailabilitySchedule = {
   windows: { dayOfWeek: number; start: string; end: string }[];
 };
 
 export const MAX_STORED_CENTS = 2_147_483_647;
+
+export function suggestedServiceChargeBasisPoints(
+  fulfillmentType: string,
+  configuration?: {
+    serviceChargeEnabled?: boolean;
+    defaultServiceChargeBasisPoints?: number;
+    serviceChargeApplication?: string;
+  } | null,
+) {
+  const basisPoints = configuration?.defaultServiceChargeBasisPoints;
+  return fulfillmentType === "dine_in" &&
+    configuration?.serviceChargeEnabled === true &&
+    configuration.serviceChargeApplication === "suggest_dine_in" &&
+    Number.isInteger(basisPoints) &&
+    (basisPoints ?? 0) > 0 &&
+    (basisPoints ?? 0) <= 10_000
+    ? (basisPoints as number)
+    : 0;
+}
+
+export function allocatePrintSplitAmounts(
+  balanceCents: number,
+  method: "equal_people" | "fixed_amount",
+  partCount: number,
+  fixedAmountCents?: number,
+) {
+  if (!Number.isSafeInteger(balanceCents) || balanceCents <= 0 || partCount < 2 || partCount > 50) {
+    throw new BadRequestException({ code: "INVALID_PRINT_SPLIT" });
+  }
+  if (method === "fixed_amount") {
+    if (
+      !Number.isSafeInteger(fixedAmountCents) ||
+      !fixedAmountCents ||
+      fixedAmountCents <= 0 ||
+      fixedAmountCents * partCount !== balanceCents
+    ) {
+      throw new BadRequestException({ code: "INVALID_FIXED_PRINT_SPLIT" });
+    }
+    return Array.from({ length: partCount }, () => fixedAmountCents);
+  }
+  const base = Math.floor(balanceCents / partCount);
+  const remainder = balanceCents % partCount;
+  if (base <= 0) throw new BadRequestException({ code: "PRINT_SPLIT_PART_TOO_SMALL" });
+  return Array.from({ length: partCount }, (_, index) => base + (index < remainder ? 1 : 0));
+}
 
 const KDS_TRANSITIONS: Record<KdsState, readonly KdsState[]> = {
   pending: ["preparing"],
@@ -21,8 +66,9 @@ const KDS_TRANSITIONS: Record<KdsState, readonly KdsState[]> = {
 };
 
 const PRINT_JOB_TRANSITIONS: Record<PrintJobState, readonly PrintJobState[]> = {
-  queued: ["printing", "failed"],
-  printing: ["printed", "failed"],
+  queued: ["printing", "confirmation_required", "failed"],
+  printing: ["confirmation_required", "printed", "failed"],
+  confirmation_required: ["printed", "failed"],
   printed: [],
   failed: [],
 };

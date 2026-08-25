@@ -197,9 +197,9 @@ export function CatalogProductEditorModal({
             </div>
 
             <fieldset className="catalog-create-stations catalog-editor-stations">
-              <legend className="catalog-text-strong-078">Praças de produção *</legend>
+              <legend className="catalog-text-strong-078">Estações de produção *</legend>
               <small className="catalog-create-stations__help">
-                Cada praça selecionada recebe o item e todas precisam concluir. Mantenha ao menos
+                Cada estação selecionada recebe o item e todas precisam concluir. Mantenha ao menos
                 uma.
               </small>
               <div className="catalog-create-stations__options">
@@ -276,7 +276,7 @@ export function CatalogProductEditorModal({
               )}
               {!hasCatalogProductionStation(editingProduct.stationIds) && (
                 <span className="catalog-editor-stations__error" role="alert">
-                  Selecione ao menos uma praça de produção para salvar.
+                  Selecione ao menos uma estação de produção para salvar.
                 </span>
               )}
             </fieldset>

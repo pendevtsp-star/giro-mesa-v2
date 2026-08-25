@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockCompatibleApi } from "./ops-release";
 
 const organizationId = "a1111111-1111-4111-8111-111111111111";
 const unitId = "b1111111-1111-4111-8111-111111111111";
@@ -8,6 +9,33 @@ const documentId = "f1111111-1111-4111-8111-111111111111";
 
 test("fiscal mantém a próxima ação legível no desktop e em 375 px", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A matriz de larguras já cobre mobile.");
+  await mockCompatibleApi(page);
+  await page.route(/\/health$/, (route) =>
+    route.fulfill({
+      status: 200,
+      json: {
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "e2e",
+        schemaVersion: 73,
+        capabilities: [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+        ],
+        database: "up",
+        integrations: {},
+      },
+    }),
+  );
+  let accountantResolved = false;
+  let attachmentUploaded = false;
   await page.addInitScript(
     ({ identityId, organizationId, unitId }) => {
       localStorage.setItem(
@@ -18,7 +46,8 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
     { identityId, organizationId, unitId },
   );
   await page.route(/\/v1\//, async (route) => {
-    const path = new URL(route.request().url()).pathname;
+    const requestUrl = new URL(route.request().url());
+    const path = requestUrl.pathname;
     const json = (body: unknown) => route.fulfill({ status: 200, json: body });
     if (path.endsWith("/auth/terminal-session"))
       return route.fulfill({ status: 401, json: { message: "Terminal ausente" } });
@@ -99,13 +128,14 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
         documentsByStatus: { authorized: 8, pending: 0, rejected: 1 },
         pendingDocuments: 0,
         openPeriods: 1,
-        openAccountantRequests: 0,
+        openAccountantRequests: 1,
         products: { total: 1, classified: 0, missingClassification: 1 },
       });
     }
     if (path.endsWith(`/fiscal/documents/${documentId}`))
       return json({
         id: documentId,
+        tabId: "a3333333-3333-4333-8333-333333333333",
         orderId: "a2222222-2222-4222-8222-222222222222",
         model: "nfce",
         number: 42,
@@ -159,14 +189,99 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
       });
     if (path.endsWith("/fiscal/periods")) return json([]);
     if (path.endsWith("/fiscal/accountant/package")) return route.fulfill({ status: 404 });
-    if (path.endsWith("/fiscal/accountant/requests")) return json([]);
+    if (
+      path.endsWith("/fiscal/accountant/requests/r1111111-1111-4111-8111-111111111111/resolve") &&
+      route.request().method() === "POST"
+    ) {
+      accountantResolved = true;
+      return json({ status: "resolved" });
+    }
+    if (
+      path.endsWith(
+        "/fiscal/accountant/requests/r1111111-1111-4111-8111-111111111111/attachments",
+      ) &&
+      route.request().method() === "POST"
+    ) {
+      attachmentUploaded = true;
+      return json({
+        attachment: {
+          id: "a4444444-4444-4444-8444-444444444444",
+          fileName: "compras.xml",
+          contentType: "application/xml",
+          sizeBytes: 12,
+          createdAt: "2026-08-18T11:00:00Z",
+        },
+        replayed: false,
+      });
+    }
+    if (path.endsWith("/fiscal/accountant/requests")) {
+      const overdue = requestUrl.searchParams.get("overdue") === "true";
+      const status = requestUrl.searchParams.get("status");
+      const targetAudience = requestUrl.searchParams.get("targetAudience");
+      const items = [
+        {
+          id: "r1111111-1111-4111-8111-111111111111",
+          competence: "2026-08",
+          title:
+            "Conferência dos documentos de compras interestaduais com descrição operacional extensa",
+          description:
+            "Precisamos confirmar os XMLs das compras interestaduais antes do fechamento mensal sem expor chaves internas do sistema.",
+          status: accountantResolved ? "resolved" : "open",
+          targetAudience: "establishment",
+          dueDate: "2026-08-20",
+          createdAt: "2026-08-17T12:00:00Z",
+          createdByName: "Ana Contadora",
+          resolution: accountantResolved ? "Documentos conferidos e fechamento liberado." : null,
+          resolvedAt: accountantResolved ? "2026-08-18T12:00:00Z" : null,
+          resolvedByName: accountantResolved ? "Bruno Gestor" : null,
+          attachments: attachmentUploaded
+            ? [
+                {
+                  id: "a4444444-4444-4444-8444-444444444444",
+                  fileName: "compras.xml",
+                  contentType: "application/xml",
+                  sizeBytes: 12,
+                  createdAt: "2026-08-18T11:00:00Z",
+                },
+              ]
+            : [],
+        },
+        {
+          id: "r2222222-2222-4222-8222-222222222222",
+          competence: "2026-07",
+          title: "Balancete disponível",
+          description: "O contador precisa confirmar o recebimento.",
+          status: "open",
+          targetAudience: "accountant",
+          dueDate: "2026-08-29",
+          createdAt: "2026-08-18T12:00:00Z",
+          createdByName: "Bruno Gestor",
+          attachments: [],
+        },
+      ].filter(
+        (item) =>
+          (!overdue || (item.status === "open" && item.dueDate < "2026-08-24")) &&
+          (!status || item.status === status) &&
+          (!targetAudience || item.targetAudience === targetAudience),
+      );
+      return json({
+        items,
+        pagination: {
+          page: Number(requestUrl.searchParams.get("page") ?? 1),
+          pageSize: 25,
+          total: overdue || status || targetAudience ? items.length : 32,
+        },
+      });
+    }
     return json({ items: [], capabilities: {}, alerts: [] });
   });
 
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("http://127.0.0.1:3112/#/fiscal");
-    await expect(page.getByRole("heading", { name: "Preparação para emitir" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Preparação para emitir" })).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(page.getByRole("button", { name: /Resumo/ })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -194,7 +309,19 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
     await expect(
       page.getByText("Revise a classificação fiscal dos produtos desta nota."),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Fechar" }).click();
+    await expect(page.getByRole("button", { name: "Revisar classificação" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir venda no balcão" })).toBeVisible();
+    if (width === 1440) {
+      await page.getByRole("button", { name: "Abrir venda no balcão" }).click();
+      await expect(page).toHaveURL(
+        /#\/counter\?tab=a3333333-3333-4333-8333-333333333333&origem=fiscal$/,
+      );
+      await expect(page.getByText("Não foi possível carregar esta área")).toBeVisible();
+      await page.goto("http://127.0.0.1:3112/#/fiscal?secao=documents");
+      await expect(page.getByRole("heading", { name: "Notas fiscais" })).toBeVisible();
+    } else {
+      await page.getByRole("button", { name: "Fechar" }).click();
+    }
 
     await page.getByRole("button", { name: /Fechamento/ }).click();
     await expect(page).toHaveURL(/#\/fiscal\?secao=closing$/);
@@ -203,6 +330,16 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
     await expect(page.getByRole("heading", { name: "Notas fiscais" })).toBeVisible();
 
     await page.goto("http://127.0.0.1:3112/#/fiscal?secao=overview");
+    await expect(page.getByText("1 solicitação do contador aberta")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir no Portal" })).toBeVisible();
+    if (width === 1440) {
+      await page.getByRole("button", { name: "Abrir no Portal" }).click();
+      await expect(page).toHaveURL(
+        /#\/accountant\?status=open&page=1&targetAudience=establishment$/,
+      );
+      await expect(page.getByRole("heading", { name: "Competência", exact: true })).toBeVisible();
+      await page.goto("http://127.0.0.1:3112/#/fiscal?secao=overview");
+    }
     const layout = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       content: document.documentElement.scrollWidth,
@@ -224,6 +361,37 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
       "flex-direction",
       width === 1440 ? "row" : "column",
     );
+    await expect(page.getByText("Ana Contadora", { exact: false })).toBeVisible();
+    if (width === 1440) {
+      await expect(page.getByText("32 solicitações", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Vencidas" }).click();
+      await expect(page).toHaveURL(/#\/accountant\?status=overdue&page=1$/);
+      await expect(page.getByText("1 solicitação", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Todas" }).click();
+      await page.getByText("Anexos").first().click();
+      await page
+        .getByLabel("Adicionar anexo")
+        .first()
+        .setInputFiles({
+          name: "compras.xml",
+          mimeType: "application/xml",
+          buffer: Buffer.from("<compras />"),
+        });
+      await expect(page.getByText("Anexo enviado com segurança.")).toBeVisible();
+      await expect(page.getByText("compras.xml")).toBeVisible();
+      await expect(page.getByText("Aguardando contador")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Responder e resolver" })).toHaveCount(1);
+      await page.getByRole("button", { name: "Responder e resolver" }).click();
+      await page.getByLabel("Resposta").fill("Documentos conferidos e fechamento liberado.");
+      await page.getByRole("button", { name: "Registrar resposta" }).click();
+      await expect(page.getByText("Resposta registrada e solicitação resolvida.")).toBeVisible();
+      await expect(page.getByText("Documentos conferidos e fechamento liberado.")).toBeVisible();
+      await expect(page.getByText("Resolvida", { exact: true })).toBeVisible();
+    } else {
+      await expect(page.getByText("Bruno Gestor", { exact: false }).first()).toBeVisible();
+      await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
+      await expect(page.locator("html")).toHaveCSS("color-scheme", "dark");
+    }
     const layout = await page.evaluate(() => ({
       viewport: document.documentElement.clientWidth,
       content: document.documentElement.scrollWidth,

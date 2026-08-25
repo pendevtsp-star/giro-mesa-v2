@@ -538,7 +538,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0053_petite_trauma");
+  assert.equal(recovery.targetMigration, "0074_crm_operational_inbox");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -548,6 +548,7 @@ test("pre-migration backup binds the migration actually applied in the source da
       { appliedBefore: "0026_doseclub_integration", appliedBeforeWhen: "1786493658116" },
       { appliedBefore: "0042_shallow_lenny_balinger", appliedBeforeWhen: "1787029862431" },
       { appliedBefore: "0045_strong_pride", appliedBeforeWhen: "1787256690924" },
+      { appliedBefore: "0053_petite_trauma", appliedBeforeWhen: "1787373316439" },
     ],
   );
   for (const transition of recovery.transitions) {
@@ -575,6 +576,10 @@ test("deployment and rollback compose contracts always include observability and
   assert.doesNotMatch(deploy, /\n"\$recovery_release\/deploy\/vps\/verify-image-provenance\.sh"\n/);
   assert.match(rollback, /compose\.images\.yaml/);
   assert.match(images, /postgres@sha256:[0-9a-f]{64}/);
+  assert.match(images, /clamav\/clamav-debian@sha256:[0-9a-f]{64}/);
+  assert.match(base, /ACCOUNTANT_ATTACHMENT_CLAMD_HOST:.*clamav/);
+  assert.match(base, /clamav_data:\/var\/lib\/clamav/);
+  assert.doesNotMatch(base, /3310:3310/);
   for (const variable of ["API", "WORKER", "SITE", "CUSTOMER", "OPS"]) {
     assert.match(images, new RegExp(`GIROMESA_${variable}_IMAGE:\\?`));
   }
@@ -583,6 +588,7 @@ test("deployment and rollback compose contracts always include observability and
   const lock = JSON.parse(readFileSync(imageLock, "utf8"));
   assert.match(lock.images.postgres.reference, /^postgres@sha256:[0-9a-f]{64}$/);
   assert.equal(lock.images.postgres.upstreamRepository, "docker.io/library/postgres");
+  assert.match(lock.images.clamav.reference, /^clamav\/clamav-debian@sha256:[0-9a-f]{64}$/);
   assert.match(
     lock.images.cosign.reference,
     /^ghcr\.io\/sigstore\/cosign\/cosign@sha256:[0-9a-f]{64}$/,

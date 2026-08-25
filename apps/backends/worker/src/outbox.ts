@@ -2,7 +2,10 @@ import {
   auditEvents,
   campaignDeliveries,
   createDatabase,
+  crmAutomationExecutions,
+  crmAutomationRules,
   growthCustomers,
+  growthIntegrations,
   identities,
   marketingCampaigns,
   membershipInvitations,
@@ -10,18 +13,40 @@ import {
   outboxEvents,
   posOrders,
   posTabs,
+  readWhatsAppArtifact,
+  units,
   webhookEndpoints,
   webhookPublications,
+  whatsappConversations,
+  whatsappMessages,
 } from "@giromesa/db";
 import {
   decryptSecret,
   encryptionKey,
   hasPermission,
+  normalizeWhatsAppPhone,
   type SecretEnvelope,
   SYSTEM_ROLES,
   type SystemRole,
 } from "@giromesa/domain";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, sql } from "drizzle-orm";
+import { purgeExpiredAccountantAttachments } from "./accountant-attachments.js";
+import { deliverAccountingRequestNotification } from "./accounting-notification.js";
+import {
+  BillingDeliveryError,
+  processBillingPaymentEvent,
+  reconcileBillingCheckout,
+  syncBillingSubscription,
+} from "./billing.js";
+import {
+  commitOrderDoseClubRedemptions,
+  DoseClubDeliveryError,
+  reverseCanceledDoseClubRedemption,
+} from "./doseclub.js";
+import {
+  DoseClubProvisioningError,
+  provisionDoseClubSubscription,
+} from "./doseclub-provisioning.js";
 import {
   deliverEmail,
   EmailDeliveryError,
@@ -34,6 +59,8 @@ import {
   InventoryConsumptionError,
   reverseCanceledOrderItemInventory,
 } from "./inventory.js";
+import { runInventoryIntegrityChecks } from "./inventory-integrity.js";
+import { deliverOperationalPush, OperationalPushDeliveryError } from "./operational-push.js";
 import {
   ORDER_READY_NOTIFICATION_TOPIC,
   OrderReadyDeliveryError,
@@ -42,7 +69,12 @@ import {
 } from "./order-ready.js";
 import { processDueReportSchedules } from "./reports.js";
 import { deliverWebhook, parseWebhookDeliveryRequest, WebhookDeliveryError } from "./webhook.js";
-import { deliverWhatsAppReady } from "./whatsapp.js";
+import {
+  deliverWhatsAppMedia,
+  deliverWhatsAppReady,
+  deliverWhatsAppText,
+  whatsappConfiguration,
+} from "./whatsapp.js";
 
 export interface ClaimedOutboxEvent extends Record<string, unknown> {
   id: string;
@@ -154,6 +186,298 @@ export class OutboxWorker {
     return processDueReportSchedules(this.connection.db, { limit, now });
   }
 
+  async runInventoryIntegrityChecks(now = new Date()) {
+    return runInventoryIntegrityChecks(this.connection.db, now);
+  }
+
+  async purgeExpiredAccountantAttachments(now = new Date()) {
+    return purgeExpiredAccountantAttachments(this.connection.db, {
+      mediaRoot: process.env.MEDIA_ROOT,
+      now,
+    });
+  }
+
+  async runCrmAutomations(scope?: { organizationId: string; unitId: string }) {
+    await this.connection.db.execute(sql`
+      with candidate_orders as (
+        select
+          deliveries.id as delivery_id,
+          deliveries.organization_id,
+          deliveries.sent_at,
+          links.tab_id,
+          sum(payments.amount_cents)::integer as revenue_cents,
+          (
+            select redemptions.id
+            from growth_coupon_redemptions as redemptions
+            where redemptions.organization_id = deliveries.organization_id
+              and redemptions.order_ref = links.tab_id
+            order by redemptions.redeemed_at asc
+            limit 1
+          ) as coupon_redemption_id,
+          min(payments.created_at) as converted_at
+        from growth_campaign_deliveries as deliveries
+        inner join growth_marketing_campaigns as campaigns
+          on campaigns.organization_id = deliveries.organization_id
+         and campaigns.id = deliveries.campaign_id
+        inner join growth_pos_tab_customer_links as links
+          on links.organization_id = deliveries.organization_id
+         and links.customer_id = deliveries.customer_id
+        inner join pos_tab_payments as payments
+          on payments.organization_id = links.organization_id
+         and payments.unit_id = links.unit_id
+         and payments.tab_id = links.tab_id
+        where deliveries.sent_at is not null
+          and deliveries.attributed_order_ref is null
+          and deliveries.experiment_variant <> 'control'
+          and payments.created_at between deliveries.sent_at
+              and deliveries.sent_at + (campaigns.attribution_window_days * interval '1 day')
+        group by deliveries.id, deliveries.organization_id, links.tab_id
+      ), ranked as (
+        select candidate_orders.*,
+               row_number() over (
+                 partition by organization_id, tab_id
+                 order by sent_at desc, delivery_id desc
+               ) as touch_rank
+        from candidate_orders
+      ), conversions as (
+        select distinct on (delivery_id)
+               delivery_id,
+               tab_id,
+               revenue_cents,
+               coupon_redemption_id
+        from ranked
+        where touch_rank = 1
+        order by delivery_id, converted_at
+      )
+      update growth_campaign_deliveries as deliveries
+      set attributed_order_ref = conversions.tab_id,
+          attributed_coupon_redemption_id = conversions.coupon_redemption_id,
+          attributed_revenue_cents = conversions.revenue_cents,
+          updated_at = now()
+      from conversions
+      where deliveries.id = conversions.delivery_id
+    `);
+    const rules = await this.connection.db
+      .select()
+      .from(crmAutomationRules)
+      .where(
+        and(
+          eq(crmAutomationRules.enabled, true),
+          scope ? eq(crmAutomationRules.organizationId, scope.organizationId) : undefined,
+          scope ? eq(crmAutomationRules.unitId, scope.unitId) : undefined,
+        ),
+      );
+    let queued = 0;
+    for (const rule of rules) {
+      type Candidate = {
+        customer_id: string;
+        name: string;
+        phone: string;
+        event_key: string;
+        scheduled_for: Date | string;
+      };
+      let candidates: Candidate[] = [];
+      if (rule.trigger === "birthday") {
+        candidates = [
+          ...(await this.connection.db.execute<Candidate>(sql`
+          select customers.id as customer_id,
+                 customers.name,
+                 customers.phone,
+                 ${"birthday:"} || extract(year from now())::text as event_key,
+                 now() as scheduled_for
+          from growth_customers as customers
+          inner join units on units.organization_id = customers.organization_id
+                          and units.id = ${rule.unitId}
+          where customers.organization_id = ${rule.organizationId}
+            and customers.default_unit_id = ${rule.unitId}
+            and customers.archived_at is null
+            and customers.whatsapp_marketing_opt_in = true
+            and customers.phone is not null
+            and substring(customers.birth_date from 6 for 5) =
+                to_char(now() at time zone units.timezone, 'MM-DD')
+          limit 250
+        `)),
+        ];
+      } else if (rule.trigger === "inactive") {
+        candidates = [
+          ...(await this.connection.db.execute<Candidate>(sql`
+          select customers.id as customer_id,
+                 customers.name,
+                 customers.phone,
+                 ${"inactive:"} || to_char(visits.last_visit_at, 'YYYY-MM-DD') as event_key,
+                 visits.last_visit_at + (${rule.inactiveDays ?? 30} * interval '1 day') as scheduled_for
+          from growth_customers as customers
+          inner join lateral (
+            select max(payments.created_at) as last_visit_at
+            from growth_pos_tab_customer_links as links
+            inner join pos_tab_payments as payments
+              on payments.organization_id = links.organization_id
+             and payments.unit_id = links.unit_id
+             and payments.tab_id = links.tab_id
+            where links.organization_id = customers.organization_id
+              and links.customer_id = customers.id
+              and links.unit_id = ${rule.unitId}
+          ) as visits on visits.last_visit_at is not null
+          where customers.organization_id = ${rule.organizationId}
+            and customers.archived_at is null
+            and customers.whatsapp_marketing_opt_in = true
+            and customers.phone is not null
+            and visits.last_visit_at <= now() - (${rule.inactiveDays ?? 30} * interval '1 day')
+          limit 250
+        `)),
+        ];
+      } else if (rule.trigger === "no_show") {
+        candidates = [
+          ...(await this.connection.db.execute<Candidate>(sql`
+          select customers.id as customer_id,
+                 customers.name,
+                 customers.phone,
+                 ${"no_show:"} || reservations.id::text as event_key,
+                 reservations.updated_at + (${rule.delayMinutes} * interval '1 minute') as scheduled_for
+          from growth_reservations as reservations
+          inner join growth_customers as customers
+            on customers.organization_id = reservations.organization_id
+           and customers.id = reservations.customer_id
+          where reservations.organization_id = ${rule.organizationId}
+            and reservations.unit_id = ${rule.unitId}
+            and reservations.status = 'no_show'
+            and reservations.updated_at >= now() - interval '30 days'
+            and reservations.updated_at + (${rule.delayMinutes} * interval '1 minute') <= now()
+            and customers.archived_at is null
+            and customers.whatsapp_marketing_opt_in = true
+            and customers.phone is not null
+          order by reservations.updated_at desc
+          limit 250
+        `)),
+        ];
+      } else {
+        candidates = [
+          ...(await this.connection.db.execute<Candidate>(sql`
+          select customers.id as customer_id,
+                 customers.name,
+                 customers.phone,
+                 ${`${rule.trigger}:`} || links.tab_id::text as event_key,
+                 max(payments.created_at) + (${rule.delayMinutes} * interval '1 minute') as scheduled_for
+          from growth_pos_tab_customer_links as links
+          inner join growth_customers as customers
+            on customers.organization_id = links.organization_id
+           and customers.id = links.customer_id
+          inner join pos_tab_payments as payments
+            on payments.organization_id = links.organization_id
+           and payments.unit_id = links.unit_id
+           and payments.tab_id = links.tab_id
+          where links.organization_id = ${rule.organizationId}
+            and links.unit_id = ${rule.unitId}
+            and payments.created_at >= now() - interval '30 days'
+            and customers.archived_at is null
+            and customers.whatsapp_marketing_opt_in = true
+            and customers.phone is not null
+          group by customers.id, customers.name, customers.phone, links.tab_id
+          having max(payments.created_at) + (${rule.delayMinutes} * interval '1 minute') <= now()
+          order by max(payments.created_at) desc
+          limit 250
+        `)),
+        ];
+      }
+      for (const candidate of candidates) {
+        let gate: Awaited<ReturnType<OutboxWorker["whatsappMarketingGate"]>>;
+        try {
+          gate = await this.whatsappMarketingGate(
+            rule.organizationId,
+            rule.unitId,
+            candidate.customer_id,
+          );
+        } catch (error) {
+          if (error instanceof OrderReadyDeliveryError) continue;
+          throw error;
+        }
+        if (!gate.allowed && gate.retryable) continue;
+        const scheduledFor = new Date(candidate.scheduled_for);
+        await this.connection.db.transaction(async (tx) => {
+          const [execution] = await tx
+            .insert(crmAutomationExecutions)
+            .values({
+              organizationId: rule.organizationId,
+              unitId: rule.unitId,
+              ruleId: rule.id,
+              customerId: candidate.customer_id,
+              eventKey: candidate.event_key,
+              status: gate.allowed ? "queued" : "suppressed",
+              reason: gate.allowed ? null : gate.code,
+              scheduledFor: Number.isNaN(scheduledFor.valueOf()) ? new Date() : scheduledFor,
+              executedAt: gate.allowed ? null : new Date(),
+            })
+            .onConflictDoNothing()
+            .returning();
+          if (!execution || !gate.allowed) return;
+          let phone: string;
+          try {
+            phone = normalizeWhatsAppPhone(candidate.phone);
+          } catch {
+            await tx
+              .update(crmAutomationExecutions)
+              .set({
+                status: "suppressed",
+                reason: "WHATSAPP_PHONE_INVALID",
+                executedAt: new Date(),
+                updatedAt: new Date(),
+              })
+              .where(eq(crmAutomationExecutions.id, execution.id));
+            return;
+          }
+          const [conversation] = await tx
+            .insert(whatsappConversations)
+            .values({
+              organizationId: rule.organizationId,
+              unitId: rule.unitId,
+              customerId: candidate.customer_id,
+              phone,
+            })
+            .onConflictDoUpdate({
+              target: [
+                whatsappConversations.organizationId,
+                whatsappConversations.unitId,
+                whatsappConversations.phone,
+              ],
+              set: { customerId: candidate.customer_id, status: "open", updatedAt: new Date() },
+            })
+            .returning();
+          if (!conversation) throw new Error("WHATSAPP_CONVERSATION_UPSERT_FAILED");
+          const [message] = await tx
+            .insert(whatsappMessages)
+            .values({
+              organizationId: rule.organizationId,
+              unitId: rule.unitId,
+              conversationId: conversation.id,
+              customerId: candidate.customer_id,
+              direction: "outbound",
+              body: rule.messageTemplate.replaceAll("{nome}", candidate.name),
+              status: "queued",
+              idempotencyKey: `automation:${execution.id}`,
+            })
+            .returning();
+          if (!message) throw new Error("WHATSAPP_AUTOMATION_MESSAGE_INSERT_FAILED");
+          await tx
+            .update(crmAutomationExecutions)
+            .set({ messageId: message.id, updatedAt: new Date() })
+            .where(eq(crmAutomationExecutions.id, execution.id));
+          await tx.insert(outboxEvents).values({
+            topic: "growth.whatsapp_message_requested",
+            aggregateType: "growth_whatsapp_message",
+            aggregateId: message.id,
+            payload: {
+              organizationId: rule.organizationId,
+              unitId: rule.unitId,
+              messageId: message.id,
+            },
+          });
+          queued += 1;
+        });
+      }
+    }
+    return queued;
+  }
+
   async expireAccessWindows() {
     return this.connection.db.transaction(async (tx) => {
       const expiredTrials = await tx.execute<{ id: string }>(sql`
@@ -242,6 +566,20 @@ export class OutboxWorker {
             });
           }
         }
+        if (result?.kind === "operational-push") {
+          await tx.insert(auditEvents).values({
+            organizationId: result.organizationId,
+            action: "pos.operational_push.dispatched",
+            entityType: "service_call",
+            entityId: result.callId,
+            metadata: {
+              unitId: result.unitId,
+              delivered: result.delivered,
+              expiredSubscriptionsRemoved: result.expired,
+              outboxEventId: event.id,
+            },
+          });
+        }
       });
     } catch (error) {
       const message =
@@ -292,8 +630,18 @@ export class OutboxWorker {
       if (
         (error instanceof EmailDeliveryError ||
           error instanceof OrderReadyDeliveryError ||
-          error instanceof FiscalDeliveryError) &&
-        (!error.retryable || (error instanceof FiscalDeliveryError && event.attempts >= 12))
+          error instanceof OperationalPushDeliveryError ||
+          error instanceof FiscalDeliveryError ||
+          error instanceof BillingDeliveryError ||
+          error instanceof DoseClubDeliveryError ||
+          error instanceof DoseClubProvisioningError) &&
+        (!error.retryable ||
+          ((error instanceof FiscalDeliveryError ||
+            error instanceof BillingDeliveryError ||
+            error instanceof OperationalPushDeliveryError ||
+            error instanceof DoseClubDeliveryError ||
+            error instanceof DoseClubProvisioningError) &&
+            event.attempts >= 12))
       ) {
         await this.connection.db.transaction(async (tx) => {
           await tx.execute(sql`
@@ -327,22 +675,54 @@ export class OutboxWorker {
           `INVENTORY_ATTENTION_RETRY:${result.issueCodes.join(",")}`,
         );
       }
+      await commitOrderDoseClubRedemptions(this.connection.db, event);
       return;
     }
     if (event.topic === "pos.item.canceled") {
       await reverseCanceledOrderItemInventory(this.connection.db, event);
+      await reverseCanceledDoseClubRedemption(this.connection.db, event);
+      return;
+    }
+    if (event.topic === "pos.tab.closed") {
+      await processFiscalEvent(this.connection.db, event);
+      await this.runCrmAutomations({
+        organizationId: requiredUuid(event.payload, "organizationId"),
+        unitId: requiredUuid(event.payload, "unitId"),
+      });
       return;
     }
     if (
-      event.topic === "pos.tab.closed" ||
       event.topic === "fiscal.document.reconcile_requested" ||
       event.topic === "fiscal.document.artifacts_requested"
     ) {
       await processFiscalEvent(this.connection.db, event);
       return;
     }
+    if (event.topic === "growth.reservation_changed") {
+      await this.runCrmAutomations({
+        organizationId: requiredUuid(event.payload, "organizationId"),
+        unitId: requiredUuid(event.payload, "unitId"),
+      });
+      return;
+    }
     if (event.topic === "growth.webhook_delivery_requested") {
       await this.deliverWebhookEvent(event);
+      return;
+    }
+    if (event.topic === "billing.payment_event_received") {
+      await processBillingPaymentEvent(this.connection.db, event);
+      return;
+    }
+    if (event.topic === "billing.subscription_sync_requested") {
+      await syncBillingSubscription(this.connection.db, event);
+      return;
+    }
+    if (event.topic === "doseclub.provisioning_requested") {
+      await provisionDoseClubSubscription(this.connection.db, event);
+      return;
+    }
+    if (event.topic === "billing.checkout_reconciliation_requested") {
+      await reconcileBillingCheckout(this.connection.db, event);
       return;
     }
     if (event.topic === "auth.password_reset_requested") {
@@ -354,7 +734,11 @@ export class OutboxWorker {
       return;
     }
     if (event.topic === "growth.campaign_delivery_requested") {
-      await this.deliverCampaignEmail(event);
+      await this.deliverCampaign(event);
+      return;
+    }
+    if (event.topic === "growth.whatsapp_message_requested") {
+      await this.deliverQueuedWhatsAppMessage(event);
       return;
     }
     if (event.topic === "management.report_export_email_requested") {
@@ -365,8 +749,18 @@ export class OutboxWorker {
       await this.deliverTimeTrackingAlert(event);
       return;
     }
+    if (
+      event.topic === "accounting.request.created" ||
+      event.topic === "accounting.request.resolved"
+    ) {
+      await deliverAccountingRequestNotification(this.connection.db, event);
+      return;
+    }
     if (event.topic === ORDER_READY_NOTIFICATION_TOPIC) {
       return this.deliverOrderReadyNotification(event);
+    }
+    if (event.topic === "pos.call.opened") {
+      return deliverOperationalPush(this.connection.db, event);
     }
     // Internal domain events are acknowledged here; dedicated consumers are added only with a real use case.
   }
@@ -377,6 +771,72 @@ export class OutboxWorker {
     } catch {
       throw new EmailDeliveryError("OUTBOX_ENCRYPTION_KEY_INVALID", true);
     }
+  }
+
+  private async whatsappMarketingGate(
+    organizationId: string,
+    unitId: string,
+    customerId: string,
+  ): Promise<
+    | { allowed: true; configuration: ReturnType<typeof whatsappConfiguration> }
+    | {
+        allowed: false;
+        code: "WHATSAPP_FREQUENCY_CAP" | "WHATSAPP_QUIET_HOURS";
+        retryable: boolean;
+      }
+  > {
+    const [integration] = await this.connection.db
+      .select()
+      .from(growthIntegrations)
+      .where(
+        and(
+          eq(growthIntegrations.organizationId, organizationId),
+          eq(growthIntegrations.unitId, unitId),
+          eq(growthIntegrations.provider, "evolution_go"),
+        ),
+      )
+      .limit(1);
+    if (!integration)
+      throw new OrderReadyDeliveryError("CUSTOMER_PROVIDER_UNAVAILABLE", false, true);
+    const config = integration.config as {
+      quietHoursStart?: unknown;
+      quietHoursEnd?: unknown;
+      maxMessagesPer30Days?: unknown;
+    };
+    const [unit] = await this.connection.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: unit?.timezone ?? "America/Sao_Paulo",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date());
+    const current = `${parts.find((part) => part.type === "hour")?.value ?? "00"}:${parts.find((part) => part.type === "minute")?.value ?? "00"}`;
+    const start = typeof config.quietHoursStart === "string" ? config.quietHoursStart : "21:00";
+    const end = typeof config.quietHoursEnd === "string" ? config.quietHoursEnd : "08:00";
+    const quiet =
+      start < end ? current >= start && current < end : current >= start || current < end;
+    if (quiet) return { allowed: false, code: "WHATSAPP_QUIET_HOURS", retryable: true };
+    const [recent] = await this.connection.db
+      .select({ value: sql<number>`count(*)` })
+      .from(whatsappMessages)
+      .where(
+        and(
+          eq(whatsappMessages.organizationId, organizationId),
+          eq(whatsappMessages.unitId, unitId),
+          eq(whatsappMessages.customerId, customerId),
+          eq(whatsappMessages.direction, "outbound"),
+          inArray(whatsappMessages.status, ["sent", "delivered", "read"]),
+          gt(whatsappMessages.occurredAt, new Date(Date.now() - 30 * 24 * 60 * 60_000)),
+        ),
+      );
+    const cap = typeof config.maxMessagesPer30Days === "number" ? config.maxMessagesPer30Days : 4;
+    if (Number(recent?.value ?? 0) >= cap)
+      return { allowed: false, code: "WHATSAPP_FREQUENCY_CAP", retryable: false };
+    return { allowed: true, configuration: whatsappConfiguration(integration) };
   }
 
   private async deliverOrderReadyNotification(
@@ -435,12 +895,28 @@ export class OutboxWorker {
     let customerProviderReference: string | undefined;
     if (plan.externalCustomer && context.customerPhone) {
       try {
+        const [integration] = await this.connection.db
+          .select()
+          .from(growthIntegrations)
+          .where(
+            and(
+              eq(growthIntegrations.organizationId, request.organizationId),
+              eq(growthIntegrations.unitId, request.unitId),
+              eq(growthIntegrations.provider, "evolution_go"),
+            ),
+          )
+          .limit(1);
+        if (!integration)
+          throw new OrderReadyDeliveryError("CUSTOMER_PROVIDER_UNAVAILABLE", false, true);
         customerProviderReference = (
-          await deliverWhatsAppReady({
-            to: context.customerPhone,
-            reference: context.tabLabel ?? request.orderId.slice(0, 8).toUpperCase(),
-            idempotencyKey: `order-ready/${event.id}/customer`,
-          })
+          await deliverWhatsAppReady(
+            {
+              to: context.customerPhone,
+              reference: context.tabLabel ?? request.orderId.slice(0, 8).toUpperCase(),
+              idempotencyKey: `order-ready/${event.id}/customer`,
+            },
+            { configuration: whatsappConfiguration(integration) },
+          )
         ).providerReference;
       } catch (error) {
         if (error instanceof OrderReadyDeliveryError) {
@@ -464,6 +940,156 @@ export class OutboxWorker {
           customerProviderReference,
         }
       : undefined;
+  }
+
+  private async deliverQueuedWhatsAppMessage(event: ClaimedOutboxEvent) {
+    if (
+      event.aggregate_type !== "growth_whatsapp_message" ||
+      event.aggregate_id !== requiredUuid(event.payload, "messageId")
+    )
+      throw new OrderReadyDeliveryError("WHATSAPP_EVENT_CONTEXT_INVALID", false);
+    const organizationId = requiredUuid(event.payload, "organizationId");
+    const unitId = requiredUuid(event.payload, "unitId");
+    const [message] = await this.connection.db
+      .select({
+        id: whatsappMessages.id,
+        body: whatsappMessages.body,
+        phone: whatsappConversations.phone,
+        status: whatsappMessages.status,
+        conversationId: whatsappMessages.conversationId,
+        contentKind: whatsappMessages.contentKind,
+        mediaStorageKey: whatsappMessages.mediaStorageKey,
+        mediaMimeType: whatsappMessages.mediaMimeType,
+        mediaFileName: whatsappMessages.mediaFileName,
+      })
+      .from(whatsappMessages)
+      .innerJoin(
+        whatsappConversations,
+        eq(whatsappConversations.id, whatsappMessages.conversationId),
+      )
+      .where(
+        and(
+          eq(whatsappMessages.organizationId, organizationId),
+          eq(whatsappMessages.unitId, unitId),
+          eq(whatsappMessages.id, event.aggregate_id),
+        ),
+      )
+      .limit(1);
+    if (!message) throw new OrderReadyDeliveryError("WHATSAPP_MESSAGE_NOT_FOUND", false);
+    if (["sent", "delivered", "read"].includes(message.status)) return;
+    const [integration] = await this.connection.db
+      .select()
+      .from(growthIntegrations)
+      .where(
+        and(
+          eq(growthIntegrations.organizationId, organizationId),
+          eq(growthIntegrations.unitId, unitId),
+          eq(growthIntegrations.provider, "evolution_go"),
+        ),
+      )
+      .limit(1);
+    if (!integration)
+      return this.failQueuedWhatsAppMessage(message.id, "CUSTOMER_PROVIDER_UNAVAILABLE");
+    try {
+      const configuration = whatsappConfiguration(integration);
+      const delivery = message.mediaStorageKey
+        ? await deliverWhatsAppMedia(
+            {
+              to: message.phone,
+              text: message.body,
+              idempotencyKey: message.id,
+              content: await readWhatsAppArtifact(
+                process.env.MEDIA_ROOT,
+                message.mediaStorageKey,
+              ).catch(() => {
+                throw new OrderReadyDeliveryError("WHATSAPP_MEDIA_UNAVAILABLE", false);
+              }),
+              fileName: message.mediaFileName ?? "anexo",
+              mimeType: message.mediaMimeType ?? "application/octet-stream",
+              type:
+                message.contentKind === "image" ||
+                message.contentKind === "video" ||
+                message.contentKind === "audio"
+                  ? message.contentKind
+                  : "document",
+            },
+            { configuration },
+          )
+        : await deliverWhatsAppText(
+            { to: message.phone, text: message.body, idempotencyKey: message.id },
+            { configuration },
+          );
+      const sentAt = new Date();
+      await this.connection.db.transaction(async (tx) => {
+        await tx
+          .update(whatsappMessages)
+          .set({
+            status: "sent",
+            providerReference: delivery.providerReference,
+            errorCode: null,
+            sentAt,
+            updatedAt: sentAt,
+          })
+          .where(eq(whatsappMessages.id, message.id));
+        await tx
+          .update(whatsappConversations)
+          .set({
+            lastMessageAt: sentAt,
+            lastOutboundAt: sentAt,
+            updatedAt: sentAt,
+          })
+          .where(eq(whatsappConversations.id, message.conversationId));
+        await tx
+          .update(crmAutomationExecutions)
+          .set({ status: "sent", executedAt: sentAt, updatedAt: sentAt })
+          .where(eq(crmAutomationExecutions.messageId, message.id));
+        await tx.insert(outboxEvents).values({
+          topic: "growth.whatsapp_message_sent",
+          aggregateType: "growth_whatsapp_message",
+          aggregateId: message.id,
+          payload: { organizationId, unitId, conversationId: message.conversationId },
+        });
+      });
+    } catch (error) {
+      const deliveryError =
+        error instanceof OrderReadyDeliveryError
+          ? error
+          : new OrderReadyDeliveryError("WHATSAPP_DELIVERY_FAILED", true);
+      await this.connection.db
+        .update(whatsappMessages)
+        .set({
+          status: deliveryError.retryable ? "queued" : "failed",
+          errorCode: deliveryError.code,
+          updatedAt: new Date(),
+        })
+        .where(eq(whatsappMessages.id, message.id));
+      if (!deliveryError.retryable)
+        await this.connection.db
+          .update(crmAutomationExecutions)
+          .set({
+            status: "failed",
+            reason: deliveryError.code,
+            executedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(crmAutomationExecutions.messageId, message.id));
+      throw deliveryError;
+    }
+  }
+
+  private async failQueuedWhatsAppMessage(messageId: string, code: string): Promise<never> {
+    const now = new Date();
+    await this.connection.db.transaction(async (tx) => {
+      await tx
+        .update(whatsappMessages)
+        .set({ status: "failed", errorCode: code, updatedAt: now })
+        .where(eq(whatsappMessages.id, messageId));
+      await tx
+        .update(crmAutomationExecutions)
+        .set({ status: "failed", reason: code, executedAt: now, updatedAt: now })
+        .where(eq(crmAutomationExecutions.messageId, messageId));
+    });
+    throw new OrderReadyDeliveryError(code, false, true);
   }
 
   private async deliverPasswordReset(event: ClaimedOutboxEvent) {
@@ -569,7 +1195,7 @@ export class OutboxWorker {
     );
   }
 
-  private async deliverCampaignEmail(event: ClaimedOutboxEvent) {
+  private async deliverCampaign(event: ClaimedOutboxEvent) {
     if (
       event.aggregate_type !== "growth_campaign_delivery" ||
       event.aggregate_id !== requiredUuid(event.payload, "deliveryId")
@@ -584,14 +1210,20 @@ export class OutboxWorker {
       .select({
         campaignChannel: marketingCampaigns.channel,
         campaignContent: marketingCampaigns.content,
+        campaignVariantBContent: marketingCampaigns.variantBContent,
         campaignName: marketingCampaigns.name,
         campaignSubject: marketingCampaigns.subject,
+        campaignUnitId: marketingCampaigns.unitId,
         customerArchivedAt: growthCustomers.archivedAt,
         customerEmail: growthCustomers.email,
         customerName: growthCustomers.name,
-        customerOptIn: growthCustomers.marketingOptIn,
+        customerDefaultUnitId: growthCustomers.defaultUnitId,
+        customerPhone: growthCustomers.phone,
+        customerEmailOptIn: growthCustomers.emailMarketingOptIn,
+        customerWhatsAppOptIn: growthCustomers.whatsappMarketingOptIn,
         deliveryId: campaignDeliveries.id,
         deliveryIdempotencyKey: campaignDeliveries.idempotencyKey,
+        experimentVariant: campaignDeliveries.experimentVariant,
         deliveryStatus: campaignDeliveries.status,
       })
       .from(campaignDeliveries)
@@ -623,12 +1255,16 @@ export class OutboxWorker {
       await this.failCampaignDelivery(row.deliveryId, campaignId, "EMAIL_EVENT_CONTEXT_INVALID");
       throw new EmailDeliveryError("EMAIL_EVENT_CONTEXT_INVALID", false);
     }
-    if (["sent", "skipped", "failed", "blocked"].includes(row.deliveryStatus)) return;
-    if (requestedChannel !== "email") {
-      await this.failCampaignDelivery(row.deliveryId, campaignId, "CAMPAIGN_CHANNEL_UNSUPPORTED");
-      throw new EmailDeliveryError("CAMPAIGN_CHANNEL_UNSUPPORTED", false);
-    }
-    if (!row.customerOptIn || row.customerArchivedAt || !row.customerEmail) {
+    if (["sent", "skipped", "failed", "blocked", "holdout"].includes(row.deliveryStatus)) return;
+    const campaignContent =
+      row.experimentVariant === "b" && row.campaignVariantBContent
+        ? row.campaignVariantBContent
+        : row.campaignContent;
+    const contactAvailable =
+      requestedChannel === "email"
+        ? row.customerEmailOptIn && row.customerEmail
+        : row.customerWhatsAppOptIn && row.customerPhone;
+    if (!contactAvailable || row.customerArchivedAt) {
       await this.connection.db
         .update(campaignDeliveries)
         .set({
@@ -638,6 +1274,172 @@ export class OutboxWorker {
         })
         .where(eq(campaignDeliveries.id, row.deliveryId));
       await this.finalizeCampaign(campaignId);
+      return;
+    }
+    const [claimedCampaign] = await this.connection.db
+      .update(marketingCampaigns)
+      .set({ status: "sending", updatedAt: new Date() })
+      .where(
+        and(
+          eq(marketingCampaigns.organizationId, organizationId),
+          eq(marketingCampaigns.id, campaignId),
+          eq(marketingCampaigns.status, "queued"),
+        ),
+      )
+      .returning({ status: marketingCampaigns.status });
+    if (!claimedCampaign) {
+      const [currentCampaign] = await this.connection.db
+        .select({ status: marketingCampaigns.status })
+        .from(marketingCampaigns)
+        .where(
+          and(
+            eq(marketingCampaigns.organizationId, organizationId),
+            eq(marketingCampaigns.id, campaignId),
+          ),
+        )
+        .limit(1);
+      if (currentCampaign?.status === "canceled") {
+        await this.connection.db
+          .update(campaignDeliveries)
+          .set({ status: "skipped", errorCode: "CAMPAIGN_CANCELED", updatedAt: new Date() })
+          .where(eq(campaignDeliveries.id, row.deliveryId));
+        return;
+      }
+      if (currentCampaign?.status !== "sending" && currentCampaign?.status !== "sent") {
+        throw new EmailDeliveryError("CAMPAIGN_NOT_DELIVERABLE", false);
+      }
+    }
+    if (requestedChannel === "whatsapp") {
+      const unitId = row.campaignUnitId ?? row.customerDefaultUnitId;
+      if (!unitId || !row.customerPhone) {
+        await this.failCampaignDelivery(
+          row.deliveryId,
+          campaignId,
+          "WHATSAPP_UNIT_OR_PHONE_UNAVAILABLE",
+        );
+        return;
+      }
+      let gate: Awaited<ReturnType<OutboxWorker["whatsappMarketingGate"]>>;
+      try {
+        gate = await this.whatsappMarketingGate(organizationId, unitId, customerId);
+      } catch (error) {
+        if (error instanceof OrderReadyDeliveryError) {
+          if (error.retryable) throw new EmailDeliveryError(error.code, true);
+          await this.failCampaignDelivery(row.deliveryId, campaignId, error.code);
+          return;
+        }
+        throw error;
+      }
+      if (!gate.allowed) {
+        if (gate.retryable) throw new EmailDeliveryError(gate.code, true);
+        await this.connection.db
+          .update(campaignDeliveries)
+          .set({ status: "skipped", errorCode: gate.code, updatedAt: new Date() })
+          .where(eq(campaignDeliveries.id, row.deliveryId));
+        await this.finalizeCampaign(campaignId);
+        return;
+      }
+      const [conversation] = await this.connection.db
+        .insert(whatsappConversations)
+        .values({
+          organizationId,
+          unitId,
+          customerId,
+          phone: normalizeWhatsAppPhone(row.customerPhone),
+        })
+        .onConflictDoUpdate({
+          target: [
+            whatsappConversations.organizationId,
+            whatsappConversations.unitId,
+            whatsappConversations.phone,
+          ],
+          set: { customerId, status: "open", updatedAt: new Date() },
+        })
+        .returning();
+      if (!conversation) throw new EmailDeliveryError("WHATSAPP_CONVERSATION_UPSERT_FAILED", true);
+      const [message] = await this.connection.db
+        .insert(whatsappMessages)
+        .values({
+          organizationId,
+          unitId,
+          conversationId: conversation.id,
+          customerId,
+          campaignDeliveryId: row.deliveryId,
+          direction: "outbound",
+          body: campaignContent,
+          status: "queued",
+          idempotencyKey: `campaign/${row.deliveryIdempotencyKey}`,
+        })
+        .onConflictDoUpdate({
+          target: [
+            whatsappMessages.organizationId,
+            whatsappMessages.unitId,
+            whatsappMessages.idempotencyKey,
+          ],
+          set: { updatedAt: new Date() },
+        })
+        .returning();
+      if (!message) throw new EmailDeliveryError("WHATSAPP_MESSAGE_UPSERT_FAILED", true);
+      try {
+        const delivery = await deliverWhatsAppText(
+          { to: row.customerPhone, text: campaignContent, idempotencyKey: message.id },
+          { configuration: gate.configuration },
+        );
+        const sentAt = new Date();
+        await this.connection.db.transaction(async (tx) => {
+          await tx
+            .update(whatsappMessages)
+            .set({
+              status: "sent",
+              providerReference: delivery.providerReference,
+              sentAt,
+              updatedAt: sentAt,
+            })
+            .where(eq(whatsappMessages.id, message.id));
+          await tx
+            .update(whatsappConversations)
+            .set({ lastMessageAt: sentAt, lastOutboundAt: sentAt, updatedAt: sentAt })
+            .where(eq(whatsappConversations.id, conversation.id));
+          await tx
+            .update(campaignDeliveries)
+            .set({
+              status: "sent",
+              providerReference: delivery.providerReference,
+              errorCode: null,
+              sentAt,
+              updatedAt: sentAt,
+            })
+            .where(eq(campaignDeliveries.id, row.deliveryId));
+        });
+        await this.finalizeCampaign(campaignId);
+      } catch (error) {
+        const deliveryError =
+          error instanceof OrderReadyDeliveryError
+            ? error
+            : new OrderReadyDeliveryError("WHATSAPP_DELIVERY_FAILED", true);
+        await this.connection.db
+          .update(whatsappMessages)
+          .set({
+            status: deliveryError.retryable ? "queued" : "failed",
+            errorCode: deliveryError.code,
+            updatedAt: new Date(),
+          })
+          .where(eq(whatsappMessages.id, message.id));
+        await this.connection.db
+          .update(campaignDeliveries)
+          .set({
+            status: deliveryError.retryable ? "pending" : "failed",
+            errorCode: deliveryError.code,
+            updatedAt: new Date(),
+          })
+          .where(eq(campaignDeliveries.id, row.deliveryId));
+        if (!deliveryError.retryable) await this.finalizeCampaign(campaignId);
+        throw deliveryError;
+      }
+      return;
+    }
+    if (!row.customerEmail) {
+      await this.failCampaignDelivery(row.deliveryId, campaignId, "EMAIL_ADDRESS_UNAVAILABLE");
       return;
     }
     let optOutToken: string;
@@ -659,10 +1461,6 @@ export class OutboxWorker {
     }
     const configuration = emailProviderConfiguration();
     const optOutUrl = `${configuration.appUrl}/cancelar-comunicacoes?token=${encodeURIComponent(optOutToken)}`;
-    await this.connection.db
-      .update(marketingCampaigns)
-      .set({ status: "sending", updatedAt: new Date() })
-      .where(and(eq(marketingCampaigns.id, campaignId), eq(marketingCampaigns.status, "queued")));
     try {
       const delivery = await deliverEmail(
         {
@@ -671,13 +1469,13 @@ export class OutboxWorker {
           html: emailHtml({
             title: row.campaignName,
             greeting: `Olá, ${row.customerName}.`,
-            body: row.campaignContent,
+            body: campaignContent,
             actionLabel: "Gerenciar comunicações",
             actionUrl: optOutUrl,
             footer:
               "Você recebeu esta mensagem porque autorizou comunicações de marketing. Use o link acima para cancelar a qualquer momento.",
           }),
-          text: `Olá, ${row.customerName}.\n\n${row.campaignContent}\n\nCancelar comunicações: ${optOutUrl}`,
+          text: `Olá, ${row.customerName}.\n\n${campaignContent}\n\nCancelar comunicações: ${optOutUrl}`,
           idempotencyKey: `campaign/${row.deliveryIdempotencyKey}`,
           headers: { "List-Unsubscribe": `<${optOutUrl}>` },
           tags: [

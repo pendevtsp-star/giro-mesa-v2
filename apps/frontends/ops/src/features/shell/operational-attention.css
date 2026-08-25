@@ -28,6 +28,24 @@
   gap: var(--gm-space-2);
 }
 
+.operational-attention-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.operational-attention-partial,
+.operational-attention-error {
+  padding: var(--gm-space-2) var(--gm-space-3);
+  border-radius: var(--gm-radius-md, 8px);
+  background: var(--gm-warning-soft, var(--gm-surface-sunken));
+  color: var(--gm-ink);
+  font-size: var(--gm-font-sm);
+}
+
+.operational-attention-error {
+  background: var(--gm-danger-soft, var(--gm-surface-sunken));
+}
+
 .operational-attention-list article {
   display: flex;
   align-items: center;

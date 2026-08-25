@@ -8,6 +8,7 @@ allowBuilds:
   '@nestjs/core': true
   '@scarf/scarf': true
   argon2: true
+  core-js: false
   esbuild: true
   protobufjs: false
 

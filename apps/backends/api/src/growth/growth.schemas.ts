@@ -65,6 +65,8 @@ function isPublicHttpsUrl(value: string) {
 export const optOutSchema = z.object({ token: z.string().trim().min(32).max(256) });
 export type OptOutInput = z.infer<typeof optOutSchema>;
 
+const customerTags = z.array(z.string().trim().min(1).max(40)).max(30);
+
 export const customerSchema = z.object({
   defaultUnitId: id.nullable().optional(),
   name: z.string().trim().min(2).max(160),
@@ -75,8 +77,40 @@ export const customerSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .nullable()
     .optional(),
+  notes: z.string().trim().max(1000).nullable().optional(),
+  tags: customerTags.default([]),
 });
 export type CustomerInput = z.infer<typeof customerSchema>;
+
+export const customerListQuerySchema = z
+  .object({
+    q: z.string().trim().max(120).optional(),
+    unitId: id.optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(30),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+export type CustomerListQueryInput = z.infer<typeof customerListQuerySchema>;
+
+export const customerUpdateSchema = customerSchema
+  .partial()
+  .extend({ tags: customerTags.optional() })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  });
+export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
+
+export const customerArchiveSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+export type CustomerArchiveInput = z.infer<typeof customerArchiveSchema>;
+
+export const customerMergeSchema = z.object({
+  sourceCustomerId: id,
+  reason: z.string().trim().min(3).max(500),
+});
+export type CustomerMergeInput = z.infer<typeof customerMergeSchema>;
 
 export const consentSchema = z.object({
   decision: z.enum(["granted", "withdrawn"]),
@@ -140,6 +174,26 @@ export const couponSchema = z
   });
 export type CouponInput = z.infer<typeof couponSchema>;
 
+export const couponUpdateSchema = z
+  .object({
+    code: couponCode.optional(),
+    type: z.enum(["fixed", "percentage"]).optional(),
+    value: z.number().int().positive().max(100_000_000).optional(),
+    minimumOrderCents: cents.optional(),
+    maximumDiscountCents: z.number().int().positive().nullable().optional(),
+    validFrom: dateTime.optional(),
+    validUntil: dateTime.nullable().optional(),
+    channels: z.array(z.string().trim().min(1).max(40)).max(20).optional(),
+    unitIds: z.array(id).max(100).optional(),
+    perCustomerLimit: z.number().int().positive().max(1000).optional(),
+    active: z.boolean().optional(),
+  })
+  .strict()
+  .refine((value) => Object.keys(value).length > 0, {
+    message: "Informe ao menos um campo para atualizar.",
+  });
+export type CouponUpdateInput = z.infer<typeof couponUpdateSchema>;
+
 export const couponRedemptionSchema = z.object({
   code: z.string().trim().min(3).max(64),
   customerId: id.optional(),
@@ -154,6 +208,13 @@ export const segmentFilterSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("all") }),
   z.object({ kind: z.literal("marketing_opt_in") }),
   z.object({ kind: z.literal("birthday_month"), month: z.number().int().min(1).max(12) }),
+  z.object({ kind: z.literal("inactive_days"), days: z.number().int().min(1).max(3650) }),
+  z.object({ kind: z.literal("minimum_visits"), visits: z.number().int().min(1).max(10000) }),
+  z.object({
+    kind: z.literal("minimum_spend_cents"),
+    amountCents: z.number().int().min(1).max(1_000_000_000),
+  }),
+  z.object({ kind: z.literal("no_show_count"), count: z.number().int().min(1).max(1000) }),
 ]);
 export const segmentSchema = z.object({
   name: z.string().trim().min(2).max(120),
@@ -170,12 +231,20 @@ export const campaignSchema = z
     channel: z.enum(["email", "whatsapp"]),
     subject: z.string().trim().min(2).max(180).nullable().optional(),
     content: z.string().trim().min(2).max(5000),
+    variantBContent: z.string().trim().min(2).max(5000).nullable().optional(),
+    attributionWindowDays: z.number().int().min(1).max(90).default(7),
+    holdoutPercentage: z.number().int().min(0).max(50).default(0),
   })
   .superRefine((value, context) => {
     if (value.channel === "email" && !value.subject)
       context.addIssue({ code: "custom", path: ["subject"], message: "Required for email" });
   });
 export type CampaignInput = z.infer<typeof campaignSchema>;
+
+export const campaignCancelSchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+export type CampaignCancelInput = z.infer<typeof campaignCancelSchema>;
 
 export const reservationSchema = z.object({
   unitId: id,
@@ -417,7 +486,160 @@ export type WebhookEventInput = z.infer<typeof webhookEventSchema>;
 
 export const doseClubSchema = z.object({
   unitId: id.nullable().optional(),
-  credentialReference: z.string().trim().min(3).max(180),
-  config: z.record(z.string(), z.unknown()).default({}),
+  credentialReference: z
+    .string()
+    .trim()
+    .regex(/^[A-Z][A-Z0-9_]{2,179}$/),
+  config: z
+    .object({
+      apiBaseUrl: z.string().url(),
+      clientId: z.string().trim().min(3).max(180),
+    })
+    .strict(),
 });
 export type DoseClubInput = z.infer<typeof doseClubSchema>;
+
+const hourMinute = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+export const evolutionUnitQuerySchema = z.object({ unitId: id });
+export type EvolutionUnitQueryInput = z.infer<typeof evolutionUnitQuerySchema>;
+
+export const evolutionConfigurationSchema = z.object({
+  unitId: id,
+  enabled: z.boolean().default(true),
+  quietHoursStart: hourMinute.default("21:00"),
+  quietHoursEnd: hourMinute.default("08:00"),
+  maxMessagesPer30Days: z.number().int().min(1).max(30).default(4),
+});
+export type EvolutionConfigurationInput = z.infer<typeof evolutionConfigurationSchema>;
+
+const whatsappMediaSchema = z.object({
+  fileName: z.string().trim().min(1).max(180),
+  mimeType: z.enum([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "video/mp4",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/ogg",
+    "audio/wav",
+    "application/pdf",
+  ]),
+  base64: z.string().min(4).max(4_200_000),
+});
+
+export const whatsappMessageSchema = z
+  .object({
+    unitId: id,
+    conversationId: id.optional(),
+    customerId: id.optional(),
+    phone: z.string().trim().min(10).max(40).optional(),
+    body: z.string().trim().max(4096).default(""),
+    media: whatsappMediaSchema.optional(),
+    idempotencyKey,
+  })
+  .superRefine((value, context) => {
+    if (!value.conversationId && !value.customerId && !value.phone)
+      context.addIssue({
+        code: "custom",
+        message: "conversationId, customerId or phone is required",
+      });
+    if (!value.body && !value.media)
+      context.addIssue({ code: "custom", path: ["body"], message: "body or media is required" });
+  });
+export type WhatsAppMessageInput = z.infer<typeof whatsappMessageSchema>;
+
+export const whatsappInboxQuerySchema = z
+  .object({
+    unitId: id,
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    cursorAt: dateTime.optional(),
+    cursorId: id.optional(),
+    status: z.enum(["open", "pending", "closed"]).optional(),
+    priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+    assignedTo: z.enum(["me", "unassigned", "any"]).default("any"),
+    search: z.string().trim().max(120).optional(),
+  })
+  .refine((value) => Boolean(value.cursorAt) === Boolean(value.cursorId), {
+    message: "cursorAt and cursorId must be provided together",
+  });
+export type WhatsAppInboxQueryInput = z.infer<typeof whatsappInboxQuerySchema>;
+
+export const whatsappMessagesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    beforeAt: dateTime.optional(),
+    beforeId: id.optional(),
+  })
+  .refine((value) => Boolean(value.beforeAt) === Boolean(value.beforeId), {
+    message: "beforeAt and beforeId must be provided together",
+  });
+export type WhatsAppMessagesQueryInput = z.infer<typeof whatsappMessagesQuerySchema>;
+
+export const whatsappConversationUpdateSchema = z.object({
+  status: z.enum(["open", "pending", "closed"]).optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  assignedIdentityId: id.nullable().optional(),
+  slaMinutes: z.number().int().min(5).max(10_080).nullable().optional(),
+  expectedUpdatedAt: dateTime,
+});
+export type WhatsAppConversationUpdateInput = z.infer<typeof whatsappConversationUpdateSchema>;
+
+export const crmQuickReplySchema = z.object({
+  unitId: id,
+  id: id.optional(),
+  title: z.string().trim().min(2).max(80),
+  body: z.string().trim().min(1).max(4096),
+  active: z.boolean().default(true),
+});
+export type CrmQuickReplyInput = z.infer<typeof crmQuickReplySchema>;
+
+export const crmAutomationExecutionQuerySchema = z
+  .object({
+    unitId: id,
+    status: z.enum(["queued", "sent", "suppressed", "failed"]).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    cursorAt: dateTime.optional(),
+    cursorId: id.optional(),
+  })
+  .refine((value) => Boolean(value.cursorAt) === Boolean(value.cursorId), {
+    message: "cursorAt and cursorId must be provided together",
+  });
+export type CrmAutomationExecutionQueryInput = z.infer<typeof crmAutomationExecutionQuerySchema>;
+
+export const crmAutomationTestSchema = z.object({
+  unitId: id,
+  phone: z.string().trim().min(10).max(40),
+});
+export type CrmAutomationTestInput = z.infer<typeof crmAutomationTestSchema>;
+
+export const crmAutomationRuleSchema = z
+  .object({
+    unitId: id,
+    trigger: z.enum(["birthday", "inactive", "post_visit", "no_show", "survey"]),
+    enabled: z.boolean(),
+    delayMinutes: z.number().int().min(0).max(525_600).default(0),
+    inactiveDays: z.number().int().min(1).max(3650).nullable().optional(),
+    messageTemplate: z.string().trim().min(1).max(4096),
+  })
+  .superRefine((value, context) => {
+    if (value.trigger === "inactive" && !value.inactiveDays) {
+      context.addIssue({
+        code: "custom",
+        path: ["inactiveDays"],
+        message: "inactiveDays is required",
+      });
+    }
+  });
+export type CrmAutomationRuleInput = z.infer<typeof crmAutomationRuleSchema>;
+
+export const evolutionWebhookSchema = z
+  .object({
+    event: z.string().trim().min(1).max(80),
+    instanceToken: z.string().trim().min(32).max(256),
+    state: z.string().trim().max(40).optional(),
+    data: z.record(z.string(), z.unknown()).default({}),
+  })
+  .passthrough();
+export type EvolutionWebhookInput = z.infer<typeof evolutionWebhookSchema>;

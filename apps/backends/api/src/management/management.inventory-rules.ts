@@ -340,7 +340,35 @@ export function returnableAging(
   };
 }
 
+export function classifyInventoryAbc(
+  rows: readonly { key: string; consumptionValueCents: number }[],
+) {
+  const ordered = [...rows].sort(
+    (left, right) =>
+      right.consumptionValueCents - left.consumptionValueCents || left.key.localeCompare(right.key),
+  );
+  const total = ordered.reduce((sum, row) => sum + Math.max(0, row.consumptionValueCents), 0);
+  let cumulative = 0;
+  return new Map(
+    ordered.map((row) => {
+      const shareBefore = total > 0 ? cumulative / total : 1;
+      cumulative += Math.max(0, row.consumptionValueCents);
+      return [
+        row.key,
+        total === 0
+          ? ("C" as const)
+          : shareBefore < 0.8
+            ? ("A" as const)
+            : shareBefore < 0.95
+              ? ("B" as const)
+              : ("C" as const),
+      ];
+    }),
+  );
+}
+
 export function cycleCountPolicy(input: {
+  classification: "A" | "B" | "C";
   inventoryValueCents: number;
   movementCount90Days: number;
   divergencePercent: number;
@@ -360,11 +388,13 @@ export function cycleCountPolicy(input: {
           ? 5
           : 0;
   const riskScore = Math.min(100, valueRisk + movementRisk + divergenceRisk + expiryRisk);
-  return riskScore >= 65
-    ? { classification: "A" as const, riskScore, frequencyDays: 7 }
-    : riskScore >= 35
-      ? { classification: "B" as const, riskScore, frequencyDays: 14 }
-      : { classification: "C" as const, riskScore, frequencyDays: 30 };
+  const abcFrequency = input.classification === "A" ? 7 : input.classification === "B" ? 14 : 30;
+  const riskFrequency = riskScore >= 65 ? 7 : riskScore >= 35 ? 14 : 30;
+  return {
+    classification: input.classification,
+    riskScore,
+    frequencyDays: Math.min(abcFrequency, riskFrequency),
+  };
 }
 
 export function forecastInventoryDemand(input: {

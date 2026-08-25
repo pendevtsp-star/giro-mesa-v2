@@ -31,6 +31,7 @@ export type Permission =
   | "reservations.manage"
   | "growth.manage"
   | "multiunit.view"
+  | "billing.manage"
   | "settings.manage"
   | "platform.manage"
   | "alerts.view";
@@ -40,6 +41,7 @@ export type RouteId =
   | "salon"
   | "counter"
   | "catalog"
+  | "table-qrs"
   | "kds"
   | "cash"
   | "inventory"
@@ -54,6 +56,7 @@ export type RouteId =
   | "reservations"
   | "crm"
   | "multiunit"
+  | "billing"
   | "settings"
   | "platform"
   | "device"

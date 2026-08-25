@@ -6,21 +6,24 @@ O código deve falhar de forma segura quando estas dependências estiverem ausen
 |---|---|---|
 | PayGo | contrato, adquirente, pinpad, credenciais e roteiro de homologação | adapter desabilitado |
 | Focus NFe | `FOCUS_NFE_PRIMARY_TOKEN`, chave de cifra, CNPJ, IE/UF, regime, CSC, certificado A1, série e cadastro fiscal dos itens | onboarding multiempresa, tokens cifrados por unidade, emissão Edge, consulta, cancelamento, inutilização e reconciliação implementados; produção permanece desabilitada sem credenciais e homologação reais |
-| Asaas | conta sandbox/produção, chave e segredo de webhook | porta backend desabilitada |
+| Asaas | conta sandbox/produção, chave e segredo de webhook, callbacks públicos e roteiro de conciliação | checkout hospedado, webhook idempotente e reconciliação por outbox implementados; permanecem fail-closed sem credenciais e homologação real de cartão/Pix |
 | Google | client ID, secret e callbacks locais/produção | OIDC Authorization Code + PKCE implementado; falta carregar as credenciais no ambiente V2 |
 | AWS | conta, role OIDC, domínio, certificado e parâmetros de ambiente | Terraform sem apply |
-| E-mail | chave Resend, remetente e domínio autenticado | adapter Resend implementado com outbox, retries, idempotência e dead-letter auditável |
-| WhatsApp | Meta Cloud API, template aprovado e consentimento | adapter transacional implementado e desabilitado por padrão; produção exige credenciais e homologação reais |
+| E-mail | chave Resend, remetente e domínio autenticado | adapter Resend implementado com outbox, retries, idempotência e dead-letter auditável; solicitações contábeis notificam somente a audiência validada no banco, sem conteúdo fiscal sensível na mensagem |
+| WhatsApp | Evolution Go 0.7.2, licença ativa, aparelho pareado e consentimento | transporte, inbox realtime, atribuição/SLA, mídia, opt-out e automações/retry implementados e desabilitados por padrão; produção exige ativação da licença, QR com `LoggedIn=true` e jornada real de texto/mídia/recibo |
 | Aviso KDS ao cliente | telefone válido, consentimento explícito, template e credenciais | aviso ao garçom é interno via realtime; cliente recebe template somente quando opt-in e o resultado é registrado como aceito pelo provedor, não como entregue |
+| Web Push operacional | par VAPID, `WEB_PUSH_VAPID_SUBJECT`, HTTPS e homologação em Android/iOS instalados | assinatura cifrada por sessão e unidade, entrega de `pos.call.opened` pelo outbox, retry e remoção de endpoints 404/410 implementados; fica fail-closed sem VAPID |
 | OpenAI | chave, política de dados e base de ajuda aprovada | busca determinística |
 | Contabilidade e folha | fornecedores escolhidos, contratos de API e mapeamento contábil | API pública/webhooks disponíveis; nenhum fornecedor presumido |
 | Piloto | empresa, rede, impressoras, produtos, mesas, equipe e dados fiscais | depende de tenant real configurado |
 | SmartPOS | terminal de desenvolvimento, modelo/Android/firmware exatos, credenciais, contrato do SDK/deeplink, assinatura, loja, atestação disponível e roteiro do fornecedor | PWA, pareamento P-256, matriz/kill switch, tentativas, outbox, estorno, conciliação, observabilidade, UI e bridge fail-closed implementados; Rede/PayGo/Stone/Getnet/Cielo/PagBank permanecem desabilitados sem adaptador, terminal físico e homologação |
-| Impressão e bump bar KDS | modelo de impressora, rede/VLAN, tabela de caracteres, largura da bobina e homologação do hardware | ESC/POS TCP, recibo 58/80 mm, corte, fila idempotente e ponte nativa implementados; `window.print()` permanece como contingência. USB/Bluetooth, leitura de sensores e roteamento KDS por praça dependem do equipamento escolhido |
+| Impressão e bump bar KDS | modelo de impressora, rede/VLAN, tabela de caracteres, largura da bobina e homologação do hardware | ESC/POS TCP, documentos 58/80 mm, corte, configuração cloud revisionada, fila idempotente, roteamento por ID de estação e ponte nativa implementados; `window.print()` permanece como contingência. USB/Bluetooth, leitura de sensores e confirmação física dependem do equipamento escolhido |
 | Hub em produção | certificado TLS local, instalador, provisionamento e cofre de segredos | SQLCipher, replay e reconciliação validados localmente |
 | Geocodificação | provedor e chave para converter endereço em coordenadas | coordenadas informadas são validadas por ponto-no-polígono; conversão automática de endereço continua bloqueada |
 
 Documentos jurídicos e procedimentos LGPD são modelos técnicos e exigem revisão profissional antes da publicação comercial.
+
+O par VAPID deve ser gerado uma vez com `pnpm --filter @giromesa/worker exec web-push generate-vapid-keys`, mantendo `WEB_PUSH_VAPID_PRIVATE_KEY` somente no cofre do ambiente. API e worker precisam receber o mesmo par e `OUTBOX_ENCRYPTION_KEY`; o frontend recebe apenas a chave pública pelo endpoint autenticado.
 
 ## Gate externo SmartPOS
 

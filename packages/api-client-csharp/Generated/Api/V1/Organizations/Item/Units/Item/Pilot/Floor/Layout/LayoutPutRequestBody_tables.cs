@@ -12,12 +12,42 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.La
     public partial class LayoutPutRequestBody_tables : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The height property</summary>
+        public int? Height { get; set; }
+        /// <summary>The label property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Label { get; set; }
+#nullable restore
+#else
+        public string Label { get; set; }
+#endif
+        /// <summary>The roomId property</summary>
+        public Guid? RoomId { get; set; }
+        /// <summary>The rotation property</summary>
+        public int? Rotation { get; set; }
+        /// <summary>The seats property</summary>
+        public int? Seats { get; set; }
+        /// <summary>The shape property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables_shape? Shape { get; set; }
         /// <summary>The tableId property</summary>
         public Guid? TableId { get; set; }
+        /// <summary>The width property</summary>
+        public int? Width { get; set; }
         /// <summary>The x property</summary>
         public int? X { get; set; }
         /// <summary>The y property</summary>
         public int? Y { get; set; }
+        /// <summary>
+        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables"/> and sets the default values.
+        /// </summary>
+        public LayoutPutRequestBody_tables()
+        {
+            Height = 76;
+            Rotation = 0;
+            Shape = global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables_shape.Rectangle;
+            Width = 122;
+        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -36,7 +66,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.La
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "height", n => { Height = n.GetIntValue(); } },
+                { "label", n => { Label = n.GetStringValue(); } },
+                { "roomId", n => { RoomId = n.GetGuidValue(); } },
+                { "rotation", n => { Rotation = n.GetIntValue(); } },
+                { "seats", n => { Seats = n.GetIntValue(); } },
+                { "shape", n => { Shape = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables_shape>(); } },
                 { "tableId", n => { TableId = n.GetGuidValue(); } },
+                { "width", n => { Width = n.GetIntValue(); } },
                 { "x", n => { X = n.GetIntValue(); } },
                 { "y", n => { Y = n.GetIntValue(); } },
             };
@@ -48,7 +85,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.La
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("height", Height);
+            writer.WriteStringValue("label", Label);
+            writer.WriteGuidValue("roomId", RoomId);
+            writer.WriteIntValue("rotation", Rotation);
+            writer.WriteIntValue("seats", Seats);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Floor.Layout.LayoutPutRequestBody_tables_shape>("shape", Shape);
             writer.WriteGuidValue("tableId", TableId);
+            writer.WriteIntValue("width", Width);
             writer.WriteIntValue("x", X);
             writer.WriteIntValue("y", Y);
         }

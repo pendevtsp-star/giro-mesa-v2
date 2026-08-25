@@ -24,6 +24,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
 #endif
         /// <summary>The printRequested property</summary>
         public bool? PrintRequested { get; set; }
+        /// <summary>The returnableDecision property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_returnableDecision? ReturnableDecision { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody"/> and sets the default values.
         /// </summary>
@@ -52,6 +54,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             {
                 { "printOptions", n => { PrintOptions = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_printOptions>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_printOptions.CreateFromDiscriminatorValue); } },
                 { "printRequested", n => { PrintRequested = n.GetBoolValue(); } },
+                { "returnableDecision", n => { ReturnableDecision = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_returnableDecision>(); } },
             };
         }
         /// <summary>
@@ -63,6 +66,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_printOptions>("printOptions", PrintOptions);
             writer.WriteBoolValue("printRequested", PrintRequested);
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.ClosePostRequestBody_returnableDecision>("returnableDecision", ReturnableDecision);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

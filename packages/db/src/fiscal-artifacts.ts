@@ -68,3 +68,15 @@ export async function readFiscalArtifact(root: string | undefined, key: string) 
     throw new Error("FISCAL_ARTIFACT_PATH_INVALID");
   return readFile(canonicalFile);
 }
+
+export async function deleteFiscalArtifact(root: string | undefined, key: string) {
+  if (!storageKey.test(key)) throw new Error("FISCAL_ARTIFACT_KEY_INVALID");
+  const configuredRoot = resolve(root?.trim() || "data/media");
+  const target = resolve(configuredRoot, ...key.split("/"));
+  const path = relative(configuredRoot, target);
+  if (!path || path.startsWith(`..${sep}`) || path === "..")
+    throw new Error("FISCAL_ARTIFACT_PATH_INVALID");
+  await unlink(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== "ENOENT") throw error;
+  });
+}

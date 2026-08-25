@@ -2,7 +2,7 @@
 
 import { getBusinessOpenState } from "@giromesa/domain/establishment-hours";
 import { Button } from "@giromesa/ui";
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicMenuBranding } from "../lib/api";
 import {
   type CartItem,
@@ -26,16 +26,100 @@ import {
   readPublicOrderOptions,
   readPublicOrderReceipt,
 } from "../lib/public-order";
+import {
+  classifyPublicFailure,
+  isTableOrderId,
+  readPresenceChallenge,
+  readTableConsumption,
+  readTableOrder,
+  readTableSession,
+  type TableSession,
+  tableOrderLines,
+} from "../lib/table-session";
 import { CartDialog } from "./menu/CartDialog";
 import { CategoryNav } from "./menu/CategoryNav";
 import { MenuHeader } from "./menu/MenuHeader";
 import type { OrderOptionsState } from "./menu/OrderFlow";
 import { ProductDetail } from "./menu/ProductDetail";
 import { ProductList } from "./menu/ProductList";
-import { PublicActions } from "./menu/PublicActions";
+import { type ConsumptionState, PublicActions, PublicServices } from "./menu/PublicActions";
+import type { TableOrderState } from "./menu/TableOrderFlow";
 
-type HubState = "checking" | "online" | "offline";
 type Notice = { tone: "success" | "warning"; text: string } | null;
+type SessionState =
+  | { status: "checking" | "anonymous" | "expired" | "unavailable" }
+  | { status: "presence_required"; tableLabel: string; message: string }
+  | {
+      status: "ready";
+      tableStatus: TableSession["status"];
+      tableLabel: string;
+      activeTab: boolean;
+      expiresAt: string;
+    };
+type OrderMode = "table" | "off_premise";
+type CommandType = "call_waiter" | "request_check";
+const TABLE_SESSION_POLL_MS = 10_000;
+const tableOrderStorageKey = (menuSlug: string) => `giromesa:table-order:${menuSlug}`;
+
+const apiBase = () => process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
+const apiEnabled = () => process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
+
+async function responsePayload(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTableSession(
+  apiUrl: string,
+  menuSlug: string,
+  tableToken?: string,
+  presenceCode?: string,
+) {
+  const response = await fetch(
+    `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-session`,
+    {
+      method: tableToken ? "POST" : "GET",
+      cache: "no-store",
+      credentials: "include",
+      ...(tableToken
+        ? {
+            body: JSON.stringify(presenceCode ? { presenceCode } : {}),
+            headers: {
+              "content-type": "application/json",
+              "X-GiroMesa-Table-Token": tableToken,
+            },
+          }
+        : {}),
+    },
+  );
+  const payload = await responsePayload(response);
+  return { response, payload, value: readTableSession(payload) };
+}
+
+function readySession(value: TableSession): SessionState {
+  return {
+    status: "ready",
+    tableStatus: value.status,
+    tableLabel: value.tableLabel,
+    activeTab: value.activeTab,
+    expiresAt: value.expiresAt,
+  };
+}
+
+function requestFailure(action: "session" | "consumption" | "command" | "order", status: number) {
+  const failure = classifyPublicFailure(status);
+  if (failure === "session") return "A sessão da mesa expirou. Leia novamente o QR Code.";
+  if (failure === "conflict")
+    return action === "session"
+      ? "Esta mesa ainda não possui uma comanda ativa."
+      : "A comanda mudou ou foi encerrada. Atualize com a equipe.";
+  if (failure === "rate_limit") return "Muitas tentativas seguidas. Aguarde um instante.";
+  if (failure === "unavailable") return "A operação está temporariamente indisponível.";
+  return "Não foi possível validar esta solicitação.";
+}
 
 export function MenuExperience({
   initialItems,
@@ -54,11 +138,12 @@ export function MenuExperience({
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
-  const [hub, setHub] = useState<HubState>("checking");
+  const [orderMode, setOrderMode] = useState<OrderMode>("off_premise");
   const [notice, setNotice] = useState<Notice>(null);
-  const [pendingCommand, setPendingCommand] = useState<
-    "public_order" | "call_waiter" | "request_check" | null
-  >(null);
+  const [pendingCommand, setPendingCommand] = useState<CommandType | null>(null);
+  const [commandAttempts, setCommandAttempts] = useState<
+    Record<CommandType, MutationAttempt | null>
+  >({ call_waiter: null, request_check: null });
   const [orderOptions, setOrderOptions] = useState<OrderOptionsState>({ status: "loading" });
   const [fulfillment, setFulfillment] = useState<"pickup" | "delivery">("pickup");
   const [customerName, setCustomerName] = useState("");
@@ -74,12 +159,23 @@ export function MenuExperience({
     postalCode: "",
   });
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [publicOrderPending, setPublicOrderPending] = useState(false);
+  const [publicOrderError, setPublicOrderError] = useState<string>();
   const [orderAttempt, setOrderAttempt] = useState<MutationAttempt | null>(null);
   const [orderReceipt, setOrderReceipt] = useState<PublicOrderReceipt | null>(null);
-  const [tableAccessToken, setTableAccessToken] = useState<string | null>(null);
+  const [tableOrderAttempt, setTableOrderAttempt] = useState<MutationAttempt | null>(null);
+  const [tableOrder, setTableOrder] = useState<TableOrderState>({ status: "idle" });
+  const [session, setSession] = useState<SessionState>({ status: "checking" });
+  const [presenceCode, setPresenceCode] = useState("");
+  const [presencePending, setPresencePending] = useState(false);
+  const [consumptionOpen, setConsumptionOpen] = useState(false);
+  const [consumption, setConsumption] = useState<ConsumptionState>({ status: "idle" });
+  const [productError, setProductError] = useState<string>();
   const [now, setNow] = useState(() => new Date());
   const productDialog = useRef<HTMLDialogElement>(null);
   const cartDialog = useRef<HTMLDialogElement>(null);
+  const restoredTableOrder = useRef(false);
+  const tableToken = useRef<string | null>(null);
 
   const categories = useMemo(
     () => ["Todos", ...new Set(initialItems.map((item) => item.category))],
@@ -90,6 +186,7 @@ export function MenuExperience({
     [initialItems, category, query],
   );
   const count = cart.reduce((total, line) => total + line.quantity, 0);
+  const pricingFulfillment = orderMode === "table" ? "pickup" : fulfillment;
   const openState = useMemo(
     () =>
       branding?.businessHours && branding.timezone
@@ -97,15 +194,54 @@ export function MenuExperience({
         : undefined,
     [branding?.businessHours, branding?.timezone, now],
   );
+
+  const loadConsumption = useCallback(async () => {
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) {
+      setConsumption({ status: "error", message: "Consulta de consumo indisponível." });
+      return null;
+    }
+    setConsumption({ status: "loading" });
+    try {
+      const response = await fetch(
+        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/consumption`,
+        { cache: "no-store", credentials: "include" },
+      );
+      const payload = await responsePayload(response);
+      const value = readTableConsumption(payload);
+      if (!response.ok || !value) {
+        const message = requestFailure("consumption", response.status);
+        if (classifyPublicFailure(response.status) === "session") {
+          setSession({ status: "expired" });
+        }
+        setConsumption({ status: "error", message });
+        return null;
+      }
+      setConsumption({ status: "ready", data: value });
+      return value;
+    } catch {
+      setConsumption({
+        status: "error",
+        message: "Não foi possível atualizar o consumo. Tente novamente.",
+      });
+      return null;
+    }
+  }, [menuSlug]);
+
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
   useEffect(() => {
-    const token = readTableAccessToken(window.location.search);
-    setTableAccessToken(token);
-    if (!token) return;
+    let active = true;
+    const apiUrl = apiBase();
+    const scannedToken = readTableAccessToken(window.location.search, window.location.hash);
+    tableToken.current = scannedToken;
     const url = new URL(window.location.href);
+    const fragment = new URLSearchParams(url.hash.replace(/^#/, ""));
+    fragment.delete("mesa");
+    url.hash = fragment.toString();
     url.searchParams.delete("mesa");
     url.searchParams.delete("token");
     url.searchParams.delete("table");
@@ -114,40 +250,140 @@ export function MenuExperience({
       "",
       `${url.pathname}${url.search}${url.hash}`,
     );
-  }, []);
 
-  useEffect(() => {
-    let active = true;
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    const apiEnabled = process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
-    async function checkHub() {
-      if (!apiUrl || !apiEnabled) {
-        if (active) setHub("offline");
-        return;
-      }
+    if (!apiUrl || !apiEnabled()) {
+      setSession({ status: scannedToken ? "unavailable" : "anonymous" });
+      return;
+    }
+    const resolvedApiUrl = apiUrl;
+
+    async function bootstrap() {
       try {
-        const response = await fetch(
-          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/hub-status`,
-          { cache: "no-store" },
+        const { response, payload, value } = await fetchTableSession(
+          resolvedApiUrl,
+          menuSlug,
+          scannedToken ?? undefined,
         );
-        const payload = (await response.json()) as { acknowledged?: boolean };
-        if (active) setHub(response.ok && payload.acknowledged ? "online" : "offline");
+        if (!active) return;
+        if (!response.ok || !value) {
+          const presence = readPresenceChallenge(payload);
+          if (scannedToken && presence) {
+            setSession({ status: "presence_required", ...presence });
+            return;
+          }
+          const sessionFailure = classifyPublicFailure(response.status) === "session";
+          setSession({
+            status: sessionFailure ? (scannedToken ? "expired" : "anonymous") : "unavailable",
+          });
+          return;
+        }
+        tableToken.current = null;
+        setSession(readySession(value));
+        setOrderMode("table");
+        if (value.activeTab) void loadConsumption();
       } catch {
-        if (active) setHub("offline");
+        if (active) {
+          setSession({ status: scannedToken ? "unavailable" : "anonymous" });
+        }
       }
     }
-    void checkHub();
-    const timer = window.setInterval(checkHub, 15_000);
+    void bootstrap();
     return () => {
       active = false;
-      window.clearInterval(timer);
     };
-  }, [menuSlug]);
+  }, [loadConsumption, menuSlug]);
+
+  async function confirmPresence() {
+    const apiUrl = apiBase();
+    const scannedToken = tableToken.current;
+    if (!apiUrl || !scannedToken || !/^\d{6}$/.test(presenceCode)) return;
+    setPresencePending(true);
+    try {
+      const { response, payload, value } = await fetchTableSession(
+        apiUrl,
+        menuSlug,
+        scannedToken,
+        presenceCode,
+      );
+      if (!response.ok || !value) {
+        const challenge = readPresenceChallenge(payload);
+        setSession({
+          status: "presence_required",
+          tableLabel:
+            challenge?.tableLabel ??
+            (session.status === "presence_required" ? session.tableLabel : "Mesa"),
+          message:
+            response.status === 429
+              ? "Muitas tentativas. Aguarde um minuto antes de tentar novamente."
+              : "Código incorreto. Confira com a equipe do estabelecimento.",
+        });
+        return;
+      }
+      tableToken.current = null;
+      setPresenceCode("");
+      setSession(readySession(value));
+      setOrderMode("table");
+      if (value.activeTab) void loadConsumption();
+    } catch {
+      setSession((current) =>
+        current.status === "presence_required"
+          ? { ...current, message: "Não foi possível validar o código agora. Tente novamente." }
+          : current,
+      );
+    } finally {
+      setPresencePending(false);
+    }
+  }
+
+  const awaitingTab = session.status === "ready" && !session.activeTab;
+  useEffect(() => {
+    const apiUrl = apiBase();
+    if (!awaitingTab || !apiUrl || !apiEnabled()) return;
+    const resolvedApiUrl = apiUrl;
+    let active = true;
+    let timer: number | undefined;
+
+    const schedule = () => {
+      if (active) timer = window.setTimeout(poll, TABLE_SESSION_POLL_MS);
+    };
+    async function poll() {
+      timer = undefined;
+      if (!active || document.hidden) return;
+      try {
+        const { response, value } = await fetchTableSession(resolvedApiUrl, menuSlug);
+        if (!active) return;
+        if (!response.ok || !value) {
+          if (classifyPublicFailure(response.status) === "session") {
+            setSession({ status: "expired" });
+            return;
+          }
+        } else if (value.activeTab) {
+          setSession(readySession(value));
+          setOrderMode("table");
+          void loadConsumption();
+          return;
+        }
+      } catch {
+        // Mantém a sessão visível e tenta novamente no próximo intervalo.
+      }
+      schedule();
+    }
+
+    const onVisibility = () => {
+      if (!document.hidden && timer === undefined) void poll();
+    };
+    schedule();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      if (timer !== undefined) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [awaitingTab, loadConsumption, menuSlug]);
 
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    const apiEnabled = process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
-    if (!apiUrl || !apiEnabled) {
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) {
       setOrderOptions({ status: "unavailable" });
       return;
     }
@@ -156,7 +392,7 @@ export function MenuExperience({
       cache: "no-store",
     })
       .then(async (response) => {
-        const options = readPublicOrderOptions(await response.json());
+        const options = readPublicOrderOptions(await responsePayload(response));
         if (!response.ok || !options) throw new Error("Opções indisponíveis");
         if (active) {
           setOrderOptions({ status: "ready", data: options });
@@ -169,20 +405,120 @@ export function MenuExperience({
     };
   }, [menuSlug]);
 
+  useEffect(() => {
+    if (session.status !== "ready" || !session.activeTab || restoredTableOrder.current) return;
+    restoredTableOrder.current = true;
+    const orderId = window.sessionStorage.getItem(tableOrderStorageKey(menuSlug));
+    if (!isTableOrderId(orderId)) {
+      window.sessionStorage.removeItem(tableOrderStorageKey(menuSlug));
+      return;
+    }
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) return;
+    let active = true;
+    void fetch(
+      `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders/${encodeURIComponent(orderId)}`,
+      { cache: "no-store", credentials: "include" },
+    )
+      .then(async (response) => ({
+        response,
+        order: readTableOrder(await responsePayload(response)),
+      }))
+      .then(({ response, order }) => {
+        if (!active) return;
+        if (!response.ok || !order) {
+          window.sessionStorage.removeItem(tableOrderStorageKey(menuSlug));
+          return;
+        }
+        setTableOrder({ status: "tracking", order });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [menuSlug, session]);
+
+  const trackedOrder = tableOrder.status === "tracking" ? tableOrder.order : null;
+  useEffect(() => {
+    if (trackedOrder?.status !== "draft") return;
+    const orderId = trackedOrder.orderId;
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) return;
+    let active = true;
+    let timer: number | undefined;
+    let polling = false;
+
+    async function poll() {
+      if (!active || document.hidden || polling) return;
+      if (timer !== undefined) window.clearTimeout(timer);
+      timer = undefined;
+      polling = true;
+      try {
+        const response = await fetch(
+          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders/${encodeURIComponent(orderId)}`,
+          { cache: "no-store", credentials: "include" },
+        );
+        const payload = await responsePayload(response);
+        const next = readTableOrder(payload);
+        if (!response.ok || !next) {
+          if (classifyPublicFailure(response.status) === "session") {
+            setSession({ status: "expired" });
+            setTableOrder({ status: "error", message: requestFailure("order", response.status) });
+            return;
+          }
+        } else {
+          setTableOrder({ status: "tracking", order: next });
+          if (next.status === "sent") {
+            setNotice({ tone: "success", text: "A equipe confirmou o pedido da mesa." });
+            void loadConsumption();
+            return;
+          }
+          if (next.status === "canceled") {
+            setNotice({
+              tone: "warning",
+              text: "O pedido da mesa não foi confirmado. Fale com a equipe para ajustar.",
+            });
+            return;
+          }
+          if (next.status !== "draft") return;
+        }
+      } catch {
+        // A solicitação permanece em rascunho; a próxima leitura tenta novamente.
+      } finally {
+        polling = false;
+      }
+      if (active) timer = window.setTimeout(poll, 3_000);
+    }
+
+    const onVisibility = () => {
+      if (!document.hidden) void poll();
+    };
+    timer = window.setTimeout(poll, 3_000);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [loadConsumption, menuSlug, trackedOrder]);
+
   function openProduct(item: MenuItem) {
     setSelected(item);
     setSelection({});
     setQuantity(1);
     setNotes("");
+    setProductError(undefined);
     window.setTimeout(() => productDialog.current?.showModal(), 0);
   }
 
   function closeProduct() {
     productDialog.current?.close();
     setSelected(null);
+    setProductError(undefined);
   }
 
   function toggleModifier(group: ModifierGroup, modifier: Modifier) {
+    setProductError(undefined);
     setSelection((current) => {
       const selectedOptions = current[group.id] ?? [];
       const exists = selectedOptions.some((option) => option.id === modifier.id);
@@ -203,11 +539,14 @@ export function MenuExperience({
       (group) => group.required && !selection[group.id]?.length,
     );
     if (missing) {
-      setNotice({ tone: "warning", text: "Escolha as opções obrigatórias antes de adicionar." });
+      setProductError("Escolha as opções obrigatórias antes de adicionar.");
       return;
     }
     const modifiers = Object.values(selection).flat();
     setOrderReceipt(null);
+    if (tableOrder.status === "tracking" && tableOrder.order.status !== "draft") {
+      setTableOrder({ status: "idle" });
+    }
     setCart((current) => [
       ...current,
       {
@@ -222,14 +561,18 @@ export function MenuExperience({
     closeProduct();
   }
 
-  function openCart() {
+  function openCart(mode?: OrderMode) {
+    if (mode) setOrderMode(mode);
     setCartOpen(true);
     window.setTimeout(() => cartDialog.current?.showModal(), 0);
   }
+
   function closeCart() {
     cartDialog.current?.close();
     setCartOpen(false);
+    setPublicOrderError(undefined);
   }
+
   function changeQuantity(lineId: string, delta: number) {
     setCart((current) =>
       current.flatMap((line) =>
@@ -242,66 +585,112 @@ export function MenuExperience({
     );
   }
 
-  async function sendCommand(type: "call_waiter" | "request_check", payload: object = {}) {
-    if (pendingCommand) return false;
-    if (hub !== "online") {
-      setNotice({
-        tone: "warning",
-        text: "Atendimento digital pausado. Chame a equipe presencialmente.",
-      });
-      return false;
-    }
-    if (!tableAccessToken) {
-      setNotice({ tone: "warning", text: "Leia novamente o QR Code disponível na mesa." });
-      return false;
-    }
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    const apiEnabled = process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED === "true";
-    if (!apiUrl || !apiEnabled) return false;
+  async function sendCommand(type: CommandType) {
+    if (pendingCommand || session.status !== "ready") return;
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) return;
+    const serialized = JSON.stringify({ type, payload: {} });
+    const attempt = resolveMutationAttempt(commandAttempts[type], serialized, () =>
+      crypto.randomUUID(),
+    );
+    setCommandAttempts((current) => ({ ...current, [type]: attempt }));
     setPendingCommand(type);
     try {
       const response = await fetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/commands`,
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
-            "Idempotency-Key": crypto.randomUUID(),
-            "X-GiroMesa-Table-Token": tableAccessToken,
+            "Idempotency-Key": attempt.key,
           },
-          body: JSON.stringify({ type, payload }),
+          body: serialized,
         },
       );
-      const result: unknown = await response.json();
-      if (!response.ok || !isCommandAccepted(result)) throw new Error("Sem confirmação do hub");
+      const payload = await responsePayload(response);
+      if (!response.ok || !isCommandAccepted(payload)) {
+        if (classifyPublicFailure(response.status) === "session") {
+          setSession({ status: "expired" });
+        }
+        throw new Error(requestFailure("command", response.status));
+      }
+      setCommandAttempts((current) => ({ ...current, [type]: null }));
       setNotice({
         tone: "success",
         text:
           type === "call_waiter"
             ? "A equipe recebeu o chamado da mesa."
-            : "A operação recebeu o pedido da conta.",
+            : "A equipe recebeu o pedido da conta.",
       });
-      return true;
-    } catch {
-      setHub("offline");
+    } catch (error) {
       setNotice({
         tone: "warning",
-        text: "Não recebemos confirmação da operação. Nenhum pedido foi registrado.",
+        text: error instanceof Error ? error.message : "Não foi possível confirmar a solicitação.",
       });
-      return false;
     } finally {
       setPendingCommand(null);
     }
   }
 
+  async function placeTableOrder() {
+    if (!cart.length || session.status !== "ready" || !session.activeTab) return;
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) return;
+    const serialized = JSON.stringify({ items: tableOrderLines(cart) });
+    const attempt = resolveMutationAttempt(tableOrderAttempt, serialized, () =>
+      crypto.randomUUID(),
+    );
+    setTableOrderAttempt(attempt);
+    setTableOrder({ status: "submitting" });
+    try {
+      const response = await fetch(
+        `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": attempt.key,
+          },
+          body: serialized,
+        },
+      );
+      const payload = await responsePayload(response);
+      const order = readTableOrder(payload);
+      if (!response.ok || !order) {
+        if (classifyPublicFailure(response.status) === "session") {
+          setSession({ status: "expired" });
+        }
+        throw new Error(requestFailure("order", response.status));
+      }
+      setTableOrder({ status: "tracking", order });
+      setTableOrderAttempt(null);
+      window.sessionStorage.setItem(tableOrderStorageKey(menuSlug), order.orderId);
+      setCart([]);
+      setNotice({
+        tone: "success",
+        text: "Pedido enviado para revisão. Aguarde a confirmação da equipe.",
+      });
+    } catch (error) {
+      setTableOrder({
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Não foi possível enviar o pedido para confirmação.",
+      });
+    }
+  }
+
   async function placePublicOrder() {
-    if (!cart.length) return;
-    if (orderOptions.status !== "ready") {
-      setNotice({ tone: "warning", text: "Pedidos públicos não estão disponíveis agora." });
+    if (!cart.length || orderOptions.status !== "ready") return;
+    if (customerName.trim().length < 2 || customerPhone.trim().length < 10 || !privacyAccepted) {
+      setPublicOrderError("Revise os campos obrigatórios antes de confirmar.");
       return;
     }
-    const apiUrl = process.env.NEXT_PUBLIC_CUSTOMER_API_URL?.replace(/\/$/, "");
-    if (!apiUrl || process.env.NEXT_PUBLIC_CUSTOMER_API_ENABLED !== "true") return;
+    const apiUrl = apiBase();
+    if (!apiUrl || !apiEnabled()) return;
     const body = {
       fulfillment,
       customer: { name: customerName.trim(), phone: customerPhone.trim() },
@@ -327,7 +716,8 @@ export function MenuExperience({
     const serialized = JSON.stringify(body);
     const attempt = resolveMutationAttempt(orderAttempt, serialized, () => crypto.randomUUID());
     setOrderAttempt(attempt);
-    setPendingCommand("public_order");
+    setPublicOrderPending(true);
+    setPublicOrderError(undefined);
     try {
       const response = await fetch(
         `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/orders`,
@@ -337,47 +727,34 @@ export function MenuExperience({
           body: serialized,
         },
       );
-      const payload: unknown = await response.json();
+      const payload = await responsePayload(response);
       const receipt = readPublicOrderReceipt(payload);
       if (!response.ok || !receipt) throw new Error("Pedido sem confirmação persistida");
       setOrderReceipt(receipt);
+      setOrderAttempt(null);
       setCart([]);
       setNotice({
         tone: "success",
-        text: `Pedido ${receipt.protocol} registrado. Pagamento aguardando retirada ou entrega.`,
+        text: `Pedido ${receipt.protocol} registrado. Pagamento na retirada ou entrega.`,
       });
     } catch {
-      setNotice({
-        tone: "warning",
-        text: "O pedido não foi confirmado. Revise os dados e tente novamente; a mesma tentativa é idempotente.",
-      });
+      setPublicOrderError(
+        "O pedido não foi confirmado. Revise os dados e tente novamente; a mesma tentativa é idempotente.",
+      );
     } finally {
-      setPendingCommand(null);
+      setPublicOrderPending(false);
     }
   }
 
   const selectedModifiers = Object.values(selection).flat();
   const selectedUnitPrice = selected
-    ? itemPrice(selected, fulfillment) +
+    ? itemPrice(selected, pricingFulfillment) +
       selectedModifiers.reduce((sum, option) => sum + option.priceCents, 0)
     : 0;
-  const selectedZone =
-    orderOptions.status === "ready"
-      ? orderOptions.data.deliveryZones.find((zone) => zone.name === deliveryZone)
-      : undefined;
-  const deliveryAddressComplete = Object.entries(address)
-    .filter(([key]) => key !== "complement")
-    .every(([, value]) => value.trim().length > 0);
-  const canPlacePublicOrder =
-    orderOptions.status === "ready" &&
-    customerName.trim().length >= 2 &&
-    customerPhone.trim().length >= 10 &&
-    privacyAccepted &&
-    (fulfillment === "pickup" || Boolean(selectedZone && deliveryAddressComplete));
 
   return (
     <main
-      className="menu-app"
+      className={`menu-app ${session.status === "ready" ? "has-table-session" : ""}`}
       style={
         branding?.primaryColor || branding?.accentColor
           ? ({
@@ -391,16 +768,49 @@ export function MenuExperience({
         Pular para o cardápio
       </a>
       <MenuHeader
-        hub={hub}
+        hub={
+          session.status === "checking"
+            ? "checking"
+            : session.status === "ready"
+              ? "online"
+              : "offline"
+        }
         branding={branding}
         open={openState?.open}
-        tableAuthorized={Boolean(tableAccessToken)}
+        tableAuthorized={session.status === "ready"}
+        tableLabel={session.status === "ready" ? session.tableLabel : undefined}
         onInfo={() =>
           setNotice({
             tone: "success",
-            text: "Cardápio publicado pela unidade. Solicitações dependem da confirmação operacional.",
+            text: "Cardápio e informações publicados por esta unidade.",
           })
         }
+      />
+      <PublicActions
+        sessionStatus={session.status}
+        tableLabel={
+          session.status === "ready" || session.status === "presence_required"
+            ? session.tableLabel
+            : undefined
+        }
+        activeTab={session.status === "ready" && session.activeTab}
+        presenceCode={presenceCode}
+        presenceMessage={session.status === "presence_required" ? session.message : undefined}
+        presencePending={presencePending}
+        pending={pendingCommand}
+        consumptionOpen={consumptionOpen}
+        consumption={consumption}
+        onCallWaiter={() => void sendCommand("call_waiter")}
+        onRequestCheck={() => void sendCommand("request_check")}
+        onToggleConsumption={() => {
+          const next = !consumptionOpen;
+          setConsumptionOpen(next);
+          if (next && consumption.status !== "ready") void loadConsumption();
+        }}
+        onRefreshConsumption={() => void loadConsumption()}
+        onOpenTableOrder={() => openCart("table")}
+        onPresenceCodeChange={setPresenceCode}
+        onConfirmPresence={() => void confirmPresence()}
       />
       <CategoryNav
         categories={categories}
@@ -410,20 +820,13 @@ export function MenuExperience({
         onQuery={setQuery}
       />
       <ProductList category={category} items={visibleItems} onOpen={openProduct} />
-      <PublicActions
-        menuSlug={menuSlug}
-        tableAuthorized={Boolean(tableAccessToken)}
-        pending={pendingCommand !== null}
-        onCallWaiter={() => void sendCommand("call_waiter")}
-        onRequestCheck={() => void sendCommand("request_check")}
-        onOpenCart={openCart}
-      />
+      <PublicServices menuSlug={menuSlug} onOpenCart={() => openCart("off_premise")} />
       {count > 0 && (
-        <Button type="button" className="cart-bar" onClick={openCart}>
+        <Button type="button" className="cart-bar" onClick={() => openCart()}>
           <span>
             <b>{count}</b> Ver seleção
           </span>
-          <strong>{formatMoney(cartTotal(cart, fulfillment))}</strong>
+          <strong>{formatMoney(cartTotal(cart, pricingFulfillment))}</strong>
         </Button>
       )}
       {notice && (
@@ -446,8 +849,12 @@ export function MenuExperience({
         notes={notes}
         quantity={quantity}
         unitPrice={selectedUnitPrice}
+        error={productError}
         onClose={closeProduct}
-        onDismiss={() => setSelected(null)}
+        onDismiss={() => {
+          setSelected(null);
+          setProductError(undefined);
+        }}
         onToggleModifier={toggleModifier}
         onNotes={setNotes}
         onQuantity={setQuantity}
@@ -458,6 +865,9 @@ export function MenuExperience({
         open={cartOpen}
         cart={cart}
         receipt={orderReceipt}
+        mode={orderMode}
+        tableAvailable={session.status === "ready" && session.activeTab}
+        tableOrder={tableOrder}
         options={orderOptions}
         fulfillment={fulfillment}
         customerName={customerName}
@@ -465,11 +875,15 @@ export function MenuExperience({
         deliveryZone={deliveryZone}
         address={address}
         privacyAccepted={privacyAccepted}
-        pending={pendingCommand === "public_order"}
-        canPlace={canPlacePublicOrder}
+        pending={publicOrderPending}
+        publicOrderError={publicOrderError}
         onClose={closeCart}
-        onDismiss={() => setCartOpen(false)}
+        onDismiss={() => {
+          setCartOpen(false);
+          setPublicOrderError(undefined);
+        }}
         onQuantity={changeQuantity}
+        onMode={setOrderMode}
         onFulfillment={setFulfillment}
         onCustomerName={setCustomerName}
         onCustomerPhone={setCustomerPhone}
@@ -477,6 +891,7 @@ export function MenuExperience({
         setAddress={setAddress}
         onPrivacy={setPrivacyAccepted}
         onPlace={() => void placePublicOrder()}
+        onPlaceTableOrder={() => void placeTableOrder()}
       />
     </main>
   );

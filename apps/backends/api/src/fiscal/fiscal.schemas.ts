@@ -144,13 +144,23 @@ const taxClassificationSchema = z
       .optional(),
     cstPis: z.string().regex(/^\d{2}$/),
     cstCofins: z.string().regex(/^\d{2}$/),
-    cstIbsCbs: z.string().trim().min(1).max(10).optional(),
-    cClassTrib: z.string().trim().min(1).max(20).optional(),
+    cstIbsCbs: z
+      .string()
+      .regex(/^\d{3}$/)
+      .optional(),
+    cClassTrib: z
+      .string()
+      .regex(/^\d{6}$/)
+      .optional(),
   })
   .catchall(z.unknown())
   .refine((value) => Boolean(value.cstIcms || value.csosn), {
     message: "Informe CST ICMS ou CSOSN.",
     path: ["csosn"],
+  })
+  .refine((value) => Boolean(value.cstIbsCbs) === Boolean(value.cClassTrib), {
+    message: "Informe CST IBS/CBS e cClassTrib em conjunto.",
+    path: ["cClassTrib"],
   })
   .refine((value) => JSON.stringify(value).length <= 32_000, "Classificação fiscal muito grande.");
 
@@ -197,18 +207,15 @@ export const productTaxRevisionImportSchema = z
     });
   });
 
-const attachmentSchema = z.object({
-  name: z.string().trim().min(1).max(240),
-  storageKey: z.string().trim().min(1).max(1_000),
-  sha256: z
-    .string()
-    .regex(/^[a-f\d]{64}$/i)
-    .optional(),
-});
-
 export const accountantRequestListQuerySchema = z.object({
   status: z.enum(["open", "resolved"]).optional(),
   competence: competenceSchema.optional(),
+  targetAudience: z.enum(["accountant", "establishment"]).optional(),
+  overdue: z
+    .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
+    .optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
 
 export const accountantRequestSchema = z.object({
@@ -216,11 +223,37 @@ export const accountantRequestSchema = z.object({
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().min(3).max(5_000),
   dueDate: date.optional(),
-  attachments: z.array(attachmentSchema).max(20).default([]),
 });
 
 export const resolveAccountantRequestSchema = z.object({
   resolution: z.string().trim().min(3).max(5_000),
+});
+
+export const accountantAttachmentUploadSchema = z.object({
+  fileName: z
+    .string()
+    .trim()
+    .min(1)
+    .max(180)
+    .refine(
+      (value) =>
+        !/[<>:"/\\|?*]/.test(value) &&
+        ![...value].some((character) => character.charCodeAt(0) < 32),
+      "Nome de arquivo inválido.",
+    ),
+  contentType: z.enum([
+    "application/pdf",
+    "application/xml",
+    "text/xml",
+    "text/csv",
+    "image/jpeg",
+    "image/png",
+  ]),
+  contentBase64: z
+    .string()
+    .min(4)
+    .max(4_194_304)
+    .regex(/^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/),
 });
 
 export const reopenFiscalPeriodSchema = z.object({
@@ -323,6 +356,7 @@ export type ProductTaxRevisionImportInput = z.infer<typeof productTaxRevisionImp
 export type AccountantRequestListQuery = z.infer<typeof accountantRequestListQuerySchema>;
 export type AccountantRequestInput = z.infer<typeof accountantRequestSchema>;
 export type ResolveAccountantRequestInput = z.infer<typeof resolveAccountantRequestSchema>;
+export type AccountantAttachmentUploadInput = z.infer<typeof accountantAttachmentUploadSchema>;
 export type ReopenFiscalPeriodInput = z.infer<typeof reopenFiscalPeriodSchema>;
 export type FiscalNumberInvalidationInput = z.infer<typeof fiscalNumberInvalidationSchema>;
 export type EdgeFiscalEvent = z.infer<typeof edgeFiscalEventSchema>;

@@ -20,6 +20,7 @@ import {
   type SpicinessLevel,
   slugify,
 } from "../../operations.shared";
+import { routeHref } from "../../router";
 import { formatMoney } from "../../rules";
 import {
   type CatalogCsvRow,
@@ -27,7 +28,7 @@ import {
   parseCatalogCsv,
   serializeCatalogCsv,
 } from "./catalog.csv";
-import { buildTableQrPrintHtml, escapeCatalogHtml } from "./catalog.print";
+import { buildTableQrPrintHtml, escapeCatalogHtml, selectTableQrRows } from "./catalog.print";
 import {
   hasCatalogProductionStation,
   normalizeCatalogStationIds,
@@ -41,7 +42,6 @@ import { CatalogProductEditorModal } from "./components/CatalogProductEditorModa
 import { CatalogProductsPanel } from "./components/CatalogProductsPanel";
 import { CatalogPromotionsModal } from "./components/CatalogPromotionsModal";
 import { CatalogSpreadsheetModal } from "./components/CatalogSpreadsheetModal";
-import { CatalogTableQrModal } from "./components/CatalogTableQrModal";
 
 export function CatalogExperience({
   initialCatalog,
@@ -281,14 +281,18 @@ export function CatalogExperience({
     }
     const rows = await api.pilot.catalogTableQrs(scope.organizationId, scope.unitId);
     const rendered = await Promise.all(
-      rows.map(async (row) => ({
-        ...row,
-        dataUrl: await QRCode.toDataURL(row.url, {
-          errorCorrectionLevel: "M",
-          margin: 1,
-          width: 320,
-        }),
-      })),
+      selectTableQrRows(rows, new Set(rows.map((row) => row.tableId))).map(async (row) => {
+        const svg = await QRCode.toString(row.url, {
+          type: "svg",
+          errorCorrectionLevel: "H",
+          margin: 4,
+          width: 768,
+        });
+        return {
+          ...row,
+          dataUrl: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`,
+        };
+      }),
     );
     setTableQrs(rendered);
     if (rendered[0]) setSelectedQrTable(0);
@@ -658,7 +662,6 @@ export function CatalogExperience({
   const [csvFileName, setCsvFileName] = useState("");
 
   // QR Codes Generator Modal State
-  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [editingProductReason, setEditingProductReason] = useState("");
   const [productType, setProductType] = useState<"prepared" | "resale">("prepared");
   const [eanBarcode, setEanBarcode] = useState("");
@@ -758,11 +761,11 @@ export function CatalogExperience({
       );
       completeCreateAttempt("station");
       setStationName("");
-      setFeedback("Praça de produção criada.");
+      setFeedback("Estação de produção criada.");
       onRetry?.();
     } catch (error) {
       setFeedback(
-        error instanceof Error ? error.message : "Não foi possível criar a praça.",
+        error instanceof Error ? error.message : "Não foi possível criar a estação de produção.",
         "danger",
       );
     } finally {
@@ -1157,7 +1160,7 @@ export function CatalogExperience({
     event.preventDefault();
     if (!editingProduct) return;
     if (!hasCatalogProductionStation(editingProduct.stationIds)) {
-      setFeedback("Selecione ao menos uma praça de produção.", "danger");
+      setFeedback("Selecione ao menos uma estação de produção.", "danger");
       return;
     }
     setBusy("update-product");
@@ -1473,11 +1476,11 @@ export function CatalogExperience({
     const selectedCategory = categoryId || catalog.categories[0]?.id;
     const priceCents = priceToCents(price);
     if (!selectedCategory || priceCents < 0) {
-      setFeedback("Crie categoria e praça e informe um preço válido.", "danger");
+      setFeedback("Crie categoria e estação de produção e informe um preço válido.", "danger");
       return;
     }
     if (!hasCatalogProductionStation(stationIds)) {
-      setFeedback("Selecione ao menos uma praça de produção.", "danger");
+      setFeedback("Selecione ao menos uma estação de produção.", "danger");
       return;
     }
     if (Boolean(scheduleStart) !== Boolean(scheduleEnd)) {
@@ -1631,16 +1634,6 @@ export function CatalogExperience({
         preview={csvParsedPreview}
       />
 
-      {/* Modal Gerador de Placas de QR Code para Mesas */}
-
-      <CatalogTableQrModal
-        branding={catalog.branding}
-        isOpen={qrModalOpen}
-        onClose={() => setQrModalOpen(false)}
-        scope={scope}
-        setFeedback={setFeedback}
-      />
-
       <div className="quick-actions-grid">
         <details className="action-panel">
           <summary>
@@ -1668,7 +1661,7 @@ export function CatalogExperience({
         <details className="action-panel">
           <summary>
             <span>
-              <strong>Nova praça</strong>
+              <strong>Nova estação de produção</strong>
               <small>Defina onde os itens serão produzidos.</small>
             </span>
             <Icon name="plus" size={18} />
@@ -1685,7 +1678,7 @@ export function CatalogExperience({
               />
             </Label>
             <Button disabled={busy === "station" || stationName.trim().length < 2} type="submit">
-              {busy === "station" ? "Salvando…" : "Criar praça"}
+              {busy === "station" ? "Salvando…" : "Criar estação"}
             </Button>
           </form>
         </details>
@@ -2020,11 +2013,11 @@ export function CatalogExperience({
             </NativeSelect>
           </Label>
 
-          {/* Praças de produção */}
+          {/* Estações de produção */}
           <div className="action-form__wide catalog-create-stations">
-            <span className="catalog-text-strong-078">Praças de produção</span>
+            <span className="catalog-text-strong-078">Estações de produção</span>
             <small className="catalog-create-stations__help">
-              Cada praça selecionada recebe o item e todas precisam concluir. Selecione ao menos
+              Cada estação selecionada recebe o item e todas precisam concluir. Selecione ao menos
               uma.
             </small>
             <div className="catalog-create-stations__options">
@@ -2772,7 +2765,7 @@ export function CatalogExperience({
         onOpenModifiers={() => setModifiersManagerModalOpen(true)}
         onOpenPdf={() => setPdfExportModalOpen(true)}
         onOpenPromotions={() => setPromosAndCombosModalOpen(true)}
-        onOpenQrGenerator={() => setQrModalOpen(true)}
+        tableQrHref={routeHref("table-qrs")}
         onOpenReorder={() => setReorderModalOpen(true)}
         onOpenSpreadsheet={() => setCsvModalOpen(true)}
         productCount={catalog.products.length}
@@ -3168,7 +3161,7 @@ export function CatalogExperience({
                   </div>
                 </div>
 
-                {/* Praça de Produção Padrão */}
+                {/* Estação de produção padrão */}
                 <Label
                   style={{
                     display: "flex",
@@ -3179,7 +3172,7 @@ export function CatalogExperience({
                     color: "var(--gm-ink)",
                   }}
                 >
-                  Praça de Produção Padrão para Novos Itens
+                  Estação de produção padrão para novos itens
                   <NativeSelect
                     value={editingCategory.defaultStationId}
                     onChange={(e) =>
@@ -3202,7 +3195,7 @@ export function CatalogExperience({
                       boxSizing: "border-box",
                     }}
                   >
-                    <option value="">Nenhuma praça fixa (definir individualmente)</option>
+                    <option value="">Nenhuma estação fixa (definir individualmente)</option>
                     {catalog.stations.map((st) => (
                       <option key={st.id} value={st.id}>
                         {st.name}
@@ -3786,17 +3779,11 @@ export function CatalogExperience({
                       color: "var(--gm-ink)",
                     }}
                   >
-                    {scope
-                      ? tableQrs.map((row, index) => (
-                          <option key={row.tableId} value={index}>
-                            {row.label}
-                          </option>
-                        ))
-                      : Array.from({ length: 20 }, (_, i) => i + 1).map((m) => (
-                          <option key={m} value={m}>
-                            Mesa {m}
-                          </option>
-                        ))}
+                    {tableQrs.map((row, index) => (
+                      <option key={row.tableId} value={index}>
+                        {row.label}
+                      </option>
+                    ))}
                   </NativeSelect>
                 </Label>
 

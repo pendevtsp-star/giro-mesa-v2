@@ -9,11 +9,19 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class MergePostRequestBody : IAdditionalDataHolder, IParsable
+    public partial class MergePostRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The reasonCode property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge.MergePostRequestBody_reasonCode? ReasonCode { get; set; }
+        /// <summary>The reasonNote property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? ReasonNote { get; set; }
+#nullable restore
+#else
+        public string ReasonNote { get; set; }
+#endif
         /// <summary>The sourceTabIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -24,13 +32,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge
 #endif
         /// <summary>The targetTabId property</summary>
         public Guid? TargetTabId { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge.MergePostRequestBody"/> and sets the default values.
-        /// </summary>
-        public MergePostRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -49,6 +50,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "reasonCode", n => { ReasonCode = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge.MergePostRequestBody_reasonCode>(); } },
+                { "reasonNote", n => { ReasonNote = n.GetStringValue(); } },
                 { "sourceTabIds", n => { SourceTabIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "targetTabId", n => { TargetTabId = n.GetGuidValue(); } },
             };
@@ -60,9 +63,10 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Merge.MergePostRequestBody_reasonCode>("reasonCode", ReasonCode);
+            writer.WriteStringValue("reasonNote", ReasonNote);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("sourceTabIds", SourceTabIds);
             writer.WriteGuidValue("targetTabId", TargetTabId);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

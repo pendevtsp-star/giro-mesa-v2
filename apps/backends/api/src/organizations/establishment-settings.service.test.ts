@@ -7,6 +7,7 @@ import {
   copyStoredSettings,
   hasUnpublishedSettings,
   normalizeStoredBranding,
+  pendingPublicSections,
   projectPublicBranding,
 } from "./establishment-settings.service.js";
 
@@ -18,6 +19,7 @@ describe("establishment settings projections", () => {
         displayName: "Mesa da Casa",
         slogan: "Comida boa",
         logoUrl: "https://cdn.example.test/logo.png",
+        coverImageUrl: "https://cdn.example.test/cover.webp",
         primaryColor: "#123456",
         accentColor: "#abcdef",
         address: "Rua Um, 10",
@@ -38,9 +40,12 @@ describe("establishment settings projections", () => {
       "displayName",
       "slogan",
       "logoUrl",
+      "logoThumbnailUrl",
+      "coverImageUrl",
       "primaryColor",
       "accentColor",
       "address",
+      "addressDetails",
       "phone",
       "instagram",
       "openingHours",
@@ -49,6 +54,7 @@ describe("establishment settings projections", () => {
     ]);
     assert.equal("wifi" in projected, false);
     assert.equal(JSON.stringify(projected).includes("segredo"), false);
+    assert.equal(projected.coverImageUrl, "https://cdn.example.test/cover.webp");
   });
 
   it("recovers malformed legacy branding with safe defaults", () => {
@@ -67,6 +73,28 @@ describe("establishment settings projections", () => {
     assert.equal(hasUnpublishedSettings(null, new Date()), true);
     assert.equal(hasUnpublishedSettings(publishedAt, new Date("2026-08-22T11:59:00.000Z")), false);
     assert.equal(hasUnpublishedSettings(publishedAt, new Date("2026-08-22T12:01:00.000Z")), true);
+  });
+
+  it("reports only public sections whose projected values changed", () => {
+    const published = projectPublicBranding({}, "Casa", "America/Sao_Paulo");
+    const draft = {
+      ...published,
+      phone: "(82) 99999-9999",
+    };
+    assert.deepEqual(pendingPublicSections(draft, published), ["contacts"]);
+    assert.deepEqual(pendingPublicSections(published, published), []);
+    assert.deepEqual(
+      pendingPublicSections(
+        { ...published, coverImageUrl: "https://cdn.example.test/cover.webp" },
+        published,
+      ),
+      ["brand"],
+    );
+    const legacyPublished = structuredClone(published) as Record<string, unknown>;
+    delete legacyPublished.logoThumbnailUrl;
+    delete legacyPublished.coverImageUrl;
+    delete legacyPublished.addressDetails;
+    assert.deepEqual(pendingPublicSections(published, legacyPublished), []);
   });
 
   it("does not combine a manager role in one unit with a staff role in another", () => {

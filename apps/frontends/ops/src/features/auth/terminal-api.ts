@@ -53,6 +53,10 @@ export const terminalApi = {
       method: "POST",
       body: JSON.stringify({ actorEpoch }),
     }),
-  lock: () => apiRequest<TerminalSessionView>("/v1/auth/terminal-session/lock", { method: "POST" }),
+  lock: (reason: "idle" | "switch" | "manual" = "manual") =>
+    apiRequest<TerminalSessionView>("/v1/auth/terminal-session/lock", {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
   close: () => apiRequest<void>("/v1/auth/terminal-session", { method: "DELETE" }),
 };

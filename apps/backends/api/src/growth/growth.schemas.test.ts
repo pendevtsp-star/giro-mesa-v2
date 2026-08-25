@@ -1,19 +1,52 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  campaignCancelSchema,
+  couponUpdateSchema,
+  crmAutomationRuleSchema,
+  customerListQuerySchema,
+  customerMergeSchema,
+  customerUpdateSchema,
   deliveryOrderQuerySchema,
   deliveryOrderSchema,
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
+  evolutionConfigurationSchema,
+  evolutionWebhookSchema,
   publicCouponValidationSchema,
   publicReservationSchema,
   publicWaitlistSchema,
   reservationListQuerySchema,
   waitlistListQuerySchema,
   webhookEndpointSchema,
+  whatsappInboxQuerySchema,
+  whatsappMessageSchema,
 } from "./growth.schemas.js";
 
 describe("growth API boundaries", () => {
+  it("bounds CRM search and requires explicit customer mutations", () => {
+    assert.deepEqual(customerListQuerySchema.parse({ q: "  Maria  ", limit: "20" }), {
+      q: "Maria",
+      limit: 20,
+      offset: 0,
+    });
+    assert.equal(customerListQuerySchema.safeParse({ limit: 101 }).success, false);
+    assert.equal(customerUpdateSchema.safeParse({}).success, false);
+    assert.deepEqual(customerUpdateSchema.parse({ tags: ["vip", "aniversário"] }).tags, [
+      "vip",
+      "aniversário",
+    ]);
+    assert.equal(
+      customerMergeSchema.safeParse({
+        sourceCustomerId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        reason: "duplicidade",
+      }).success,
+      true,
+    );
+    assert.equal(couponUpdateSchema.safeParse({}).success, false);
+    assert.equal(campaignCancelSchema.safeParse({ reason: "x" }).success, false);
+  });
+
   it("bounds reception lists and validates reservation periods", () => {
     assert.deepEqual(reservationListQuerySchema.parse({}), {
       scope: "active",
@@ -172,6 +205,61 @@ describe("growth API boundaries", () => {
         customerId: "f898be18-4f20-4e20-93b3-75468c80646e",
       }).success,
       false,
+    );
+  });
+
+  it("bounds Evolution Go, inbox sends and CRM automations", () => {
+    const unitId = "f898be18-4f20-4e20-93b3-75468c80646e";
+    assert.equal(evolutionConfigurationSchema.safeParse({ unitId, enabled: true }).success, true);
+    assert.equal(
+      evolutionConfigurationSchema.safeParse({
+        unitId,
+        enabled: true,
+        quietHoursStart: "25:00",
+      }).success,
+      false,
+    );
+    assert.equal(
+      whatsappMessageSchema.safeParse({ unitId, body: "Olá", idempotencyKey: "send-1" }).success,
+      false,
+    );
+    assert.equal(
+      whatsappMessageSchema.safeParse({
+        unitId,
+        phone: "5511999999999",
+        idempotencyKey: "send-media-1",
+        media: {
+          fileName: "arquivo.pdf",
+          mimeType: "application/pdf",
+          base64: "JVBERi0=",
+        },
+      }).success,
+      true,
+    );
+    assert.equal(
+      whatsappInboxQuerySchema.safeParse({
+        unitId,
+        cursorAt: "2026-08-25T12:00:00.000Z",
+      }).success,
+      false,
+    );
+    assert.equal(
+      crmAutomationRuleSchema.safeParse({
+        unitId,
+        trigger: "inactive",
+        enabled: true,
+        delayMinutes: 0,
+        messageTemplate: "Olá, {nome}",
+      }).success,
+      false,
+    );
+    assert.equal(
+      evolutionWebhookSchema.safeParse({
+        event: "message",
+        instanceToken: "x".repeat(64),
+        data: {},
+      }).success,
+      true,
     );
   });
 });

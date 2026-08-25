@@ -77,8 +77,23 @@ const notifyReadyDataSchema = z.object({ tabId: z.uuid() }).strict();
 const transitionCallDataSchema = z.object({ callId: z.uuid() }).strict();
 const sendOrderDataSchema = z.object({ orderId: z.uuid() }).strict();
 const transferTabDataSchema = z.object({ tabId: z.uuid(), body: transferTabSchema }).strict();
-const mergeTabsDataSchema = z.object({ body: mergeTabsSchema }).strict();
-const groupTablesDataSchema = z.object({ body: tableGroupSchema }).strict();
+function normalizeLegacyReorganizationData(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const data = value as Record<string, unknown>;
+  if (!data.body || typeof data.body !== "object" || Array.isArray(data.body)) return value;
+  const body = data.body as Record<string, unknown>;
+  if (body.reasonCode || typeof body.reason !== "string") return value;
+  const { reason, ...rest } = body;
+  return { ...data, body: { ...rest, reasonCode: "other", reasonNote: reason } };
+}
+const mergeTabsDataSchema = z.preprocess(
+  normalizeLegacyReorganizationData,
+  z.object({ body: mergeTabsSchema }).strict(),
+);
+const groupTablesDataSchema = z.preprocess(
+  normalizeLegacyReorganizationData,
+  z.object({ body: tableGroupSchema }).strict(),
+);
 const detachTableGroupDataSchema = z
   .object({ groupId: z.uuid(), body: detachTableGroupSchema })
   .strict();

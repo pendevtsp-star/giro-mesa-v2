@@ -221,22 +221,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
             const editingSupplier = supplierDirectory.find(
               (supplier) => supplier.id === editingSupplierId,
             );
-            const suggestions = data.suggestions.length
-              ? data.suggestions
-              : stock.items
-                  .filter(
-                    (item) =>
-                      item.active &&
-                      stock.balances
-                        .filter((balance) => balance.inventoryItemId === item.id)
-                        .reduce((sum, balance) => sum + balance.quantity, 0) <=
-                        item.minimumQuantity,
-                  )
-                  .map((item) => ({
-                    inventoryItemId: item.id,
-                    suggestedQuantity: String(item.reorderQuantity),
-                    reason: "Estoque no mínimo",
-                  }));
+            const suggestions = data.suggestions;
             async function submitSupplier(event: FormEvent<HTMLFormElement>) {
               event.preventDefault();
               const saved = await run(
@@ -530,20 +515,17 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     <div className="purchases-suggestions">
                       {suggestions.slice(0, 4).map((suggestion) => (
                         <div key={suggestion.inventoryItemId}>
-                          <strong>
-                            {itemById.get(suggestion.inventoryItemId)?.name ?? "Item"}
-                          </strong>
+                          <strong>{suggestion.itemName}</strong>
                           <small>
                             {suggestion.reason ?? "Reposição sugerida"} · comprar{" "}
-                            {suggestion.suggestedQuantity}{" "}
-                            {itemById.get(suggestion.inventoryItemId)?.purchaseUnit ??
-                              itemById.get(suggestion.inventoryItemId)?.unit ??
-                              "un"}
+                            {suggestion.suggestedQuantity} {suggestion.purchaseUnit}
+                            {suggestion.supplierName ? ` · ${suggestion.supplierName}` : ""}
                           </small>
                           {canCreate && (
                             <Button
                               onClick={() => {
                                 setEditingId(null);
+                                setSupplierId(suggestion.supplierId ?? "");
                                 setLines([
                                   {
                                     ...newLine(),
@@ -1114,6 +1096,9 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                 <InvoiceImportModal
                   items={stock.items}
                   locations={stock.locations}
+                  orderItems={data.items}
+                  orders={data.orders}
+                  invoices={data.invoices}
                   onClose={() => setNfeOpen(false)}
                   onDone={() => {
                     setNfeOpen(false);
