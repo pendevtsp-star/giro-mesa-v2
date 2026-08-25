@@ -415,8 +415,8 @@ export const commercialCatalogVersions = pgTable(
       .on(table.status)
       .where(sql`${table.status} = 'published'::catalog_status`),
     uniqueIndex("commercial_catalog_single_scheduled_unique")
-      .on(table.status)
-      .where(sql`${table.status}::text = 'scheduled'`),
+      .on(sql`(true)`)
+      .where(sql`${table.scheduledPublishAt} is not null`),
     foreignKey({
       name: "commercial_catalog_versions_source_version_id_fk",
       columns: [table.sourceVersionId],

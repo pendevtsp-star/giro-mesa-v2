@@ -7826,6 +7826,9 @@ export class PilotPosService {
       unitId,
       "operations:payments:record",
     );
+    if (input.cashRegisterId && !input.installationId) {
+      await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    }
     await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     const cashierActor = await this.canOperateCashier(identityId, organizationId, unitId);
     if (input.installationId) {

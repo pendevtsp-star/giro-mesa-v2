@@ -359,7 +359,13 @@ it("synchronizes an isolated tenant-safe and idempotent Cloud/Edge flow in Postg
           payload: {
             kind: "pilot.mutation",
             action: "merge-tabs",
-            data: { body: { targetTabId: openId, sourceTabIds: [splitId] } },
+            data: {
+              body: {
+                targetTabId: openId,
+                sourceTabIds: [splitId],
+                reasonCode: "operational_reorganization",
+              },
+            },
           },
         },
         {

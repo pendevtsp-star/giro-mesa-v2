@@ -12,7 +12,7 @@ import {
   organizations,
   roleBindings,
 } from "@giromesa/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { BillingService } from "./billing.service.js";
@@ -125,26 +125,34 @@ test("persists the promoted checkout price selected from the published catalog",
   );
   let organizationId: string | undefined;
   let identityId: string | undefined;
+  let catalogId: string | undefined;
   let promotionId: string | undefined;
   try {
     const suffix = randomUUID();
     const [catalog] = await database.db
-      .select({ id: commercialCatalogVersions.id })
-      .from(commercialCatalogVersions)
-      .where(eq(commercialCatalogVersions.status, "published"))
-      .limit(1);
+      .insert(commercialCatalogVersions)
+      .values({
+        version: Number.parseInt(suffix.replaceAll("-", "").slice(0, 7), 16),
+        status: "published",
+      })
+      .returning({ id: commercialCatalogVersions.id });
     assert.ok(catalog);
+    catalogId = catalog.id;
     const [plan] = await database.db
-      .select({
+      .insert(commercialPlans)
+      .values({
+        catalogVersionId: catalog.id,
+        slug: "operacao",
+        name: "Operação",
+        monthlyPriceCents: 19_900,
+        annualPriceCents: 199_000,
+        includedUnits: 1,
+      })
+      .returning({
         id: commercialPlans.id,
         slug: commercialPlans.slug,
         monthlyPriceCents: commercialPlans.monthlyPriceCents,
-      })
-      .from(commercialPlans)
-      .where(
-        and(eq(commercialPlans.catalogVersionId, catalog.id), eq(commercialPlans.slug, "operacao")),
-      )
-      .limit(1);
+      });
     assert.ok(plan);
     const promotionCode = `TEST${suffix.replaceAll("-", "").slice(0, 12)}`.toUpperCase();
     const [promotion] = await database.db
@@ -245,6 +253,10 @@ test("persists the promoted checkout price selected from the published catalog",
       await database.db
         .delete(commercialPromotions)
         .where(eq(commercialPromotions.id, promotionId));
+    if (catalogId)
+      await database.db
+        .delete(commercialCatalogVersions)
+        .where(eq(commercialCatalogVersions.id, catalogId));
     await database.client.end();
   }
 });

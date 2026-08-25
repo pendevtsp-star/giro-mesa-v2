@@ -248,7 +248,7 @@ it("routes POS payments across one or multiple cash registers", async (context) 
       (error: unknown) => {
         assert.equal(
           (error as { response?: { code?: string } }).response?.code,
-          "CASH_REGISTER_BINDING_REQUIRED",
+          "TERMINAL_PROFILE_REQUIRED",
         );
         return true;
       },
@@ -262,6 +262,7 @@ it("routes POS payments across one or multiple cash registers", async (context) 
       {
         label: "Terminal do caixa B",
         mode: "cashier",
+        paymentMode: "cashier",
         defaultRoute: "cash",
         printerId: null,
         stationId: null,
