@@ -75,12 +75,13 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
   assert.equal(matrix.targetMigration, "0074_crm_operational_inbox");
-  assert.equal(matrix.transitions.length, 4);
+  assert.equal(matrix.transitions.length, 5);
   const [
     transition,
     previousProductionTransition,
     currentProductionTransition,
     latestProductionTransition,
+    appOnlyTransition,
   ] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
@@ -119,6 +120,13 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(latestProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(latestProductionTransition.testedUpgrade, true);
   assert.deepEqual(latestProductionTransition.evidence, transition.evidence);
+  assert.equal(appOnlyTransition.appliedBefore, matrix.targetMigration);
+  assert.equal(appOnlyTransition.appliedBeforeWhen, "1787709600000");
+  assert.equal(appOnlyTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(appOnlyTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(appOnlyTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(appOnlyTransition.testedUpgrade, true);
+  assert.deepEqual(appOnlyTransition.evidence, transition.evidence);
   const evidence = JSON.parse(
     readFileSync(join(root, "docs", "evidence", "recovery", "5421ce-validation.json"), "utf8"),
   );

@@ -549,6 +549,7 @@ test("pre-migration backup binds the migration actually applied in the source da
       { appliedBefore: "0042_shallow_lenny_balinger", appliedBeforeWhen: "1787029862431" },
       { appliedBefore: "0045_strong_pride", appliedBeforeWhen: "1787256690924" },
       { appliedBefore: "0053_petite_trauma", appliedBeforeWhen: "1787373316439" },
+      { appliedBefore: "0074_crm_operational_inbox", appliedBeforeWhen: "1787709600000" },
     ],
   );
   for (const transition of recovery.transitions) {
