@@ -1,4 +1,4 @@
-const CACHE_NAME = "giromesa-ops-shell-v0.2.6-r1";
+const CACHE_NAME = "giromesa-ops-shell-v0.2.7-r1";
 const SCOPE_URL = new URL(self.registration.scope);
 const CORE_ASSETS = [
   "./",

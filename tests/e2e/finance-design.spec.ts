@@ -191,9 +191,15 @@ test("financeiro mantém agenda e ações legíveis no desktop e em 375 px", asy
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("http://127.0.0.1:3112/#/finance");
+    await page.reload();
     await expect(page.getByRole("heading", { name: "Financeiro" })).toBeVisible();
     await expect(page.getByText("Saldo projetado", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Agenda", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Registrar lançamento" })).toBeVisible();
+    await expect(page.getByLabel("Categoria", { exact: true })).toBeHidden();
+    await page.getByText("Mais informações", { exact: true }).click();
+    await expect(page.getByLabel("Categoria", { exact: true })).toBeVisible();
+    await page.getByText("Mais informações", { exact: true }).click();
     await page.getByRole("button", { name: /Aluguel/ }).click();
     await expect(page.getByText("Registrar liquidação", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: /Conciliação/ }).click();

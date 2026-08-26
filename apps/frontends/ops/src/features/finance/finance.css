@@ -98,7 +98,8 @@
 
 .finance-tabs button:focus-visible,
 .finance-entry:focus-visible,
-.finance-panel > summary:focus-visible {
+.finance-panel > summary:focus-visible,
+.finance-form-options > summary:focus-visible {
   outline: 3px solid var(--gm-focus);
   outline-offset: 2px;
 }
@@ -251,6 +252,11 @@
   list-style: none;
 }
 
+.finance-panel > summary::-webkit-details-marker,
+.finance-form-options > summary::-webkit-details-marker {
+  display: none;
+}
+
 .finance-panel > summary span:first-child {
   display: grid;
   gap: var(--gm-space-1);
@@ -262,6 +268,71 @@
 
 .finance-panel > .finance-form {
   padding: 0 var(--gm-space-4) var(--gm-space-4);
+}
+
+.finance-disclosure-icon {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  margin-right: 3px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--gm-duration-fast) var(--gm-ease);
+}
+
+.finance-panel[open] > summary .finance-disclosure-icon,
+.finance-form-options[open] > summary .finance-disclosure-icon {
+  transform: rotate(225deg);
+}
+
+.finance-form label {
+  gap: 4px;
+  font-size: var(--gm-font-sm);
+}
+
+.finance-form-options {
+  border-top: 1px solid var(--gm-border);
+  border-bottom: 1px solid var(--gm-border);
+}
+
+.finance-form-options > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  gap: var(--gm-space-3);
+  cursor: pointer;
+  list-style: none;
+}
+
+.finance-form-options > summary > span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.finance-form-options > summary small,
+.finance-form__footer small {
+  color: var(--gm-muted);
+  font-weight: 400;
+}
+
+.finance-form-options__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 0 0 var(--gm-space-3);
+  gap: var(--gm-space-3);
+}
+
+.finance-form__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gm-space-3);
+}
+
+.finance-form__footer button {
+  flex: 0 0 auto;
 }
 
 .finance-entry-panel {
@@ -428,7 +499,8 @@
   .finance-metrics,
   .finance-reconciliation-grid,
   .finance-filters,
-  .finance-form {
+  .finance-form,
+  .finance-form-options__grid {
     grid-template-columns: 1fr;
   }
 
@@ -444,6 +516,15 @@
   .finance-entry__amount {
     grid-column: 2;
     text-align: left;
+  }
+
+  .finance-form__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .finance-form__footer button {
+    width: 100%;
   }
 }
 

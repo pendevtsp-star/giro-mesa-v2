@@ -11,8 +11,8 @@
     <Nullable>enable</Nullable>
     <ApplicationTitle>GiroMesa Operação</ApplicationTitle>
     <ApplicationId>br.com.giromesa.operacao</ApplicationId>
-    <ApplicationDisplayVersion>0.2.6</ApplicationDisplayVersion>
-    <ApplicationVersion>4</ApplicationVersion>
+    <ApplicationDisplayVersion>0.2.7</ApplicationDisplayVersion>
+    <ApplicationVersion>5</ApplicationVersion>
     <WindowsPackageType>None</WindowsPackageType>
     <MauiXamlInflator>SourceGen</MauiXamlInflator>
     <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>

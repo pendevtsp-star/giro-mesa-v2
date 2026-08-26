@@ -553,9 +553,9 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                       <summary>
                         <span>
                           <strong>Novo lançamento</strong>
-                          <small>Conta única ou parcelada</small>
+                          <small>Cadastre uma conta única ou parcelada</small>
                         </span>
-                        <span aria-hidden="true">+</span>
+                        <span className="finance-disclosure-icon" aria-hidden="true" />
                       </summary>
                       <form className="finance-form" onSubmit={(event) => void createEntry(event)}>
                         <label>
@@ -570,25 +570,19 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                             <option value="receivable">Conta a receber</option>
                           </NativeSelect>
                         </label>
-                        <label className="finance-wide">
-                          Descrição
-                          <Input minLength={3} name="description" required />
-                        </label>
                         <label>
-                          Valor de cada parcela
+                          Valor da parcela
                           <Input inputMode="decimal" name="amount" placeholder="0,00" required />
                         </label>
-                        <label>
-                          Categoria
-                          <Input name="category" />
-                        </label>
-                        <label>
-                          Centro de custo
-                          <Input name="costCenter" />
-                        </label>
-                        <label>
-                          Documento
-                          <Input name="documentNumber" />
+                        <label className="finance-wide">
+                          Descrição
+                          <Input
+                            autoComplete="off"
+                            minLength={3}
+                            name="description"
+                            placeholder="Ex.: aluguel de agosto"
+                            required
+                          />
                         </label>
                         <label>
                           Competência
@@ -618,21 +612,47 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                             type="number"
                           />
                         </label>
-                        <label className="finance-wide">
-                          Observações
-                          <Input name="notes" />
-                        </label>
-                        <label>
-                          Nome do anexo
-                          <Input name="attachmentName" placeholder="Nota fiscal" />
-                        </label>
-                        <label>
-                          URL do anexo
-                          <Input name="attachmentUrl" type="url" />
-                        </label>
-                        <Button className="finance-wide" disabled={busy !== null} type="submit">
-                          {busy === "create" ? "Salvando…" : "Registrar"}
-                        </Button>
+                        <details className="finance-form-options finance-wide">
+                          <summary>
+                            <span>
+                              <strong>Mais informações</strong>
+                              <small>Categoria, documento, observações e anexo</small>
+                            </span>
+                            <span className="finance-disclosure-icon" aria-hidden="true" />
+                          </summary>
+                          <div className="finance-form-options__grid">
+                            <label>
+                              Categoria
+                              <Input name="category" />
+                            </label>
+                            <label>
+                              Centro de custo
+                              <Input name="costCenter" />
+                            </label>
+                            <label>
+                              Documento
+                              <Input name="documentNumber" />
+                            </label>
+                            <label>
+                              Observações
+                              <Input name="notes" />
+                            </label>
+                            <label>
+                              Nome do anexo
+                              <Input name="attachmentName" placeholder="Ex.: nota fiscal" />
+                            </label>
+                            <label>
+                              URL do anexo
+                              <Input name="attachmentUrl" type="url" />
+                            </label>
+                          </div>
+                        </details>
+                        <div className="finance-form__footer finance-wide">
+                          <small>Revise os dados antes de registrar.</small>
+                          <Button disabled={busy !== null} type="submit">
+                            {busy === "create" ? "Registrando…" : "Registrar lançamento"}
+                          </Button>
+                        </div>
                       </form>
                     </details>
                   )}
