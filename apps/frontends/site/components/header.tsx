@@ -28,7 +28,7 @@ export function Header() {
             Entrar
           </Link>
           <Link className="button button-primary header-trial" href="/teste-gratis">
-            Testar 14 dias
+            Solicitar teste
           </Link>
         </div>
       </div>

@@ -1103,6 +1103,11 @@ describe("integração operacional", () => {
       { reason: "Provedor recuperado e incidente conferido" },
       "outbox-retry-1",
     );
+    await api.platform.grantPilotAccess(
+      "33333333-3333-4333-8333-333333333333",
+      { reason: "Cliente piloto aprovado pelo time de produto" },
+      "pilot-access-1",
+    );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -1124,6 +1129,17 @@ describe("integração operacional", () => {
         method: "POST",
         headers: expect.objectContaining({ "idempotency-key": "outbox-retry-1" }),
         body: JSON.stringify({ reason: "Provedor recuperado e incidente conferido" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      expect.stringContaining(
+        "/v1/platform/tenants/33333333-3333-4333-8333-333333333333/pilot-access",
+      ),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "idempotency-key": "pilot-access-1" }),
+        body: JSON.stringify({ reason: "Cliente piloto aprovado pelo time de produto" }),
       }),
     );
   });

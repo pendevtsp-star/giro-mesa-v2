@@ -2,19 +2,24 @@
 
 import { Button, Input, Label, NativeSelect, Textarea } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
-import { type CommercialAttribution, isPersistedLeadReceipt } from "../lib/commercial";
+import {
+  type CommercialAttribution,
+  type CommercialPlan,
+  isPersistedLeadReceipt,
+} from "../lib/commercial";
 
-type PlanSlug = "operacao" | "crescimento" | "rede";
 type LeadFormProps = {
   kind: "trial" | "contact";
-  initialPlan?: PlanSlug;
+  initialPlan?: CommercialPlan["slug"];
+  plans?: CommercialPlan[];
   initialMessage?: string;
   attribution: CommercialAttribution;
 };
 
 export function LeadForm({
   kind,
-  initialPlan = "operacao",
+  initialPlan,
+  plans = [],
   initialMessage = "",
   attribution,
 }: LeadFormProps) {
@@ -106,10 +111,12 @@ export function LeadForm({
             </Label>
             <Label>
               Plano de interesse
-              <NativeSelect name="planSlug" defaultValue={initialPlan}>
-                <option value="operacao">Operação</option>
-                <option value="crescimento">Crescimento</option>
-                <option value="rede">Rede</option>
+              <NativeSelect name="planSlug" defaultValue={initialPlan} required>
+                {plans.map((plan) => (
+                  <option key={plan.slug} value={plan.slug}>
+                    {plan.name}
+                  </option>
+                ))}
               </NativeSelect>
             </Label>
           </div>

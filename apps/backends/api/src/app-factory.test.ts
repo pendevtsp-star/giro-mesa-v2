@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createApplication } from "./app-factory.js";
+import { createApplication, shouldExposeOpenApi } from "./app-factory.js";
+
+test("exposes OpenAPI only outside production", () => {
+  assert.equal(shouldExposeOpenApi("development"), true);
+  assert.equal(shouldExposeOpenApi("test"), true);
+  assert.equal(shouldExposeOpenApi("production"), false);
+});
 
 test("boots the complete Nest application graph", async (context) => {
   if (!process.env.DATABASE_URL) {

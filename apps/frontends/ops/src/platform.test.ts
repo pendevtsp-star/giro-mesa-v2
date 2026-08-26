@@ -8,6 +8,7 @@ import {
   maskPhone,
   parseCommercialLeads,
   parseCommercialOverview,
+  parsePilotAccessGrant,
   parsePlatformIncidents,
   parsePlatformOverview,
   parsePlatformTenant,
@@ -146,7 +147,13 @@ describe("painel real da plataforma", () => {
         missingItems: ["cardapio"],
         updatedAt: "2026-08-09T20:00:00.000Z",
       },
-      trial: null,
+      trial: {
+        trial: {
+          startsAt: "2026-08-09T20:00:00.000Z",
+          endsAt: "2027-02-09T20:00:00.000Z",
+        },
+        plan: { slug: "pro" },
+      },
       billing: {
         subscriptions: [
           {
@@ -198,6 +205,7 @@ describe("painel real da plataforma", () => {
 
     expect(detail.billing).toMatchObject({ planSlug: "pro", provider: "asaas" });
     expect(detail.billing.nextChargeAt).toBeNull();
+    expect(detail.billing.pilotEndsAt).toBe("2027-02-09T20:00:00.000Z");
     expect(detail.onboarding.pendingItems).toEqual(["cardapio"]);
     expect(detail.health.staleHubs).toBe(1);
     expect(detail.timeline[0]?.title).toBe("platform.incident.claim");
@@ -245,6 +253,16 @@ describe("painel real da plataforma", () => {
         members: [{ email: "ana@example.com" }],
       }),
     ).toEqual({ document: "05953016000132", email: "ana@example.com", phone: null });
+  });
+
+  it("lê a data confirmada da concessão piloto sem assumir sucesso local", () => {
+    expect(parsePilotAccessGrant({ endsAt: "2027-02-26T12:00:00.000Z", extended: true })).toEqual({
+      endsAt: "2027-02-26T12:00:00.000Z",
+      extended: true,
+    });
+    expect(() => parsePilotAccessGrant({ endsAt: "2027-02-26T12:00:00.000Z" })).toThrow(
+      InvalidPlatformPayloadError,
+    );
   });
 
   it("valida publicação comercial, funil real e valores em centavos", () => {

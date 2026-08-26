@@ -34,12 +34,14 @@
 .site-footer li {
   margin: 10px 0;
 }
-.site-footer li a {
+.site-footer li a,
+.site-footer .footer-link-button {
   color: #d0d8d4;
   text-decoration: none;
   font-size: 13px;
 }
-.site-footer li a:hover {
+.site-footer li a:hover,
+.site-footer .footer-link-button:hover {
   color: var(--lime);
 }
 .footer-bottom {

@@ -358,7 +358,8 @@ function normalizeLanding(value: unknown): CommercialLanding | null {
     !normalized.finalCta.ctaLabel ||
     !normalized.finalCta.ctaHref ||
     !normalized.legal.terms ||
-    !normalized.legal.privacy
+    !normalized.legal.privacy ||
+    !hasCookiePolicy(normalized.legal.privacy)
   )
     return null;
   return normalized as CommercialLanding;
@@ -377,6 +378,11 @@ function normalizeLegalDocument(value: unknown): CommercialLegalDocument | null 
   return version && effectiveAt && title && sections
     ? { version, effectiveAt, title, sections }
     : null;
+}
+function hasCookiePolicy(document: CommercialLegalDocument): boolean {
+  return document.sections.some((section) =>
+    section.heading.toLocaleLowerCase("pt-BR").includes("cookie"),
+  );
 }
 function normalizeSeo(value: unknown): CommercialSeo | null {
   if (!isRecord(value)) return null;

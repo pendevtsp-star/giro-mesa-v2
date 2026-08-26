@@ -43,6 +43,16 @@ type PlatformIncident = {
   detail: Record<string, unknown>;
   occurredAt: Date;
 };
+export type PilotAccessGrant = {
+  organizationId: string;
+  trialId: string;
+  startsAt: string;
+  previousEndsAt: string;
+  endsAt: string;
+  durationMonths: number;
+  extended: boolean;
+  replayed: boolean;
+};
 
 @Injectable()
 export class PlatformControlService {
@@ -264,6 +274,93 @@ export class PlatformControlService {
         actorEmail: maskEmail(event.actorEmail),
       })),
     };
+  }
+
+  async grantPilotAccess(
+    actorIdentityId: string,
+    organizationId: string,
+    idempotencyKey: string,
+    reason: string,
+  ): Promise<PilotAccessGrant> {
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`platform:${actorIdentityId}:${idempotencyKey}`}, 0))`,
+      );
+      const [receipt] = await tx
+        .select()
+        .from(platformActionReceipts)
+        .where(
+          and(
+            eq(platformActionReceipts.actorIdentityId, actorIdentityId),
+            eq(platformActionReceipts.idempotencyKey, idempotencyKey),
+          ),
+        )
+        .limit(1);
+      const action = "platform.tenant.pilot_access.grant";
+      if (receipt) {
+        if (receipt.action !== action || receipt.targetId !== organizationId) {
+          throw new ConflictException({ code: "PLATFORM_IDEMPOTENCY_KEY_REUSED" });
+        }
+        return {
+          ...(receipt.result as Omit<PilotAccessGrant, "replayed">),
+          replayed: true,
+        };
+      }
+
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`platform-tenant:${organizationId}`}, 0))`,
+      );
+      const [organization] = await tx
+        .select({ id: organizations.id, billingState: organizations.billingState })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .for("update")
+        .limit(1);
+      if (!organization) throw new NotFoundException({ code: "PLATFORM_TENANT_NOT_FOUND" });
+      if (organization.billingState !== "trial_active") {
+        throw new ConflictException({ code: "PLATFORM_PILOT_ACCESS_REQUIRES_ACTIVE_TRIAL" });
+      }
+      const [trial] = await tx
+        .select({ id: trials.id, startsAt: trials.startsAt, endsAt: trials.endsAt })
+        .from(trials)
+        .where(eq(trials.organizationId, organizationId))
+        .for("update")
+        .limit(1);
+      if (!trial) throw new ConflictException({ code: "PLATFORM_PILOT_ACCESS_TRIAL_REQUIRED" });
+
+      const now = new Date();
+      const { endsAt, extended } = resolvePilotAccessEndsAt(trial.endsAt, now);
+      if (extended) {
+        await tx.update(trials).set({ endsAt }).where(eq(trials.id, trial.id));
+      }
+      const result = {
+        organizationId,
+        trialId: trial.id,
+        startsAt: trial.startsAt.toISOString(),
+        previousEndsAt: trial.endsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
+        durationMonths: PILOT_ACCESS_MONTHS,
+        extended,
+      } satisfies Omit<PilotAccessGrant, "replayed">;
+      await tx.insert(auditEvents).values({
+        organizationId,
+        actorIdentityId,
+        action,
+        entityType: "trial",
+        entityId: trial.id,
+        metadata: { reason, ...result },
+      });
+      await tx.insert(platformActionReceipts).values({
+        actorIdentityId,
+        idempotencyKey,
+        action,
+        targetType: "organization",
+        targetId: organizationId,
+        reason,
+        result,
+      });
+      return { ...result, replayed: false };
+    });
   }
 
   async revealTenantPii(actorIdentityId: string, organizationId: string, reason: string) {
@@ -850,7 +947,19 @@ export function failureCode(value: string | null | undefined) {
 }
 
 export function safeAuditMetadata(value: Record<string, unknown>) {
-  const allowed = ["reason", "source", "status", "code", "attachmentId", "topic", "attempts"];
+  const allowed = [
+    "reason",
+    "source",
+    "status",
+    "code",
+    "attachmentId",
+    "topic",
+    "attempts",
+    "previousEndsAt",
+    "endsAt",
+    "durationMonths",
+    "extended",
+  ];
   return allowed.reduce<Record<string, string | number | boolean>>((result, key) => {
     const candidate = value[key];
     if (typeof candidate === "number" || typeof candidate === "boolean") result[key] = candidate;
@@ -868,4 +977,22 @@ function uuidValue(value: unknown) {
 
 function severityRank(value: IncidentSeverity) {
   return { low: 1, medium: 2, high: 3, critical: 4 }[value];
+}
+
+export const PILOT_ACCESS_MONTHS = 6;
+
+export function resolvePilotAccessEndsAt(currentEndsAt: Date, grantedAt: Date) {
+  const sixMonthsFromGrant = addUtcMonths(grantedAt, PILOT_ACCESS_MONTHS);
+  return {
+    endsAt: currentEndsAt > sixMonthsFromGrant ? currentEndsAt : sixMonthsFromGrant,
+    extended: currentEndsAt < sixMonthsFromGrant,
+  };
+}
+
+function addUtcMonths(date: Date, months: number) {
+  const result = new Date(date);
+  const targetMonth = (result.getUTCMonth() + months) % 12;
+  result.setUTCMonth(result.getUTCMonth() + months);
+  if (result.getUTCMonth() !== targetMonth) result.setUTCDate(0);
+  return result;
 }

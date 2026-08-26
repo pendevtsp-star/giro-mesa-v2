@@ -77335,6 +77335,212 @@
         ]
       }
     },
+    "/api/v1/platform/tenants/{organizationId}/pilot-access": {
+      "post": {
+        "operationId": "PlatformController_grantPilotAccess[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "organizationId",
+                    "trialId",
+                    "startsAt",
+                    "previousEndsAt",
+                    "endsAt",
+                    "durationMonths",
+                    "extended",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trialId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "previousEndsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "durationMonths": {
+                      "type": "integer",
+                      "example": 6
+                    },
+                    "extended": {
+                      "type": "boolean"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/platform/tenants/{organizationId}/pilot-access": {
+      "post": {
+        "operationId": "PlatformController_grantPilotAccess[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "organizationId",
+                    "trialId",
+                    "startsAt",
+                    "previousEndsAt",
+                    "endsAt",
+                    "durationMonths",
+                    "extended",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "organizationId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trialId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "startsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "previousEndsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "endsAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "durationMonths": {
+                      "type": "integer",
+                      "example": 6
+                    },
+                    "extended": {
+                      "type": "boolean"
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/platform/tenants/{organizationId}/pii-access": {
       "post": {
         "operationId": "PlatformController_revealTenantPii[0]",

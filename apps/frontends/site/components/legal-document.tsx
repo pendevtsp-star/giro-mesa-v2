@@ -1,5 +1,16 @@
 import type { CommercialLegalDocument } from "../lib/commercial";
 
+function sectionId(heading: string) {
+  const normalized = heading
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^[0-9]+-/, "")
+    .replace(/^-|-$/g, "");
+  return normalized.includes("cookie") ? "cookies" : normalized;
+}
+
 export function LegalDocument({ document }: { document: CommercialLegalDocument | null }) {
   if (!document)
     return (
@@ -20,7 +31,7 @@ export function LegalDocument({ document }: { document: CommercialLegalDocument 
         <p className="eyebrow">Documento publicado</p>
         <h1>{document.title}</h1>
         {document.sections.map((section) => (
-          <section key={section.heading}>
+          <section id={sectionId(section.heading)} key={section.heading}>
             <h2>{section.heading}</h2>
             <p className="legal-body">{section.body}</p>
           </section>

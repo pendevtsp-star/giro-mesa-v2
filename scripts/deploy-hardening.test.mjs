@@ -28,6 +28,7 @@ const bootstrapScript = join(root, "deploy", "vps", "bootstrap-env.sh");
 const pilotCompose = join(root, "deploy", "vps", "compose.pilot.yaml");
 const imagesCompose = join(root, "deploy", "vps", "compose.images.yaml");
 const trustedEntrypoint = join(root, "deploy", "vps", "deploy-entrypoint.sh");
+const ingressConfig = join(root, "deploy", "vps", "nginx-pilot.conf");
 
 test("Linux backup rejects incomplete, duplicate and forged runtime source sets before Docker", () => {
   const api = `ghcr.io/pendevtsp-star/giro-mesa-v2-api@sha256:${"a".repeat(64)}`;
@@ -238,13 +239,21 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
     'POSTGRES_PASSWORD="unchanged-postgres-secret"',
     "COMMAND_FINGERPRINT_ACTIVE_KEY_VERSION=v7",
     `COMMAND_FINGERPRINT_KEYS={"v7":"${fingerprint}"}`,
+    "COOKIE_DOMAIN=.giromesa.com.br",
+    "NEXT_PUBLIC_DEMO_HUB_ACK=obsolete",
+    "CUSTOMER_QA_DEMO_SLUG=obsolete",
+    "VITE_DEMO_MODE=true",
     "",
   ].join("\n");
   writeFileSync(envFile, existing);
   const grants =
     "admin@example.com=platform.pii.read|platform.action.propose|platform.action.approve|platform.tenant.suspend";
+  const roles = "admin@example.com=admin,viewer@example.com=viewer";
   try {
-    const first = run(ensureScript, [envFile], { PLATFORM_ADMIN_GRANTS_BOOTSTRAP: grants });
+    const first = run(ensureScript, [envFile], {
+      PLATFORM_ADMIN_GRANTS_BOOTSTRAP: grants,
+      PLATFORM_ADMIN_ROLES_BOOTSTRAP: roles,
+    });
     assert.equal(first.status, 0, output(first));
     assert.doesNotMatch(output(first), /unchanged-postgres-secret|admin@example\.com|v7/);
     const afterFirst = readFileSync(envFile, "utf8");
@@ -254,6 +263,16 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
     assert.match(afterFirst, /^PUBLIC_TABLE_SESSION_SIGNING_KEY=/m);
     assert.match(afterFirst, /^GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64=/m);
     assert.match(afterFirst, /^PLATFORM_ADMIN_GRANTS=/m);
+    assert.match(afterFirst, /^PLATFORM_ADMIN_ROLES=/m);
+    assert.match(afterFirst, /^QR_TABLE_TOKEN_SECRET=[a-f\d]{64}$/m);
+    assert.match(afterFirst, /^MEDIA_ROOT=\/app\/data\/media$/m);
+    assert.match(afterFirst, /^SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS=300$/m);
+    assert.match(afterFirst, /^NEXT_PUBLIC_REDE_STORE_URL=$/m);
+    assert.match(afterFirst, /^REPORT_EMAIL_DELIVERY_HOMOLOGATED=false$/m);
+    assert.doesNotMatch(
+      afterFirst,
+      /^(COOKIE_DOMAIN|NEXT_PUBLIC_DEMO_HUB_ACK|CUSTOMER_QA_DEMO_SLUG|VITE_DEMO_MODE)=/m,
+    );
     assert.match(afterFirst, /^FISCAL_RELEASE_ENV=homologation$/m);
     assert.match(afterFirst, /^FOCUS_NFE_PRIMARY_TOKEN=$/m);
     assert.match(afterFirst, /^FOCUS_NFE_TIMEOUT_MS=15000$/m);
@@ -263,6 +282,28 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
     const second = run(ensureScript, [envFile]);
     assert.equal(second.status, 0, output(second));
     assert.equal(readFileSync(envFile, "utf8"), afterFirst);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("runtime env rejects invalid platform roles and short QR secrets atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-role-"));
+  const envFile = join(directory, ".env");
+  const existing = "POSTGRES_PASSWORD=preserve-me\nQR_TABLE_TOKEN_SECRET=short\n";
+  writeFileSync(envFile, existing);
+  try {
+    const invalidRole = run(ensureScript, [envFile], {
+      PLATFORM_ADMIN_ROLES_BOOTSTRAP: "admin@example.com=owner",
+    });
+    assert.notEqual(invalidRole.status, 0);
+    assert.match(output(invalidRole), /PLATFORM_ADMIN_ROLES_INVALID/);
+    assert.equal(readFileSync(envFile, "utf8"), existing);
+
+    const shortSecret = run(ensureScript, [envFile]);
+    assert.notEqual(shortSecret.status, 0);
+    assert.match(output(shortSecret), /QR_TABLE_TOKEN_SECRET_INVALID/);
+    assert.equal(readFileSync(envFile, "utf8"), existing);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -522,6 +563,22 @@ test("deploy health gate includes the asynchronous worker", () => {
   assert.match(deploy, /GIROMESA_STABILITY_SECONDS/);
   assert.match(deploy, /SOURCE_RELEASE_RESTORED_BEFORE_MIGRATION/);
   assert.match(deploy, /postgres_status == healthy/);
+});
+
+test("public ingress keeps the internal Evolution webhook off the Internet", () => {
+  const ingress = readFileSync(ingressConfig, "utf8");
+  for (const header of [
+    "Strict-Transport-Security",
+    "X-Content-Type-Options",
+    "X-Frame-Options",
+    "Referrer-Policy",
+    "Permissions-Policy",
+  ]) {
+    assert.match(ingress, new RegExp(`add_header ${header} `));
+  }
+  assert.match(ingress, /location = \/api\/v1\/growth\/evolution-go\/webhook \{ return 404; \}/);
+  assert.match(ingress, /location = \/v1\/growth\/evolution-go\/webhook \{ return 404; \}/);
+  assert.match(ingress, /location \/ \{/);
 });
 
 test("pre-migration backup binds the migration actually applied in the source database", () => {

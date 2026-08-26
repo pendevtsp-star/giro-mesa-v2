@@ -8340,6 +8340,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/platform/tenants/{organizationId}/pilot-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_grantPilotAccess[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/platform/tenants/{organizationId}/pilot-access": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PlatformController_grantPilotAccess[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/platform/tenants/{organizationId}/pii-access": {
     parameters: {
       query?: never;
@@ -42851,6 +42883,94 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  "PlatformController_grantPilotAccess[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            trialId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            previousEndsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @example 6 */
+            durationMonths: number;
+            extended: boolean;
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
+  "PlatformController_grantPilotAccess[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            trialId: string;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            previousEndsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** @example 6 */
+            durationMonths: number;
+            extended: boolean;
+            replayed: boolean;
+          };
+        };
       };
     };
   };

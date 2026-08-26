@@ -15,7 +15,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBody, ApiOkResponse } from "@nestjs/swagger";
+import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { PlatformAdminGuard, type PlatformRequest } from "./platform.guard.js";
@@ -266,6 +266,52 @@ export class PlatformController {
   ) {
     requirePlatformCapability(request.platformAccess, "tenants:read");
     return this.control.tenant360(organizationId, request.platformAccess);
+  }
+
+  @Post("tenants/:organizationId/pilot-access")
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: "object",
+      required: [
+        "organizationId",
+        "trialId",
+        "startsAt",
+        "previousEndsAt",
+        "endsAt",
+        "durationMonths",
+        "extended",
+        "replayed",
+      ],
+      properties: {
+        organizationId: { type: "string", format: "uuid" },
+        trialId: { type: "string", format: "uuid" },
+        startsAt: { type: "string", format: "date-time" },
+        previousEndsAt: { type: "string", format: "date-time" },
+        endsAt: { type: "string", format: "date-time" },
+        durationMonths: { type: "integer", example: 6 },
+        extended: { type: "boolean" },
+        replayed: { type: "boolean" },
+      },
+    },
+  })
+  grantPilotAccess(
+    @Req() request: PlatformRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(platformReasonBodySchema)) body: PlatformReasonBody,
+  ) {
+    requirePlatformCapability(request.platformAccess, "billing:write");
+    return this.control.grantPilotAccess(
+      request.auth.identityId,
+      organizationId,
+      idempotencyKey(rawIdempotencyKey),
+      body.reason,
+    );
   }
 
   @Post("tenants/:organizationId/pii-access")

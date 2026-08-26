@@ -165,6 +165,19 @@
   .whatsapp {
     padding: 11px 15px;
   }
+  .cookie-consent {
+    right: var(--gm-space-2);
+    bottom: var(--gm-space-2);
+    left: var(--gm-space-2);
+  }
+  .cookie-consent__content,
+  .cookie-consent__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .cookie-consent__actions .button {
+    width: 100%;
+  }
   .plan ul {
     min-height: auto;
   }

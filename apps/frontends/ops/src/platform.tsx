@@ -108,6 +108,11 @@ interface TenantPii {
   phone: string | null;
 }
 
+interface PilotAccessGrant {
+  endsAt: string;
+  extended: boolean;
+}
+
 interface TenantDetail {
   id: string;
   name: string;
@@ -129,6 +134,8 @@ interface TenantDetail {
     provider: string | null;
     nextChargeAt: string | null;
     delinquentSince: string | null;
+    pilotStartsAt: string | null;
+    pilotEndsAt: string | null;
   };
   onboarding: {
     status: string;
@@ -283,6 +290,7 @@ interface PlatformApi {
     limit: number;
   }) => Promise<unknown>;
   tenant: (organizationId: string) => Promise<unknown>;
+  grantPilotAccess: (organizationId: string, body: { reason: string }) => Promise<unknown>;
   incidents: (params: {
     search?: string;
     status?: string;
@@ -529,6 +537,9 @@ export function parsePlatformTenant(value: unknown): TenantDetail {
   const subscriptions = optionalRecords(billing?.subscriptions);
   const subscription = subscriptions[0];
   const plan = optionalRecord(subscription?.plan);
+  const trialBundle = optionalRecord(payload.trial);
+  const trial = optionalRecord(trialBundle?.trial);
+  const trialPlan = optionalRecord(trialBundle?.plan);
   const charges = optionalRecords(billing?.charges);
   const pendingCharge = charges.find(
     (charge) => !["paid", "received", "confirmed"].includes(String(charge.status).toLowerCase()),
@@ -552,13 +563,15 @@ export function parsePlatformTenant(value: unknown): TenantDetail {
       failedIntegrations: incidents.filter((incident) => incident.category === "fiscal").length,
     },
     billing: {
-      planSlug: optionalText(plan?.slug),
+      planSlug: optionalText(plan?.slug) ?? optionalText(trialPlan?.slug),
       status: optionalText(subscription?.state) ?? text(organization.billingState),
       provider: optionalText(subscription?.provider),
       nextChargeAt: optionalText(pendingCharge?.dueAt),
       delinquentSince: ["restricted", "suspended"].includes(text(organization.billingState))
         ? text(organization.billingStateChangedAt)
         : null,
+      pilotStartsAt: optionalText(trial?.startsAt),
+      pilotEndsAt: optionalText(trial?.endsAt),
     },
     onboarding: {
       status: onboarding?.activatedAt ? "ativado" : onboarding ? "em andamento" : "não iniciado",
@@ -632,6 +645,11 @@ export function parseTenantPii(value: unknown): TenantPii {
     email: optionalText(member?.email),
     phone: null,
   };
+}
+
+export function parsePilotAccessGrant(value: unknown): PilotAccessGrant {
+  const payload = record(value);
+  return { endsAt: text(payload.endsAt), extended: bool(payload.extended) };
 }
 
 export function parseCommercialOverview(value: unknown): CommercialOverview {
@@ -972,6 +990,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
     action: IncidentAction | "retry";
   } | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
+  const [pilotAccessOpen, setPilotAccessOpen] = useState(false);
   const [revealedPii, setRevealedPii] = useState<TenantPii | null>(null);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -1014,6 +1033,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   const access = overview.state.status === "ready" ? overview.state.data.access : null;
   const canManageIncidents = access ? hasCapability(access, "incidents:write") : false;
   const canRetryOutbox = access ? hasCapability(access, "outbox:retry") : false;
+  const canGrantPilotAccess = access ? hasCapability(access, "billing:write") : false;
   const canRevealPii = access ? hasCapability(access, "pii:read") : false;
 
   function submitTenantSearch(event: FormEvent) {
@@ -1033,6 +1053,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   function resetActionForm() {
     setActionTarget(null);
     setRevealOpen(false);
+    setPilotAccessOpen(false);
     setReason("");
     setConfirmed(false);
     setSnoozedUntil("");
@@ -1093,6 +1114,38 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
         tone: "danger",
         text:
           error instanceof Error ? error.message : "A plataforma não autorizou o acesso aos dados.",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function grantPilotAccess(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedTenantId || reason.trim().length < 8 || !confirmed) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const result = parsePilotAccessGrant(
+        await platformApi.grantPilotAccess(selectedTenantId, { reason: reason.trim() }),
+      );
+      setFeedback({
+        tone: "success",
+        text: result.extended
+          ? `Acesso piloto confirmado até ${dateTime(result.endsAt)}.`
+          : `O tenant já tinha acesso igual ou superior até ${dateTime(result.endsAt)}.`,
+      });
+      resetActionForm();
+      tenant.retry();
+      tenants.retry();
+      overview.retry();
+    } catch (error) {
+      setFeedback({
+        tone: "danger",
+        text:
+          error instanceof Error
+            ? error.message
+            : "A plataforma não confirmou a concessão do acesso piloto.",
       });
     } finally {
       setBusy(false);
@@ -1247,9 +1300,11 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
           </div>
 
           <TenantWorkspace
+            canGrantPilotAccess={canGrantPilotAccess}
             canRevealPii={canRevealPii}
             data={tenant.state.status === "ready" ? tenant.state.data : null}
             loadingState={selectedTenantId ? tenant.state : null}
+            onGrantPilotAccess={() => setPilotAccessOpen(true)}
             onReveal={() => setRevealOpen(true)}
             pii={revealedPii}
             retry={tenant.retry}
@@ -1311,6 +1366,47 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
               type="submit"
             >
               {busy ? "Confirmando…" : "Confirmar"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        description="O período será de seis meses a partir da confirmação e nunca reduzirá um acesso vigente mais longo. A ação será auditada."
+        isOpen={pilotAccessOpen}
+        onClose={() => !busy && resetActionForm()}
+        size="sm"
+        title="Conceder acesso piloto"
+      >
+        <form className="platform-action-form" onSubmit={grantPilotAccess}>
+          <label htmlFor="platform-pilot-access-reason">Motivo da concessão</label>
+          <Textarea
+            id="platform-pilot-access-reason"
+            minLength={8}
+            onChange={(event) => setReason(event.target.value)}
+            required
+            value={reason}
+          />
+          <label className="platform-confirm" htmlFor="platform-pilot-access-confirm">
+            <Input
+              checked={confirmed}
+              id="platform-pilot-access-confirm"
+              onChange={(event) => setConfirmed(event.target.checked)}
+              required
+              type="checkbox"
+            />
+            Confirmo a concessão do acesso piloto por seis meses.
+          </label>
+          <div className="platform-modal-actions">
+            <Button disabled={busy} onClick={resetActionForm} type="button" variant="secondary">
+              Cancelar
+            </Button>
+            <Button
+              aria-busy={busy}
+              disabled={busy || reason.trim().length < 8 || !confirmed}
+              type="submit"
+            >
+              {busy ? "Confirmando…" : "Conceder acesso"}
             </Button>
           </div>
         </form>
@@ -3039,9 +3135,11 @@ function Pagination({
 }
 
 function TenantWorkspace({
+  canGrantPilotAccess,
   canRevealPii,
   data,
   loadingState,
+  onGrantPilotAccess,
   onReveal,
   pii,
   retry,
@@ -3049,9 +3147,11 @@ function TenantWorkspace({
   stale,
   updating,
 }: {
+  canGrantPilotAccess: boolean;
   canRevealPii: boolean;
   data: TenantDetail | null;
   loadingState: RemoteState<TenantDetail | null> | null;
+  onGrantPilotAccess: () => void;
   onReveal: () => void;
   pii: TenantPii | null;
   retry: () => void;
@@ -3091,6 +3191,11 @@ function TenantWorkspace({
         </div>
         <div className="platform-header__actions">
           <Badge tone={billingTone(data.billingState)}>{data.billingState}</Badge>
+          {canGrantPilotAccess && data.billingState === "trial_active" && (
+            <Button onClick={onGrantPilotAccess} size="sm" type="button">
+              Conceder 6 meses
+            </Button>
+          )}
           {canRevealPii && !pii && (
             <Button onClick={onReveal} size="sm" type="button" variant="secondary">
               Revelar dados
@@ -3151,6 +3256,12 @@ function TenantWorkspace({
               <dt>Próxima cobrança</dt>
               <dd>{dateTime(data.billing.nextChargeAt)}</dd>
             </div>
+            {data.billing.pilotEndsAt && (
+              <div>
+                <dt>Acesso piloto até</dt>
+                <dd>{dateTime(data.billing.pilotEndsAt)}</dd>
+              </div>
+            )}
             {data.billing.delinquentSince && (
               <div>
                 <dt>Restrição desde</dt>

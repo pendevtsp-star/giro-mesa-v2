@@ -24,6 +24,23 @@ describe("platform administrator allowlist", () => {
       "commercial:media",
     ]);
     assert.equal(engineering?.capabilities.includes("pii:read"), false);
+    assert.equal(engineering?.capabilities.includes("billing:write"), false);
+    assert.equal(
+      platformAccessForEmail(
+        "admin@giromesa.com.br",
+        "admin@giromesa.com.br=admin,viewer@giromesa.com.br=viewer",
+        "",
+      )?.capabilities.includes("billing:write"),
+      true,
+    );
+    assert.equal(
+      platformAccessForEmail(
+        "viewer@giromesa.com.br",
+        "admin@giromesa.com.br=admin,viewer@giromesa.com.br=viewer",
+        "",
+      )?.role,
+      "viewer",
+    );
     assert.equal(
       platformAccessForEmail("legacy@giromesa.com.br", "", "legacy@giromesa.com.br")?.role,
       "admin",

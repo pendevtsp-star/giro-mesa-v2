@@ -64,7 +64,10 @@ function publishedCatalog() {
           version: "2026-08",
           effectiveAt: "2026-08-25T00:00:00.000Z",
           title: "Política de Privacidade",
-          sections: [{ heading: "Dados", body: "Dados necessários para o serviço." }],
+          sections: [
+            { heading: "Dados", body: "Dados necessários para o serviço." },
+            { heading: "Cookies", body: "Cookies necessários e opcionais." },
+          ],
         },
       },
     },
@@ -175,6 +178,12 @@ test("falha fechado para SEO, mídia ou desconto inconsistentes", () => {
     ],
   };
   assert.equal(normalizeCommercialCatalog(inventedDiscount), null);
+
+  const withoutCookiePolicy = publishedCatalog();
+  withoutCookiePolicy.landing.legal.privacy.sections = [
+    { heading: "Dados", body: "Dados necessários para o serviço." },
+  ];
+  assert.equal(normalizeCommercialCatalog(withoutCookiePolicy), null);
 });
 
 test("preserva campanha e UTMs e deriva versões somente do catálogo publicado", () => {

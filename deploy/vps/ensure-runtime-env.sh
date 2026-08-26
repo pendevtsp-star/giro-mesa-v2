@@ -20,6 +20,12 @@ lines = text.splitlines()
 entry = re.compile(r"^([A-Z][A-Z0-9_]*)=(.*)$")
 values = {}
 duplicates = set()
+obsolete_names = {
+    "COOKIE_DOMAIN",
+    "CUSTOMER_QA_DEMO_SLUG",
+    "NEXT_PUBLIC_DEMO_HUB_ACK",
+    "VITE_DEMO_MODE",
+}
 for line in lines:
     match = entry.match(line)
     if match:
@@ -57,7 +63,20 @@ permissions = {
     "platform.membership.restore",
     "platform.incident.transition",
 }
-email_pattern = re.compile(r"^[^@\s=;]+@[^@\s=;]+\.[^@\s=;]+$")
+email_pattern = re.compile(r"^[^@\s=;,:]+@[^@\s=;,:]+\.[^@\s=;,:]+$")
+roles = {"viewer", "support", "finance", "fiscal", "engineering", "admin"}
+
+def valid_roles(value):
+    if not value or "\n" in value or "\r" in value:
+        return False
+    for assignment in value.split(","):
+        separator = "=" if "=" in assignment else ":"
+        if assignment.count(separator) != 1:
+            return False
+        email, role = assignment.split(separator, 1)
+        if not email_pattern.fullmatch(email.strip()) or role.strip() not in roles:
+            return False
+    return True
 
 def valid_grants(value):
     if not value or "\n" in value or "\r" in value:
@@ -74,6 +93,15 @@ def valid_grants(value):
     return True
 
 additions = {}
+configured_roles = values.get("PLATFORM_ADMIN_ROLES")
+if configured_roles is None:
+    configured_roles = os.environ.get("PLATFORM_ADMIN_ROLES_BOOTSTRAP", "")
+    if configured_roles:
+        additions["PLATFORM_ADMIN_ROLES"] = configured_roles
+if configured_roles and not valid_roles(configured_roles):
+    print("PLATFORM_ADMIN_ROLES_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+
 grants = values.get("PLATFORM_ADMIN_GRANTS")
 if grants is None:
     grants = os.environ.get("PLATFORM_ADMIN_GRANTS_BOOTSTRAP", "")
@@ -134,6 +162,35 @@ for name, exact in (
     elif not valid_key(value, exact=exact):
         print(f"{name}_INVALID", file=sys.stderr)
         raise SystemExit(1)
+
+qr_table_token_secret = values.get("QR_TABLE_TOKEN_SECRET")
+if qr_table_token_secret is None:
+    additions["QR_TABLE_TOKEN_SECRET"] = secrets.token_hex(32)
+elif len(qr_table_token_secret.strip()) < 32:
+    print("QR_TABLE_TOKEN_SECRET_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+
+runtime_defaults = {
+    "MEDIA_ROOT": "/app/data/media",
+    "SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS": "300",
+    "NEXT_PUBLIC_REDE_STORE_URL": "",
+    "NEXT_PUBLIC_PAYGO_STORE_URL": "",
+    "NEXT_PUBLIC_STONE_STORE_URL": "",
+    "REPORT_EMAIL_DELIVERY_HOMOLOGATED": "false",
+}
+for name, default in runtime_defaults.items():
+    if name not in values:
+        additions[name] = default
+if values.get("MEDIA_ROOT", "/app/data/media") != "/app/data/media":
+    print("MEDIA_ROOT_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+smartpos_skew = values.get("SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS", "300")
+if not smartpos_skew.isascii() or not smartpos_skew.isdigit() or not 30 <= int(smartpos_skew) <= 900:
+    print("SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("REPORT_EMAIL_DELIVERY_HOMOLOGATED", "false") not in {"true", "false"}:
+    print("REPORT_EMAIL_DELIVERY_HOMOLOGATED_INVALID", file=sys.stderr)
+    raise SystemExit(1)
 
 if "FOCUS_NFE_PRIMARY_TOKEN" not in values:
     additions["FOCUS_NFE_PRIMARY_TOKEN"] = ""
@@ -228,12 +285,15 @@ for name, minimum, maximum in (
         print(f"{name}_INVALID", file=sys.stderr)
         raise SystemExit(1)
 
-if not additions:
+has_obsolete_names = any(name in values for name in obsolete_names)
+if not additions and not has_obsolete_names:
     os.chmod(target, stat.S_IRUSR | stat.S_IWUSR)
     print("Runtime env validado; nenhum segredo foi alterado ou exibido.")
     raise SystemExit(0)
 
-updated = text
+updated = "\n".join(
+    line for line in lines if not ((match := entry.match(line)) and match.group(1) in obsolete_names)
+)
 if updated and not updated.endswith("\n"):
     updated += "\n"
 for name, value in additions.items():

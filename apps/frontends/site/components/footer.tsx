@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CookiePreferences } from "./cookie-preferences";
 import { Logo } from "./header";
 
 const groups = [
@@ -58,6 +59,11 @@ export function Footer() {
                   <Link href={href}>{label}</Link>
                 </li>
               ))}
+              {group.title === "Legal" ? (
+                <li>
+                  <CookiePreferences />
+                </li>
+              ) : null}
             </ul>
           </div>
         ))}

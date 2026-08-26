@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CookieConsent } from "../components/cookie-consent";
 import { Footer } from "../components/footer";
 import { Header } from "../components/header";
 import "./globals.css";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Header />
         {children}
         <Footer />
+        <CookieConsent />
         <a
           className="whatsapp"
           href={whatsappHref}

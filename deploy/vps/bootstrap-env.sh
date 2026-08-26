@@ -65,8 +65,33 @@ resend_from=${resend_from:-GiroMesa <contato@giromesa.com.br>}
 resend_reply_to=$(read_key PLATFORM_SUPPORT_EMAIL "$legacy_primary" "$legacy_runtime" || true)
 resend_reply_to=${resend_reply_to:-contato@giromesa.com.br}
 admin_emails=${PLATFORM_ADMIN_EMAILS_OVERRIDE:-}
+platform_admin_roles=${PLATFORM_ADMIN_ROLES_OVERRIDE:-}
 platform_admin_grants=${PLATFORM_ADMIN_GRANTS_OVERRIDE:-}
 whatsapp_number=${WHATSAPP_NUMBER_OVERRIDE:-}
+
+if [[ -n "$platform_admin_roles" ]] && ! PLATFORM_ADMIN_ROLES_CANDIDATE="$platform_admin_roles" python3 - <<'PY'
+import os, re, sys
+
+allowed = {"viewer", "support", "finance", "fiscal", "engineering", "admin"}
+email = re.compile(r"^[^@\s=;,:]+@[^@\s=;,:]+\.[^@\s=;,:]+$")
+value = os.environ["PLATFORM_ADMIN_ROLES_CANDIDATE"]
+valid = bool(value) and "\n" not in value and "\r" not in value
+for assignment in value.split(",") if valid else ():
+    separator = "=" if "=" in assignment else ":"
+    if assignment.count(separator) != 1:
+        valid = False
+        break
+    address, role = assignment.split(separator, 1)
+    if not email.fullmatch(address.strip()) or role.strip() not in allowed:
+        valid = False
+        break
+if not valid:
+    print("PLATFORM_ADMIN_ROLES_OVERRIDE inválido.", file=sys.stderr)
+    raise SystemExit(1)
+PY
+then
+  exit 1
+fi
 
 if [[ -n "$platform_admin_grants" ]] && ! PLATFORM_ADMIN_GRANTS_CANDIDATE="$platform_admin_grants" python3 - <<'PY'
 import os, re, sys
@@ -157,15 +182,16 @@ write_key ACCOUNTANT_ATTACHMENT_CLAMD_PORT 3310
 write_key ACCOUNTANT_ATTACHMENT_SCAN_TIMEOUT_MS 10000
 write_key ACCOUNTANT_ATTACHMENT_RETENTION_DAYS 1827
 write_key PLATFORM_ADMIN_EMAILS "$admin_emails"
+if [[ -n "$platform_admin_roles" ]]; then write_key PLATFORM_ADMIN_ROLES "$platform_admin_roles"; fi
 if [[ -n "$platform_admin_grants" ]]; then write_key PLATFORM_ADMIN_GRANTS "$platform_admin_grants"; fi
 write_key INTERNAL_API_KEY "$internal_key"
 write_key SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS 300
-write_key COOKIE_DOMAIN .giromesa.com.br
 write_key GOOGLE_OAUTH_CLIENT_ID "$google_client_id"
 write_key GOOGLE_OAUTH_CLIENT_SECRET "$google_client_secret"
 write_key GOOGLE_OAUTH_REDIRECT_URI https://api.giromesa.com.br/api/v1/auth/google/callback
 write_key LEGAL_TERMS_VERSION 2026-08-09
 write_key EMAIL_PROVIDER_ENABLED true
+write_key REPORT_EMAIL_DELIVERY_HOMOLOGATED false
 write_key EMAIL_PROVIDER_CREDENTIAL_REFERENCE resend
 write_key RESEND_API_KEY "$resend_api_key"
 write_key RESEND_FROM "$resend_from"

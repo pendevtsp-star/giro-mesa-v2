@@ -18,6 +18,9 @@ import { DatabaseReadinessService, MetricsService } from "./health/health.module
 import { TABLE_SESSION_COOKIE_NAME } from "./public-menu/table-session-token.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
+export const shouldExposeOpenApi = (environment = process.env.NODE_ENV) =>
+  environment !== "production";
+
 export async function createApplication(options: { checkDatabaseReadiness?: boolean } = {}) {
   const adapter = new FastifyAdapter({
     trustProxy: configuredTrustProxy(),
@@ -81,8 +84,10 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
       .build(),
   );
   addZodRequestBodies(app, document);
-  fastify.get("/api/v1/openapi.json", async () => document);
-  fastify.get("/openapi.json", async () => document);
+  if (shouldExposeOpenApi()) {
+    fastify.get("/api/v1/openapi.json", async () => document);
+    fastify.get("/openapi.json", async () => document);
+  }
 
   const auth = app.get(AuthService);
   const realtime = app.get(RealtimeService);

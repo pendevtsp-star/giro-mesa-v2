@@ -16,6 +16,27 @@ Configure `PLATFORM_ADMIN_ROLES` no deploy com entradas `email=perfil`, usando `
 
 Revogue imediatamente o acesso de quem sair da equipe ou mudar de função. Não use a central enquanto o MFA estiver indisponível; recupere a conta pelo fluxo de segurança antes de continuar.
 
+### Bootstrap do responsável da plataforma
+
+Para provisionar `pendevtsp@gmail.com`, configure no deploy `PLATFORM_ADMIN_ROLES=pendevtsp@gmail.com=admin` e reinicie apenas o processo da API pelo procedimento de release. Não use `PLATFORM_ADMIN_EMAILS`, senha em `.env`, seed, código ou mensagem de chat.
+
+1. Crie a conta individual pelo fluxo normal de cadastro/login com uma senha aleatória longa gerada e guardada diretamente no gerenciador de senhas do responsável. Se a conta já existir, use o fluxo de recuperação de senha; nunca entregue uma senha temporária em repositório, log ou ticket.
+2. Faça login, cadastre o TOTP em **Segurança**, confirme o primeiro código e guarde os códigos de recuperação fora da VPS. A API exige um fator MFA verificado para toda rota `/v1/platform`; a allowlist isolada não basta.
+3. Em uma nova sessão, abra a Central de controle e confirme o perfil `admin` e o selo de MFA. Se não abrir, revise exatamente o e-mail normalizado na variável, o cadastro ativo e o fator MFA; não reduza o guard para recuperar acesso.
+
+`MFA_ENCRYPTION_KEY` deve estar configurada e estável antes do cadastro do TOTP. A troca dessa chave sem uma migração de fatores invalida a recuperação dos segredos MFA existentes.
+
+### Acesso piloto de seis meses
+
+Somente `admin` possui `billing:write` para conceder acesso piloto. O procedimento não cria conta compartilhada, não cria assinatura nem confirma cobrança no provedor.
+
+1. O tenant deve concluir o onboarding e ativar o trial normal; a Central aceita somente um tenant em `trial_active` com trial persistido. Isso preserva os gates de ativação do produto.
+2. Abra a Visão 360º, confira o tenant e a data de **Acesso piloto até**, clique em **Conceder 6 meses**, informe o motivo objetivo e confirme a ação.
+3. A API grava a data final em `trials.endsAt` como o maior valor entre a data atual acrescida de seis meses-calendário e a data já existente. Portanto, uma nova concessão nunca encurta um acesso maior.
+4. Confirme a data retornada pela API e a linha do tempo. A ação registra ator, tenant, trial, motivo, datas anterior/final e se houve extensão; a chave idempotente impede uma repetição de rede.
+
+Se a API retornar `PLATFORM_PILOT_ACCESS_REQUIRES_ACTIVE_TRIAL`, conclua/ative o onboarding ou trate a assinatura existente; não altere diretamente o banco. `PLATFORM_PILOT_ACCESS_TRIAL_REQUIRED` indica inconsistência de dados que deve ser investigada antes de qualquer nova tentativa.
+
 ## Fluxo de atendimento
 
 1. Pesquise pelo nome, documento, e-mail ou ID e confirme o tenant correto.
