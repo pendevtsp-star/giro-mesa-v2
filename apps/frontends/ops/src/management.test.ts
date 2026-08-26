@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   InvalidManagementPayloadError,
   parseCash,
+  parseFinance,
   parseInventory,
   parseOverview,
   parseRecipeCatalog,
@@ -13,6 +14,44 @@ import {
 } from "./management";
 
 describe("dados gerenciais reais", () => {
+  it("aceita o limite de aprovação financeiro desativado", () => {
+    const finance = parseFinance({
+      entries: [],
+      payablePayments: [],
+      receivablePayments: [],
+      payables: [],
+      receivables: [],
+      reconciliationImports: [],
+      reconciliationEntries: [],
+      approvals: [],
+      settings: {
+        paymentApprovalThresholdCents: null,
+        requireDistinctApprover: true,
+        dueSoonDays: 7,
+      },
+      summary: {
+        payableCents: 0,
+        receivableCents: 0,
+        projectedBalanceCents: 0,
+        overdueCount: 0,
+        dueTodayCount: 0,
+        dueSoonCount: 0,
+        unresolvedReconciliations: 0,
+      },
+      projection: [],
+      pagination: { page: 1, pageSize: 25, total: 0, pageCount: 0 },
+      capabilities: {
+        canManage: true,
+        canConfigure: true,
+        canApprove: true,
+        canOperateCash: true,
+      },
+    });
+
+    expect(finance.settings.paymentApprovalThresholdCents).toBeNull();
+    expect(finance.entries).toEqual([]);
+  });
+
   it("normaliza o acesso da pessoa no autoacompanhamento", () => {
     expect(
       parseSelfTimeTracking({

@@ -64,6 +64,15 @@ const automationDefaults: Record<
   },
 };
 
+export async function requestEvolutionQr(
+  configured: boolean,
+  configure: () => Promise<unknown>,
+  load: () => Promise<unknown>,
+) {
+  if (!configured) await configure();
+  return parseCrmEvolutionQr(await load());
+}
+
 function AutomationEditor({
   scope,
   trigger,
@@ -467,14 +476,24 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
     }
   }
 
-  async function loadQr() {
+  async function loadQr(configured: boolean) {
     setBusy("qr");
     setFeedback("");
     try {
-      const result = parseCrmEvolutionQr(
-        await api.growth.evolutionQr(scope.organizationId, scope.unitId),
+      const result = await requestEvolutionQr(
+        configured,
+        () =>
+          api.growth.configureEvolution(scope.organizationId, {
+            unitId: scope.unitId,
+            enabled: true,
+            quietHoursStart: quietStart,
+            quietHoursEnd: quietEnd,
+            maxMessagesPer30Days: Number(cap),
+          }),
+        () => api.growth.evolutionQr(scope.organizationId, scope.unitId),
       );
       setQr(result.qrDataUrl);
+      integration.retry();
       if (result.ready) setFeedback("WhatsApp conectado; nenhum QR Code é necessário.");
     } catch (error) {
       setFeedback(crmError(error, "Não foi possível obter o QR Code."));
@@ -586,7 +605,7 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
                         size="sm"
                         variant="secondary"
                         disabled={busy === "qr"}
-                        onClick={() => void loadQr()}
+                        onClick={() => void loadQr(value.configured)}
                       >
                         {busy === "qr" ? "Carregando…" : "Exibir QR Code"}
                       </Button>

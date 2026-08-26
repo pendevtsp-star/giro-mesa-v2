@@ -3030,7 +3030,7 @@ export function parseFinance(value: unknown): FinanceData {
       };
     }),
     settings: {
-      paymentApprovalThresholdCents: numeric(settings.paymentApprovalThresholdCents),
+      paymentApprovalThresholdCents: numeric(settings.paymentApprovalThresholdCents, true),
       requireDistinctApprover: settings.requireDistinctApprover !== false,
       dueSoonDays: integer(settings.dueSoonDays ?? 7),
     },
