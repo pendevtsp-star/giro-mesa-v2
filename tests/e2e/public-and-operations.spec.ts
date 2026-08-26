@@ -3,7 +3,7 @@
 test("landing communicates the trial and exposes the legal map", async ({ page }) => {
   await page.goto("http://localhost:3110");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByRole("link", { name: /testar 14 dias/i }).first()).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /solicitar teste/i }).first()).toHaveAttribute(
     "href",
     "/teste-gratis",
   );

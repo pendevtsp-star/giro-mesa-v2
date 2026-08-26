@@ -1,10 +1,13 @@
 import { createServer } from "node:http";
 
-const document = (title) => ({
+const document = (
+  title,
+  sections = [{ heading: "Teste", body: "Conteúdo persistido e publicado para a jornada E2E." }],
+) => ({
   version: "e2e",
   effectiveAt: "2026-08-25T00:00:00.000Z",
   title,
-  sections: [{ heading: "Teste", body: "Conteúdo persistido e publicado para a jornada E2E." }],
+  sections,
 });
 
 const catalog = {
@@ -41,7 +44,10 @@ const catalog = {
     },
     legal: {
       terms: document("Termos de Uso"),
-      privacy: document("Política de Privacidade"),
+      privacy: document("Política de Privacidade", [
+        { heading: "Privacidade", body: "Tratamento de dados na jornada E2E." },
+        { heading: "Cookies", body: "Preferências e consentimento da jornada E2E." },
+      ]),
     },
   },
   seo: {
