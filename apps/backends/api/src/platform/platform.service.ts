@@ -139,7 +139,7 @@ export class PlatformService {
           organizationId: units.organizationId,
           units: sql<number>`count(*) filter (where ${units.active} = true)`.mapWith(Number),
           staleHubs:
-            sql<number>`count(*) filter (where ${units.active} = true and (${hubHeartbeats.lastSeenAt} is null or ${hubHeartbeats.lastSeenAt} < ${staleHeartbeat}))`.mapWith(
+            sql<number>`count(*) filter (where ${units.active} = true and (${hubHeartbeats.lastSeenAt} is null or ${hubHeartbeats.lastSeenAt} < ${staleHeartbeat.toISOString()}))`.mapWith(
               Number,
             ),
         })
