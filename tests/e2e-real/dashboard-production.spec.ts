@@ -168,12 +168,13 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
   });
 }
 
-test("back office pesquisa tenant, trata incidentes e explicita dados parciais", async ({
+test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados parciais", async ({
   page,
 }) => {
   const tenantId = "11111111-1111-4111-8111-111111111111";
   const eventId = "22222222-2222-4222-8222-222222222222";
   let failOverview = false;
+  let tenantCreateAttempts = 0;
   await page.route("**/health", (route) =>
     route.fulfill({
       json: {
@@ -210,6 +211,26 @@ test("back office pesquisa tenant, trata incidentes e explicita dados parciais",
       return;
     }
     if (request.method() !== "GET") {
+      if (pathname === "/v1/platform/tenants") {
+        tenantCreateAttempts += 1;
+        if (tenantCreateAttempts === 1) {
+          await route.fulfill({
+            status: 503,
+            json: { message: "Resposta perdida; tente novamente." },
+          });
+          return;
+        }
+        await route.fulfill({
+          status: 201,
+          json: {
+            organization: { id: tenantId, tradeName: "Casa Centro", billingState: "onboarding" },
+            unit: { id: "unit-1", name: "Matriz" },
+            owner: { identityId: "owner-1", email: "owner@casacentro.test" },
+            replayed: false,
+          },
+        });
+        return;
+      }
       if (pathname.endsWith("/pii-access")) {
         await route.fulfill({
           json: {
@@ -271,6 +292,7 @@ test("back office pesquisa tenant, trata incidentes e explicita dados parciais",
                   role: "admin",
                   capabilities: [
                     "tenants:read",
+                    "tenants:write",
                     "billing:read",
                     "fiscal:read",
                     "incidents:write",
@@ -371,6 +393,39 @@ test("back office pesquisa tenant, trata incidentes e explicita dados parciais",
   await expect(page.getByRole("alert").filter({ hasText: "Dados parciais" })).toContainText(
     "metrics",
   );
+
+  const firstTenantCreateRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/v1/platform/tenants",
+  );
+  await page.getByRole("button", { name: "Cadastrar cliente piloto" }).click();
+  const tenantDialog = page.getByRole("dialog", { name: "Cliente piloto" });
+  await tenantDialog.getByLabel("Razão social").fill("Casa Centro Alimentos Ltda.");
+  await tenantDialog.getByLabel("Nome fantasia").fill("Casa Centro");
+  await tenantDialog.getByLabel("CNPJ").fill("05.953.016/0001-32");
+  await tenantDialog.getByLabel("Primeira unidade").fill("Matriz");
+  await tenantDialog.getByLabel("E-mail do responsável").fill("owner@casacentro.test");
+  await tenantDialog.getByLabel("Motivo do cadastro").fill("Cliente aprovado para o piloto");
+  await tenantDialog.getByRole("checkbox").check();
+  await tenantDialog.getByRole("button", { name: "Cadastrar cliente" }).click();
+  const failedTenantCreation = await firstTenantCreateRequest;
+  await expect(tenantDialog.getByRole("alert")).toContainText("Tente novamente");
+  const replayTenantCreateRequest = page.waitForRequest(
+    (request) =>
+      request.method() === "POST" && new URL(request.url()).pathname === "/v1/platform/tenants",
+  );
+  await tenantDialog.getByRole("button", { name: "Cadastrar cliente" }).click();
+  const tenantCreation = await replayTenantCreateRequest;
+  expect(tenantCreation.postDataJSON()).toMatchObject({
+    document: "05953016000132",
+    ownerEmail: "owner@casacentro.test",
+    timezone: "America/Sao_Paulo",
+  });
+  expect(tenantCreation.headers()["idempotency-key"]).toBeTruthy();
+  expect(tenantCreation.headers()["idempotency-key"]).toBe(
+    failedTenantCreation.headers()["idempotency-key"],
+  );
+  await expect(page.getByText(/foram cadastradas/)).toBeVisible();
 
   const tenantSearch = page
     .getByRole("search")

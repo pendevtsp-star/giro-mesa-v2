@@ -1108,6 +1108,18 @@ describe("integração operacional", () => {
       { reason: "Cliente piloto aprovado pelo time de produto" },
       "pilot-access-1",
     );
+    await api.platform.createTenant(
+      {
+        legalName: "Restaurante Piloto Ltda",
+        tradeName: "Restaurante Piloto",
+        document: "12345678000190",
+        unitName: "Matriz",
+        timezone: "America/Sao_Paulo",
+        ownerEmail: "owner@example.com",
+        reason: "Cliente selecionado para o piloto",
+      },
+      "pilot-tenant-1",
+    );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -1140,6 +1152,23 @@ describe("integração operacional", () => {
         method: "POST",
         headers: expect.objectContaining({ "idempotency-key": "pilot-access-1" }),
         body: JSON.stringify({ reason: "Cliente piloto aprovado pelo time de produto" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      expect.stringContaining("/v1/platform/tenants"),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ "idempotency-key": "pilot-tenant-1" }),
+        body: JSON.stringify({
+          legalName: "Restaurante Piloto Ltda",
+          tradeName: "Restaurante Piloto",
+          document: "12345678000190",
+          unitName: "Matriz",
+          timezone: "America/Sao_Paulo",
+          ownerEmail: "owner@example.com",
+          reason: "Cliente selecionado para o piloto",
+        }),
       }),
     );
   });

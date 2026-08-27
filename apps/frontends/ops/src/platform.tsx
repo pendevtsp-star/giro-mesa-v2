@@ -8,7 +8,7 @@ import {
   NativeSelect,
   Textarea,
 } from "@giromesa/ui";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import "./platform.css";
 
@@ -107,6 +107,33 @@ interface TenantPii {
   email: string | null;
   phone: string | null;
 }
+
+interface PilotTenantCreated {
+  organization: { id: string; tradeName: string; billingState: string };
+  unit: { id: string; name: string };
+  owner: { identityId: string; email: string };
+  replayed: boolean;
+}
+
+interface PilotTenantForm {
+  legalName: string;
+  tradeName: string;
+  document: string;
+  unitName: string;
+  timezone: string;
+  ownerEmail: string;
+  reason: string;
+}
+
+const emptyPilotTenantForm: PilotTenantForm = {
+  legalName: "",
+  tradeName: "",
+  document: "",
+  unitName: "",
+  timezone: "America/Sao_Paulo",
+  ownerEmail: "",
+  reason: "",
+};
 
 interface PilotAccessGrant {
   endsAt: string;
@@ -290,6 +317,7 @@ interface PlatformApi {
     limit: number;
   }) => Promise<unknown>;
   tenant: (organizationId: string) => Promise<unknown>;
+  createTenant: (body: PilotTenantForm, idempotencyKey?: string) => Promise<unknown>;
   grantPilotAccess: (organizationId: string, body: { reason: string }) => Promise<unknown>;
   incidents: (params: {
     search?: string;
@@ -652,6 +680,30 @@ export function parsePilotAccessGrant(value: unknown): PilotAccessGrant {
   return { endsAt: text(payload.endsAt), extended: bool(payload.extended) };
 }
 
+export function parsePilotTenantCreated(value: unknown): PilotTenantCreated {
+  const payload = record(value);
+  const organization = record(payload.organization);
+  const unit = record(payload.unit);
+  const owner = record(payload.owner);
+  return {
+    organization: {
+      id: text(organization.id),
+      tradeName: text(organization.tradeName),
+      billingState: text(organization.billingState),
+    },
+    unit: { id: text(unit.id), name: text(unit.name) },
+    owner: { identityId: text(owner.identityId), email: text(owner.email) },
+    replayed: bool(payload.replayed),
+  };
+}
+
+export function normalizeOrganizationDocument(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 14);
+}
+
 export function parseCommercialOverview(value: unknown): CommercialOverview {
   const payload = record(value);
   const publication = optionalRecord(payload.publication);
@@ -991,6 +1043,10 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   } | null>(null);
   const [revealOpen, setRevealOpen] = useState(false);
   const [pilotAccessOpen, setPilotAccessOpen] = useState(false);
+  const [tenantCreateOpen, setTenantCreateOpen] = useState(false);
+  const [tenantCreateError, setTenantCreateError] = useState<string | null>(null);
+  const [pilotTenantForm, setPilotTenantForm] = useState<PilotTenantForm>(emptyPilotTenantForm);
+  const tenantCreateIdempotencyKey = useRef(crypto.randomUUID());
   const [revealedPii, setRevealedPii] = useState<TenantPii | null>(null);
   const [reason, setReason] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -1033,6 +1089,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   const access = overview.state.status === "ready" ? overview.state.data.access : null;
   const canManageIncidents = access ? hasCapability(access, "incidents:write") : false;
   const canRetryOutbox = access ? hasCapability(access, "outbox:retry") : false;
+  const canCreateTenant = access ? hasCapability(access, "tenants:write") : false;
   const canGrantPilotAccess = access ? hasCapability(access, "billing:write") : false;
   const canRevealPii = access ? hasCapability(access, "pii:read") : false;
 
@@ -1057,6 +1114,63 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
     setReason("");
     setConfirmed(false);
     setSnoozedUntil("");
+  }
+
+  function resetPilotTenantForm() {
+    setTenantCreateOpen(false);
+    setTenantCreateError(null);
+    setPilotTenantForm(emptyPilotTenantForm);
+    tenantCreateIdempotencyKey.current = crypto.randomUUID();
+    setConfirmed(false);
+  }
+
+  async function createPilotTenant(event: FormEvent) {
+    event.preventDefault();
+    if (
+      !confirmed ||
+      pilotTenantForm.document.length !== 14 ||
+      pilotTenantForm.reason.trim().length < 8
+    )
+      return;
+    setBusy(true);
+    setTenantCreateError(null);
+    setFeedback(null);
+    try {
+      const result = parsePilotTenantCreated(
+        await platformApi.createTenant(
+          {
+            ...pilotTenantForm,
+            legalName: pilotTenantForm.legalName.trim(),
+            tradeName: pilotTenantForm.tradeName.trim(),
+            unitName: pilotTenantForm.unitName.trim(),
+            ownerEmail: pilotTenantForm.ownerEmail.trim().toLowerCase(),
+            reason: pilotTenantForm.reason.trim(),
+          },
+          tenantCreateIdempotencyKey.current,
+        ),
+      );
+      setSelectedTenantId(result.organization.id);
+      setTenantInput("");
+      setTenantSearch("");
+      setTenantStatus("all");
+      setTenantCursor(undefined);
+      setTenantHistory([]);
+      setFeedback({
+        tone: "success",
+        text: `${result.organization.tradeName} e a unidade ${result.unit.name} foram cadastradas. O responsável deve concluir o onboarding e ativar o teste; depois use “Conceder 6 meses”.`,
+      });
+      resetPilotTenantForm();
+      tenants.retry();
+      overview.retry();
+    } catch (error) {
+      setTenantCreateError(
+        error instanceof Error
+          ? error.message
+          : "A plataforma não confirmou o cadastro do cliente piloto.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitIncidentAction(event: FormEvent) {
@@ -1266,6 +1380,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
 
           <div className="platform-primary-grid">
             <TenantSearchPanel
+              canCreate={canCreateTenant}
               history={tenantHistory}
               input={tenantInput}
               remote={tenants}
@@ -1278,6 +1393,11 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
                 setSelectedTenantId(organizationId);
               }}
               setStatus={setTenantStatus}
+              startCreate={() => {
+                setFeedback(null);
+                setConfirmed(false);
+                setTenantCreateOpen(true);
+              }}
               status={tenantStatus}
               submit={submitTenantSearch}
               tenantCursor={tenantCursor}
@@ -1316,6 +1436,155 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
       ) : (
         <CommercialWorkspace access={access} refreshToken={refreshToken} />
       )}
+
+      <Modal
+        description="Crie a empresa e a primeira unidade e vincule um responsável que já tenha uma conta GiroMesa. Nenhuma senha será criada no backoffice."
+        isOpen={tenantCreateOpen}
+        onClose={() => !busy && resetPilotTenantForm()}
+        size="md"
+        title="Cliente piloto"
+      >
+        <form className="platform-action-form" onSubmit={createPilotTenant}>
+          {tenantCreateError && (
+            <div className="platform-remote platform-remote--error" role="alert">
+              {tenantCreateError}
+            </div>
+          )}
+          <div className="platform-form-grid">
+            <label htmlFor="platform-pilot-legal-name">
+              <span>Razão social</span>
+              <Input
+                autoComplete="organization"
+                id="platform-pilot-legal-name"
+                maxLength={160}
+                minLength={2}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    legalName: event.target.value,
+                  }))
+                }
+                required
+                value={pilotTenantForm.legalName}
+              />
+            </label>
+            <label htmlFor="platform-pilot-trade-name">
+              <span>Nome fantasia</span>
+              <Input
+                id="platform-pilot-trade-name"
+                maxLength={120}
+                minLength={2}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    tradeName: event.target.value,
+                  }))
+                }
+                required
+                value={pilotTenantForm.tradeName}
+              />
+            </label>
+            <label htmlFor="platform-pilot-document">
+              <span>CNPJ</span>
+              <Input
+                autoComplete="off"
+                id="platform-pilot-document"
+                inputMode="text"
+                minLength={14}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    document: normalizeOrganizationDocument(event.target.value),
+                  }))
+                }
+                pattern="[A-Z0-9]{12}[0-9]{2}"
+                placeholder="Somente letras e números"
+                required
+                value={pilotTenantForm.document}
+              />
+            </label>
+            <label htmlFor="platform-pilot-unit-name">
+              <span>Primeira unidade</span>
+              <Input
+                id="platform-pilot-unit-name"
+                maxLength={120}
+                minLength={2}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    unitName: event.target.value,
+                  }))
+                }
+                required
+                value={pilotTenantForm.unitName}
+              />
+            </label>
+            <label className="platform-form-grid__wide" htmlFor="platform-pilot-owner-email">
+              <span>E-mail do responsável</span>
+              <Input
+                aria-describedby="platform-pilot-owner-email-hint"
+                autoComplete="email"
+                id="platform-pilot-owner-email"
+                maxLength={320}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    ownerEmail: event.target.value,
+                  }))
+                }
+                required
+                type="email"
+                value={pilotTenantForm.ownerEmail}
+              />
+              <small className="platform-form-hint" id="platform-pilot-owner-email-hint">
+                O responsável deve criar a conta GiroMesa com este e-mail antes do cadastro.
+              </small>
+            </label>
+            <label className="platform-form-grid__wide" htmlFor="platform-pilot-reason">
+              <span>Motivo do cadastro</span>
+              <Textarea
+                id="platform-pilot-reason"
+                minLength={8}
+                onChange={(event) =>
+                  setPilotTenantForm((current) => ({
+                    ...current,
+                    reason: event.target.value,
+                  }))
+                }
+                required
+                value={pilotTenantForm.reason}
+              />
+            </label>
+          </div>
+          <label className="platform-confirm" htmlFor="platform-pilot-confirm">
+            <Input
+              checked={confirmed}
+              id="platform-pilot-confirm"
+              onChange={(event) => setConfirmed(event.target.checked)}
+              required
+              type="checkbox"
+            />
+            Confirmo a empresa, a unidade, o responsável e o registro desta ação em auditoria.
+          </label>
+          <div className="platform-modal-actions">
+            <Button
+              disabled={busy}
+              onClick={resetPilotTenantForm}
+              type="button"
+              variant="secondary"
+            >
+              Cancelar
+            </Button>
+            <Button
+              aria-busy={busy}
+              disabled={busy || pilotTenantForm.reason.trim().length < 8 || !confirmed}
+              type="submit"
+            >
+              {busy ? "Cadastrando…" : "Cadastrar cliente"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         description="A plataforma registrará operador, tenant, motivo e horário."
@@ -2751,6 +3020,7 @@ async function fileBase64(file: File): Promise<string> {
 }
 
 function TenantSearchPanel({
+  canCreate,
   history,
   input,
   remote,
@@ -2760,10 +3030,12 @@ function TenantSearchPanel({
   setInput,
   setSelectedTenantId,
   setStatus,
+  startCreate,
   status,
   submit,
   tenantCursor,
 }: {
+  canCreate: boolean;
   history: Array<string | undefined>;
   input: string;
   remote: RemoteResult<TenantList>;
@@ -2773,6 +3045,7 @@ function TenantSearchPanel({
   setInput: (value: string) => void;
   setSelectedTenantId: (value: string) => void;
   setStatus: (value: string) => void;
+  startCreate: () => void;
   status: string;
   submit: (event: FormEvent) => void;
   tenantCursor: string | undefined;
@@ -2784,7 +3057,16 @@ function TenantSearchPanel({
           <p className="eyebrow">Busca global</p>
           <h2>Tenants</h2>
         </div>
-        {remote.state.status === "ready" && <Badge tone="info">Página {history.length + 1}</Badge>}
+        <div className="platform-header__actions">
+          {remote.state.status === "ready" && (
+            <Badge tone="info">Página {history.length + 1}</Badge>
+          )}
+          {canCreate && (
+            <Button onClick={startCreate} size="sm" type="button">
+              Cadastrar cliente piloto
+            </Button>
+          )}
+        </div>
       </div>
       <search aria-label="Buscar tenants">
         <form className="platform-search" onSubmit={submit}>

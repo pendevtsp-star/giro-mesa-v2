@@ -6,11 +6,17 @@ import {
   commercialCatalogVersions,
   commercialPlans,
   identities,
+  legalEntities,
+  memberships,
+  onboardingRecords,
   organizations,
+  outboxEvents,
   platformActionReceipts,
+  roleBindings,
   trials,
+  units,
 } from "@giromesa/db";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { PlatformControlService, resolvePilotAccessEndsAt } from "./platform-control.service.js";
 
@@ -161,6 +167,144 @@ test("persists, audits and replays a six-month pilot grant without touching anot
       await database.db
         .delete(commercialCatalogVersions)
         .where(eq(commercialCatalogVersions.id, catalogId));
+    await database.client.end();
+  }
+});
+
+test("provisions an existing owner tenant without making the platform actor a member", async (context) => {
+  const databaseUrl = process.env.PILOT_DATABASE_URL;
+  if (!databaseUrl) {
+    context.skip("PILOT_DATABASE_URL not configured");
+    return;
+  }
+  process.env.DATABASE_URL = databaseUrl;
+  const database = new DatabaseService();
+  const identityIds: string[] = [];
+  let organizationId: string | undefined;
+  try {
+    const suffix = randomUUID();
+    const [actor, owner] = await database.db
+      .insert(identities)
+      .values([
+        {
+          email: `platform-actor+${suffix}@example.test`,
+          displayName: "Platform Actor",
+          emailVerifiedAt: new Date(),
+        },
+        {
+          email: `pilot-owner+${suffix}@example.test`,
+          displayName: "Pilot Owner",
+        },
+      ])
+      .returning({ id: identities.id, email: identities.email });
+    assert.ok(actor && owner);
+    identityIds.push(actor.id, owner.id);
+
+    const documentPrefix = suffix.replaceAll("-", "").slice(0, 12).toUpperCase();
+    const input = {
+      legalName: "Pilot Tenant Ltda",
+      tradeName: "Pilot Tenant",
+      document: `${documentPrefix}11`,
+      unitName: "Matriz",
+      timezone: "America/Sao_Paulo",
+      ownerEmail: owner.email,
+      reason: "Cliente piloto aprovado pelo time de produto",
+    };
+    const service = new PlatformControlService(database);
+    const created = await service.registerTenant(actor.id, `tenant-create-${suffix}`, input);
+    organizationId = created.organization.id;
+
+    assert.equal(created.replayed, false);
+    assert.equal(created.organization.billingState, "onboarding");
+    assert.equal(created.owner.identityId, owner.id);
+    assert.equal(created.owner.email, owner.email);
+    const [
+      organization,
+      entity,
+      unit,
+      ownerMembership,
+      actorMembership,
+      onboarding,
+      audit,
+      outbox,
+    ] = await Promise.all([
+      database.db
+        .select()
+        .from(organizations)
+        .where(eq(organizations.id, created.organization.id))
+        .limit(1),
+      database.db
+        .select()
+        .from(legalEntities)
+        .where(eq(legalEntities.organizationId, created.organization.id))
+        .limit(1),
+      database.db.select().from(units).where(eq(units.id, created.unit.id)).limit(1),
+      database.db
+        .select({
+          identityId: memberships.identityId,
+          status: memberships.status,
+          role: roleBindings.role,
+        })
+        .from(memberships)
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .where(
+          and(
+            eq(memberships.organizationId, created.organization.id),
+            eq(memberships.identityId, owner.id),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(
+          and(
+            eq(memberships.organizationId, created.organization.id),
+            eq(memberships.identityId, actor.id),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select()
+        .from(onboardingRecords)
+        .where(eq(onboardingRecords.organizationId, created.organization.id))
+        .limit(1),
+      database.db
+        .select()
+        .from(auditEvents)
+        .where(eq(auditEvents.organizationId, created.organization.id))
+        .limit(1),
+      database.db
+        .select()
+        .from(outboxEvents)
+        .where(eq(outboxEvents.aggregateId, created.organization.id))
+        .limit(1),
+    ]);
+    assert.equal(organization[0]?.billingState, "onboarding");
+    assert.equal(entity[0]?.document, input.document);
+    assert.equal(unit[0]?.legalEntityId, entity[0]?.id);
+    assert.deepEqual(ownerMembership[0], { identityId: owner.id, status: "active", role: "owner" });
+    assert.equal(actorMembership.length, 0);
+    assert.equal(onboarding.length, 1);
+    assert.equal(audit[0]?.action, "platform.tenant.created");
+    assert.equal(audit[0]?.actorIdentityId, actor.id);
+    assert.equal(outbox[0]?.topic, "organization.created");
+
+    const replay = await service.registerTenant(actor.id, `tenant-create-${suffix}`, input);
+    assert.equal(replay.replayed, true);
+    assert.equal(replay.organization.id, created.organization.id);
+  } finally {
+    if (organizationId) {
+      await database.db
+        .delete(platformActionReceipts)
+        .where(eq(platformActionReceipts.actorIdentityId, identityIds[0] ?? ""));
+      await database.db.delete(auditEvents).where(eq(auditEvents.organizationId, organizationId));
+      await database.db.delete(outboxEvents).where(eq(outboxEvents.aggregateId, organizationId));
+      await database.db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+    if (identityIds.length > 0) {
+      await database.db.delete(identities).where(inArray(identities.id, identityIds));
+    }
     await database.client.end();
   }
 });

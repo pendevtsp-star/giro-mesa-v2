@@ -77273,6 +77273,159 @@
         "tags": [
           "Platform"
         ]
+      },
+      "post": {
+        "operationId": "PlatformController_registerTenant[0]",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "tradeName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "document": {
+                    "type": "string"
+                  },
+                  "unitName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "default": "America/Sao_Paulo",
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
+                  "ownerEmail": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "tradeName",
+                  "document",
+                  "unitName",
+                  "ownerEmail",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "organization",
+                    "unit",
+                    "owner",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "tradeName",
+                        "billingState"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "tradeName": {
+                          "type": "string"
+                        },
+                        "billingState": {
+                          "type": "string",
+                          "enum": [
+                            "onboarding"
+                          ]
+                        }
+                      }
+                    },
+                    "unit": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "owner": {
+                      "type": "object",
+                      "required": [
+                        "identityId",
+                        "email"
+                      ],
+                      "properties": {
+                        "identityId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        }
+                      }
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
       }
     },
     "/v1/platform/tenants": {
@@ -77282,6 +77435,159 @@
         "responses": {
           "200": {
             "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      },
+      "post": {
+        "operationId": "PlatformController_registerTenant[1]",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "tradeName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "document": {
+                    "type": "string"
+                  },
+                  "unitName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "default": "America/Sao_Paulo",
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
+                  "ownerEmail": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "tradeName",
+                  "document",
+                  "unitName",
+                  "ownerEmail",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "organization",
+                    "unit",
+                    "owner",
+                    "replayed"
+                  ],
+                  "properties": {
+                    "organization": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "tradeName",
+                        "billingState"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "tradeName": {
+                          "type": "string"
+                        },
+                        "billingState": {
+                          "type": "string",
+                          "enum": [
+                            "onboarding"
+                          ]
+                        }
+                      }
+                    },
+                    "unit": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "owner": {
+                      "type": "object",
+                      "required": [
+                        "identityId",
+                        "email"
+                      ],
+                      "properties": {
+                        "identityId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string",
+                          "format": "email"
+                        }
+                      }
+                    },
+                    "replayed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "tags": [

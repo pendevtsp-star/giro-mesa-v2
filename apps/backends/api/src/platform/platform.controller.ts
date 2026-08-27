@@ -17,6 +17,7 @@ import {
 } from "@nestjs/common";
 import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/session.guard.js";
+import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { PlatformAdminGuard, type PlatformRequest } from "./platform.guard.js";
 import {
@@ -39,11 +40,13 @@ import {
   type PlatformIncidentAction,
   type PlatformIncidentQuery,
   type PlatformReasonBody,
+  type PlatformTenantRegistration,
   platformIdempotencyKeySchema,
   platformIncidentActionSchema,
   platformIncidentFingerprintSchema,
   platformIncidentQuerySchema,
   platformReasonBodySchema,
+  platformTenantRegistrationSchema,
   type TenantDirectoryQuery,
   tenantDirectoryQuerySchema,
 } from "./platform.schemas.js";
@@ -266,6 +269,60 @@ export class PlatformController {
   ) {
     requirePlatformCapability(request.platformAccess, "tenants:read");
     return this.control.tenant360(organizationId, request.platformAccess);
+  }
+
+  @Post("tenants")
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(platformTenantRegistrationSchema) })
+  @ApiCreatedResponse({
+    schema: {
+      type: "object",
+      required: ["organization", "unit", "owner", "replayed"],
+      properties: {
+        organization: {
+          type: "object",
+          required: ["id", "tradeName", "billingState"],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            tradeName: { type: "string" },
+            billingState: { type: "string", enum: ["onboarding"] },
+          },
+        },
+        unit: {
+          type: "object",
+          required: ["id", "name"],
+          properties: {
+            id: { type: "string", format: "uuid" },
+            name: { type: "string" },
+          },
+        },
+        owner: {
+          type: "object",
+          required: ["identityId", "email"],
+          properties: {
+            identityId: { type: "string", format: "uuid" },
+            email: { type: "string", format: "email" },
+          },
+        },
+        replayed: { type: "boolean" },
+      },
+    },
+  })
+  registerTenant(
+    @Req() request: PlatformRequest,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(platformTenantRegistrationSchema)) body: PlatformTenantRegistration,
+  ) {
+    requirePlatformCapability(request.platformAccess, "tenants:write");
+    return this.control.registerTenant(
+      request.auth.identityId,
+      idempotencyKey(rawIdempotencyKey),
+      body,
+    );
   }
 
   @Post("tenants/:organizationId/pilot-access")

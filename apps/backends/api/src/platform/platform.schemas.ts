@@ -1,3 +1,4 @@
+import { createOrganizationSchema, emailSchema } from "@giromesa/contracts";
 import { z } from "zod";
 
 export const platformIdempotencyKeySchema = z.string().trim().min(8).max(160);
@@ -60,6 +61,14 @@ export type PlatformIncidentAction = z.infer<typeof platformIncidentActionSchema
 
 export const platformReasonBodySchema = z.object({ reason: platformReasonSchema }).strict();
 export type PlatformReasonBody = z.infer<typeof platformReasonBodySchema>;
+
+export const platformTenantRegistrationSchema = createOrganizationSchema
+  .extend({
+    ownerEmail: emailSchema,
+    reason: platformReasonSchema,
+  })
+  .strict();
+export type PlatformTenantRegistration = z.infer<typeof platformTenantRegistrationSchema>;
 
 export const platformIncidentFingerprintSchema = z
   .string()

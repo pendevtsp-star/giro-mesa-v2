@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   auditEvents,
   charges,
@@ -13,6 +14,7 @@ import {
   platformActionReceipts,
   platformIncidentStates,
   providerCustomers,
+  roleBindings,
   subscriptions,
   trials,
   units,
@@ -24,6 +26,7 @@ import { DatabaseService } from "../database/database.module.js";
 import type {
   PlatformIncidentAction,
   PlatformIncidentQuery,
+  PlatformTenantRegistration,
   TenantDirectoryQuery,
 } from "./platform.schemas.js";
 import type { PlatformAccess } from "./platform-access.js";
@@ -51,6 +54,13 @@ export type PilotAccessGrant = {
   endsAt: string;
   durationMonths: number;
   extended: boolean;
+  replayed: boolean;
+};
+
+export type PlatformTenantRegistrationResult = {
+  organization: { id: string; tradeName: string; billingState: "onboarding" };
+  unit: { id: string; name: string };
+  owner: { identityId: string; email: string };
   replayed: boolean;
 };
 
@@ -274,6 +284,159 @@ export class PlatformControlService {
         actorEmail: maskEmail(event.actorEmail),
       })),
     };
+  }
+
+  async registerTenant(
+    actorIdentityId: string,
+    idempotencyKey: string,
+    input: PlatformTenantRegistration,
+  ): Promise<PlatformTenantRegistrationResult> {
+    const action = "platform.tenant.created";
+    const targetId = tenantRegistrationFingerprint(input);
+    try {
+      return await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`platform:${actorIdentityId}:${idempotencyKey}`}, 0))`,
+        );
+        const [receipt] = await tx
+          .select()
+          .from(platformActionReceipts)
+          .where(
+            and(
+              eq(platformActionReceipts.actorIdentityId, actorIdentityId),
+              eq(platformActionReceipts.idempotencyKey, idempotencyKey),
+            ),
+          )
+          .limit(1);
+        if (receipt) {
+          if (receipt.action !== action || receipt.targetId !== targetId) {
+            throw new ConflictException({ code: "PLATFORM_IDEMPOTENCY_KEY_REUSED" });
+          }
+          return {
+            ...(receipt.result as Omit<PlatformTenantRegistrationResult, "replayed">),
+            replayed: true,
+          };
+        }
+
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`platform-tenant-document:${input.document}`}, 0))`,
+        );
+        const [owner] = await tx
+          .select({
+            id: identities.id,
+            email: identities.email,
+            kind: identities.kind,
+            disabledAt: identities.disabledAt,
+          })
+          .from(identities)
+          .where(eq(identities.email, input.ownerEmail))
+          .for("update")
+          .limit(1);
+        if (!owner) {
+          throw new NotFoundException({
+            code: "PLATFORM_TENANT_OWNER_NOT_FOUND",
+            message: "A conta proprietária deve existir antes do cadastro do tenant.",
+          });
+        }
+        if (owner.kind !== "human" || owner.disabledAt) {
+          throw new ConflictException({
+            code: "PLATFORM_TENANT_OWNER_INACTIVE",
+            message: "A conta proprietária está inativa e não pode receber um tenant.",
+          });
+        }
+        const [organization] = await tx
+          .insert(organizations)
+          .values({
+            legalName: input.legalName,
+            tradeName: input.tradeName,
+            document: input.document,
+            billingState: "onboarding",
+          })
+          .returning({
+            id: organizations.id,
+            tradeName: organizations.tradeName,
+            billingState: organizations.billingState,
+          });
+        if (!organization) throw new Error("Platform tenant organization was not created");
+        const [legalEntity] = await tx
+          .insert(legalEntities)
+          .values({
+            organizationId: organization.id,
+            legalName: input.legalName,
+            document: input.document,
+          })
+          .returning({ id: legalEntities.id });
+        if (!legalEntity) throw new Error("Platform tenant legal entity was not created");
+        const [unit] = await tx
+          .insert(units)
+          .values({
+            organizationId: organization.id,
+            legalEntityId: legalEntity.id,
+            name: input.unitName,
+            timezone: input.timezone,
+          })
+          .returning({ id: units.id, name: units.name });
+        if (!unit) throw new Error("Platform tenant unit was not created");
+        const [membership] = await tx
+          .insert(memberships)
+          .values({ identityId: owner.id, organizationId: organization.id, status: "active" })
+          .returning({ id: memberships.id });
+        if (!membership) throw new Error("Platform tenant owner membership was not created");
+        await tx
+          .insert(roleBindings)
+          .values({ membershipId: membership.id, unitId: null, role: "owner" });
+        await tx.insert(onboardingRecords).values({ organizationId: organization.id });
+        await tx.insert(auditEvents).values({
+          organizationId: organization.id,
+          unitId: unit.id,
+          actorIdentityId,
+          action,
+          entityType: "organization",
+          entityId: organization.id,
+          metadata: { reason: input.reason },
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "organization.created",
+          aggregateType: "organization",
+          aggregateId: organization.id,
+          payload: { organizationId: organization.id, unitId: unit.id },
+        });
+        const result = {
+          organization: {
+            id: organization.id,
+            tradeName: organization.tradeName,
+            billingState: "onboarding",
+          },
+          unit,
+          owner: { identityId: owner.id, email: owner.email },
+        } satisfies Omit<PlatformTenantRegistrationResult, "replayed">;
+        await tx.insert(platformActionReceipts).values({
+          actorIdentityId,
+          idempotencyKey,
+          action,
+          targetType: "organization_provisioning",
+          targetId,
+          reason: input.reason,
+          result,
+        });
+        return { ...result, replayed: false };
+      });
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error &&
+        "code" in error &&
+        error.code === "23505" &&
+        "constraint" in error &&
+        error.constraint === "organizations_document_unique"
+      ) {
+        throw new ConflictException({
+          code: "PLATFORM_TENANT_DOCUMENT_EXISTS",
+          message: "Já existe um tenant com este CNPJ.",
+        });
+      }
+      throw error;
+    }
   }
 
   async grantPilotAccess(
@@ -987,6 +1150,10 @@ export function resolvePilotAccessEndsAt(currentEndsAt: Date, grantedAt: Date) {
     endsAt: currentEndsAt > sixMonthsFromGrant ? currentEndsAt : sixMonthsFromGrant,
     extended: currentEndsAt < sixMonthsFromGrant,
   };
+}
+
+function tenantRegistrationFingerprint(input: PlatformTenantRegistration) {
+  return createHash("sha256").update(JSON.stringify(input)).digest("hex");
 }
 
 function addUtcMonths(date: Date, months: number) {

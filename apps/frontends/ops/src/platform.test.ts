@@ -6,9 +6,11 @@ import {
   maskDocument,
   maskEmail,
   maskPhone,
+  normalizeOrganizationDocument,
   parseCommercialLeads,
   parseCommercialOverview,
   parsePilotAccessGrant,
+  parsePilotTenantCreated,
   parsePlatformIncidents,
   parsePlatformOverview,
   parsePlatformTenant,
@@ -261,6 +263,26 @@ describe("painel real da plataforma", () => {
       extended: true,
     });
     expect(() => parsePilotAccessGrant({ endsAt: "2027-02-26T12:00:00.000Z" })).toThrow(
+      InvalidPlatformPayloadError,
+    );
+  });
+
+  it("normaliza o CNPJ e aceita somente o cadastro confirmado pela API", () => {
+    expect(normalizeOrganizationDocument("AB.345.678/0001-12")).toBe("AB345678000112");
+    expect(
+      parsePilotTenantCreated({
+        organization: { id: "org-1", tradeName: "Bar Piloto", billingState: "onboarding" },
+        unit: { id: "unit-1", name: "Matriz" },
+        owner: { identityId: "identity-1", email: "owner@example.com" },
+        replayed: false,
+      }),
+    ).toMatchObject({
+      organization: { id: "org-1", billingState: "onboarding" },
+      unit: { id: "unit-1" },
+      owner: { email: "owner@example.com" },
+      replayed: false,
+    });
+    expect(() => parsePilotTenantCreated({ organization: { id: "org-1" } })).toThrow(
       InvalidPlatformPayloadError,
     );
   });

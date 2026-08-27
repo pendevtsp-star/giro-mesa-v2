@@ -37,6 +37,7 @@ const capabilitiesByRole = {
   ],
   admin: [
     "tenants:read",
+    "tenants:write",
     "billing:read",
     "billing:write",
     "fiscal:read",

@@ -8285,7 +8285,7 @@ export interface paths {
     };
     get: operations["PlatformController_tenants[0]"];
     put?: never;
-    post?: never;
+    post: operations["PlatformController_registerTenant[0]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -8301,7 +8301,7 @@ export interface paths {
     };
     get: operations["PlatformController_tenants[1]"];
     put?: never;
-    post?: never;
+    post: operations["PlatformController_registerTenant[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -42831,6 +42831,61 @@ export interface operations {
       };
     };
   };
+  "PlatformController_registerTenant[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          legalName: string;
+          tradeName: string;
+          document: string;
+          unitName: string;
+          /** @default America/Sao_Paulo */
+          timezone?: string;
+          /** Format: email */
+          ownerEmail: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              tradeName: string;
+              /** @enum {string} */
+              billingState: "onboarding";
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+            };
+            owner: {
+              /** Format: uuid */
+              identityId: string;
+              /** Format: email */
+              email: string;
+            };
+            replayed: boolean;
+          };
+        };
+      };
+    };
+  };
   "PlatformController_tenants[1]": {
     parameters: {
       query?: never;
@@ -42845,6 +42900,61 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  "PlatformController_registerTenant[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          legalName: string;
+          tradeName: string;
+          document: string;
+          unitName: string;
+          /** @default America/Sao_Paulo */
+          timezone?: string;
+          /** Format: email */
+          ownerEmail: string;
+          reason: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            organization: {
+              /** Format: uuid */
+              id: string;
+              tradeName: string;
+              /** @enum {string} */
+              billingState: "onboarding";
+            };
+            unit: {
+              /** Format: uuid */
+              id: string;
+              name: string;
+            };
+            owner: {
+              /** Format: uuid */
+              identityId: string;
+              /** Format: email */
+              email: string;
+            };
+            replayed: boolean;
+          };
+        };
       };
     };
   };

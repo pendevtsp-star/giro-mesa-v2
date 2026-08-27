@@ -30,12 +30,14 @@ Para provisionar `pendevtsp@gmail.com`, configure no deploy `PLATFORM_ADMIN_ROLE
 
 Somente `admin` possui `billing:write` para conceder acesso piloto. O procedimento não cria conta compartilhada, não cria assinatura nem confirma cobrança no provedor.
 
-1. O tenant deve concluir o onboarding e ativar o trial normal; a Central aceita somente um tenant em `trial_active` com trial persistido. Isso preserva os gates de ativação do produto.
-2. Abra a Visão 360º, confira o tenant e a data de **Acesso piloto até**, clique em **Conceder 6 meses**, informe o motivo objetivo e confirme a ação.
-3. A API grava a data final em `trials.endsAt` como o maior valor entre a data atual acrescida de seis meses-calendário e a data já existente. Portanto, uma nova concessão nunca encurta um acesso maior.
-4. Confirme a data retornada pela API e a linha do tempo. A ação registra ator, tenant, trial, motivo, datas anterior/final e se houve extensão; a chave idempotente impede uma repetição de rede.
+1. O responsável do cliente cria a conta pessoal pelo fluxo normal do GiroMesa. O backoffice nunca define a senha dele.
+2. Com perfil `admin`, clique em **Cadastrar cliente piloto**, informe empresa, CNPJ, primeira unidade, o mesmo e-mail da conta e o motivo. A criação do tenant, da unidade e do vínculo de proprietário ocorre na mesma transação auditada e idempotente.
+3. O responsável conclui o onboarding e ativa o trial normal. A Central aceita a concessão somente quando o tenant está em `trial_active` com trial persistido; isso preserva os gates de ativação do produto.
+4. Abra a Visão 360º, confira o tenant e a data de **Acesso piloto até**, clique em **Conceder 6 meses**, informe o motivo objetivo e confirme a ação.
+5. A API grava a data final em `trials.endsAt` como o maior valor entre a data atual acrescida de seis meses-calendário e a data já existente. Portanto, uma nova concessão nunca encurta um acesso maior.
+6. Confirme a data retornada pela API e a linha do tempo. A ação registra ator, tenant, trial, motivo, datas anterior/final e se houve extensão; a chave idempotente impede uma repetição de rede.
 
-Se a API retornar `PLATFORM_PILOT_ACCESS_REQUIRES_ACTIVE_TRIAL`, conclua/ative o onboarding ou trate a assinatura existente; não altere diretamente o banco. `PLATFORM_PILOT_ACCESS_TRIAL_REQUIRED` indica inconsistência de dados que deve ser investigada antes de qualquer nova tentativa.
+`PLATFORM_TENANT_OWNER_NOT_FOUND` exige que o responsável crie a conta informada; `PLATFORM_TENANT_OWNER_INACTIVE` exige recuperação pela equipe. `PLATFORM_TENANT_DOCUMENT_EXISTS` indica CNPJ já cadastrado. Se a API retornar `PLATFORM_PILOT_ACCESS_REQUIRES_ACTIVE_TRIAL`, conclua/ative o onboarding ou trate a assinatura existente; não altere diretamente o banco. `PLATFORM_PILOT_ACCESS_TRIAL_REQUIRED` indica inconsistência de dados que deve ser investigada antes de qualquer nova tentativa.
 
 ## Fluxo de atendimento
 

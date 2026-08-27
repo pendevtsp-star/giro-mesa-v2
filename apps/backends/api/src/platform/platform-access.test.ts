@@ -25,12 +25,21 @@ describe("platform administrator allowlist", () => {
     ]);
     assert.equal(engineering?.capabilities.includes("pii:read"), false);
     assert.equal(engineering?.capabilities.includes("billing:write"), false);
+    assert.equal(engineering?.capabilities.includes("tenants:write"), false);
     assert.equal(
       platformAccessForEmail(
         "admin@giromesa.com.br",
         "admin@giromesa.com.br=admin,viewer@giromesa.com.br=viewer",
         "",
       )?.capabilities.includes("billing:write"),
+      true,
+    );
+    assert.equal(
+      platformAccessForEmail(
+        "admin@giromesa.com.br",
+        "admin@giromesa.com.br=admin",
+        "",
+      )?.capabilities.includes("tenants:write"),
       true,
     );
     assert.equal(

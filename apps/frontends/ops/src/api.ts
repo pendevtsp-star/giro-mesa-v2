@@ -1210,6 +1210,18 @@ export const api = {
     },
     tenant: (organizationId: string) =>
       request<unknown>(`/v1/platform/tenants/${encodeURIComponent(organizationId)}`),
+    createTenant: (
+      body: {
+        legalName: string;
+        tradeName: string;
+        document: string;
+        unitName: string;
+        timezone: string;
+        ownerEmail: string;
+        reason: string;
+      },
+      idempotencyKey?: string,
+    ) => idempotentRequest<unknown>("/v1/platform/tenants", "POST", body, idempotencyKey),
     grantPilotAccess: (organizationId: string, body: { reason: string }, idempotencyKey?: string) =>
       idempotentRequest<unknown>(
         `/v1/platform/tenants/${encodeURIComponent(organizationId)}/pilot-access`,
