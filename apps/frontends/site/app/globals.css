@@ -4,3 +4,24 @@
 @import "../styles/footer.css" layer(legacy);
 @import "../styles/inner-pages.css" layer(legacy);
 @import "../styles/responsive.css" layer(legacy);
+
+/* The shared Label primitive is inline-flex by default. Public auth forms
+   need stacked labels so the control keeps its full width. */
+.auth-form > label[data-slot="label"]:not(.check-label) {
+  display: grid;
+  align-items: stretch;
+  gap: 7px;
+  width: 100%;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.auth-form > label.check-label[data-slot="label"] {
+  align-items: flex-start;
+  display: flex;
+  gap: 9px;
+  font-size: 13px;
+  line-height: 1.3;
+}

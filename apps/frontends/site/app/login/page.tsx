@@ -140,7 +140,12 @@ export default function LoginPage() {
           </p>
           {!challengeToken && !oauthMfa && (
             <>
-              <Button className="button google-button" type="button" onClick={startGoogleLogin}>
+              <Button
+                className="button google-button"
+                type="button"
+                variant="secondary"
+                onClick={startGoogleLogin}
+              >
                 <span aria-hidden="true">G</span> Continuar com Google
               </Button>
               <div className="divider">

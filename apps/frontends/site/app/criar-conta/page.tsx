@@ -91,6 +91,7 @@ export default function CreateAccountPage() {
         <Button
           className="button google-button"
           type="button"
+          variant="secondary"
           onClick={startGoogleSignup}
           disabled={!termsAccepted}
         >
