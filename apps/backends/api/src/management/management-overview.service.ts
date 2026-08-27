@@ -451,6 +451,8 @@ export class ManagementOverviewService {
   }
 
   private async loadMultiunit(organizationId: string, dayStart: Date, now: Date) {
+    const dayStartIso = dayStart.toISOString();
+    const nowIso = now.toISOString();
     const [unitRows, salesRows, marginRows, kdsRows, deliveryRows] = await Promise.all([
       this.database.db
         .select({ id: units.id, name: units.name })
@@ -460,7 +462,7 @@ export class ManagementOverviewService {
         .select({
           unitId: posTabs.unitId,
           salesCents:
-            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${dayStart}), 0)`.mapWith(
+            sql<number>`coalesce(sum(${posTabs.totalCents}) filter (where ${posTabs.status} = 'closed' and ${posTabs.closedAt} >= ${dayStartIso}::timestamptz), 0)`.mapWith(
               Number,
             ),
         })
@@ -498,7 +500,7 @@ export class ManagementOverviewService {
         .select({
           unitId: posKdsTickets.unitId,
           alerts:
-            sql<number>`count(*) filter (where ${posKdsTickets.status} in ('pending', 'preparing') and coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + interval '15 minutes') < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${posKdsTickets.status} in ('pending', 'preparing') and coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + interval '15 minutes') < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -509,7 +511,7 @@ export class ManagementOverviewService {
         .select({
           unitId: deliveryOrders.unitId,
           alerts:
-            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -858,6 +860,9 @@ export class ManagementOverviewService {
     const periodDuration = Math.max(60 * 60_000, now.getTime() - periodStart.getTime());
     const previousStart = new Date(periodStart.getTime() - periodDuration);
     const consumptionStart = new Date(now.getTime() - 30 * 24 * 60 * 60_000);
+    const nowIso = now.toISOString();
+    const periodStartIso = periodStart.toISOString();
+    const previousStartIso = previousStart.toISOString();
     const [balances, purchaseRows, eventRows, consumptionRows] = await Promise.all([
       this.database.db
         .select({
@@ -893,7 +898,7 @@ export class ManagementOverviewService {
               Number,
             ),
           delayed:
-            sql<number>`count(*) filter (where ${managementPurchaseOrders.status} in ('approved', 'partially_received') and ${managementPurchaseOrders.expectedAt} < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${managementPurchaseOrders.status} in ('approved', 'partially_received') and ${managementPurchaseOrders.expectedAt} < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -907,11 +912,11 @@ export class ManagementOverviewService {
       this.database.db
         .select({
           count:
-            sql<number>`count(*) filter (where ${managementInventoryEvents.createdAt} >= ${periodStart})`.mapWith(
+            sql<number>`count(*) filter (where ${managementInventoryEvents.createdAt} >= ${periodStartIso}::timestamptz)`.mapWith(
               Number,
             ),
           previous:
-            sql<number>`count(*) filter (where ${managementInventoryEvents.createdAt} >= ${previousStart} and ${managementInventoryEvents.createdAt} < ${periodStart})`.mapWith(
+            sql<number>`count(*) filter (where ${managementInventoryEvents.createdAt} >= ${previousStartIso}::timestamptz and ${managementInventoryEvents.createdAt} < ${periodStartIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -1103,6 +1108,9 @@ export class ManagementOverviewService {
     const riskEnd = new Date(now.getTime() + riskMinutes * 60_000);
     const dayStart = new Date(now);
     dayStart.setUTCHours(0, 0, 0, 0);
+    const nowIso = now.toISOString();
+    const riskEndIso = riskEnd.toISOString();
+    const dayStartIso = dayStart.toISOString();
     const [orderRows, courierRows] = await Promise.all([
       this.database.db
         .select({
@@ -1118,15 +1126,15 @@ export class ManagementOverviewService {
             Number,
           ),
           delayed:
-            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} is not null and ${deliveryOrders.promisedAt} < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} is not null and ${deliveryOrders.promisedAt} < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
           atRisk:
-            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} >= ${now} and ${deliveryOrders.promisedAt} <= ${riskEnd})`.mapWith(
+            sql<number>`count(*) filter (where ${deliveryOrders.status} in ('placed', 'confirmed', 'preparing', 'ready', 'dispatched') and ${deliveryOrders.promisedAt} >= ${nowIso}::timestamptz and ${deliveryOrders.promisedAt} <= ${riskEndIso}::timestamptz)`.mapWith(
               Number,
             ),
           canceledToday:
-            sql<number>`count(*) filter (where ${deliveryOrders.status} = 'canceled' and ${deliveryOrders.updatedAt} >= ${dayStart})`.mapWith(
+            sql<number>`count(*) filter (where ${deliveryOrders.status} = 'canceled' and ${deliveryOrders.updatedAt} >= ${dayStartIso}::timestamptz)`.mapWith(
               Number,
             ),
         })
@@ -1170,15 +1178,17 @@ export class ManagementOverviewService {
     now: Date,
   ): Promise<NonNullable<OverviewSnapshot["reservations"]>> {
     const upcomingEnd = new Date(now.getTime() + 2 * 60 * 60 * 1_000);
+    const nowIso = now.toISOString();
+    const upcomingEndIso = upcomingEnd.toISOString();
     const [reservationRows, waitlistRows] = await Promise.all([
       this.database.db
         .select({
           upcoming:
-            sql<number>`count(*) filter (where ${reservations.status} in ('booked', 'confirmed') and ${reservations.scheduledAt} >= ${now} and ${reservations.scheduledAt} <= ${upcomingEnd})`.mapWith(
+            sql<number>`count(*) filter (where ${reservations.status} in ('booked', 'confirmed') and ${reservations.scheduledAt} >= ${nowIso}::timestamptz and ${reservations.scheduledAt} <= ${upcomingEndIso}::timestamptz)`.mapWith(
               Number,
             ),
           overdue:
-            sql<number>`count(*) filter (where ${reservations.status} in ('booked', 'confirmed') and ${reservations.scheduledAt} < ${now})`.mapWith(
+            sql<number>`count(*) filter (where ${reservations.status} in ('booked', 'confirmed') and ${reservations.scheduledAt} < ${nowIso}::timestamptz)`.mapWith(
               Number,
             ),
         })

@@ -675,7 +675,7 @@ export class PlatformControlService {
             version: hubHeartbeats.version,
             total: sql<number>`count(*)::int`.mapWith(Number),
             stale:
-              sql<number>`count(*) filter (where ${hubHeartbeats.lastSeenAt} < ${staleAt.toISOString()})::int`.mapWith(
+              sql<number>`count(*) filter (where ${hubHeartbeats.lastSeenAt} < ${staleAt.toISOString()}::timestamptz)::int`.mapWith(
                 Number,
               ),
           })

@@ -2076,6 +2076,7 @@ export class GrowthService {
       behaviorFilter = sql`substring(${growthCustomers.birthDate}, 6, 2)::int = ${Number(filter.month)}`;
     } else if (kind === "inactive_days") {
       const cutoff = new Date(Date.now() - Number(filter.days) * 24 * 60 * 60 * 1000);
+      const cutoffIso = cutoff.toISOString();
       behaviorFilter = sql`not exists (
         select 1 from growth_pos_tab_customer_links links
         inner join pos_tabs tabs
@@ -2085,7 +2086,7 @@ export class GrowthService {
         where links.organization_id = ${campaign.organizationId}
           and links.customer_id = ${growthCustomers.id}
           and tabs.status = 'closed'
-          and tabs.closed_at >= ${cutoff}
+          and tabs.closed_at >= ${cutoffIso}::timestamptz
       )`;
     } else if (kind === "minimum_visits") {
       behaviorFilter = sql`(
