@@ -1575,16 +1575,18 @@ export function OperationalApp({
               ))}
             </nav>
           )}
-          <TimeClockBanner
-            identityId={session.identityId}
-            scope={{
-              organizationId: session.organizationId,
-              unitId: session.unitId,
-              profileId: session.profile.id,
-              refreshToken: scopeRevision,
-            }}
-            timeZone={establishmentContext.timezone}
-          />
+          {!session.platformAdmin && (
+            <TimeClockBanner
+              identityId={session.identityId}
+              scope={{
+                organizationId: session.organizationId,
+                unitId: session.unitId,
+                profileId: session.profile.id,
+                refreshToken: scopeRevision,
+              }}
+              timeZone={establishmentContext.timezone}
+            />
+          )}
           <Suspense
             fallback={
               <Card className="remote-state" role="status">
