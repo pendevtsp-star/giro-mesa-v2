@@ -74,13 +74,14 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0074_crm_operational_inbox");
-  assert.equal(matrix.transitions.length, 5);
+  assert.equal(matrix.targetMigration, "0075_platform_staff_invitations");
+  assert.equal(matrix.transitions.length, 6);
   const [
     transition,
     previousProductionTransition,
     currentProductionTransition,
     latestProductionTransition,
+    previousAppTransition,
     appOnlyTransition,
   ] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
@@ -120,8 +121,15 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(latestProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(latestProductionTransition.testedUpgrade, true);
   assert.deepEqual(latestProductionTransition.evidence, transition.evidence);
+  assert.equal(previousAppTransition.appliedBefore, "0074_crm_operational_inbox");
+  assert.equal(previousAppTransition.appliedBeforeWhen, "1787709600000");
+  assert.equal(previousAppTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(previousAppTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousAppTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(previousAppTransition.testedUpgrade, true);
+  assert.deepEqual(previousAppTransition.evidence, transition.evidence);
   assert.equal(appOnlyTransition.appliedBefore, matrix.targetMigration);
-  assert.equal(appOnlyTransition.appliedBeforeWhen, "1787709600000");
+  assert.equal(appOnlyTransition.appliedBeforeWhen, "1787796000000");
   assert.equal(appOnlyTransition.appliedAfter, matrix.targetMigration);
   assert.equal(appOnlyTransition.recoveryMigration, "0045_strong_pride");
   assert.equal(appOnlyTransition.recoveryArtifact, transition.recoveryArtifact);
