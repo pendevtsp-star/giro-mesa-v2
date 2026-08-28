@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { doseClubManagedCredential } from "./doseclub.js";
+import { doseClubManagedCredential, includesDoseClubEntitlement } from "./doseclub.js";
+
+describe("includesDoseClubEntitlement", () => {
+  it("aceita somente o entitlement explícito ou aliases legados", () => {
+    assert.equal(includesDoseClubEntitlement(["salon", "doseclub.subscription"]), true);
+    assert.equal(includesDoseClubEntitlement(["bundle"]), true);
+    assert.equal(includesDoseClubEntitlement(["integrations", "inventory"]), false);
+    assert.equal(includesDoseClubEntitlement("bundle"), false);
+  });
+});
 
 describe("doseClubManagedCredential", () => {
   it("derives a stable tenant credential without persisting the token", () => {

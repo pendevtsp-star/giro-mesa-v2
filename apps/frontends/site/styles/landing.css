@@ -21,6 +21,12 @@
   align-items: center;
   gap: 62px;
 }
+.hero-grid--text-only {
+  grid-template-columns: 1fr;
+}
+.hero-grid--text-only .hero-copy {
+  max-width: 880px;
+}
 .hero-copy h1 {
   margin: 18px 0 24px;
   font-family: Georgia, "Times New Roman", serif;

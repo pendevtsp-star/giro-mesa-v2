@@ -1184,6 +1184,38 @@ export const api = {
   },
   platform: {
     overview: () => request<unknown>("/v1/platform/overview"),
+    team: () => request<unknown>("/v1/platform/team"),
+    inviteTeamMember: (
+      body: {
+        email: string;
+        role: "viewer" | "support" | "finance" | "fiscal" | "engineering";
+        reason: string;
+        reauth: { mfaCode: string };
+      },
+      idempotencyKey?: string,
+    ) => idempotentRequest<unknown>("/v1/platform/team/invitations", "POST", body, idempotencyKey),
+    cancelTeamInvitation: (
+      invitationId: string,
+      body: { reason: string; reauth: { mfaCode: string } },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/team/invitations/${encodeURIComponent(invitationId)}`,
+        "DELETE",
+        body,
+        idempotencyKey,
+      ),
+    revokeTeamMember: (
+      identityId: string,
+      body: { reason: string; reauth: { mfaCode: string } },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<unknown>(
+        `/v1/platform/team/members/${encodeURIComponent(identityId)}`,
+        "DELETE",
+        body,
+        idempotencyKey,
+      ),
     tenants: (
       filters: {
         search?: string;

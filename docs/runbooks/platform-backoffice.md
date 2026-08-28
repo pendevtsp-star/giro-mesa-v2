@@ -10,9 +10,9 @@ Central interna da equipe GiroMesa para localizar tenants, acompanhar ativação
 - Financeiro consulta assinatura, faturas e eventos de cobrança do assinante; não acessa o caixa do restaurante por este painel.
 - Fiscal consulta integrações e incidentes fiscais; credenciais e certificados nunca são exibidos.
 - Engenharia investiga falhas técnicas e pode assumir, adiar, resolver ou reprocessar eventos quando houver causa conhecida.
-- Administração possui todas as capacidades e é o único perfil autorizado a revelar PII sob motivo. Perfis e operadores autorizados são configurados no ambiente/deploy; aplique sempre o menor privilégio.
+- Administração possui todas as capacidades, gerencia a equipe e é o único perfil autorizado a revelar PII sob motivo. Mantenha apenas o responsável de contingência no ambiente/deploy; convide os demais operadores pela área **Equipe interna**, sempre com o menor privilégio.
 
-Configure `PLATFORM_ADMIN_ROLES` no deploy com entradas `email=perfil`, usando `viewer`, `support`, `finance`, `fiscal`, `engineering` ou `admin`. `PLATFORM_ADMIN_EMAILS` existe apenas para compatibilidade e concede `admin`; migre a allowlist legada para perfis explícitos.
+Configure `PLATFORM_ADMIN_ROLES` no deploy somente com a entrada `email=admin` do responsável de contingência. `PLATFORM_ADMIN_EMAILS` existe apenas para compatibilidade, concede `admin` e deve permanecer vazio. Acesso cotidiano é persistido, revogável e auditável; não acrescente a equipe ao `.env`.
 
 Revogue imediatamente o acesso de quem sair da equipe ou mudar de função. Não use a central enquanto o MFA estiver indisponível; recupere a conta pelo fluxo de segurança antes de continuar.
 
@@ -20,11 +20,20 @@ Revogue imediatamente o acesso de quem sair da equipe ou mudar de função. Não
 
 Para provisionar `pendevtsp@gmail.com`, configure no deploy `PLATFORM_ADMIN_ROLES=pendevtsp@gmail.com=admin` e reinicie apenas o processo da API pelo procedimento de release. Não use `PLATFORM_ADMIN_EMAILS`, senha em `.env`, seed, código ou mensagem de chat.
 
-1. Crie a conta individual pelo fluxo normal de cadastro/login com uma senha aleatória longa gerada e guardada diretamente no gerenciador de senhas do responsável. Se a conta já existir, use o fluxo de recuperação de senha; nunca entregue uma senha temporária em repositório, log ou ticket.
+1. Crie a conta individual pelo Google ou pelo fluxo normal de cadastro/login, confirme a propriedade do e-mail e use uma senha aleatória longa guardada diretamente no gerenciador de senhas do responsável. Uma conta local ainda não verificada não recebe acesso apenas por coincidir com o e-mail do `.env`. Se a conta já existir, use o fluxo de recuperação de senha; nunca entregue uma senha temporária em repositório, log ou ticket.
 2. Faça login, cadastre o TOTP em **Segurança**, confirme o primeiro código e guarde os códigos de recuperação fora da VPS. A API exige um fator MFA verificado para toda rota `/v1/platform`; a allowlist isolada não basta.
 3. Em uma nova sessão, abra a Central de controle e confirme o perfil `admin` e o selo de MFA. Se não abrir, revise exatamente o e-mail normalizado na variável, o cadastro ativo e o fator MFA; não reduza o guard para recuperar acesso.
 
 `MFA_ENCRYPTION_KEY` deve estar configurada e estável antes do cadastro do TOTP. A troca dessa chave sem uma migração de fatores invalida a recuperação dos segredos MFA existentes.
+
+### Convite de membros da equipe
+
+1. Em **Equipe interna**, informe o e-mail pessoal do colaborador, selecione `viewer`, `support`, `finance`, `fiscal` ou `engineering`, registre o motivo e confirme com seu código MFA atual. Convites nunca concedem `admin`.
+2. O link expira em sete dias e o token fica cifrado no outbox e no fragmento da URL, sem ser salvo em texto puro ou enviado aos logs HTTP. O provedor de e-mail precisa estar habilitado.
+3. O convidado entra ou cria a conta com o mesmo e-mail, ativa MFA em **Segurança** e aceita o convite. Só então o acesso persistido passa a valer.
+4. Cancele convites pendentes e revogue membros pela mesma tela. A revogação é imediata; motivo, ator e instante permanecem na auditoria.
+
+Não compartilhe contas, links ou códigos MFA. O administrador de contingência configurado no deploy não aparece na lista persistida e só pode ser removido alterando a configuração em um novo release.
 
 ### Acesso piloto de seis meses
 
@@ -90,3 +99,14 @@ Antes de publicar uma versão comercial:
 2. Confirme que Termos e Privacidade aprovados são exatamente as versões vinculadas ao bundle.
 3. Simule indisponibilidade e payload inválido: nenhum preço, formulário ou documento preliminar deve aparecer.
 4. Se houver experimento, valide estabilidade da variante, impressão idempotente e atribuição do lead sem PII, IP ou user-agent.
+
+### Correção da comunicação legada do teste assistido
+
+`apps/backends/api/src/platform/prepare-commercial-copy.ts` prepara a correção dos textos exatos da migration 0073: solicitação assistida, 14 dias após a ativação sem cartão e indisponibilidade atual da continuidade offline. Preserva textos personalizados, preços, entitlements, ofertas, experimentos e documentos legais. Não altera migrations anteriores nem a versão publicada.
+
+1. Compile com `rtk pnpm --filter @giromesa/api build`. Configure `API_URL` e `COMMERCIAL_SESSION_TOKEN` apenas no ambiente do processo, usando sessão pessoal de operador com MFA e `commercial:read`/`commercial:write`. Nunca coloque o token no comando, arquivo versionado ou log.
+2. Obtenha o UUID da versão publicada na Central. Execute `rtk proxy node apps/backends/api/dist/platform/prepare-commercial-copy.js <UUID>`: o padrão somente consulta e retorna o payload proposto para revisão.
+3. Após revisar origem e payload, execute o mesmo comando com `--apply`, em uma janela sem edição concorrente do catálogo. Ele cria um rascunho pelo fluxo normal, grava com idempotência e confirma por nova leitura; não aprova nem publica. Um rascunho preexistente de outro fluxo gera conflito e não é sobrescrito. Se a criação for repetida, retorna `review_required` e o payload proposto sem gravar novamente: confira/ajuste o rascunho na Central, pois outro operador pode tê-lo editado. O endpoint atual não oferece revisão condicional; a primeira gravação exige ausência de edição concorrente entre a consulta e o envio.
+4. Revise o preview na Central, incluindo personalizações e experimentos que possam substituir a copy. Um segundo operador autorizado aprova a versão; publique pelo fluxo normal e confira o catálogo público e a landing. Sem essa publicação, o texto público permanece igual. Remova `COMMERCIAL_SESSION_TOKEN` do ambiente ao terminar.
+
+O script aceita HTTPS (HTTP somente em localhost) e rejeita redirecionamentos. Nunca executá-lo contra produção sem autorização operacional explícita. O teste focado é `rtk proxy node --test apps/backends/api/dist/platform/prepare-commercial-copy.test.js` após o build.

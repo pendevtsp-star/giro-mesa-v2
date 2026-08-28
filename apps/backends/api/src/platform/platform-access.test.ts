@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { isPlatformAdminEmail, platformAccessForEmail } from "./platform-access.js";
+import {
+  isPlatformAdminEmail,
+  platformAccessForEmail,
+  platformAccessForRole,
+  platformInvitableRoles,
+} from "./platform-access.js";
 
 describe("platform administrator allowlist", () => {
   it("matches complete normalized addresses and rejects partial matches", () => {
@@ -60,5 +65,11 @@ describe("platform administrator allowlist", () => {
     if (previous === undefined) delete process.env.PLATFORM_ADMIN_ROLES;
     else process.env.PLATFORM_ADMIN_ROLES = previous;
     assert.equal(platformAccessForEmail("unknown@example.com", "", ""), null);
+  });
+
+  it("maps persisted roles without allowing an invitation to create another admin", () => {
+    assert.equal(platformAccessForRole("engineering")?.capabilities.includes("outbox:retry"), true);
+    assert.equal(platformAccessForRole("invalid"), null);
+    assert.equal(platformInvitableRoles.includes("admin" as never), false);
   });
 });

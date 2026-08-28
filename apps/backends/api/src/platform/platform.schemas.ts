@@ -1,5 +1,6 @@
 import { createOrganizationSchema, emailSchema } from "@giromesa/contracts";
 import { z } from "zod";
+import { platformInvitableRoles } from "./platform-access.js";
 
 export const platformIdempotencyKeySchema = z.string().trim().min(8).max(160);
 export const platformReasonSchema = z.string().trim().min(8).max(500);
@@ -69,6 +70,31 @@ export const platformTenantRegistrationSchema = createOrganizationSchema
   })
   .strict();
 export type PlatformTenantRegistration = z.infer<typeof platformTenantRegistrationSchema>;
+
+export const platformStaffInviteSchema = z
+  .object({
+    email: emailSchema,
+    role: z.enum(platformInvitableRoles),
+    reason: platformReasonSchema,
+    reauth: z.object({ mfaCode: z.string().regex(/^\d{6}$/) }).strict(),
+  })
+  .strict();
+export type PlatformStaffInviteInput = z.infer<typeof platformStaffInviteSchema>;
+
+export const platformStaffInvitationAcceptSchema = z
+  .object({ token: z.string().trim().min(32).max(256) })
+  .strict();
+export type PlatformStaffInvitationAcceptInput = z.infer<
+  typeof platformStaffInvitationAcceptSchema
+>;
+
+export const platformStaffActionSchema = z
+  .object({
+    reason: platformReasonSchema,
+    reauth: z.object({ mfaCode: z.string().regex(/^\d{6}$/) }).strict(),
+  })
+  .strict();
+export type PlatformStaffActionInput = z.infer<typeof platformStaffActionSchema>;
 
 export const platformIncidentFingerprintSchema = z
   .string()

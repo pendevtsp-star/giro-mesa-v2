@@ -1,7 +1,17 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { z } from "zod";
 
 export type GoogleAuthIntent = "login" | "signup";
+
+export const googleOAuthPrepareSchema = z
+  .object({
+    intent: z.enum(["login", "signup"]),
+    termsAccepted: z.boolean().optional().default(false),
+    returnTo: z.string().trim().min(1).max(1_024).optional(),
+  })
+  .strict();
+export type GoogleOAuthPrepareInput = z.infer<typeof googleOAuthPrepareSchema>;
 
 export interface GoogleProfile {
   subject: string;

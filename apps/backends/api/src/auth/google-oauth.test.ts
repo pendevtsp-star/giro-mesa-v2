@@ -37,6 +37,21 @@ describe("Google OAuth boundary", () => {
       consumeGoogleState(flow.stateCookie, state?.state, config, Date.now() + 11 * 60_000),
       null,
     );
+
+    const platformFlow = beginGoogleOAuth(
+      "login",
+      config,
+      "/aceitar-convite#platform=invite_token_abcdefghijklmnopqrstuvwxyz",
+    );
+    const platformAuthorization = new URL(platformFlow.authorizationUrl);
+    assert.equal(
+      consumeGoogleState(
+        platformFlow.stateCookie,
+        platformAuthorization.searchParams.get("state") ?? undefined,
+        config,
+      )?.returnTo,
+      "/aceitar-convite#platform=invite_token_abcdefghijklmnopqrstuvwxyz",
+    );
   });
 
   it("rejects unsafe return targets", () => {

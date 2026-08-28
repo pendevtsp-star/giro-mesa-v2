@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Card,
+  commercialEntitlementLabels,
   EmptyState,
   Input,
   Modal,
@@ -10,6 +11,7 @@ import {
 } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
+import { PlatformTeam } from "./platform-team";
 import "./platform.css";
 
 type Row = Record<string, unknown>;
@@ -138,6 +140,7 @@ const emptyPilotTenantForm: PilotTenantForm = {
 interface PilotAccessGrant {
   endsAt: string;
   extended: boolean;
+  doseClubQueued: boolean;
 }
 
 interface TenantDetail {
@@ -187,6 +190,21 @@ interface TenantDetail {
     lastCheckedAt: string | null;
     lastError: string | null;
   }>;
+  doseClub: {
+    available: boolean;
+    providerEnabled: boolean;
+    entitled: boolean;
+    connections: Array<{
+      id: string;
+      unitId: string | null;
+      unitName: string;
+      status: string;
+      managed: boolean;
+      provisioningStatus: string | null;
+      healthCheckedAt: string | null;
+      updatedAt: string;
+    }>;
+  };
   timeline: Array<{
     id: string;
     title: string;
@@ -575,6 +593,7 @@ export function parsePlatformTenant(value: unknown): TenantDetail {
   const onboarding = optionalRecord(payload.onboarding);
   const incidents = parseIncidentRows(optionalRecords(payload.incidents));
   const units = optionalRecords(payload.units);
+  const doseClub = optionalRecord(payload.doseClub);
   return {
     id: text(organization.id),
     name: text(organization.tradeName),
@@ -635,6 +654,21 @@ export function parsePlatformTenant(value: unknown): TenantDetail {
         lastError: null,
       };
     }),
+    doseClub: {
+      available: doseClub !== undefined,
+      providerEnabled: doseClub ? bool(doseClub.providerEnabled) : false,
+      entitled: doseClub ? bool(doseClub.entitled) : false,
+      connections: optionalRecords(doseClub?.connections).map((row) => ({
+        id: text(row.id),
+        unitId: optionalText(row.unitId),
+        unitName: optionalText(row.unitName) ?? "Todas as unidades",
+        status: text(row.status),
+        managed: bool(row.managed),
+        provisioningStatus: optionalText(row.provisioningStatus),
+        healthCheckedAt: optionalText(row.healthCheckedAt),
+        updatedAt: text(row.updatedAt),
+      })),
+    },
     timeline: optionalRecords(payload.timeline).map((row) => ({
       id: text(row.id),
       title: text(row.action),
@@ -677,7 +711,21 @@ export function parseTenantPii(value: unknown): TenantPii {
 
 export function parsePilotAccessGrant(value: unknown): PilotAccessGrant {
   const payload = record(value);
-  return { endsAt: text(payload.endsAt), extended: bool(payload.extended) };
+  return {
+    endsAt: text(payload.endsAt),
+    extended: bool(payload.extended),
+    doseClubQueued: bool(payload.doseClubQueued),
+  };
+}
+
+export function toggleCommercialEntitlement(
+  entitlements: string[],
+  entitlement: string,
+  enabled: boolean,
+) {
+  return enabled
+    ? [...new Set([...entitlements, entitlement])]
+    : entitlements.filter((item) => item !== entitlement);
 }
 
 export function parsePilotTenantCreated(value: unknown): PilotTenantCreated {
@@ -1025,7 +1073,7 @@ function RemoteMessage({
 }
 
 export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
-  const [area, setArea] = useState<"control" | "commercial">("control");
+  const [area, setArea] = useState<"control" | "commercial" | "team">("control");
   const [tenantInput, setTenantInput] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [tenantStatus, setTenantStatus] = useState("active");
@@ -1092,6 +1140,7 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   const canCreateTenant = access ? hasCapability(access, "tenants:write") : false;
   const canGrantPilotAccess = access ? hasCapability(access, "billing:write") : false;
   const canRevealPii = access ? hasCapability(access, "pii:read") : false;
+  const canManageTeam = access ? hasCapability(access, "team:manage") : false;
 
   function submitTenantSearch(event: FormEvent) {
     event.preventDefault();
@@ -1245,9 +1294,11 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
       );
       setFeedback({
         tone: "success",
-        text: result.extended
-          ? `Acesso piloto confirmado até ${dateTime(result.endsAt)}.`
-          : `O tenant já tinha acesso igual ou superior até ${dateTime(result.endsAt)}.`,
+        text: `${
+          result.extended
+            ? `Acesso piloto confirmado até ${dateTime(result.endsAt)}.`
+            : `O tenant já tinha acesso igual ou superior até ${dateTime(result.endsAt)}.`
+        }${result.doseClubQueued ? " Provisionamento do DoseClub enviado para a fila." : ""}`,
       });
       resetActionForm();
       tenant.retry();
@@ -1320,6 +1371,17 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
         >
           Comercial &amp; Site
         </Button>
+        {canManageTeam && (
+          <Button
+            aria-pressed={area === "team"}
+            onClick={() => setArea("team")}
+            size="sm"
+            type="button"
+            variant={area === "team" ? "primary" : "ghost"}
+          >
+            Equipe interna
+          </Button>
+        )}
       </nav>
 
       {area === "control" ? (
@@ -1433,8 +1495,10 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
             updating={tenant.updating}
           />
         </>
-      ) : (
+      ) : area === "commercial" ? (
         <CommercialWorkspace access={access} refreshToken={refreshToken} />
+      ) : (
+        <PlatformTeam />
       )}
 
       <Modal
@@ -2228,71 +2292,104 @@ function CommercialCatalog({
     });
   return (
     <div className="commercial-grid">
-      {draft.plans.map((plan, index) => (
-        <Card className="commercial-editor" key={plan.id}>
-          <div className="section-title">
-            <div>
-              <p className="eyebrow">Plano {plan.slug}</p>
-              <h3>{plan.name}</h3>
+      {draft.plans.map((plan, index) => {
+        const explicitDoseClub = plan.entitlements.includes("doseclub.subscription");
+        const inheritedDoseClub =
+          !explicitDoseClub &&
+          plan.entitlements.some(
+            (entitlement) => entitlement === "doseclub" || entitlement === "bundle",
+          );
+        return (
+          <Card className="commercial-editor" key={plan.id}>
+            <div className="section-title">
+              <div>
+                <p className="eyebrow">Plano {plan.slug}</p>
+                <h3>{plan.name}</h3>
+              </div>
+              <Badge tone="info">{centsToBrl(plan.monthlyPriceCents)} / mês</Badge>
             </div>
-            <Badge tone="info">{centsToBrl(plan.monthlyPriceCents)} / mês</Badge>
-          </div>
-          <label htmlFor={`plan-name-${plan.id}`}>Nome</label>
-          <Input
-            id={`plan-name-${plan.id}`}
-            onChange={(event) => update(index, { name: event.target.value })}
-            value={plan.name}
-          />
-          <label htmlFor={`plan-description-${plan.id}`}>Descrição</label>
-          <Textarea
-            id={`plan-description-${plan.id}`}
-            onChange={(event) => update(index, { description: event.target.value })}
-            value={plan.description}
-          />
-          <div className="commercial-fields">
-            <label htmlFor={`plan-monthly-${plan.id}`}>
-              Mensal (R$)
-              <Input
-                id={`plan-monthly-${plan.id}`}
-                inputMode="decimal"
-                onChange={(event) => {
-                  try {
-                    update(index, { monthlyPriceCents: brlToCents(event.target.value) });
-                  } catch {
-                    /* validação nativa no blur */
-                  }
-                }}
-                defaultValue={(plan.monthlyPriceCents / 100).toFixed(2).replace(".", ",")}
+            <label htmlFor={`plan-name-${plan.id}`}>Nome</label>
+            <Input
+              id={`plan-name-${plan.id}`}
+              onChange={(event) => update(index, { name: event.target.value })}
+              value={plan.name}
+            />
+            <label htmlFor={`plan-description-${plan.id}`}>Descrição</label>
+            <Textarea
+              id={`plan-description-${plan.id}`}
+              onChange={(event) => update(index, { description: event.target.value })}
+              value={plan.description}
+            />
+            <div className="commercial-fields">
+              <label htmlFor={`plan-monthly-${plan.id}`}>
+                Mensal (R$)
+                <Input
+                  id={`plan-monthly-${plan.id}`}
+                  inputMode="decimal"
+                  onChange={(event) => {
+                    try {
+                      update(index, { monthlyPriceCents: brlToCents(event.target.value) });
+                    } catch {
+                      /* validação nativa no blur */
+                    }
+                  }}
+                  defaultValue={(plan.monthlyPriceCents / 100).toFixed(2).replace(".", ",")}
+                />
+              </label>
+              <label htmlFor={`plan-annual-${plan.id}`}>
+                Anual (R$)
+                <Input
+                  id={`plan-annual-${plan.id}`}
+                  inputMode="decimal"
+                  onChange={(event) => {
+                    try {
+                      update(index, { annualPriceCents: brlToCents(event.target.value) });
+                    } catch {
+                      /* validação nativa no blur */
+                    }
+                  }}
+                  defaultValue={(plan.annualPriceCents / 100).toFixed(2).replace(".", ",")}
+                />
+              </label>
+              <label htmlFor={`plan-units-${plan.id}`}>
+                Unidades incluídas
+                <Input
+                  id={`plan-units-${plan.id}`}
+                  min={1}
+                  onChange={(event) => update(index, { includedUnits: Number(event.target.value) })}
+                  type="number"
+                  value={plan.includedUnits}
+                />
+              </label>
+            </div>
+            <label className="commercial-entitlement" htmlFor={`plan-doseclub-${plan.id}`}>
+              <input
+                checked={explicitDoseClub || inheritedDoseClub}
+                disabled={inheritedDoseClub}
+                id={`plan-doseclub-${plan.id}`}
+                onChange={(event) =>
+                  update(index, {
+                    entitlements: toggleCommercialEntitlement(
+                      plan.entitlements,
+                      "doseclub.subscription",
+                      event.target.checked,
+                    ),
+                  })
+                }
+                type="checkbox"
               />
+              <span>
+                <strong>DoseClub</strong>
+                <small>
+                  {inheritedDoseClub
+                    ? "Incluído por bundle ou entitlement legado; ajuste essa origem para remover."
+                    : commercialEntitlementLabels["doseclub.subscription"]}
+                </small>
+              </span>
             </label>
-            <label htmlFor={`plan-annual-${plan.id}`}>
-              Anual (R$)
-              <Input
-                id={`plan-annual-${plan.id}`}
-                inputMode="decimal"
-                onChange={(event) => {
-                  try {
-                    update(index, { annualPriceCents: brlToCents(event.target.value) });
-                  } catch {
-                    /* validação nativa no blur */
-                  }
-                }}
-                defaultValue={(plan.annualPriceCents / 100).toFixed(2).replace(".", ",")}
-              />
-            </label>
-            <label htmlFor={`plan-units-${plan.id}`}>
-              Unidades incluídas
-              <Input
-                id={`plan-units-${plan.id}`}
-                min={1}
-                onChange={(event) => update(index, { includedUnits: Number(event.target.value) })}
-                type="number"
-                value={plan.includedUnits}
-              />
-            </label>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }
@@ -3650,6 +3747,79 @@ function TenantWorkspace({
               title="Sem integrações visíveis"
             />
           )}
+        </Card>
+        <Card>
+          <SectionTitle eyebrow="Benefício do plano" title="DoseClub" />
+          <div className="platform-inline-status">
+            {data.doseClub.available ? (
+              <>
+                <Badge tone={data.doseClub.entitled ? "success" : "warning"}>
+                  {data.doseClub.entitled ? "Incluído no plano" : "Fora do plano"}
+                </Badge>
+                <Badge tone={data.doseClub.providerEnabled ? "success" : "danger"}>
+                  Provedor {data.doseClub.providerEnabled ? "habilitado" : "desabilitado"}
+                </Badge>
+              </>
+            ) : (
+              <Badge tone="info">Estado não informado</Badge>
+            )}
+          </div>
+          {!data.doseClub.available ? (
+            <EmptyState
+              description="A API ainda não retornou a projeção segura do DoseClub. Atualize após publicar o backend."
+              icon="◇"
+              title="Estado indisponível"
+            />
+          ) : !data.doseClub.entitled ? (
+            <EmptyState
+              description="Inclua DoseClub no plano comercial, publique o catálogo e conceda o acesso piloto para enfileirar o provisionamento."
+              icon="◇"
+              title="Entitlement pendente"
+            />
+          ) : data.doseClub.connections.length ? (
+            <div className="platform-compact-list">
+              {data.doseClub.connections.map((connection) => (
+                <article key={connection.id}>
+                  <div>
+                    <strong>{connection.unitName}</strong>
+                    <small>
+                      {connection.managed ? "gerenciada automaticamente" : "configuração manual"}
+                      {connection.provisioningStatus
+                        ? ` · ${connection.provisioningStatus}`
+                        : " · status remoto pendente"}
+                      {` · atualizado ${dateTime(connection.updatedAt)}`}
+                    </small>
+                  </div>
+                  <Badge
+                    tone={
+                      connection.status === "active"
+                        ? connection.provisioningStatus === "waiting_product_mappings"
+                          ? "warning"
+                          : "success"
+                        : connection.status === "failed"
+                          ? "danger"
+                          : "warning"
+                    }
+                  >
+                    {connection.status === "active" &&
+                    connection.provisioningStatus === "waiting_product_mappings"
+                      ? "Mapeamentos pendentes"
+                      : connection.status}
+                  </Badge>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              description="Conceda ou reconfirme os seis meses para enfileirar a criação das conexões por unidade."
+              icon="◇"
+              title="Aguardando provisionamento"
+            />
+          )}
+          <p className="platform-boundary">
+            Os mapeamentos de cliente, filial e produtos permanecem no DoseClub; esta tela não
+            replica essa fonte de verdade.
+          </p>
         </Card>
         <Card className="platform-timeline">
           <SectionTitle eyebrow="Auditoria" title="Linha do tempo" />

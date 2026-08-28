@@ -13,7 +13,7 @@ export function FeaturesSection({
         <div className="container">
           <div className="section-heading light">
             <p className="eyebrow">Benefícios publicados</p>
-            <h2>{benefits.title}</h2>
+            <h2 id="produto">{benefits.title}</h2>
           </div>
           <div className="capability-grid">
             {benefits.items.map((item) => (

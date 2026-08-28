@@ -5,6 +5,7 @@ import {
   auditEvents,
   commercialCatalogVersions,
   commercialPlans,
+  growthIntegrations,
   identities,
   legalEntities,
   memberships,
@@ -18,6 +19,7 @@ import {
 } from "@giromesa/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { platformAccessForEmail } from "./platform-access.js";
 import { PlatformControlService, resolvePilotAccessEndsAt } from "./platform-control.service.js";
 
 test("persists, audits and replays a six-month pilot grant without touching another tenant", async (context) => {
@@ -29,6 +31,7 @@ test("persists, audits and replays a six-month pilot grant without touching anot
   process.env.DATABASE_URL = databaseUrl;
   const database = new DatabaseService();
   const organizationIds: string[] = [];
+  const trialIds: string[] = [];
   let actorIdentityId: string | undefined;
   let catalogId: string | undefined;
   try {
@@ -58,6 +61,7 @@ test("persists, audits and replays a six-month pilot grant without touching anot
         monthlyPriceCents: 1,
         annualPriceCents: 1,
         includedUnits: 1,
+        entitlements: ["salon", "doseclub.subscription"],
       })
       .returning({ id: commercialPlans.id });
     assert.ok(plan);
@@ -105,6 +109,26 @@ test("persists, audits and replays a six-month pilot grant without touching anot
       ])
       .returning({ id: trials.id });
     assert.ok(trial && foreignTrial);
+    trialIds.push(trial.id, foreignTrial.id);
+
+    const [unit] = await database.db
+      .insert(units)
+      .values({ organizationId: organization.id, name: "Matriz", active: true })
+      .returning({ id: units.id });
+    assert.ok(unit);
+    await database.db.insert(growthIntegrations).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      provider: "doseclub",
+      status: "active",
+      credentialReference: `managed:v1:${"a".repeat(64)}`,
+      config: {
+        apiBaseUrl: "https://segredo.example.test",
+        clientId: "segredo-client",
+        provisioningStatus: "waiting_product_mappings",
+        healthCheckedAt: "2026-08-27T12:00:00.000Z",
+      },
+    });
 
     const service = new PlatformControlService(database);
     const before = new Date();
@@ -115,7 +139,7 @@ test("persists, audits and replays a six-month pilot grant without touching anot
       "Cliente piloto aprovado pelo time de produto",
     );
     const after = new Date();
-    const [persisted, untouchedForeignTrial, receipt, audit] = await Promise.all([
+    const [persisted, untouchedForeignTrial, receipt, audit, queued] = await Promise.all([
       database.db
         .select({ endsAt: trials.endsAt })
         .from(trials)
@@ -131,18 +155,46 @@ test("persists, audits and replays a six-month pilot grant without touching anot
         .from(platformActionReceipts)
         .where(eq(platformActionReceipts.actorIdentityId, actor.id)),
       database.db.select().from(auditEvents).where(eq(auditEvents.entityId, trial.id)),
+      database.db
+        .select()
+        .from(outboxEvents)
+        .where(
+          and(eq(outboxEvents.aggregateType, "trial"), eq(outboxEvents.aggregateId, trial.id)),
+        ),
     ]);
     const lowerBound = resolvePilotAccessEndsAt(initialEndsAt, before).endsAt;
     const upperBound = resolvePilotAccessEndsAt(initialEndsAt, after).endsAt;
     const grantedEndsAt = new Date(granted.endsAt);
     assert.equal(granted.replayed, false);
     assert.equal(granted.extended, true);
+    assert.equal(granted.doseClubQueued, true);
     assert.equal(grantedEndsAt >= lowerBound && grantedEndsAt <= upperBound, true);
     assert.equal(persisted[0]?.endsAt.toISOString(), granted.endsAt);
     assert.equal(untouchedForeignTrial[0]?.endsAt.toISOString(), initialEndsAt.toISOString());
     assert.equal(receipt.length, 1);
     assert.equal(audit.length, 1);
     assert.equal(audit[0]?.action, "platform.tenant.pilot_access.grant");
+    assert.equal(queued.length, 1);
+
+    const access = platformAccessForEmail(
+      "platform-pilot@example.test",
+      "platform-pilot@example.test=admin",
+      "",
+    );
+    assert.ok(access);
+    const tenant = await service.tenant360(organization.id, access);
+    assert.deepEqual(tenant.doseClub.connections[0], {
+      id: tenant.doseClub.connections[0]?.id,
+      unitId: unit.id,
+      unitName: "Matriz",
+      status: "active",
+      managed: true,
+      provisioningStatus: "waiting_product_mappings",
+      healthCheckedAt: "2026-08-27T12:00:00.000Z",
+      updatedAt: tenant.doseClub.connections[0]?.updatedAt,
+    });
+    assert.equal(tenant.doseClub.entitled, true);
+    assert.equal(JSON.stringify(tenant.doseClub).includes("segredo"), false);
 
     const replay = await service.grantPilotAccess(
       actor.id,
@@ -152,7 +204,15 @@ test("persists, audits and replays a six-month pilot grant without touching anot
     );
     assert.equal(replay.replayed, true);
     assert.equal(replay.endsAt, granted.endsAt);
+    const replayedQueue = await database.db
+      .select()
+      .from(outboxEvents)
+      .where(and(eq(outboxEvents.aggregateType, "trial"), eq(outboxEvents.aggregateId, trial.id)));
+    assert.equal(replayedQueue.length, 1);
   } finally {
+    if (trialIds.length > 0) {
+      await database.db.delete(outboxEvents).where(inArray(outboxEvents.aggregateId, trialIds));
+    }
     if (actorIdentityId) {
       await database.db
         .delete(platformActionReceipts)
@@ -183,7 +243,7 @@ test("provisions an existing owner tenant without making the platform actor a me
   let organizationId: string | undefined;
   try {
     const suffix = randomUUID();
-    const [actor, owner] = await database.db
+    const [actor, owner, unverifiedOwner] = await database.db
       .insert(identities)
       .values([
         {
@@ -194,11 +254,16 @@ test("provisions an existing owner tenant without making the platform actor a me
         {
           email: `pilot-owner+${suffix}@example.test`,
           displayName: "Pilot Owner",
+          emailVerifiedAt: new Date(),
+        },
+        {
+          email: `pilot-unverified+${suffix}@example.test`,
+          displayName: "Pilot Unverified",
         },
       ])
       .returning({ id: identities.id, email: identities.email });
-    assert.ok(actor && owner);
-    identityIds.push(actor.id, owner.id);
+    assert.ok(actor && owner && unverifiedOwner);
+    identityIds.push(actor.id, owner.id, unverifiedOwner.id);
 
     const documentPrefix = suffix.replaceAll("-", "").slice(0, 12).toUpperCase();
     const input = {
@@ -211,6 +276,22 @@ test("provisions an existing owner tenant without making the platform actor a me
       reason: "Cliente piloto aprovado pelo time de produto",
     };
     const service = new PlatformControlService(database);
+    await assert.rejects(
+      service.registerTenant(actor.id, `tenant-unverified-${suffix}`, {
+        ...input,
+        ownerEmail: unverifiedOwner.email,
+      }),
+      (error: unknown) => {
+        if (!error || typeof error !== "object" || !("getResponse" in error)) return false;
+        const response = (error as { getResponse: () => unknown }).getResponse();
+        return (
+          response !== null &&
+          typeof response === "object" &&
+          "code" in response &&
+          response.code === "PLATFORM_TENANT_OWNER_EMAIL_UNVERIFIED"
+        );
+      },
+    );
     const created = await service.registerTenant(actor.id, `tenant-create-${suffix}`, input);
     organizationId = created.organization.id;
 

@@ -8,10 +8,11 @@ import {
   organizations,
   roleBindings,
   subscriptions,
+  trials,
   units,
 } from "@giromesa/db";
-import { doseClubManagedCredential } from "@giromesa/domain";
-import { and, eq } from "drizzle-orm";
+import { doseClubManagedCredential, includesDoseClubEntitlement } from "@giromesa/domain";
+import { and, eq, inArray } from "drizzle-orm";
 import type { ClaimedOutboxEvent } from "./outbox.js";
 
 type Database = GiroMesaDatabase["db"];
@@ -26,33 +27,29 @@ export class DoseClubProvisioningError extends Error {
   }
 }
 
-const DOSECLUB_ENTITLEMENTS = new Set(["doseclub", "doseclub.subscription", "bundle"]);
+export { includesDoseClubEntitlement } from "@giromesa/domain";
 
-export function includesDoseClubEntitlement(value: unknown): boolean {
-  return (
-    Array.isArray(value) &&
-    value.some((item) => typeof item === "string" && DOSECLUB_ENTITLEMENTS.has(item))
-  );
-}
-
-export async function provisionDoseClubSubscription(db: Database, event: ClaimedOutboxEvent) {
+export function doseClubAccessReference(event: ClaimedOutboxEvent) {
   const organizationId = requiredUuid(event.payload.organizationId, "organizationId");
-  const subscriptionId = requiredUuid(event.payload.subscriptionId, "subscriptionId");
-  if (event.aggregate_type !== "subscription" || event.aggregate_id !== subscriptionId) {
+  const key = event.aggregate_type === "subscription" ? "subscriptionId" : "trialId";
+  if (event.aggregate_type !== "subscription" && event.aggregate_type !== "trial") {
     throw new DoseClubProvisioningError("DOSECLUB_PROVISIONING_EVENT_INVALID", false);
   }
+  const accessId = requiredUuid(event.payload[key], key);
+  if (event.aggregate_id !== accessId) {
+    throw new DoseClubProvisioningError("DOSECLUB_PROVISIONING_EVENT_INVALID", false);
+  }
+  return { organizationId, accessId, kind: event.aggregate_type } as const;
+}
 
-  const [subscription] = await db
-    .select({ state: subscriptions.state, entitlements: commercialPlans.entitlements })
-    .from(subscriptions)
-    .innerJoin(commercialPlans, eq(commercialPlans.id, subscriptions.commercialPlanId))
-    .where(
-      and(eq(subscriptions.id, subscriptionId), eq(subscriptions.organizationId, organizationId)),
-    )
-    .limit(1);
-  if (!subscription) throw new DoseClubProvisioningError("DOSECLUB_SUBSCRIPTION_NOT_FOUND", false);
-  const enabled =
-    subscription.state === "active" && includesDoseClubEntitlement(subscription.entitlements);
+export async function reconcileDoseClubAccess(db: Database, event: ClaimedOutboxEvent) {
+  const { organizationId, accessId, kind } = doseClubAccessReference(event);
+
+  const eventSourceEligible =
+    kind === "subscription"
+      ? await subscriptionIsEligible(db, organizationId, accessId)
+      : await trialIsEligible(db, organizationId, accessId);
+  const enabled = eventSourceEligible || (await organizationHasDoseClubAccess(db, organizationId));
   const existing = await db
     .select()
     .from(growthIntegrations)
@@ -62,8 +59,8 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
         eq(growthIntegrations.provider, "doseclub"),
       ),
     );
-  if (!enabled && !existing.some((row) => row.credentialReference?.startsWith("managed:v1:")))
-    return;
+  const managed = existing.filter((row) => row.credentialReference?.startsWith("managed:v1:"));
+  if (!enabled && managed.length === 0) return;
 
   const [organization] = await db
     .select()
@@ -74,30 +71,47 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
     .select()
     .from(units)
     .where(
-      enabled
-        ? and(eq(units.organizationId, organizationId), eq(units.active, true))
-        : eq(units.organizationId, organizationId),
+      and(eq(units.organizationId, organizationId), ...(enabled ? [eq(units.active, true)] : [])),
     );
-  const [owner] = await db
-    .select({ id: identities.id, email: identities.email, name: identities.displayName })
-    .from(memberships)
-    .innerJoin(identities, eq(identities.id, memberships.identityId))
-    .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-    .where(
-      and(
-        eq(memberships.organizationId, organizationId),
-        eq(memberships.status, "active"),
-        eq(roleBindings.role, "owner"),
-      ),
-    )
-    .limit(1);
-  if (!organization || !owner || (enabled && unitRows.length === 0)) {
+  const [owner] = enabled
+    ? await db
+        .select({ id: identities.id, email: identities.email, name: identities.displayName })
+        .from(memberships)
+        .innerJoin(identities, eq(identities.id, memberships.identityId))
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .where(
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            eq(roleBindings.role, "owner"),
+          ),
+        )
+        .limit(1)
+    : [];
+  if (!organization || (enabled && (!owner || unitRows.length === 0))) {
     throw new DoseClubProvisioningError("DOSECLUB_PROVISIONING_CONTEXT_INCOMPLETE", false);
+  }
+
+  if (
+    enabled &&
+    hasDoseClubManualConflict(
+      existing,
+      unitRows.map((unit) => unit.id),
+    )
+  ) {
+    throw new DoseClubProvisioningError("DOSECLUB_MANUAL_CONNECTION_CONFLICT", false);
   }
 
   const settings = configuration();
   const integrationRows = [];
   for (const unit of unitRows) {
+    const current = existing.find((row) => row.unitId === unit.id);
+    if (!enabled) {
+      if (current?.credentialReference?.startsWith("managed:v1:")) {
+        integrationRows.push({ row: current, unit });
+      }
+      continue;
+    }
     const [row] = await db
       .insert(growthIntegrations)
       .values({
@@ -119,6 +133,9 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
     if (!row) throw new DoseClubProvisioningError("DOSECLUB_INTEGRATION_NOT_CREATED", true);
     integrationRows.push({ row, unit });
   }
+  if (integrationRows.length === 0) {
+    throw new DoseClubProvisioningError("DOSECLUB_PROVISIONING_CONTEXT_INCOMPLETE", false);
+  }
 
   const credentials = integrationRows.map(({ row, unit }) => ({
     id: unit.id,
@@ -138,7 +155,7 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
       organizationName: organization.tradeName,
       document: organization.document,
       giroMesaApiBaseUrl: settings.giroMesaApiBaseUrl,
-      owner,
+      ...(owner ? { owner } : {}),
       units: credentials,
     }),
   });
@@ -148,9 +165,9 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
       .update(growthIntegrations)
       .set({ status: "disabled", config: { provisioningStatus: "revoked" }, updatedAt: new Date() })
       .where(
-        and(
-          eq(growthIntegrations.organizationId, organizationId),
-          eq(growthIntegrations.provider, "doseclub"),
+        inArray(
+          growthIntegrations.id,
+          integrationRows.map(({ row }) => row.id),
         ),
       );
     return;
@@ -198,14 +215,108 @@ export async function provisionDoseClubSubscription(db: Database, event: Claimed
   await db.insert(auditEvents).values({
     organizationId,
     action: "doseclub.integration.automatically_provisioned",
-    entityType: "subscription",
-    entityId: subscriptionId,
+    entityType: kind,
+    entityId: accessId,
     metadata: {
       tenantId: provisioned.tenantId,
       units: unitRows.map((unit) => unit.id),
       status: provisioned.status,
     },
   });
+}
+
+async function subscriptionIsEligible(
+  db: Database,
+  organizationId: string,
+  subscriptionId: string,
+) {
+  const [subscription] = await db
+    .select({ state: subscriptions.state, entitlements: commercialPlans.entitlements })
+    .from(subscriptions)
+    .innerJoin(commercialPlans, eq(commercialPlans.id, subscriptions.commercialPlanId))
+    .where(
+      and(eq(subscriptions.id, subscriptionId), eq(subscriptions.organizationId, organizationId)),
+    )
+    .limit(1);
+  if (!subscription) throw new DoseClubProvisioningError("DOSECLUB_SUBSCRIPTION_NOT_FOUND", false);
+  return subscription.state === "active" && includesDoseClubEntitlement(subscription.entitlements);
+}
+
+async function trialIsEligible(db: Database, organizationId: string, trialId: string) {
+  const [trial] = await db
+    .select({
+      billingState: organizations.billingState,
+      startsAt: trials.startsAt,
+      endsAt: trials.endsAt,
+      entitlements: commercialPlans.entitlements,
+    })
+    .from(trials)
+    .innerJoin(organizations, eq(organizations.id, trials.organizationId))
+    .innerJoin(commercialPlans, eq(commercialPlans.id, trials.commercialPlanId))
+    .where(and(eq(trials.id, trialId), eq(trials.organizationId, organizationId)))
+    .limit(1);
+  if (!trial) throw new DoseClubProvisioningError("DOSECLUB_TRIAL_NOT_FOUND", false);
+  return isActiveDoseClubTrial(trial);
+}
+
+async function organizationHasDoseClubAccess(db: Database, organizationId: string) {
+  const [subscriptionRows, trialRows] = await Promise.all([
+    db
+      .select({ entitlements: commercialPlans.entitlements })
+      .from(subscriptions)
+      .innerJoin(commercialPlans, eq(commercialPlans.id, subscriptions.commercialPlanId))
+      .where(
+        and(eq(subscriptions.organizationId, organizationId), eq(subscriptions.state, "active")),
+      ),
+    db
+      .select({
+        billingState: organizations.billingState,
+        startsAt: trials.startsAt,
+        endsAt: trials.endsAt,
+        entitlements: commercialPlans.entitlements,
+      })
+      .from(trials)
+      .innerJoin(organizations, eq(organizations.id, trials.organizationId))
+      .innerJoin(commercialPlans, eq(commercialPlans.id, trials.commercialPlanId))
+      .where(eq(trials.organizationId, organizationId)),
+  ]);
+  return hasEffectiveDoseClubAccess([
+    ...subscriptionRows.map((row) => includesDoseClubEntitlement(row.entitlements)),
+    ...trialRows.map((trial) => isActiveDoseClubTrial(trial)),
+  ]);
+}
+
+export function hasEffectiveDoseClubAccess(sources: boolean[]) {
+  return sources.some(Boolean);
+}
+
+export function isActiveDoseClubTrial(
+  trial: {
+    billingState: string;
+    startsAt: Date;
+    endsAt: Date;
+    entitlements: unknown;
+  },
+  now = new Date(),
+) {
+  return (
+    trial.billingState === "trial_active" &&
+    trial.startsAt <= now &&
+    trial.endsAt > now &&
+    includesDoseClubEntitlement(trial.entitlements)
+  );
+}
+
+export function hasDoseClubManualConflict(
+  connections: Array<{ unitId: string | null; credentialReference: string | null }>,
+  activeUnitIds: string[],
+) {
+  return connections.some(
+    (row) =>
+      Boolean(row.credentialReference) &&
+      !row.credentialReference?.startsWith("managed:v1:") &&
+      (row.unitId === null || activeUnitIds.includes(row.unitId)),
+  );
 }
 
 function configuration() {

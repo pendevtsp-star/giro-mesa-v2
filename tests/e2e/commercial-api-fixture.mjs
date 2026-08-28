@@ -18,14 +18,18 @@ const catalog = {
       eyebrow: "Gestão para food service",
       title: "Sua operação em uma base.",
       description: "Pedidos, produção e gestão conectados.",
-      primaryCtaLabel: "Começar",
+      primaryCtaLabel: "Solicitar teste assistido",
       primaryCtaHref: "/teste-gratis",
+      secondaryCtaLabel: "Explorar recursos",
+      secondaryCtaHref: "/#produto",
       media: null,
     },
     socialProof: { title: "Operações atendidas", items: [] },
     benefits: {
       title: "Controle no turno real",
-      items: [{ title: "Atendimento", description: "Um pedido, vários canais.", icon: "operations" }],
+      items: [
+        { title: "Atendimento", description: "Um pedido, vários canais.", icon: "operations" },
+      ],
     },
     howItWorks: {
       title: "Ativação assistida",

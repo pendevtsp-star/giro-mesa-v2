@@ -40,12 +40,16 @@ import {
   type PlatformIncidentAction,
   type PlatformIncidentQuery,
   type PlatformReasonBody,
+  type PlatformStaffActionInput,
+  type PlatformStaffInviteInput,
   type PlatformTenantRegistration,
   platformIdempotencyKeySchema,
   platformIncidentActionSchema,
   platformIncidentFingerprintSchema,
   platformIncidentQuerySchema,
   platformReasonBodySchema,
+  platformStaffActionSchema,
+  platformStaffInviteSchema,
   platformTenantRegistrationSchema,
   type TenantDirectoryQuery,
   tenantDirectoryQuerySchema,
@@ -60,6 +64,7 @@ import {
   maskPhone,
   PlatformControlService,
 } from "./platform-control.service.js";
+import { PlatformTeamService } from "./platform-team.service.js";
 
 @UseGuards(SessionGuard, PlatformAdminGuard)
 @Controller(["api/v1/platform", "v1/platform"])
@@ -68,7 +73,74 @@ export class PlatformController {
     private readonly platform: PlatformService,
     private readonly control: PlatformControlService,
     private readonly commercial: PlatformCommercialService,
+    private readonly team: PlatformTeamService,
   ) {}
+
+  @Get("team")
+  teamMembers(@Req() request: PlatformRequest) {
+    requirePlatformCapability(request.platformAccess, "team:manage");
+    return this.team.list();
+  }
+
+  @Post("team/invitations")
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(platformStaffInviteSchema) })
+  inviteTeamMember(
+    @Req() request: PlatformRequest,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(platformStaffInviteSchema)) body: PlatformStaffInviteInput,
+  ) {
+    requirePlatformCapability(request.platformAccess, "team:manage");
+    return this.team.invite(request.auth.identityId, idempotencyKey(rawIdempotencyKey), body);
+  }
+
+  @Delete("team/invitations/:invitationId")
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(platformStaffActionSchema) })
+  cancelTeamInvitation(
+    @Req() request: PlatformRequest,
+    @Param("invitationId", ParseUUIDPipe) invitationId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(platformStaffActionSchema)) body: PlatformStaffActionInput,
+  ) {
+    requirePlatformCapability(request.platformAccess, "team:manage");
+    return this.team.cancelInvitation(
+      request.auth.identityId,
+      invitationId,
+      idempotencyKey(rawIdempotencyKey),
+      body,
+    );
+  }
+
+  @Delete("team/members/:identityId")
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(platformStaffActionSchema) })
+  revokeTeamMember(
+    @Req() request: PlatformRequest,
+    @Param("identityId", ParseUUIDPipe) identityId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(platformStaffActionSchema)) body: PlatformStaffActionInput,
+  ) {
+    requirePlatformCapability(request.platformAccess, "team:manage");
+    return this.team.revokeMember(
+      request.auth.identityId,
+      identityId,
+      idempotencyKey(rawIdempotencyKey),
+      body,
+    );
+  }
 
   @Get("commercial/overview")
   commercialOverview(@Req() request: PlatformRequest) {
@@ -342,6 +414,7 @@ export class PlatformController {
         "endsAt",
         "durationMonths",
         "extended",
+        "doseClubQueued",
         "replayed",
       ],
       properties: {
@@ -352,6 +425,7 @@ export class PlatformController {
         endsAt: { type: "string", format: "date-time" },
         durationMonths: { type: "integer", example: 6 },
         extended: { type: "boolean" },
+        doseClubQueued: { type: "boolean" },
         replayed: { type: "boolean" },
       },
     },

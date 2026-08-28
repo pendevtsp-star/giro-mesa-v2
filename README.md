@@ -99,7 +99,8 @@ Variáveis fundamentais:
 | `SESSION_SECRET` | Segredo aleatório de pelo menos 32 bytes |
 | `QR_TABLE_TOKEN_SECRET` | Segredo aleatório independente para tokens de mesa |
 | `MFA_ENCRYPTION_KEY`, `OUTBOX_ENCRYPTION_KEY` | Chaves Base64 distintas, cada uma com 32 bytes |
-| `PLATFORM_ADMIN_EMAILS` | E-mails autorizados para o back office da plataforma |
+| `PLATFORM_ADMIN_ROLES` | Somente o responsável de contingência, no formato `email=admin`; a equipe é convidada e revogada pelo backoffice |
+| `PLATFORM_ADMIN_EMAILS` | Compatibilidade legada; mantenha vazio |
 
 Google, Resend, Asaas, Focus NFe, Evolution/WhatsApp, DoseClub, Web Push, SmartPOS e OpenAI são opcionais no código, mas permanecem **fail-closed** quando não há credenciais ou homologação. Os requisitos de cada provedor estão em [docs/external-dependencies.md](./docs/external-dependencies.md).
 

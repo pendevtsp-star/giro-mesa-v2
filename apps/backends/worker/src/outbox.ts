@@ -11,6 +11,7 @@ import {
   membershipInvitations,
   organizations,
   outboxEvents,
+  platformStaffInvitations,
   posOrders,
   posTabs,
   readWhatsAppArtifact,
@@ -43,10 +44,7 @@ import {
   DoseClubDeliveryError,
   reverseCanceledDoseClubRedemption,
 } from "./doseclub.js";
-import {
-  DoseClubProvisioningError,
-  provisionDoseClubSubscription,
-} from "./doseclub-provisioning.js";
+import { DoseClubProvisioningError, reconcileDoseClubAccess } from "./doseclub-provisioning.js";
 import {
   deliverEmail,
   EmailDeliveryError,
@@ -480,7 +478,7 @@ export class OutboxWorker {
 
   async expireAccessWindows() {
     return this.connection.db.transaction(async (tx) => {
-      const expiredTrials = await tx.execute<{ id: string }>(sql`
+      const expiredTrials = await tx.execute<{ id: string; trial_id: string }>(sql`
         update organizations as organization
         set billing_state = 'restricted',
             billing_state_changed_at = now(),
@@ -490,7 +488,7 @@ export class OutboxWorker {
         where trial.organization_id = organization.id
           and organization.billing_state = 'trial_active'
           and trial.ends_at <= now()
-        returning organization.id
+        returning organization.id, trial.id as trial_id
       `);
       const expiredGrace = await tx.execute<{ id: string }>(sql`
         update organizations
@@ -506,6 +504,14 @@ export class OutboxWorker {
         ...[...expiredTrials].map((row) => ({ ...row, reason: "trial_expired" })),
         ...[...expiredGrace].map((row) => ({ ...row, reason: "grace_expired" })),
       ];
+      for (const item of expiredTrials) {
+        await tx.insert(outboxEvents).values({
+          topic: "doseclub.provisioning_requested",
+          aggregateType: "trial",
+          aggregateId: item.trial_id,
+          payload: { organizationId: item.id, trialId: item.trial_id },
+        });
+      }
       for (const item of changed) {
         await tx.insert(auditEvents).values({
           organizationId: item.id,
@@ -718,7 +724,7 @@ export class OutboxWorker {
       return;
     }
     if (event.topic === "doseclub.provisioning_requested") {
-      await provisionDoseClubSubscription(this.connection.db, event);
+      await reconcileDoseClubAccess(this.connection.db, event);
       return;
     }
     if (event.topic === "billing.checkout_reconciliation_requested") {
@@ -731,6 +737,10 @@ export class OutboxWorker {
     }
     if (event.topic === "membership.invited") {
       await this.deliverMembershipInvite(event);
+      return;
+    }
+    if (event.topic === "platform.staff_invited") {
+      await this.deliverPlatformStaffInvite(event);
       return;
     }
     if (event.topic === "growth.campaign_delivery_requested") {
@@ -1190,6 +1200,64 @@ export class OutboxWorker {
         text: `${invitation.organizationName} convidou você para acessar o GiroMesa com o perfil ${role}.\n\nAceite o convite: ${actionUrl}\n\nO convite expira em 7 dias e funciona somente para este e-mail.`,
         idempotencyKey: `membership-invite/${event.id}`,
         tags: [{ name: "message_type", value: "membership_invite" }],
+      },
+      { configuration },
+    );
+  }
+
+  private async deliverPlatformStaffInvite(event: ClaimedOutboxEvent) {
+    if (event.aggregate_type !== "platform_staff_invitation" || !UUID.test(event.aggregate_id)) {
+      throw new EmailDeliveryError("EMAIL_EVENT_CONTEXT_INVALID", false);
+    }
+    activeExpiry(event.payload);
+    const [invitation] = await this.connection.db
+      .select({
+        acceptedAt: platformStaffInvitations.acceptedAt,
+        email: platformStaffInvitations.email,
+        expiresAt: platformStaffInvitations.expiresAt,
+        revokedAt: platformStaffInvitations.revokedAt,
+        role: platformStaffInvitations.role,
+        tokenHash: platformStaffInvitations.tokenHash,
+      })
+      .from(platformStaffInvitations)
+      .where(eq(platformStaffInvitations.id, event.aggregate_id))
+      .limit(1);
+    if (
+      !invitation ||
+      invitation.acceptedAt ||
+      invitation.revokedAt ||
+      invitation.expiresAt <= new Date()
+    ) {
+      throw new EmailDeliveryError("PLATFORM_INVITATION_INACTIVE", false);
+    }
+    let token: string;
+    try {
+      token = decryptSecret(
+        requiredEnvelope(event.payload, "invitationTokenEnvelope"),
+        this.outboxEncryptionKey(),
+        `platform-staff-invitation:${invitation.tokenHash}`,
+      );
+    } catch (error) {
+      if (error instanceof EmailDeliveryError) throw error;
+      throw new EmailDeliveryError("EMAIL_SECRET_DECRYPTION_FAILED", false);
+    }
+    const configuration = emailProviderConfiguration();
+    const actionUrl = `${configuration.appUrl}/aceitar-convite#platform=${encodeURIComponent(token)}`;
+    await deliverEmail(
+      {
+        to: invitation.email,
+        subject: "Convite para o backoffice do GiroMesa",
+        html: emailHtml({
+          title: "Acesso ao backoffice GiroMesa",
+          greeting: "Olá!",
+          body: `Você recebeu um convite pessoal para a equipe interna do GiroMesa com o perfil ${invitation.role}. O convite expira em 7 dias e o acesso exige MFA.`,
+          actionLabel: "Aceitar convite",
+          actionUrl,
+          footer: "Se você não reconhece este convite, ignore a mensagem.",
+        }),
+        text: `Você recebeu um convite para o backoffice GiroMesa com o perfil ${invitation.role}.\n\nAceite: ${actionUrl}\n\nO convite expira em 7 dias e o acesso exige MFA.`,
+        idempotencyKey: `platform-staff-invite/${event.id}`,
+        tags: [{ name: "message_type", value: "platform_staff_invite" }],
       },
       { configuration },
     );

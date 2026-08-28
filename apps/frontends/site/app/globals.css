@@ -5,6 +5,17 @@
 @import "../styles/inner-pages.css" layer(legacy);
 @import "../styles/responsive.css" layer(legacy);
 
+/* The site's container owns its gutters; Tailwind's utility otherwise
+   overrides the legacy layer and stretches mobile content to the edges. */
+.container {
+  width: min(1180px, calc(100% - 2 * var(--gm-space-5)));
+  max-width: 1180px;
+  margin-inline: auto;
+}
+.container.narrow {
+  max-width: 800px;
+}
+
 /* The shared Label primitive is inline-flex by default. Public auth forms
    need stacked labels so the control keeps its full width. */
 .auth-form > label[data-slot="label"]:not(.check-label) {

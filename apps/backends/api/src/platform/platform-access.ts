@@ -1,13 +1,13 @@
 import { ForbiddenException } from "@nestjs/common";
 
-export const platformRoles = [
+export const platformInvitableRoles = [
   "viewer",
   "support",
   "finance",
   "fiscal",
   "engineering",
-  "admin",
 ] as const;
+export const platformRoles = [...platformInvitableRoles, "admin"] as const;
 export type PlatformRole = (typeof platformRoles)[number];
 
 const capabilitiesByRole = {
@@ -36,6 +36,7 @@ const capabilitiesByRole = {
     "commercial:media",
   ],
   admin: [
+    "team:manage",
     "tenants:read",
     "tenants:write",
     "billing:read",
@@ -90,6 +91,16 @@ export function platformAccessForEmail(
   const role =
     configured?.role ?? (legacyEmails(legacyAllowlist).includes(normalized) ? "admin" : null);
   return role ? { role, capabilities: [...capabilitiesByRole[role]], mfaEnforced: true } : null;
+}
+
+export function platformAccessForRole(role: string): PlatformAccess | null {
+  return platformRoles.includes(role as PlatformRole)
+    ? {
+        role: role as PlatformRole,
+        capabilities: [...capabilitiesByRole[role as PlatformRole]],
+        mfaEnforced: true,
+      }
+    : null;
 }
 
 export function isPlatformAdminEmail(email: string, configured?: string) {

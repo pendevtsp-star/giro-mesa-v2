@@ -6549,6 +6549,144 @@
         ]
       }
     },
+    "/api/v1/auth/google/prepare": {
+      "post": {
+        "operationId": "AuthController_googlePrepare[0]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intent": {
+                    "type": "string",
+                    "enum": [
+                      "login",
+                      "signup"
+                    ]
+                  },
+                  "termsAccepted": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "returnTo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "intent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/v1/auth/google/prepare": {
+      "post": {
+        "operationId": "AuthController_googlePrepare[1]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intent": {
+                    "type": "string",
+                    "enum": [
+                      "login",
+                      "signup"
+                    ]
+                  },
+                  "termsAccepted": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "returnTo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "intent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/public/v1/auth/google/prepare": {
+      "post": {
+        "operationId": "AuthController_googlePrepare[2]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "intent": {
+                    "type": "string",
+                    "enum": [
+                      "login",
+                      "signup"
+                    ]
+                  },
+                  "termsAccepted": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "returnTo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "intent"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/api/v1/auth/google/callback": {
       "get": {
         "operationId": "AuthController_googleCallback[0]",
@@ -74463,6 +74601,462 @@
         ]
       }
     },
+    "/api/v1/platform/team": {
+      "get": {
+        "operationId": "PlatformController_teamMembers[0]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/team": {
+      "get": {
+        "operationId": "PlatformController_teamMembers[1]",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/team/invitations": {
+      "post": {
+        "operationId": "PlatformController_inviteTeamMember[0]",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "support",
+                      "finance",
+                      "fiscal",
+                      "engineering"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "email",
+                  "role",
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/team/invitations": {
+      "post": {
+        "operationId": "PlatformController_inviteTeamMember[1]",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "support",
+                      "finance",
+                      "fiscal",
+                      "engineering"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "email",
+                  "role",
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/team/invitations/{invitationId}": {
+      "delete": {
+        "operationId": "PlatformController_cancelTeamInvitation[0]",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/team/invitations/{invitationId}": {
+      "delete": {
+        "operationId": "PlatformController_cancelTeamInvitation[1]",
+        "parameters": [
+          {
+            "name": "invitationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/team/members/{identityId}": {
+      "delete": {
+        "operationId": "PlatformController_revokeTeamMember[0]",
+        "parameters": [
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/v1/platform/team/members/{identityId}": {
+      "delete": {
+        "operationId": "PlatformController_revokeTeamMember[1]",
+        "parameters": [
+          {
+            "name": "identityId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 160
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 500
+                  },
+                  "reauth": {
+                    "type": "object",
+                    "properties": {
+                      "mfaCode": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "mfaCode"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "reason",
+                  "reauth"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
     "/api/v1/platform/commercial/overview": {
       "get": {
         "operationId": "PlatformController_commercialOverview[0]",
@@ -77679,6 +78273,7 @@
                     "endsAt",
                     "durationMonths",
                     "extended",
+                    "doseClubQueued",
                     "replayed"
                   ],
                   "properties": {
@@ -77707,6 +78302,9 @@
                       "example": 6
                     },
                     "extended": {
+                      "type": "boolean"
+                    },
+                    "doseClubQueued": {
                       "type": "boolean"
                     },
                     "replayed": {
@@ -77782,6 +78380,7 @@
                     "endsAt",
                     "durationMonths",
                     "extended",
+                    "doseClubQueued",
                     "replayed"
                   ],
                   "properties": {
@@ -77810,6 +78409,9 @@
                       "example": 6
                     },
                     "extended": {
+                      "type": "boolean"
+                    },
+                    "doseClubQueued": {
                       "type": "boolean"
                     },
                     "replayed": {
@@ -78342,6 +78944,76 @@
         },
         "tags": [
           "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/invitations/accept": {
+      "post": {
+        "operationId": "PlatformInvitationController_accept[0]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PlatformInvitation"
+        ]
+      }
+    },
+    "/v1/platform/invitations/accept": {
+      "post": {
+        "operationId": "PlatformInvitationController_accept[1]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 32,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "token"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PlatformInvitation"
         ]
       }
     },

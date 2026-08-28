@@ -1,14 +1,18 @@
-import { mfaFactors } from "@giromesa/db";
+import { identities, mfaFactors, platformStaffAccess } from "@giromesa/db";
 import {
   type CanActivate,
   type ExecutionContext,
   ForbiddenException,
   Injectable,
 } from "@nestjs/common";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import type { AuthenticatedRequest } from "../auth/session.guard.js";
 import { DatabaseService } from "../database/database.module.js";
-import { type PlatformAccess, platformAccessForEmail } from "./platform-access.js";
+import {
+  type PlatformAccess,
+  platformAccessForEmail,
+  platformAccessForRole,
+} from "./platform-access.js";
 
 export type PlatformRequest = AuthenticatedRequest & { platformAccess: PlatformAccess };
 
@@ -18,7 +22,30 @@ export class PlatformAdminGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<PlatformRequest>();
-    const access = platformAccessForEmail(request.auth.email);
+    const [identity] = await this.database.db
+      .select({
+        disabledAt: identities.disabledAt,
+        emailVerifiedAt: identities.emailVerifiedAt,
+        kind: identities.kind,
+      })
+      .from(identities)
+      .where(eq(identities.id, request.auth.identityId))
+      .limit(1);
+    if (identity?.kind !== "human" || identity.disabledAt || !identity.emailVerifiedAt) {
+      throw new ForbiddenException({ code: "PLATFORM_IDENTITY_NOT_VERIFIED" });
+    }
+    const [storedAccess] = await this.database.db
+      .select({ role: platformStaffAccess.role })
+      .from(platformStaffAccess)
+      .where(
+        and(
+          eq(platformStaffAccess.identityId, request.auth.identityId),
+          isNull(platformStaffAccess.revokedAt),
+        ),
+      )
+      .limit(1);
+    const access =
+      platformAccessForEmail(request.auth.email) ?? platformAccessForRole(storedAccess?.role ?? "");
     if (!access) throw new ForbiddenException({ code: "PLATFORM_ACCESS_DENIED" });
     const [factor] = await this.database.db
       .select({ identityId: mfaFactors.identityId })

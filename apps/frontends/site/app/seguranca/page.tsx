@@ -18,9 +18,16 @@ export default function SecurityPage() {
   const [disableWithRecovery, setDisableWithRecovery] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [returnTo, setReturnTo] = useState("");
   const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 
   useEffect(() => {
+    const candidate = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+      .get("returnTo")
+      ?.trim();
+    if (candidate && /^\/aceitar-convite#platform=[A-Za-z0-9_-]{32,256}$/.test(candidate)) {
+      setReturnTo(candidate);
+    }
     let active = true;
     if (!apiUrl) {
       setMessage("O serviço de segurança não está configurado neste ambiente.");
@@ -259,6 +266,11 @@ export default function SecurityPage() {
         <p className="form-status" role="status" aria-live="polite">
           {message}
         </p>
+        {enabled === true && returnTo && (
+          <p className="security-login-link">
+            <Link href={returnTo}>Continuar para aceitar o convite</Link>
+          </p>
+        )}
         {enabled === null && message && (
           <p className="security-login-link">
             <Link href="/login">Entrar para gerenciar a segurança</Link>

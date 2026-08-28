@@ -21,7 +21,9 @@ import {
   UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
+import { ApiBody } from "@nestjs/swagger";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { AuthService } from "./auth.service.js";
 import {
@@ -29,7 +31,9 @@ import {
   consumeGoogleState,
   exchangeGoogleCode,
   type GoogleAuthIntent,
+  type GoogleOAuthPrepareInput,
   googleConfiguration,
+  googleOAuthPrepareSchema,
 } from "./google-oauth.js";
 import {
   type ConfirmMfaSetupInput,
@@ -211,6 +215,20 @@ export class AuthController {
     return this.startGoogle(intent, reply, returnTo);
   }
 
+  @HttpCode(200)
+  @Post("google/prepare")
+  @ApiBody({ schema: toOpenApiSchema(googleOAuthPrepareSchema) })
+  googlePrepare(
+    @Body(new ZodPipe(googleOAuthPrepareSchema)) body: GoogleOAuthPrepareInput,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    if (body.intent === "signup" && !body.termsAccepted) {
+      throw new UnauthorizedException({ code: "TERMS_ACCEPTANCE_REQUIRED" });
+    }
+    const flow = this.prepareGoogle(body.intent, reply, body.returnTo);
+    return { authorizationUrl: flow.authorizationUrl };
+  }
+
   @Get("google/callback")
   async googleCallback(
     @Query("code") code: string | undefined,
@@ -227,13 +245,7 @@ export class AuthController {
     );
     reply.clearCookie(GOOGLE_STATE_COOKIE_NAME, clearSessionCookieOptions());
     if (!state) throw new UnauthorizedException({ code: "INVALID_GOOGLE_STATE" });
-    const failureTarget = this.siteTarget(
-      state.intent,
-      new URLSearchParams({
-        google: "failed",
-        ...(state.returnTo ? { returnTo: state.returnTo } : {}),
-      }).toString(),
-    );
+    const failureTarget = this.siteTarget(state.intent, "failed", state.returnTo);
     if (providerError || !code) return this.redirect(reply, failureTarget);
     try {
       const profile = await exchangeGoogleCode(code, state, config);
@@ -244,16 +256,7 @@ export class AuthController {
           result.challengeToken,
           shortLivedAuthCookieOptions(5 * 60),
         );
-        return this.redirect(
-          reply,
-          this.siteTarget(
-            "login",
-            new URLSearchParams({
-              google: "mfa",
-              ...(state.returnTo ? { returnTo: state.returnTo } : {}),
-            }).toString(),
-          ),
-        );
+        return this.redirect(reply, this.siteTarget("login", "mfa", state.returnTo));
       }
       reply.clearCookie(OAUTH_MFA_COOKIE_NAME, clearSessionCookieOptions());
       reply.setCookie(SESSION_COOKIE_NAME, result.token, sessionCookieOptions(result.expiresAt));
@@ -276,6 +279,14 @@ export class AuthController {
   }
 
   private startGoogle(intent: GoogleAuthIntent, reply: FastifyReply, returnTo?: string) {
+    if (returnTo?.includes("#platform=")) {
+      throw new UnauthorizedException({ code: "SENSITIVE_RETURN_TARGET_REQUIRES_POST" });
+    }
+    const flow = this.prepareGoogle(intent, reply, returnTo);
+    return this.redirect(reply, flow.authorizationUrl);
+  }
+
+  private prepareGoogle(intent: GoogleAuthIntent, reply: FastifyReply, returnTo?: string) {
     let flow: ReturnType<typeof beginGoogleOAuth>;
     try {
       flow = beginGoogleOAuth(intent, this.googleConfig(), returnTo);
@@ -284,7 +295,7 @@ export class AuthController {
     }
     reply.clearCookie(OAUTH_MFA_COOKIE_NAME, clearSessionCookieOptions());
     reply.setCookie(GOOGLE_STATE_COOKIE_NAME, flow.stateCookie, shortLivedAuthCookieOptions());
-    return this.redirect(reply, flow.authorizationUrl);
+    return flow;
   }
 
   private googleConfig() {
@@ -293,10 +304,11 @@ export class AuthController {
     return config;
   }
 
-  private siteTarget(intent: GoogleAuthIntent, query: string) {
+  private siteTarget(intent: GoogleAuthIntent, google: "failed" | "mfa", returnTo?: string) {
     const base = this.absoluteTarget("APP_URL");
     const target = new URL(intent === "signup" ? "/criar-conta" : "/login", base);
-    target.search = query;
+    target.searchParams.set("google", google);
+    if (returnTo) target.hash = new URLSearchParams({ returnTo }).toString();
     return target.toString();
   }
 

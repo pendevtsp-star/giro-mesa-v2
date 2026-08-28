@@ -4,6 +4,7 @@ import {
   charges,
   commercialPlans,
   fiscalProfiles,
+  growthIntegrations,
   hubHeartbeats,
   identities,
   legalEntities,
@@ -19,7 +20,7 @@ import {
   trials,
   units,
 } from "@giromesa/db";
-import { missingActivationItems } from "@giromesa/domain";
+import { includesDoseClubEntitlement, missingActivationItems } from "@giromesa/domain";
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
@@ -54,6 +55,7 @@ export type PilotAccessGrant = {
   endsAt: string;
   durationMonths: number;
   extended: boolean;
+  doseClubQueued: boolean;
   replayed: boolean;
 };
 
@@ -144,6 +146,8 @@ export class PlatformControlService {
       billingRows,
       chargeRows,
       fiscalRows,
+      doseClubRows,
+      subscriptionEntitlementRows,
     ] = await Promise.all([
       this.database.db
         .select()
@@ -219,9 +223,39 @@ export class PlatformControlService {
             .where(eq(legalEntities.organizationId, organizationId))
             .orderBy(asc(legalEntities.legalName))
         : Promise.resolve([]),
+      this.database.db
+        .select({
+          id: growthIntegrations.id,
+          unitId: growthIntegrations.unitId,
+          unitName: units.name,
+          status: growthIntegrations.status,
+          credentialReference: growthIntegrations.credentialReference,
+          config: growthIntegrations.config,
+          updatedAt: growthIntegrations.updatedAt,
+        })
+        .from(growthIntegrations)
+        .leftJoin(units, eq(units.id, growthIntegrations.unitId))
+        .where(
+          and(
+            eq(growthIntegrations.organizationId, organizationId),
+            eq(growthIntegrations.provider, "doseclub"),
+          ),
+        )
+        .orderBy(asc(units.name)),
+      this.database.db
+        .select({ state: subscriptions.state, entitlements: commercialPlans.entitlements })
+        .from(subscriptions)
+        .innerJoin(commercialPlans, eq(commercialPlans.id, subscriptions.commercialPlanId))
+        .where(eq(subscriptions.organizationId, organizationId))
+        .orderBy(desc(subscriptions.createdAt)),
     ]);
 
     const onboarding = onboardingRows[0];
+    const effectiveEntitlements =
+      organization.billingState === "trial_active"
+        ? trialRows[0]?.plan.entitlements
+        : (subscriptionEntitlementRows.find(({ state }) => state === "active")?.entitlements ??
+          trialRows[0]?.plan.entitlements);
     const incidents = await this.incidents({
       organizationId,
       search: "",
@@ -276,6 +310,23 @@ export class PlatformControlService {
               : null,
           }))
         : null,
+      doseClub: {
+        providerEnabled: process.env.DOSECLUB_PROVIDER_ENABLED === "true",
+        entitled: includesDoseClubEntitlement(effectiveEntitlements),
+        connections: doseClubRows.map((row) => {
+          const config = isRecord(row.config) ? row.config : {};
+          return {
+            id: row.id,
+            unitId: row.unitId,
+            unitName: row.unitName,
+            status: row.status,
+            managed: row.credentialReference?.startsWith("managed:v1:") ?? false,
+            provisioningStatus: safeIntegrationText(config.provisioningStatus),
+            healthCheckedAt: safeIntegrationText(config.healthCheckedAt),
+            updatedAt: row.updatedAt,
+          };
+        }),
+      },
       incidents: incidents.items,
       timeline: timeline.map((event) => ({
         ...event,
@@ -327,6 +378,7 @@ export class PlatformControlService {
             email: identities.email,
             kind: identities.kind,
             disabledAt: identities.disabledAt,
+            emailVerifiedAt: identities.emailVerifiedAt,
           })
           .from(identities)
           .where(eq(identities.email, input.ownerEmail))
@@ -342,6 +394,12 @@ export class PlatformControlService {
           throw new ConflictException({
             code: "PLATFORM_TENANT_OWNER_INACTIVE",
             message: "A conta proprietária está inativa e não pode receber um tenant.",
+          });
+        }
+        if (!owner.emailVerifiedAt) {
+          throw new ConflictException({
+            code: "PLATFORM_TENANT_OWNER_EMAIL_UNVERIFIED",
+            message: "A conta proprietária precisa confirmar o e-mail antes de receber um tenant.",
           });
         }
         const [organization] = await tx
@@ -484,8 +542,14 @@ export class PlatformControlService {
         throw new ConflictException({ code: "PLATFORM_PILOT_ACCESS_REQUIRES_ACTIVE_TRIAL" });
       }
       const [trial] = await tx
-        .select({ id: trials.id, startsAt: trials.startsAt, endsAt: trials.endsAt })
+        .select({
+          id: trials.id,
+          startsAt: trials.startsAt,
+          endsAt: trials.endsAt,
+          entitlements: commercialPlans.entitlements,
+        })
         .from(trials)
+        .innerJoin(commercialPlans, eq(commercialPlans.id, trials.commercialPlanId))
         .where(eq(trials.organizationId, organizationId))
         .for("update")
         .limit(1);
@@ -493,6 +557,7 @@ export class PlatformControlService {
 
       const now = new Date();
       const { endsAt, extended } = resolvePilotAccessEndsAt(trial.endsAt, now);
+      const doseClubQueued = includesDoseClubEntitlement(trial.entitlements);
       if (extended) {
         await tx.update(trials).set({ endsAt }).where(eq(trials.id, trial.id));
       }
@@ -504,7 +569,16 @@ export class PlatformControlService {
         endsAt: endsAt.toISOString(),
         durationMonths: PILOT_ACCESS_MONTHS,
         extended,
+        doseClubQueued,
       } satisfies Omit<PilotAccessGrant, "replayed">;
+      if (doseClubQueued) {
+        await tx.insert(outboxEvents).values({
+          topic: "doseclub.provisioning_requested",
+          aggregateType: "trial",
+          aggregateId: trial.id,
+          payload: { organizationId, trialId: trial.id },
+        });
+      }
       await tx.insert(auditEvents).values({
         organizationId,
         actorIdentityId,
@@ -1065,6 +1139,14 @@ export class PlatformControlService {
       ),
     ];
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function safeIntegrationText(value: unknown) {
+  return typeof value === "string" && value.length <= 120 ? value : null;
 }
 
 export function maskDocument(value: string | null | undefined) {

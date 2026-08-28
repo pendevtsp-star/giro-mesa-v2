@@ -1,4 +1,17 @@
 import Link from "next/link";
+import { MobileNavigation } from "./mobile-navigation";
+
+function NavigationLinks() {
+  return (
+    <>
+      <a href="/#produto">Produto</a>
+      <a href="/#solucoes">Soluções</a>
+      <a href="/#planos">Planos</a>
+      <a href="/#recursos">Recursos</a>
+      <Link href="/instalar">Instalar</Link>
+    </>
+  );
+}
 
 export function Logo() {
   return (
@@ -17,11 +30,7 @@ export function Header() {
       <div className="container header-inner">
         <Logo />
         <nav className="desktop-nav" aria-label="Navegação principal">
-          <a href="/#produto">Produto</a>
-          <a href="/#solucoes">Soluções</a>
-          <a href="/#planos">Planos</a>
-          <a href="/#recursos">Recursos</a>
-          <Link href="/instalar">Instalar</Link>
+          <NavigationLinks />
         </nav>
         <div className="header-actions">
           <Link className="button button-ghost" href="/login">
@@ -30,6 +39,12 @@ export function Header() {
           <Link className="button button-primary header-trial" href="/teste-gratis">
             Solicitar teste
           </Link>
+          <MobileNavigation>
+            <NavigationLinks />
+            <Link className="button button-primary" href="/teste-gratis">
+              Solicitar teste assistido
+            </Link>
+          </MobileNavigation>
         </div>
       </div>
     </header>

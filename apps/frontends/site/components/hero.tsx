@@ -18,7 +18,7 @@ export function Hero({
   return (
     <section className="hero">
       <div className="hero-glow" aria-hidden="true" />
-      <div className="container hero-grid">
+      <div className={`container hero-grid${hero.media ? "" : " hero-grid--text-only"}`}>
         <div className="hero-copy">
           <p className="eyebrow">
             <span aria-hidden="true" /> {hero.eyebrow}

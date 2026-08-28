@@ -72,3 +72,56 @@ export const platformActionReceipts = pgTable(
     check("platform_action_receipts_reason_check", sql`length(trim(${table.reason})) >= 8`),
   ],
 );
+
+export const platformStaffInvitations = pgTable(
+  "platform_staff_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: varchar("email", { length: 254 }).notNull(),
+    role: varchar("role", { length: 24 }).notNull(),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    invitedByIdentityId: uuid("invited_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedByIdentityId: uuid("accepted_by_identity_id").references(() => identities.id),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("platform_staff_invitations_token_unique").on(table.tokenHash),
+    uniqueIndex("platform_staff_invitations_pending_email_unique")
+      .on(table.email)
+      .where(sql`${table.acceptedAt} is null and ${table.revokedAt} is null`),
+    index("platform_staff_invitations_expiry_idx").on(table.expiresAt),
+    check(
+      "platform_staff_invitations_role_check",
+      sql`${table.role} in ('viewer', 'support', 'finance', 'fiscal', 'engineering')`,
+    ),
+  ],
+);
+
+export const platformStaffAccess = pgTable(
+  "platform_staff_access",
+  {
+    identityId: uuid("identity_id")
+      .primaryKey()
+      .references(() => identities.id, { onDelete: "cascade" }),
+    role: varchar("role", { length: 24 }).notNull(),
+    grantedByIdentityId: uuid("granted_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedByIdentityId: uuid("revoked_by_identity_id").references(() => identities.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("platform_staff_access_active_idx").on(table.revokedAt, table.role),
+    check(
+      "platform_staff_access_role_check",
+      sql`${table.role} in ('viewer', 'support', 'finance', 'fiscal', 'engineering', 'admin')`,
+    ),
+  ],
+);

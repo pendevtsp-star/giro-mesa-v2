@@ -17,6 +17,7 @@ import {
   outboxEvents,
   passwordCredentials,
   passwordResetTokens,
+  platformStaffAccess,
   roleBindings,
 } from "@giromesa/db";
 import { encryptionKey, encryptSecret } from "@giromesa/domain";
@@ -636,7 +637,13 @@ export class AuthService {
 
   async me(identityId: string) {
     const [identity] = await this.database.db
-      .select({ id: identities.id, email: identities.email, displayName: identities.displayName })
+      .select({
+        id: identities.id,
+        email: identities.email,
+        displayName: identities.displayName,
+        emailVerifiedAt: identities.emailVerifiedAt,
+        kind: identities.kind,
+      })
       .from(identities)
       .where(eq(identities.id, identityId))
       .limit(1);
@@ -652,7 +659,20 @@ export class AuthService {
       .from(memberships)
       .leftJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
       .where(eq(memberships.identityId, identityId));
-    return { identity, memberships: scopes, platformAdmin: isPlatformAdminEmail(identity.email) };
+    const [staffAccess] = await this.database.db
+      .select({ identityId: platformStaffAccess.identityId })
+      .from(platformStaffAccess)
+      .where(
+        and(eq(platformStaffAccess.identityId, identityId), isNull(platformStaffAccess.revokedAt)),
+      )
+      .limit(1);
+    const verifiedHuman = identity.kind === "human" && Boolean(identity.emailVerifiedAt);
+    return {
+      identity: { id: identity.id, email: identity.email, displayName: identity.displayName },
+      memberships: scopes,
+      platformAdmin:
+        verifiedHuman && (isPlatformAdminEmail(identity.email) || Boolean(staffAccess)),
+    };
   }
 
   async requestPasswordReset(input: RequestPasswordResetInput) {

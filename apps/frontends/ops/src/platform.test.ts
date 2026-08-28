@@ -16,6 +16,7 @@ import {
   parsePlatformTenant,
   parsePlatformTenants,
   parseTenantPii,
+  toggleCommercialEntitlement,
 } from "./platform";
 
 describe("painel real da plataforma", () => {
@@ -177,6 +178,22 @@ describe("painel real da plataforma", () => {
         },
       ],
       fiscal: [],
+      doseClub: {
+        providerEnabled: true,
+        entitled: true,
+        connections: [
+          {
+            id: "integration-1",
+            unitId: "unit-1",
+            unitName: "Centro",
+            status: "active",
+            managed: true,
+            provisioningStatus: "waiting_product_mappings",
+            healthCheckedAt: "2026-08-09T20:00:00.000Z",
+            updatedAt: "2026-08-09T20:00:00.000Z",
+          },
+        ],
+      },
       incidents: [
         {
           fingerprint: "hub:unit-1:hub-1:1",
@@ -211,6 +228,12 @@ describe("painel real da plataforma", () => {
     expect(detail.onboarding.pendingItems).toEqual(["cardapio"]);
     expect(detail.health.staleHubs).toBe(1);
     expect(detail.timeline[0]?.title).toBe("platform.incident.claim");
+    expect(detail.doseClub).toMatchObject({
+      available: true,
+      providerEnabled: true,
+      entitled: true,
+    });
+    expect(detail.doseClub.connections[0]?.provisioningStatus).toBe("waiting_product_mappings");
   });
 
   it("valida incidentes por fingerprint e preserva cursor", () => {
@@ -258,13 +281,34 @@ describe("painel real da plataforma", () => {
   });
 
   it("lê a data confirmada da concessão piloto sem assumir sucesso local", () => {
-    expect(parsePilotAccessGrant({ endsAt: "2027-02-26T12:00:00.000Z", extended: true })).toEqual({
+    expect(
+      parsePilotAccessGrant({
+        endsAt: "2027-02-26T12:00:00.000Z",
+        extended: true,
+        doseClubQueued: true,
+      }),
+    ).toEqual({
       endsAt: "2027-02-26T12:00:00.000Z",
       extended: true,
+      doseClubQueued: true,
     });
     expect(() => parsePilotAccessGrant({ endsAt: "2027-02-26T12:00:00.000Z" })).toThrow(
       InvalidPlatformPayloadError,
     );
+  });
+
+  it("altera somente o entitlement DoseClub e preserva os demais", () => {
+    expect(toggleCommercialEntitlement(["salon"], "doseclub.subscription", true)).toEqual([
+      "salon",
+      "doseclub.subscription",
+    ]);
+    expect(
+      toggleCommercialEntitlement(
+        ["salon", "doseclub.subscription"],
+        "doseclub.subscription",
+        false,
+      ),
+    ).toEqual(["salon"]);
   });
 
   it("normaliza o CNPJ e aceita somente o cadastro confirmado pela API", () => {

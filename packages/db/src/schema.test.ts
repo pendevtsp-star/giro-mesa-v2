@@ -134,6 +134,7 @@ import {
   posTabs,
   posTerminalProfiles,
 } from "./operations-schema.js";
+import { platformStaffAccess, platformStaffInvitations } from "./platform-schema.js";
 import {
   billingCheckouts,
   billingUpgradeQuotes,
@@ -767,5 +768,21 @@ describe("database schema", () => {
     assert.match(multiunitMigration, /management_person_access_person_unit_pk/);
     assert.match(multiunitMigration, /DROP CONSTRAINT "management_person_access_pkey"/);
     assert.match(multiunitMigration, /ADD COLUMN "device_id"/);
+  });
+
+  it("persists separate platform staff invitations and revocable access", async () => {
+    assert.ok(platformStaffInvitations.tokenHash);
+    assert.ok(platformStaffInvitations.acceptedByIdentityId);
+    assert.ok(platformStaffInvitations.revokedAt);
+    assert.ok(platformStaffAccess.role);
+    assert.ok(platformStaffAccess.revokedByIdentityId);
+
+    const migration = await readFile(
+      new URL("../drizzle/0075_platform_staff_invitations.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /CREATE TABLE "platform_staff_invitations"/);
+    assert.match(migration, /platform_staff_invitations_pending_email_unique/);
+    assert.match(migration, /CREATE TABLE "platform_staff_access"/);
   });
 });

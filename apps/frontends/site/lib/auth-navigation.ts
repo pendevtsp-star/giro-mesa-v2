@@ -27,3 +27,33 @@ export function resolveLocalReturnTo(value: string | null, currentOrigin: string
     return null;
   }
 }
+
+export async function prepareGoogleRedirect(
+  apiUrl: string,
+  input: {
+    intent: "login" | "signup";
+    termsAccepted?: boolean;
+    returnTo?: string;
+  },
+  fetcher: typeof fetch = fetch,
+): Promise<string | null> {
+  const response = await fetcher(`${apiUrl}/v1/auth/google/prepare`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) return null;
+  const payload = (await response.json()) as { authorizationUrl?: unknown };
+  if (typeof payload.authorizationUrl !== "string") return null;
+  try {
+    const target = new URL(payload.authorizationUrl);
+    return target.protocol === "https:" &&
+      target.hostname === "accounts.google.com" &&
+      target.pathname === "/o/oauth2/v2/auth"
+      ? target.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}

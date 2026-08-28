@@ -3,7 +3,11 @@
 import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
-import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
+import {
+  prepareGoogleRedirect,
+  resolveLocalReturnTo,
+  resolveOpsUrl,
+} from "../../lib/auth-navigation";
 
 export default function CreateAccountPage() {
   const [message, setMessage] = useState("");
@@ -12,10 +16,16 @@ export default function CreateAccountPage() {
 
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
-    setReturnTo(resolveLocalReturnTo(parameters.get("returnTo"), window.location.origin));
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    setReturnTo(
+      resolveLocalReturnTo(
+        fragment.get("returnTo") ?? parameters.get("returnTo"),
+        window.location.origin,
+      ),
+    );
   }, []);
 
-  function startGoogleSignup() {
+  async function startGoogleSignup() {
     if (!termsAccepted) {
       setMessage("Aceite os Termos e a Política de Privacidade para criar a conta.");
       return;
@@ -26,10 +36,13 @@ export default function CreateAccountPage() {
       setMessage("A criação com Google ainda não está configurada neste ambiente.");
       return;
     }
-    const target = new URL(`${apiUrl}/v1/auth/google/signup`);
-    target.searchParams.set("termsAccepted", "true");
-    if (returnTo) target.searchParams.set("returnTo", returnTo);
-    window.location.assign(target.toString());
+    const target = await prepareGoogleRedirect(apiUrl, {
+      intent: "signup",
+      termsAccepted: true,
+      ...(returnTo ? { returnTo } : {}),
+    });
+    if (target) window.location.assign(target);
+    else setMessage("Não foi possível iniciar a criação com Google.");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -92,7 +105,7 @@ export default function CreateAccountPage() {
           className="button google-button"
           type="button"
           variant="secondary"
-          onClick={startGoogleSignup}
+          onClick={() => void startGoogleSignup()}
           disabled={!termsAccepted}
         >
           <span aria-hidden="true">G</span> Criar com Google

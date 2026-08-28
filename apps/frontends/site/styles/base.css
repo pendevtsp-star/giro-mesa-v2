@@ -18,6 +18,7 @@
 }
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 92px;
 }
 body {
   margin: 0;
@@ -47,13 +48,6 @@ textarea:focus-visible,
 summary:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--gm-brand) 60%, white);
   outline-offset: 3px;
-}
-.container {
-  width: min(1180px, calc(100% - 40px));
-  margin-inline: auto;
-}
-.narrow {
-  max-width: 800px;
 }
 .skip-link {
   position: fixed;
@@ -176,6 +170,9 @@ summary:focus-visible {
 .hero-actions {
   display: flex;
   gap: 10px;
+}
+.mobile-nav {
+  display: none;
 }
 .button {
   min-height: 44px;

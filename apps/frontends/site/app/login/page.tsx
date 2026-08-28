@@ -3,7 +3,11 @@
 import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
-import { resolveLocalReturnTo, resolveOpsUrl } from "../../lib/auth-navigation";
+import {
+  prepareGoogleRedirect,
+  resolveLocalReturnTo,
+  resolveOpsUrl,
+} from "../../lib/auth-navigation";
 import { buildMfaProof, readMfaChallenge } from "../../lib/mfa";
 
 export default function LoginPage() {
@@ -16,8 +20,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const google = parameters.get("google");
-    setReturnTo(resolveLocalReturnTo(parameters.get("returnTo"), window.location.origin));
+    setReturnTo(
+      resolveLocalReturnTo(
+        fragment.get("returnTo") ?? parameters.get("returnTo"),
+        window.location.origin,
+      ),
+    );
     if (google === "mfa") {
       setOauthMfa(true);
       setMessage("Confirme o segundo fator para concluir o acesso com Google.");
@@ -104,16 +114,19 @@ export default function LoginPage() {
     }
   }
 
-  function startGoogleLogin() {
+  async function startGoogleLogin() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
     const opsUrl = resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
     if (!apiUrl || !opsUrl || process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED !== "true") {
       setMessage("O Google ainda não está configurado neste ambiente.");
       return;
     }
-    const target = new URL(`${apiUrl}/v1/auth/google/login`);
-    if (returnTo) target.searchParams.set("returnTo", returnTo);
-    window.location.assign(target.toString());
+    const target = await prepareGoogleRedirect(apiUrl, {
+      intent: "login",
+      ...(returnTo ? { returnTo } : {}),
+    });
+    if (target) window.location.assign(target);
+    else setMessage("Não foi possível iniciar o acesso com Google.");
   }
 
   return (
@@ -144,7 +157,7 @@ export default function LoginPage() {
                 className="button google-button"
                 type="button"
                 variant="secondary"
-                onClick={startGoogleLogin}
+                onClick={() => void startGoogleLogin()}
               >
                 <span aria-hidden="true">G</span> Continuar com Google
               </Button>
