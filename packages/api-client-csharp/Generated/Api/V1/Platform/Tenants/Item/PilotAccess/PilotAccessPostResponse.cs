@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Platform.Tenants.Item.PilotAccess
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The doseClubQueued property</summary>
+        public bool? DoseClubQueued { get; set; }
         /// <summary>The durationMonths property</summary>
         public int? DurationMonths { get; set; }
         /// <summary>The endsAt property</summary>
@@ -55,6 +57,7 @@ namespace GiroMesa.ApiClient.Api.V1.Platform.Tenants.Item.PilotAccess
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "doseClubQueued", n => { DoseClubQueued = n.GetBoolValue(); } },
                 { "durationMonths", n => { DurationMonths = n.GetIntValue(); } },
                 { "endsAt", n => { EndsAt = n.GetDateTimeOffsetValue(); } },
                 { "extended", n => { Extended = n.GetBoolValue(); } },
@@ -72,6 +75,7 @@ namespace GiroMesa.ApiClient.Api.V1.Platform.Tenants.Item.PilotAccess
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteBoolValue("doseClubQueued", DoseClubQueued);
             writer.WriteIntValue("durationMonths", DurationMonths);
             writer.WriteDateTimeOffsetValue("endsAt", EndsAt);
             writer.WriteBoolValue("extended", Extended);

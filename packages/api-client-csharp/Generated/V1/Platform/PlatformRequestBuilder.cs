@@ -3,8 +3,10 @@
 using GiroMesa.ApiClient.V1.Platform.Commercial;
 using GiroMesa.ApiClient.V1.Platform.Fiscal;
 using GiroMesa.ApiClient.V1.Platform.Incidents;
+using GiroMesa.ApiClient.V1.Platform.Invitations;
 using GiroMesa.ApiClient.V1.Platform.Outbox;
 using GiroMesa.ApiClient.V1.Platform.Overview;
+using GiroMesa.ApiClient.V1.Platform.Team;
 using GiroMesa.ApiClient.V1.Platform.Tenants;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions;
@@ -35,6 +37,11 @@ namespace GiroMesa.ApiClient.V1.Platform
         {
             get => new global::GiroMesa.ApiClient.V1.Platform.Incidents.IncidentsRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The invitations property</summary>
+        public global::GiroMesa.ApiClient.V1.Platform.Invitations.InvitationsRequestBuilder Invitations
+        {
+            get => new global::GiroMesa.ApiClient.V1.Platform.Invitations.InvitationsRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The outbox property</summary>
         public global::GiroMesa.ApiClient.V1.Platform.Outbox.OutboxRequestBuilder Outbox
         {
@@ -44,6 +51,11 @@ namespace GiroMesa.ApiClient.V1.Platform
         public global::GiroMesa.ApiClient.V1.Platform.Overview.OverviewRequestBuilder Overview
         {
             get => new global::GiroMesa.ApiClient.V1.Platform.Overview.OverviewRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The team property</summary>
+        public global::GiroMesa.ApiClient.V1.Platform.Team.TeamRequestBuilder Team
+        {
+            get => new global::GiroMesa.ApiClient.V1.Platform.Team.TeamRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The tenants property</summary>
         public global::GiroMesa.ApiClient.V1.Platform.Tenants.TenantsRequestBuilder Tenants

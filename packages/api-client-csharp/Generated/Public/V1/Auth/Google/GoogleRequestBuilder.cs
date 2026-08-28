@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Public.V1.Auth.Google.Callback;
 using GiroMesa.ApiClient.Public.V1.Auth.Google.Login;
+using GiroMesa.ApiClient.Public.V1.Auth.Google.Prepare;
 using GiroMesa.ApiClient.Public.V1.Auth.Google.Signup;
 using GiroMesa.ApiClient.Public.V1.Auth.Google.Start;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -27,6 +28,11 @@ namespace GiroMesa.ApiClient.Public.V1.Auth.Google
         public global::GiroMesa.ApiClient.Public.V1.Auth.Google.Login.LoginRequestBuilder Login
         {
             get => new global::GiroMesa.ApiClient.Public.V1.Auth.Google.Login.LoginRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The prepare property</summary>
+        public global::GiroMesa.ApiClient.Public.V1.Auth.Google.Prepare.PrepareRequestBuilder Prepare
+        {
+            get => new global::GiroMesa.ApiClient.Public.V1.Auth.Google.Prepare.PrepareRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The signup property</summary>
         public global::GiroMesa.ApiClient.Public.V1.Auth.Google.Signup.SignupRequestBuilder Signup
