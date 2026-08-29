@@ -54,6 +54,10 @@ if [[ ! $max_rto_minutes =~ ^([1-9]|[12][0-9]|30)$ ]]; then
   echo "RESTORE_RTO_INVALID" >&2
   exit 1
 fi
+if [[ $expected_target_migration_id == "0075_platform_staff_invitations" && -z $smoke_sql_file ]]; then
+  echo "RESTORE_SMOKE_SQL_REQUIRED:$expected_target_migration_id" >&2
+  exit 1
+fi
 for tool in python3 docker tar openssl; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "RESTORE_TOOL_REQUIRED:$tool" >&2

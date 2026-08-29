@@ -1,6 +1,6 @@
 {
   "name": "@giromesa/worker",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "start": "node dist/main.js",
     "lint": "biome check src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm build && node --test dist/**/*.test.js"
+    "test": "pnpm build && node --test --test-concurrency=1 dist/**/*.test.js"
   },
   "dependencies": {
     "@giromesa/db": "workspace:*",

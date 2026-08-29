@@ -8,6 +8,7 @@ import {
   accountantRequests,
   identities,
   memberships,
+  mfaFactors,
   organizations,
   outboxEvents,
   roleBindings,
@@ -155,6 +156,17 @@ it("executes the accountant request journey through authenticated HTTP routes", 
     assert.equal(uploaded.response.status, 201);
     const attachmentId = uploaded.body.attachment.id as string;
     process.env.PLATFORM_ADMIN_EMAILS = owner.email;
+    await database.db
+      .update(identities)
+      .set({ emailVerifiedAt: new Date() })
+      .where(eq(identities.id, owner.identityId));
+    await database.db.insert(mfaFactors).values({
+      identityId: owner.identityId,
+      encryptedSecret: "test-only",
+      iv: "0".repeat(24),
+      authTag: "0".repeat(32),
+      verifiedAt: new Date(),
+    });
     const legalHoldPath = `/api/v1/platform/fiscal/organizations/${organizationId}/units/${unit.id}/accountant/requests/${requestId}/attachments/${attachmentId}/legal-hold`;
     const held = await jsonRequest(baseUrl, legalHoldPath, {
       method: "PATCH",

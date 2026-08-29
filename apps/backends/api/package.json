@@ -1,6 +1,6 @@
 {
   "name": "@giromesa/api",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "biome check src",
     "openapi:generate": "pnpm build && node dist/openapi.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "pnpm build && node --test dist/**/*.test.js"
+    "test": "pnpm build && node --test --test-concurrency=1 dist/**/*.test.js"
   },
   "dependencies": {
     "@fastify/cookie": "11.0.2",

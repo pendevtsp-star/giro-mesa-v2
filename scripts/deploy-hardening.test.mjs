@@ -536,24 +536,67 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /rollback-compatibility\.json/);
   assert.match(rollback, /compose\.observability\.yaml/);
   assert.match(rollback, /system\.worker_probe/);
+  assert.match(rollback, /requiredAppliedMigration"\) == sys\.argv\[2\]/);
+  assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0045_strong_pride");
-  assert.deepEqual(matrix.transitions, [
-    {
-      appliedMigration: "0045_strong_pride",
-      targetReleaseMigration: "0045_strong_pride",
-      targetArtifact: "git:5421cefb866576183119b265fcaa9f042745e591",
-      evidence: {
-        workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        testReportDigest:
-          "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-      },
+  assert.equal(matrix.requiredAppliedMigration, "0075_platform_staff_invitations");
+  assert.deepEqual(matrix.transitions, []);
+  assert.deepEqual(matrix.fullRestore, {
+    required: true,
+    procedure: "scripts/restore-drill.sh",
+    backupManifestSchemaVersion: 2,
+    requiredCoverage: {
+      database: true,
+      objects: true,
+      encryptedConfiguration: true,
     },
-  ]);
+    requiredBindings: [
+      "sourceArtifact",
+      "sourceMigrationId",
+      "targetArtifact",
+      "targetMigrationId",
+    ],
+    requiresSmokeSql: true,
+  });
+  const restore = readFileSync(join(root, matrix.fullRestore.procedure), "utf8");
+  assert.match(
+    restore,
+    /payload\.get\("coverage"\) != \{"mode": "embedded", "database": True, "objects": True, "encryptedConfiguration": True\}/,
+  );
+  assert.match(restore, /BACKUP_SOURCE_ARTIFACT_MISMATCH|BACKUP_ARTIFACT_MISMATCH/);
+  assert.match(restore, /BACKUP_SOURCE_MIGRATION_MISMATCH/);
+  assert.match(restore, /BACKUP_TARGET_ARTIFACT_MISMATCH/);
+  assert.match(restore, /BACKUP_TARGET_MIGRATION_MISMATCH/);
+  assert.match(restore, /--smoke-sql-file/);
   assert.match(rollback, /targetArtifact/);
   assert.match(rollback, /testReportDigest/);
   assert.match(rollback, /actions\/runs/);
+});
+
+test("schema 75 full restore requires a functional smoke before Docker", () => {
+  const result = run(restoreScript, [
+    "--backup-directory",
+    "/tmp/does-not-exist",
+    "--target-database-container",
+    "never-run",
+    "--database-name",
+    "giromesa",
+    "--database-user",
+    "giromesa",
+    "--expected-artifact",
+    `git:${"a".repeat(40)}`,
+    "--expected-source-migration-id",
+    "0074_crm_operational_inbox",
+    "--expected-target-artifact",
+    `git:${"b".repeat(40)}`,
+    "--expected-target-migration-id",
+    "0075_platform_staff_invitations",
+  ]);
+
+  assert.notEqual(result.status, 0);
+  assert.match(output(result), /RESTORE_SMOKE_SQL_REQUIRED:0075_platform_staff_invitations/);
+  assert.doesNotMatch(output(result), /BACKUP_MANIFEST_MISSING|RESTORE_TOOL_REQUIRED/);
 });
 
 test("deploy health gate includes the asynchronous worker", () => {
@@ -573,8 +616,23 @@ test("public ingress keeps the internal Evolution webhook off the Internet", () 
     "X-Frame-Options",
     "Referrer-Policy",
     "Permissions-Policy",
+    "Content-Security-Policy",
   ]) {
     assert.match(ingress, new RegExp(`add_header ${header} `));
+  }
+  for (const directive of [
+    "default-src 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'self'",
+    "script-src 'self' 'unsafe-inline'",
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://api.giromesa.com.br wss://api.giromesa.com.br",
+    "worker-src 'self' blob:",
+    "frame-src https://www.openstreetmap.org",
+  ]) {
+    assert.match(ingress, new RegExp(directive.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(ingress, /location = \/api\/v1\/growth\/evolution-go\/webhook \{ return 404; \}/);
   assert.match(ingress, /location = \/v1\/growth\/evolution-go\/webhook \{ return 404; \}/);

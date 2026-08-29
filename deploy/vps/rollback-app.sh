@@ -74,7 +74,7 @@ PY
 python3 - "$matrix_file" "$applied_migration" "$target_migration" "$target_sha" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
-valid = value.get("schemaVersion") == 2 and value.get("requiredAppliedMigration") == "0045_strong_pride" and any(
+valid = value.get("schemaVersion") == 2 and value.get("requiredAppliedMigration") == sys.argv[2] and any(
     item.get("appliedMigration") == sys.argv[2]
     and item.get("targetReleaseMigration") == sys.argv[3]
     and item.get("targetArtifact") == f"git:{sys.argv[4]}"

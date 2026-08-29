@@ -1,15 +1,22 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0045_strong_pride",
-  "transitions": [
-    {
-      "appliedMigration": "0045_strong_pride",
-      "targetReleaseMigration": "0045_strong_pride",
-      "targetArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
-      "evidence": {
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
-      }
-    }
-  ]
+  "requiredAppliedMigration": "0075_platform_staff_invitations",
+  "transitions": [],
+  "fullRestore": {
+    "required": true,
+    "procedure": "scripts/restore-drill.sh",
+    "backupManifestSchemaVersion": 2,
+    "requiredCoverage": {
+      "database": true,
+      "objects": true,
+      "encryptedConfiguration": true
+    },
+    "requiredBindings": [
+      "sourceArtifact",
+      "sourceMigrationId",
+      "targetArtifact",
+      "targetMigrationId"
+    ],
+    "requiresSmokeSql": true
+  }
 }
