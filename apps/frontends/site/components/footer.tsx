@@ -8,7 +8,7 @@ const groups = [
     links: [
       ["Visão geral", "/#produto"],
       ["Planos", "/#planos"],
-      ["Teste assistido", "/teste-gratis"],
+      ["Criar conta grátis", "/criar-conta"],
       ["Instalar GiroMesa", "/instalar"],
     ],
   },

@@ -128,6 +128,10 @@ function publicHref(value: unknown): string | null {
   const normalized = textValue(value);
   return normalized && isSafePublicHref(normalized) ? normalized : null;
 }
+function selfServiceCta(label: string, href: string): { label: string; href: string } {
+  if (!href.startsWith("/teste-gratis")) return { label, href };
+  return { label: "Criar conta grátis", href: "/criar-conta" };
+}
 function isoDate(value: unknown): string | null {
   const normalized = textValue(value);
   return normalized && !Number.isNaN(Date.parse(normalized)) ? normalized : null;
@@ -221,6 +225,7 @@ function normalizePlan(value: unknown): CommercialPlan | null {
   const monthly = normalizeOffer(value.offers.monthly, monthlyPriceCents);
   const annual = normalizeOffer(value.offers.annual, annualPriceCents);
   if (!monthly || !annual) return null;
+  const cta = selfServiceCta(ctaLabel, ctaHref);
   return {
     slug,
     name,
@@ -232,8 +237,8 @@ function normalizePlan(value: unknown): CommercialPlan | null {
     features,
     featured: value.featured,
     displayOrder,
-    ctaLabel,
-    ctaHref,
+    ctaLabel: cta.label,
+    ctaHref: cta.href,
     offers: { monthly, annual },
   };
 }
@@ -248,7 +253,16 @@ function normalizeItems<T>(
 }
 function normalizeLanding(value: unknown): CommercialLanding | null {
   if (!isRecord(value)) return null;
-  const { hero, socialProof, benefits, howItWorks, testimonials, faq, finalCta, legal } = value;
+  const {
+    hero,
+    socialProof,
+    benefits,
+    howItWorks,
+    testimonials,
+    faq,
+    finalCta: finalCtaValue,
+    legal,
+  } = value;
   if (
     !isRecord(hero) ||
     !isRecord(socialProof) ||
@@ -256,7 +270,7 @@ function normalizeLanding(value: unknown): CommercialLanding | null {
     !isRecord(howItWorks) ||
     !isRecord(testimonials) ||
     !isRecord(faq) ||
-    !isRecord(finalCta) ||
+    !isRecord(finalCtaValue) ||
     !isRecord(legal)
   )
     return null;
@@ -304,7 +318,13 @@ function normalizeLanding(value: unknown): CommercialLanding | null {
     const answer = textValue(item.answer);
     return question && answer ? { question, answer } : null;
   });
-  const finalCtaHref = publicHref(finalCta.ctaHref);
+  const finalCtaHref = publicHref(finalCtaValue.ctaHref);
+  const primaryCta = primaryCtaHref
+    ? selfServiceCta(textValue(hero.primaryCtaLabel) ?? "", primaryCtaHref)
+    : null;
+  const finalCta = finalCtaHref
+    ? selfServiceCta(textValue(finalCtaValue.ctaLabel) ?? "", finalCtaHref)
+    : null;
   const terms = normalizeLegalDocument(legal.terms);
   const privacy = normalizeLegalDocument(legal.privacy);
   const normalized = {
@@ -312,8 +332,8 @@ function normalizeLanding(value: unknown): CommercialLanding | null {
       eyebrow: textValue(hero.eyebrow),
       title: textValue(hero.title),
       description: textValue(hero.description),
-      primaryCtaLabel: textValue(hero.primaryCtaLabel),
-      primaryCtaHref,
+      primaryCtaLabel: primaryCta?.label ?? null,
+      primaryCtaHref: primaryCta?.href ?? null,
       secondaryCtaLabel:
         hero.secondaryCtaLabel === undefined ? undefined : textValue(hero.secondaryCtaLabel),
       secondaryCtaHref,
@@ -325,10 +345,10 @@ function normalizeLanding(value: unknown): CommercialLanding | null {
     testimonials: { title: textValue(testimonials.title), items: testimonialItems },
     faq: { title: textValue(faq.title), items: faqItems },
     finalCta: {
-      title: textValue(finalCta.title),
-      description: textValue(finalCta.description),
-      ctaLabel: textValue(finalCta.ctaLabel),
-      ctaHref: finalCtaHref,
+      title: textValue(finalCtaValue.title),
+      description: textValue(finalCtaValue.description),
+      ctaLabel: finalCta?.label ?? null,
+      ctaHref: finalCta?.href ?? null,
     },
     legal: { terms, privacy },
   };
@@ -405,8 +425,12 @@ function normalizeExperiment(value: unknown): CommercialExperiment | null {
   const description = textValue(value.variant.description);
   const ctaLabel = textValue(value.variant.ctaLabel);
   const ctaHref = publicHref(value.variant.ctaHref);
-  return key && weight && headline && description && ctaLabel && ctaHref
-    ? { slug, variant: { key, weight, headline, description, ctaLabel, ctaHref } }
+  const cta = ctaLabel && ctaHref ? selfServiceCta(ctaLabel, ctaHref) : null;
+  return key && weight && headline && description && cta
+    ? {
+        slug,
+        variant: { key, weight, headline, description, ctaLabel: cta.label, ctaHref: cta.href },
+      }
     : null;
 }
 function queryText(value: string | string[] | undefined, maxLength: number): string | undefined {

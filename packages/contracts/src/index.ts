@@ -1258,6 +1258,10 @@ export const createOrganizationSchema = z.object({
   timezone: z.string().trim().min(3).max(64).default("America/Sao_Paulo"),
 });
 
+export const selfServiceOrganizationSchema = createOrganizationSchema.extend({
+  planSlug: z.enum(["operacao", "crescimento", "rede"]).default("operacao"),
+});
+
 export const enrollDeviceSchema = z.object({
   label: z.string().trim().min(2).max(120),
   certificateFingerprint: z.string().trim().min(32).max(128).optional(),
@@ -1973,6 +1977,7 @@ export type PublicLoginInput = z.infer<typeof publicLoginSchema>;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchema>;
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+export type SelfServiceOrganizationInput = z.infer<typeof selfServiceOrganizationSchema>;
 export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;
 export type InviteMembershipInput = z.infer<typeof inviteMembershipSchema>;
 export type OperationalCapability = z.infer<typeof operationalCapabilitySchema>;

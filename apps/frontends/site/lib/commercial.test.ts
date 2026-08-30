@@ -242,7 +242,8 @@ test("aplica apenas headline e CTA da variante atribuída e envia a atribuição
   assert.ok(catalog);
   const hero = commercialHeroForCatalog(catalog);
   assert.equal(hero.title, "Controle o próximo turno.");
-  assert.equal(hero.primaryCtaLabel, "Organizar operação");
+  assert.equal(hero.primaryCtaLabel, "Criar conta grátis");
+  assert.equal(hero.primaryCtaHref, "/criar-conta");
   assert.equal(catalog.plans[0]?.offers.monthly.priceCents, 12900);
   assert.deepEqual(commercialAttributionForCatalog(undefined, catalog, "visitor-opaque-123"), {
     landingVersion: 7,

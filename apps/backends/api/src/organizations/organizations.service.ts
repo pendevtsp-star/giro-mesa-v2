@@ -4,9 +4,12 @@ import type {
   CreateOrganizationInput,
   EnrollDeviceInput,
   InviteMembershipInput,
+  SelfServiceOrganizationInput,
 } from "@giromesa/contracts";
 import {
   auditEvents,
+  commercialCatalogVersions,
+  commercialPlans,
   deviceEnrollments,
   identities,
   legalEntities,
@@ -20,9 +23,10 @@ import {
   posCatalogBranding,
   posPaymentDeviceCredentials,
   roleBindings,
+  trials,
   units,
 } from "@giromesa/db";
-import { encryptionKey, encryptSecret } from "@giromesa/domain";
+import { encryptionKey, encryptSecret, trialWindow } from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
@@ -30,7 +34,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { and, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { smartPosInstallationLockKey } from "../pilot-operations/pilot-smartpos.service.js";
 import { projectBrandingSummary } from "./establishment-settings.service.js";
@@ -99,6 +103,164 @@ export class OrganizationsService {
         return { organization, unit };
       });
     } catch (error) {
+      if (typeof error === "object" && error && "code" in error && error.code === "23505") {
+        throw new ConflictException({
+          code: "ORGANIZATION_EXISTS",
+          message: "Já existe uma organização com este CNPJ.",
+        });
+      }
+      throw error;
+    }
+  }
+
+  async createSelfService(identityId: string, input: SelfServiceOrganizationInput) {
+    const [plan] = await this.database.db
+      .select({ id: commercialPlans.id, slug: commercialPlans.slug })
+      .from(commercialPlans)
+      .innerJoin(
+        commercialCatalogVersions,
+        eq(commercialCatalogVersions.id, commercialPlans.catalogVersionId),
+      )
+      .where(
+        and(
+          eq(commercialPlans.slug, input.planSlug),
+          eq(commercialCatalogVersions.status, "published"),
+        ),
+      )
+      .orderBy(desc(commercialCatalogVersions.version))
+      .limit(1);
+    if (!plan)
+      throw new BadRequestException({
+        code: "PLAN_NOT_AVAILABLE",
+        message: "Plano selecionado indisponível.",
+      });
+
+    const { planSlug: _planSlug, ...organizationInput } = input;
+    try {
+      return await this.database.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`self-service:${identityId}:${input.document}`}::text, 0))`,
+        );
+        const [existing] = await tx
+          .select({ organization: organizations, unit: units, membershipId: memberships.id })
+          .from(memberships)
+          .innerJoin(organizations, eq(organizations.id, memberships.organizationId))
+          .innerJoin(units, eq(units.organizationId, organizations.id))
+          .where(
+            and(
+              eq(memberships.identityId, identityId),
+              eq(memberships.status, "active"),
+              eq(organizations.document, input.document),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          const [trial] = await tx
+            .select()
+            .from(trials)
+            .where(eq(trials.organizationId, existing.organization.id))
+            .limit(1);
+          if (!trial)
+            throw new ConflictException({
+              code: "ORGANIZATION_EXISTS",
+              message: "Já existe uma organização com este CNPJ.",
+            });
+          return {
+            organization: existing.organization,
+            unit: existing.unit,
+            trial,
+            membershipId: existing.membershipId,
+            replayed: true,
+          };
+        }
+        const [conflict] = await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.document, input.document))
+          .limit(1);
+        if (conflict)
+          throw new ConflictException({
+            code: "ORGANIZATION_EXISTS",
+            message: "Já existe uma organização com este CNPJ.",
+          });
+
+        const now = new Date();
+        const window = trialWindow(now);
+        const [organization] = await tx
+          .insert(organizations)
+          .values({ ...organizationInput, billingState: "trial_active" })
+          .returning();
+        if (!organization) throw new Error("Organization was not created");
+        const [legalEntity] = await tx
+          .insert(legalEntities)
+          .values({
+            organizationId: organization.id,
+            legalName: input.legalName,
+            document: input.document,
+          })
+          .returning();
+        if (!legalEntity) throw new Error("Legal entity was not created");
+        const [unit] = await tx
+          .insert(units)
+          .values({
+            organizationId: organization.id,
+            legalEntityId: legalEntity.id,
+            name: input.unitName,
+            timezone: input.timezone,
+          })
+          .returning();
+        if (!unit) throw new Error("Unit was not created");
+        const [membership] = await tx
+          .insert(memberships)
+          .values({ identityId, organizationId: organization.id, status: "active" })
+          .returning();
+        if (!membership) throw new Error("Membership was not created");
+        await tx
+          .insert(roleBindings)
+          .values({ membershipId: membership.id, unitId: null, role: "owner" });
+        await tx.insert(onboardingRecords).values({
+          organizationId: organization.id,
+          checklist: { business: true, unit: true },
+          activatedAt: now,
+          activatedByIdentityId: identityId,
+        });
+        const [trial] = await tx
+          .insert(trials)
+          .values({
+            organizationId: organization.id,
+            commercialPlanId: plan.id,
+            ...window,
+            activatedByIdentityId: identityId,
+          })
+          .returning();
+        if (!trial) throw new Error("Trial was not created");
+        await tx.insert(auditEvents).values({
+          organizationId: organization.id,
+          unitId: unit.id,
+          actorIdentityId: identityId,
+          action: "trial.activated",
+          entityType: "trial",
+          entityId: trial.id,
+          metadata: {
+            planSlug: plan.slug,
+            selfService: true,
+            endsAt: window.endsAt.toISOString(),
+          },
+        });
+        await tx.insert(outboxEvents).values({
+          topic: "trial.activated",
+          aggregateType: "trial",
+          aggregateId: trial.id,
+          payload: {
+            organizationId: organization.id,
+            trialId: trial.id,
+            endsAt: window.endsAt.toISOString(),
+          },
+        });
+        return { organization, unit, trial, membershipId: membership.id, replayed: false };
+      });
+    } catch (error) {
+      if (error instanceof ConflictException) throw error;
       if (typeof error === "object" && error && "code" in error && error.code === "23505") {
         throw new ConflictException({
           code: "ORGANIZATION_EXISTS",

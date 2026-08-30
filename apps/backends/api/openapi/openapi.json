@@ -7449,6 +7449,136 @@
         ]
       }
     },
+    "/api/v1/organizations/self-service": {
+      "post": {
+        "operationId": "OrganizationsController_createSelfService[0]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "tradeName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "document": {
+                    "type": "string"
+                  },
+                  "unitName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "default": "America/Sao_Paulo",
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
+                  "planSlug": {
+                    "default": "operacao",
+                    "type": "string",
+                    "enum": [
+                      "operacao",
+                      "crescimento",
+                      "rede"
+                    ]
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "tradeName",
+                  "document",
+                  "unitName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/self-service": {
+      "post": {
+        "operationId": "OrganizationsController_createSelfService[1]",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "legalName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "tradeName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "document": {
+                    "type": "string"
+                  },
+                  "unitName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "default": "America/Sao_Paulo",
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 64
+                  },
+                  "planSlug": {
+                    "default": "operacao",
+                    "type": "string",
+                    "enum": [
+                      "operacao",
+                      "crescimento",
+                      "rede"
+                    ]
+                  }
+                },
+                "required": [
+                  "legalName",
+                  "tradeName",
+                  "document",
+                  "unitName"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/api/v1/organizations/{organizationId}/units/{unitId}/settings": {
       "get": {
         "operationId": "OrganizationsController_getSettings[0]",

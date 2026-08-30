@@ -10,6 +10,7 @@ import {
 import type { ScopeSource, Session } from "./app/types";
 import {
   BootstrapError,
+  CreateOrganizationScreen,
   LoadingScreen,
   LoginScreen,
   ScopeScreen,
@@ -222,6 +223,15 @@ export function App() {
       return <TerminalLockScreen onClose={logout} onUnlock={unlockTerminal} view={terminalView} />;
     }
     if (scopeSource) {
+      if (scopeSource.organizations.length === 0) {
+        return (
+          <CreateOrganizationScreen
+            identityName={scopeSource.identityName}
+            onBack={logout}
+            onCreated={restoreSession}
+          />
+        );
+      }
       return (
         <ScopeScreen
           source={scopeSource}

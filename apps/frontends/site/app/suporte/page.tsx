@@ -34,7 +34,7 @@ export default function SupportPage() {
           <span>◎</span>
           <h2>Implantação</h2>
           <p>Checklist, cardápio, equipe, mesas e simulação.</p>
-          <Link href="/teste-gratis">Solicitar avaliação</Link>
+          <Link href="/criar-conta">Criar conta grátis</Link>
         </article>
         <article id="status">
           <span>◌</span>

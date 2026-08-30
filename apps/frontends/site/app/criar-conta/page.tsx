@@ -89,7 +89,10 @@ export default function CreateAccountPage() {
       <section className="auth-box">
         <p className="eyebrow">Identidade GiroMesa</p>
         <h1>Criar sua conta</h1>
-        <p>A conta identifica você. A empresa só será criada após o fluxo de onboarding.</p>
+        <p>
+          Crie sua conta e cadastre o estabelecimento no próximo passo. O teste grátis começa na
+          hora.
+        </p>
         <Label className="check-label">
           <Input
             checked={termsAccepted}

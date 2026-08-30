@@ -49,7 +49,12 @@ export class OnboardingService {
       .where(eq(onboardingRecords.organizationId, organizationId))
       .limit(1);
     if (!record) throw new NotFoundException();
-    if (record.activatedAt)
+    const [organization] = await this.database.db
+      .select({ billingState: organizations.billingState })
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
+    if (record.activatedAt && organization?.billingState !== "trial_active")
       throw new ConflictException({
         code: "ONBOARDING_ALREADY_ACTIVATED",
         message: "O onboarding já foi ativado.",

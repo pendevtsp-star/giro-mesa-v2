@@ -36,13 +36,13 @@ export function Header() {
           <Link className="button button-ghost" href="/login">
             Entrar
           </Link>
-          <Link className="button button-primary header-trial" href="/teste-gratis">
-            Solicitar teste
+          <Link className="button button-primary header-trial" href="/criar-conta">
+            Criar conta grátis
           </Link>
           <MobileNavigation>
             <NavigationLinks />
-            <Link className="button button-primary" href="/teste-gratis">
-              Solicitar teste assistido
+            <Link className="button button-primary" href="/criar-conta">
+              Criar conta grátis
             </Link>
           </MobileNavigation>
         </div>

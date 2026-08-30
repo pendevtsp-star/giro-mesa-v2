@@ -1924,6 +1924,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/self-service": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_createSelfService[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/self-service": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_createSelfService[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/settings": {
     parameters: {
       query?: never;
@@ -21104,6 +21136,72 @@ export interface operations {
     requestBody?: never;
     responses: {
       204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OrganizationsController_createSelfService[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          legalName: string;
+          tradeName: string;
+          document: string;
+          unitName: string;
+          /** @default America/Sao_Paulo */
+          timezone?: string;
+          /**
+           * @default operacao
+           * @enum {string}
+           */
+          planSlug?: "operacao" | "crescimento" | "rede";
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OrganizationsController_createSelfService[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          legalName: string;
+          tradeName: string;
+          document: string;
+          unitName: string;
+          /** @default America/Sao_Paulo */
+          timezone?: string;
+          /**
+           * @default operacao
+           * @enum {string}
+           */
+          planSlug?: "operacao" | "crescimento" | "rede";
+        };
+      };
+    };
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };

@@ -248,8 +248,8 @@ export default function LoginPage() {
           {!challengeToken && !oauthMfa && (
             <div className="auth-footer">
               <p>
-                Ainda não usa? <Link href="/criar-conta">Crie sua identidade</Link> ou solicite um{" "}
-                <Link href="/teste-gratis">teste assistido</Link>.
+                Ainda não usa? <Link href="/criar-conta">Crie sua conta grátis</Link> e cadastre seu
+                estabelecimento.
               </p>
               <p>
                 <Link href="/seguranca">Segurança da conta, MFA e recuperação</Link>

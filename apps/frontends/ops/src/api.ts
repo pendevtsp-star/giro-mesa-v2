@@ -14,6 +14,7 @@ import type {
   OperationalPushSubscription,
   PrintDocumentPayloadV2,
   RestoreEstablishmentSettingsInput,
+  SelfServiceOrganizationInput,
   UpdateOrganizationSettingsInput,
   UpdateUnitSettingsInput,
 } from "@giromesa/contracts";
@@ -831,6 +832,11 @@ export const api = {
   logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
+  createSelfServiceOrganization: (body: SelfServiceOrganizationInput) =>
+    request<unknown>("/v1/organizations/self-service", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   settings: {
     get: (organizationId: string, unitId: string) =>
       request<EstablishmentSettings>(

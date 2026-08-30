@@ -15,6 +15,8 @@ import {
   inviteMembershipSchema,
   type RestoreEstablishmentSettingsInput,
   restoreEstablishmentSettingsSchema,
+  type SelfServiceOrganizationInput,
+  selfServiceOrganizationSchema,
   type UpdateOrganizationSettingsInput,
   type UpdateUnitSettingsInput,
   updateOrganizationSettingsSchema,
@@ -84,6 +86,15 @@ export class OrganizationsController {
     @Body(new ZodPipe(createOrganizationSchema)) body: CreateOrganizationInput,
   ) {
     return this.organizationsService.create(request.auth.identityId, body);
+  }
+
+  @ApiBody({ schema: toOpenApiSchema(selfServiceOrganizationSchema) })
+  @Post("self-service")
+  createSelfService(
+    @Req() request: AuthenticatedRequest,
+    @Body(new ZodPipe(selfServiceOrganizationSchema)) body: SelfServiceOrganizationInput,
+  ) {
+    return this.organizationsService.createSelfService(request.auth.identityId, body);
   }
 
   @ApiOkResponse({ schema: toOpenApiSchema(establishmentSettingsSchema) })
