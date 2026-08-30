@@ -153,9 +153,7 @@ describe("protected salon operation", () => {
   it("keeps the fullscreen HUD and side drawer visible", () => {
     expect(salonCss).toContain(".salon-shell:fullscreen > .salon-fullscreen-bar");
     expect(salonCss).toContain(".salon-shell:fullscreen > .salon-command-center");
-    expect(appCss).toContain(
-      ".salon-service-modal:not(.salon-service-modal--compact) .gm-modal",
-    );
+    expect(appCss).toContain(".salon-service-modal:not(.salon-service-modal--compact) .gm-modal");
     expect(salonCss).toContain(".salon-hud-signals");
   });
 });
