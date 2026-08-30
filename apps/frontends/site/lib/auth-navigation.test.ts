@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { prepareGoogleRedirect, resolveLocalReturnTo, resolveOpsUrl } from "./auth-navigation.ts";
+import {
+  hasAuthenticatedSession,
+  prepareGoogleRedirect,
+  resolveLocalReturnTo,
+  resolveOpsUrl,
+} from "./auth-navigation.ts";
 
 test("resolve o destino operacional configurado", () => {
   assert.equal(
@@ -63,5 +68,29 @@ test("prepara Google por POST e aceita somente a origem oficial", async () => {
         }),
     ),
     null,
+  );
+});
+
+test("retoma apenas uma sessão autenticada usando o cookie existente", async () => {
+  let credentials: RequestCredentials | undefined;
+  let cache: RequestCache | undefined;
+  const authenticated = await hasAuthenticatedSession(
+    "https://api.giromesa.com.br",
+    async (input, init) => {
+      assert.equal(String(input), "https://api.giromesa.com.br/v1/auth/me");
+      credentials = init?.credentials;
+      cache = init?.cache;
+      return new Response(null, { status: 200 });
+    },
+  );
+
+  assert.equal(authenticated, true);
+  assert.equal(credentials, "include");
+  assert.equal(cache, "no-store");
+  assert.equal(
+    await hasAuthenticatedSession("https://api.giromesa.com.br", async () =>
+      Promise.resolve(new Response(null, { status: 401 })),
+    ),
+    false,
   );
 });

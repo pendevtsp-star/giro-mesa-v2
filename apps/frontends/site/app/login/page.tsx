@@ -4,11 +4,27 @@ import { Button, Input, Label } from "@giromesa/ui";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
 import {
+  hasAuthenticatedSession,
   prepareGoogleRedirect,
   resolveLocalReturnTo,
   resolveOpsUrl,
 } from "../../lib/auth-navigation";
 import { buildMfaProof, readMfaChallenge } from "../../lib/mfa";
+
+function navigation() {
+  const parameters = new URLSearchParams(window.location.search);
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const returnTo = resolveLocalReturnTo(
+    fragment.get("returnTo") ?? parameters.get("returnTo"),
+    window.location.origin,
+  );
+  return {
+    returnTo,
+    destination: returnTo
+      ? new URL(returnTo, window.location.origin).toString()
+      : resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin),
+  };
+}
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,24 +32,52 @@ export default function LoginPage() {
   const [challengeToken, setChallengeToken] = useState("");
   const [oauthMfa, setOauthMfa] = useState(false);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
-  const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
-    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const google = parameters.get("google");
-    setReturnTo(
-      resolveLocalReturnTo(
-        fragment.get("returnTo") ?? parameters.get("returnTo"),
-        window.location.origin,
-      ),
-    );
     if (google === "mfa") {
       setOauthMfa(true);
       setMessage("Confirme o segundo fator para concluir o acesso com Google.");
     } else if (google === "failed") {
       setMessage("Não foi possível concluir o acesso com Google. Tente novamente ou use e-mail.");
     }
+
+    let checking = false;
+    let stopped = false;
+    const resumeSession = async () => {
+      if (checking) return;
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+      const { destination } = navigation();
+      if (!apiUrl || !destination) {
+        setCheckingSession(false);
+        return;
+      }
+      checking = true;
+      setCheckingSession(true);
+      const authenticated = await hasAuthenticatedSession(apiUrl);
+      checking = false;
+      if (stopped) return;
+      if (authenticated) {
+        window.location.replace(destination);
+        return;
+      }
+      setCheckingSession(false);
+    };
+    const resumeVisibleSession = () => {
+      if (document.visibilityState === "visible") void resumeSession();
+    };
+    const resumeCachedSession = () => void resumeSession();
+
+    void resumeSession();
+    document.addEventListener("visibilitychange", resumeVisibleSession);
+    window.addEventListener("pageshow", resumeCachedSession);
+    return () => {
+      stopped = true;
+      document.removeEventListener("visibilitychange", resumeVisibleSession);
+      window.removeEventListener("pageshow", resumeCachedSession);
+    };
   }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -43,9 +87,7 @@ export default function LoginPage() {
       setMessage("O serviço de autenticação ainda não está configurado neste ambiente.");
       return;
     }
-    const destination = returnTo
-      ? new URL(returnTo, window.location.origin).toString()
-      : resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
+    const { destination } = navigation();
     if (!destination) {
       setMessage("O destino seguro do aplicativo operacional ainda não está configurado.");
       return;
@@ -76,7 +118,7 @@ export default function LoginPage() {
         setMessage("Confirme o segundo fator para concluir o acesso.");
         return;
       }
-      window.location.assign(destination);
+      window.location.replace(destination);
     } catch {
       setMessage("Não foi possível entrar. Revise os dados ou recupere sua senha.");
     }
@@ -85,9 +127,7 @@ export default function LoginPage() {
   async function verifyMfa(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-    const destination = returnTo
-      ? new URL(returnTo, window.location.origin).toString()
-      : resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
+    const { destination } = navigation();
     if (!apiUrl || !destination) {
       setMessage("O acesso seguro ainda não está configurado neste ambiente.");
       return;
@@ -108,7 +148,7 @@ export default function LoginPage() {
         },
       );
       if (!response.ok) throw new Error("Falha de MFA");
-      window.location.assign(destination);
+      window.location.replace(destination);
     } catch {
       setMessage("Código inválido ou expirado. Tente novamente.");
     }
@@ -121,6 +161,7 @@ export default function LoginPage() {
       setMessage("O Google ainda não está configurado neste ambiente.");
       return;
     }
+    const { returnTo } = navigation();
     const target = await prepareGoogleRedirect(apiUrl, {
       intent: "login",
       ...(returnTo ? { returnTo } : {}),
@@ -151,7 +192,7 @@ export default function LoginPage() {
           <p>
             Use sua conta pessoal. Em terminais compartilhados, acesse pelo dispositivo cadastrado.
           </p>
-          {!challengeToken && !oauthMfa && (
+          {!checkingSession && !challengeToken && !oauthMfa && (
             <>
               <Button
                 className="button google-button"
@@ -167,7 +208,7 @@ export default function LoginPage() {
             </>
           )}
           {challengeToken || oauthMfa ? (
-            <form onSubmit={verifyMfa} className="auth-form">
+            <form onSubmit={verifyMfa} className="auth-form" hidden={checkingSession}>
               <Label>
                 {useRecoveryCode ? "Código de recuperação" : "Código do autenticador"}
                 <Input
@@ -205,7 +246,7 @@ export default function LoginPage() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={submit} className="auth-form">
+            <form onSubmit={submit} className="auth-form" hidden={checkingSession}>
               <Label>
                 E-mail
                 <Input type="email" name="email" autoComplete="email" required />
@@ -243,9 +284,9 @@ export default function LoginPage() {
             </form>
           )}
           <p className="form-status" role="status">
-            {message}
+            {checkingSession ? "Retomando sua sessão…" : message}
           </p>
-          {!challengeToken && !oauthMfa && (
+          {!checkingSession && !challengeToken && !oauthMfa && (
             <div className="auth-footer">
               <p>
                 Ainda não usa? <Link href="/criar-conta">Crie sua conta grátis</Link> e cadastre seu

@@ -57,3 +57,18 @@ export async function prepareGoogleRedirect(
     return null;
   }
 }
+
+export async function hasAuthenticatedSession(
+  apiUrl: string,
+  fetcher: typeof fetch = fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetcher(`${apiUrl}/v1/auth/me`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

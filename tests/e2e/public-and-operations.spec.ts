@@ -48,6 +48,27 @@ test("login supports password visibility and recovery", async ({ page }) => {
   await expect(page.getByRole("link", { name: /esqueci|minha senha|recuperar/i })).toBeVisible();
 });
 
+test("login retoma a sessão confiável ao voltar para a janela", async ({ page }) => {
+  let authenticated = false;
+  await page.route("http://localhost:3200/v1/auth/me", (route) =>
+    route.fulfill({
+      status: authenticated ? 200 : 401,
+      contentType: "application/json",
+      headers: {
+        "Access-Control-Allow-Origin": siteUrl,
+        "Access-Control-Allow-Credentials": "true",
+      },
+      body: JSON.stringify(authenticated ? { id: "user-e2e" } : { code: "UNAUTHORIZED" }),
+    }),
+  );
+
+  await page.goto(`${siteUrl}/login`);
+  await expect(page.getByLabel(/senha/i).first()).toBeVisible();
+  authenticated = true;
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent("pageshow")));
+  await page.waitForURL("http://127.0.0.1:3112/**");
+});
+
 test("email links expose complete reset, invitation and opt-out actions", async ({ page }) => {
   const token = "a".repeat(43);
   await page.goto(`${siteUrl}/recuperar-senha?token=${token}`);
