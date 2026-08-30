@@ -162,7 +162,7 @@ test("login local preserva o convite no fragmento e nunca o envia em URL HTTP", 
     "href",
     `/login#returnTo=${encodeURIComponent(expectedReturn)}`,
   );
-  await expect(page.getByRole("link", { name: "Criar conta" })).toHaveAttribute(
+  await expect(page.locator('a[href^="/criar-conta#returnTo="]')).toHaveAttribute(
     "href",
     `/criar-conta#returnTo=${encodeURIComponent(expectedReturn)}`,
   );

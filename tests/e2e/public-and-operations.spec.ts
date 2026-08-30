@@ -8,7 +8,7 @@ test("landing communicates the trial and exposes the legal map", async ({ page }
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.locator(".hero-actions .button-primary")).toHaveAttribute(
     "href",
-    /^\/teste-gratis(?:\?|$)/,
+    /^\/criar-conta(?:\?|$)/,
   );
   await expect(page.getByRole("link", { name: /termos/i }).last()).toBeVisible();
   await expect(page.getByRole("link", { name: /privacidade/i }).last()).toBeVisible();
