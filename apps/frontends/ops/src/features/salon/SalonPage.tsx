@@ -4879,7 +4879,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       <span aria-hidden="true"> · </span>
                       {serviceModeLabel(selectedServiceMode)}
                     </span>
-                    <div>
+                    <div className="salon-service-modal__context">
                       <Badge tone={selectedCall?.kind === "bill" ? "warning" : "info"}>
                         {selectedCall?.kind === "bill" ? "Conta solicitada" : "Em atendimento"}
                       </Badge>

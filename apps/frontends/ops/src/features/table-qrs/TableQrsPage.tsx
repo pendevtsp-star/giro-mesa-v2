@@ -14,6 +14,7 @@ import {
 import QRCode from "qrcode";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ApiClientError,
   api,
   type CatalogTableQr,
   type TableQrLifecycle,
@@ -120,7 +121,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
   const [lifecycle, setLifecycle] = useState<TableQrLifecycle | null>(null);
   const [draft, setDraft] = useState<TableQrSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [loadError, setLoadError] = useState<{ code: string; message: string } | null>(null);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [busy, setBusy] = useState("");
   const [query, setQuery] = useState("");
@@ -146,7 +147,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    setLoadError("");
+    setLoadError(null);
     try {
       const value = await api.pilot.tableQrLifecycle(scope.organizationId, scope.unitId);
       setLifecycle(value);
@@ -157,9 +158,11 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
         return retained.size > 0 ? retained : activeIds;
       });
     } catch (error) {
-      setLoadError(
-        error instanceof Error ? error.message : "Não foi possível carregar os QR das mesas.",
-      );
+      setLoadError({
+        code: error instanceof ApiClientError ? error.code : "TABLE_QR_LOAD_FAILED",
+        message:
+          error instanceof Error ? error.message : "Não foi possível carregar os QR das mesas.",
+      });
     } finally {
       setLoading(false);
     }
@@ -558,10 +561,21 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
   }
 
   if (loadError && !lifecycle) {
+    if (loadError.code === "PUBLIC_MENU_NOT_FOUND") {
+      return (
+        <Card className="table-qrs-state" role="status">
+          <strong>Publique o cardápio antes de gerar os QR</strong>
+          <p>As placas das mesas precisam apontar para um cardápio público ativo desta unidade.</p>
+          <a className="gm-button gm-button--secondary gm-button--sm" href="#/catalog">
+            Abrir Cardápio
+          </a>
+        </Card>
+      );
+    }
     return (
       <Card className="table-qrs-state" role="alert">
         <strong>Não foi possível carregar QR das mesas</strong>
-        <p>{loadError}</p>
+        <p>{loadError.message}</p>
         <Button onClick={() => void load()} size="sm" variant="secondary">
           Tentar novamente
         </Button>
@@ -601,7 +615,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
       )}
       {loadError && lifecycle && (
         <div className="table-qrs-feedback table-qrs-feedback--warning" role="status">
-          Exibindo a última leitura confirmada. {loadError}
+          Exibindo a última leitura confirmada. {loadError.message}
         </div>
       )}
 

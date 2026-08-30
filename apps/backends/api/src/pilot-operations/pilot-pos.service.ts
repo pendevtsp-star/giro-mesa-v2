@@ -5037,8 +5037,10 @@ export class PilotPosService {
            and (tabs.status = 'open' or tabs.closed_at >= now() - interval '24 hours')
       )
     `;
+    const channelFilter =
+      query.channel === "all" ? sql`true` : sql`queue.fulfillment_type = ${query.channel}`;
     const baseFilter = sql`
-      (${query.channel} = 'all' or queue.fulfillment_type = ${query.channel})
+      ${channelFilter}
       and (
         ${query.query} = ''
         or position(

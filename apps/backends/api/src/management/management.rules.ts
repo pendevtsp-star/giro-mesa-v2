@@ -38,7 +38,7 @@ function assertCents(value: number, field: string, allowZero = false) {
 
 export function quantityToMilli(value: string | number, field = "quantity") {
   const normalized = typeof value === "number" ? String(value) : value.trim();
-  if (!/^-?\d+(\.\d{1,3})?$/.test(normalized)) {
+  if (!/^-?\d+(?:\.\d{1,3}0*)?$/.test(normalized)) {
     throw new BadRequestException({
       code: "INVALID_QUANTITY",
       message: `${field} deve ter no máximo três casas decimais.`,
@@ -47,7 +47,7 @@ export function quantityToMilli(value: string | number, field = "quantity") {
   const negative = normalized.startsWith("-");
   const unsigned = negative ? normalized.slice(1) : normalized;
   const [whole = "0", fraction = ""] = unsigned.split(".");
-  const milli = Number(whole) * 1_000 + Number(fraction.padEnd(3, "0"));
+  const milli = Number(whole) * 1_000 + Number(fraction.slice(0, 3).padEnd(3, "0"));
   if (!Number.isSafeInteger(milli)) {
     throw new BadRequestException({
       code: "INVALID_QUANTITY",

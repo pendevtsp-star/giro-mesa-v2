@@ -20,6 +20,7 @@ import {
   purchaseLineReconciliation,
   purchaseReceiptPlan,
   purchaseStockConversion,
+  quantityToMilli,
   reportPercentageChange,
   reportPeriodContext,
   requiresCashApproval,
@@ -70,6 +71,12 @@ describe("management rules", () => {
       quantityDelta: "-2.001",
       resultingQuantity: "-0.001",
     });
+  });
+
+  it("accepts PostgreSQL scale zeros without accepting extra quantity precision", () => {
+    assert.equal(quantityToMilli("45.000000"), 45_000);
+    assert.equal(quantityToMilli("1.23000"), 1_230);
+    assert.throws(() => quantityToMilli("1.23001"), BadRequestException);
   });
 
   it("plans the entire purchase receipt before persistence", () => {

@@ -545,6 +545,11 @@ export function OperationalApp({
   }, [canManageKdsUnitSettings, session.unitId]);
 
   useEffect(() => {
+    void route;
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [route]);
+
+  useEffect(() => {
     if (route !== "kds") return;
     const parsedArea = parseKdsArea(
       window.location.hash,

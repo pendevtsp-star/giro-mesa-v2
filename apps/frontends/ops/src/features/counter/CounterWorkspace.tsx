@@ -1568,6 +1568,7 @@ export function TabWorkspace({
                           event.currentTarget.closest("details")?.removeAttribute("open");
                         }}
                         type="button"
+                        variant="ghost"
                       >
                         <span>
                           <strong>Detalhes</strong>
@@ -1581,6 +1582,7 @@ export function TabWorkspace({
                           event.currentTarget.closest("details")?.removeAttribute("open");
                         }}
                         type="button"
+                        variant="ghost"
                       >
                         <span>
                           <strong>Histórico</strong>
@@ -1593,6 +1595,7 @@ export function TabWorkspace({
                           event.currentTarget.closest("details")?.removeAttribute("open");
                         }}
                         type="button"
+                        variant="ghost"
                       >
                         <span>
                           <strong>Visor do cliente</strong>
@@ -1721,7 +1724,7 @@ export function TabWorkspace({
                           value={customerPhone}
                         />
                       </Label>
-                      <Label className="inline-form__wide">
+                      <Label className="counter-metadata-form__consent inline-form__wide">
                         <input
                           className="accent-primary"
                           checked={readyNotificationConsent}
@@ -3783,6 +3786,21 @@ export function TabWorkspace({
                       </small>
                     </div>
                     <div className="service-action-dock__actions">
+                      {compactHeading && cart.length > 0 && (
+                        <>
+                          <Button
+                            disabled={busy}
+                            onClick={() => void submitCart(false)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Manter em espera
+                          </Button>
+                          <Button disabled={busy} onClick={() => void submitCart(true)} size="sm">
+                            Enviar pedido ({cartQuantity})
+                          </Button>
+                        </>
+                      )}
                       {!cart.length && data.tab.tableId && (
                         <Button
                           disabled={busy || billRequestPending || Boolean(billCall)}
@@ -3797,21 +3815,23 @@ export function TabWorkspace({
                               : "Pedir conta"}
                         </Button>
                       )}
-                      <Button
-                        onClick={() =>
-                          terminalPaymentMode === "disabled"
-                            ? void requestBillAndPrint()
-                            : openReceive()
-                        }
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {terminalPaymentMode === "disabled"
-                          ? "Pedir conta ao caixa"
-                          : terminalPaymentMode === "homologated_pos"
-                            ? "Cobrar na POS"
-                            : "Receber no caixa"}
-                      </Button>
+                      {!cart.length && (
+                        <Button
+                          onClick={() =>
+                            terminalPaymentMode === "disabled"
+                              ? void requestBillAndPrint()
+                              : openReceive()
+                          }
+                          size="sm"
+                          variant="ghost"
+                        >
+                          {terminalPaymentMode === "disabled"
+                            ? "Pedir conta ao caixa"
+                            : terminalPaymentMode === "homologated_pos"
+                              ? "Cobrar na POS"
+                              : "Receber no caixa"}
+                        </Button>
+                      )}
                       <Button onClick={() => setView("table")} size="sm" variant="ghost">
                         Dados e ações
                       </Button>

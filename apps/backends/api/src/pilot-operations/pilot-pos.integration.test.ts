@@ -2249,7 +2249,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     const queueTabId = (queueOpened.tab as { id: string }).id;
     const queueQuery = {
       stage: "all" as const,
-      channel: "pickup" as const,
+      channel: "all" as const,
       query: "Queue stage test",
       page: 1,
       limit: 1,

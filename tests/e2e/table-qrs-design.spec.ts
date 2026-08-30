@@ -5,7 +5,7 @@ const organizationId = "a1111111-1111-4111-8111-111111111111";
 const unitId = "b1111111-1111-4111-8111-111111111111";
 const identityId = "c1111111-1111-4111-8111-111111111111";
 
-async function mockTableQrSession(page: Page) {
+async function mockTableQrSession(page: Page, publicMenuPublished = true) {
   await page.addInitScript(
     ({ identityId, organizationId, unitId }) => {
       localStorage.setItem(
@@ -54,6 +54,12 @@ async function mockTableQrSession(page: Page) {
       ]);
     }
     if (path.endsWith("/pilot/catalog/tables/qr/lifecycle")) {
+      if (!publicMenuPublished) {
+        return route.fulfill({
+          status: 404,
+          json: { code: "PUBLIC_MENU_NOT_FOUND" },
+        });
+      }
       return json({
         settings: {
           revision: 3,
@@ -136,6 +142,20 @@ async function mockTableQrSession(page: Page) {
     return json({});
   });
 }
+
+test("QR das mesas orienta publicar o cardápio quando ele ainda não existe", async ({ page }) => {
+  await mockTableQrSession(page, false);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:3112/#/table-qrs");
+
+  await expect(page.getByText("Publique o cardápio antes de gerar os QR")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Abrir Cardápio" })).toHaveAttribute(
+    "href",
+    "#/catalog",
+  );
+  await expect(page.getByText(/versão atual da API/)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 
 test("QR das mesas permanece operacional em desktop e 375 px", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A jornada cobre os dois viewports diretamente.");

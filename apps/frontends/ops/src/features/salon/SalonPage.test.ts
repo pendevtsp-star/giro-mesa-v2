@@ -22,6 +22,7 @@ import {
 } from "./salon-operations";
 
 const salonCss = readFileSync(fileURLToPath(new URL("./salon.css", import.meta.url)), "utf8");
+const appCss = readFileSync(fileURLToPath(new URL("../../styles.css", import.meta.url)), "utf8");
 
 describe("tableStatusPresentation", () => {
   it("never presents an operational call as a free table", () => {
@@ -152,7 +153,9 @@ describe("protected salon operation", () => {
   it("keeps the fullscreen HUD and side drawer visible", () => {
     expect(salonCss).toContain(".salon-shell:fullscreen > .salon-fullscreen-bar");
     expect(salonCss).toContain(".salon-shell:fullscreen > .salon-command-center");
-    expect(salonCss).toContain(".salon-shell:fullscreen .salon-service-modal .gm-modal");
+    expect(appCss).toContain(
+      ".salon-service-modal:not(.salon-service-modal--compact) .gm-modal",
+    );
     expect(salonCss).toContain(".salon-hud-signals");
   });
 });

@@ -9,3 +9,39 @@
 @import "./styles/responsive.css" layer(legacy);
 @import "./features/shell/navigation.css" layer(legacy);
 @import "./styles/convergence.css" layer(legacy);
+
+/* Operational drawers must outrank the unlayered modal defaults from @giromesa/ui. */
+@media (min-width: 761px) {
+  .salon-service-modal:not(.salon-service-modal--compact).gm-modal-backdrop[open],
+  .counter-modal.gm-modal-backdrop[open] {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+  }
+
+  .salon-service-modal:not(.salon-service-modal--compact) .gm-modal,
+  .counter-modal .gm-modal {
+    border-radius: var(--gm-radius-lg) 0 0 var(--gm-radius-lg);
+    height: 100dvh;
+    max-height: none;
+    max-width: min(720px, 100vw);
+    width: min(720px, 100vw);
+  }
+}
+
+@media (max-width: 760px) {
+  .salon-service-modal.gm-modal-backdrop[open],
+  .counter-modal.gm-modal-backdrop[open] {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .salon-service-modal .gm-modal,
+  .counter-modal .gm-modal {
+    border-radius: 0;
+    height: 100dvh;
+    max-height: none;
+    max-width: none;
+    width: 100vw;
+  }
+}

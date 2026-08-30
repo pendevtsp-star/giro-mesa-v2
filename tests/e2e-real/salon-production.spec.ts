@@ -949,6 +949,12 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
 
   const dialog = page.getByRole("dialog", { name: "Mesa 03" });
   await expect(dialog).toBeVisible();
+  const desktopDrawerBounds = await dialog.locator(".gm-modal").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { right: rect.right, viewportWidth: window.innerWidth, width: rect.width };
+  });
+  expect(desktopDrawerBounds.width).toBeLessThanOrEqual(720);
+  expect(desktopDrawerBounds.viewportWidth - desktopDrawerBounds.right).toBeLessThanOrEqual(1);
   await expect(dialog.getByText("Preparar conta", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Linha do tempo da mesa", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Online", { exact: true })).toHaveCount(0);
@@ -962,6 +968,14 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");
   await firstAccountLine.getByRole("button", { name: "Fechar" }).click();
   await dialog.getByRole("button", { name: /^Pedido/ }).click();
+  const productCard = dialog.locator(".real-product-option").first();
+  const productCardBounds = await productCard.evaluate((element) => {
+    const card = element.getBoundingClientRect();
+    const button = element.querySelector("button")?.getBoundingClientRect();
+    return { buttonBottom: button?.bottom ?? 0, cardBottom: card.bottom, width: card.width };
+  });
+  expect(productCardBounds.width).toBeGreaterThan(200);
+  expect(productCardBounds.buttonBottom).toBeLessThanOrEqual(productCardBounds.cardBottom + 1);
   await dialog.getByRole("button", { name: "Adicionar Prato da casa", exact: true }).click();
   const productDialog = page.getByRole("dialog", { name: "Prato da casa" });
   await expect(productDialog.getByLabel("Observação para a produção")).toBeVisible();
@@ -971,6 +985,12 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     .evaluate((element) => element.getBoundingClientRect().width);
   expect(quantityWidth).toBeLessThan(150);
   await productDialog.getByRole("button", { name: "Fechar" }).click();
+  await expect(productDialog).toBeHidden();
+  await dialog.getByRole("button", { name: "Adicionar Café Expresso", exact: true }).click();
+  await expect(dialog.getByRole("button", { name: "Enviar pedido (1)" })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Receber no caixa" })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Dados e ações" }).click();
+  await expect(dialog.locator(".counter-metadata-form")).toBeVisible();
   await expectWcagAa(page);
 
   for (const viewport of viewports) {
@@ -991,6 +1011,11 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     expect(bounds.right).toBeLessThanOrEqual(bounds.viewportWidth);
     expect(bounds.top).toBeGreaterThanOrEqual(0);
     expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
+    expect(
+      await dialog
+        .locator(".counter-metadata-form")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
   }
 
   await page.keyboard.press("Escape");

@@ -209,3 +209,18 @@ test("financeiro mantém agenda e ações legíveis no desktop e em 375 px", asy
     ).toBe(true);
   }
 });
+
+test("navegação para outro módulo não preserva a rolagem do financeiro", async ({ page }) => {
+  await mockFinance(page);
+  await page.setViewportSize({ width: 1440, height: 600 });
+  await page.goto("http://127.0.0.1:3112/#/finance");
+  await expect(page.getByRole("heading", { name: "Financeiro" })).toBeVisible();
+
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    window.location.hash = "#/dashboard";
+  });
+
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+});
