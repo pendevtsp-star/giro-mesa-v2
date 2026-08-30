@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item;
 using GiroMesa.ApiClient.V1.Organizations.MembershipInvitations;
+using GiroMesa.ApiClient.V1.Organizations.SelfService;
 using Microsoft.Kiota.Abstractions.Extensions;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Microsoft.Kiota.Abstractions;
@@ -22,6 +23,11 @@ namespace GiroMesa.ApiClient.V1.Organizations
         public global::GiroMesa.ApiClient.V1.Organizations.MembershipInvitations.MembershipInvitationsRequestBuilder MembershipInvitations
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.MembershipInvitations.MembershipInvitationsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The selfService property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.SelfService.SelfServiceRequestBuilder SelfService
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.SelfService.SelfServiceRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>Gets an item from the GiroMesa.ApiClient.v1.organizations.item collection</summary>
         /// <param name="position">Unique identifier of the item</param>
