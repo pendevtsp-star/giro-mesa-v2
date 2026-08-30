@@ -968,6 +968,12 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");
   await firstAccountLine.getByRole("button", { name: "Fechar" }).click();
   await dialog.getByRole("button", { name: /^Pedido/ }).click();
+  await dialog.locator(".real-product-picker").evaluate((picker) => {
+    const cards = [...picker.children];
+    for (let index = 0; index < 4; index += 1) {
+      for (const card of cards) picker.append(card.cloneNode(true));
+    }
+  });
   const productCard = dialog.locator(".real-product-option").first();
   const productCardBounds = await productCard.evaluate((element) => {
     const card = element.getBoundingClientRect();
@@ -976,6 +982,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   });
   expect(productCardBounds.width).toBeGreaterThan(200);
   expect(productCardBounds.buttonBottom).toBeLessThanOrEqual(productCardBounds.cardBottom + 1);
+  await dialog.locator(".real-product-picker").evaluate((picker) => {
+    for (const card of [...picker.children].slice(2)) card.remove();
+  });
   await dialog.getByRole("button", { name: "Adicionar Prato da casa", exact: true }).click();
   const productDialog = page.getByRole("dialog", { name: "Prato da casa" });
   await expect(productDialog.getByLabel("Observação para a produção")).toBeVisible();
