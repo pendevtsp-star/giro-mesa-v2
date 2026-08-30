@@ -1083,10 +1083,24 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
     "true",
   );
 
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const formColumns = await page
+    .locator(".counter-open-form")
+    .evaluate((form) => getComputedStyle(form).gridTemplateColumns.trim().split(/\s+/).length);
+  const searchWidthRatio = await page
+    .locator(".counter-queue-tools .gm-search-field")
+    .evaluate((search) => {
+      const queue = search.closest(".counter-queue-tools");
+      return queue ? search.getBoundingClientRect().width / queue.getBoundingClientRect().width : 0;
+    });
+  expect(formColumns).toBe(3);
+  expect(searchWidthRatio).toBeGreaterThan(0.9);
+  await page.setViewportSize({ width: 375, height: 812 });
+
   await page.getByText("Prazo e identificação").click();
   await expect(page.getByLabel("Data")).toHaveAttribute("type", "date");
   await expect(page.getByLabel("Telefone")).toBeVisible();
-  const quickOpenForm = page.getByRole("button", { name: "Abrir e pedir" }).locator("..");
+  const quickOpenForm = page.locator(".counter-open-form");
 
   for (const viewport of [
     { width: 375, height: 812 },

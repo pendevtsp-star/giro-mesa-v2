@@ -4691,15 +4691,16 @@
 }
 
 .counter-open-form {
-  align-items: end;
-  grid-template-columns: minmax(130px, 0.55fr) minmax(170px, 1fr) minmax(150px, 0.8fr) minmax(
-      220px,
-      1fr
-    ) auto;
+  align-items: start;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(360px, 1fr) auto;
 }
 
 .counter-open-form > .gm-button {
+  align-self: end;
+  grid-column: 3;
+  grid-row: 1;
   min-height: 40px;
+  min-width: 160px;
   white-space: nowrap;
   width: auto;
 }
@@ -4726,10 +4727,10 @@
 }
 
 .counter-operation .counter-queue-tools {
-  align-items: center;
+  align-items: stretch;
   display: grid;
   gap: 0.65rem;
-  grid-template-columns: minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   padding: 0.6rem;
 }
 
