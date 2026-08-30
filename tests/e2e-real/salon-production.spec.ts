@@ -963,6 +963,13 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     "aria-current",
     "page",
   );
+  const fullPayment = dialog.getByRole("button", { name: /^Receber conta inteira/ });
+  await expect(fullPayment).toBeVisible();
+  await expect(fullPayment).toContainText("R$ 287,40");
+  await fullPayment.click();
+  await expect(dialog.getByLabel("Valor a receber")).toHaveValue("287.4");
+  await expect(dialog.getByLabel("Valor recebido")).toHaveValue("287.4");
+  await expect(dialog.getByLabel("Valor a receber")).toBeFocused();
   const firstAccountLine = dialog.locator(".account-line-group").first();
   await firstAccountLine.getByRole("button", { name: /Ações para/ }).click();
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");

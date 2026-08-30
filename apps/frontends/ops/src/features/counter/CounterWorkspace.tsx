@@ -523,6 +523,7 @@ export function TabWorkspace({
   } | null>(null);
   const metadataVersionRef = useRef(0);
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const paymentAmountRef = useRef<HTMLInputElement>(null);
   const terminalProfile = readActiveTerminalProfile(scope.unitId);
   const terminalPaymentMode =
     terminalProfile?.paymentMode ??
@@ -1383,9 +1384,24 @@ export function TabWorkspace({
               }
             }
 
-            function openReceive() {
+            function prepareFullCashierPayment() {
               setView("account");
-              if (integratedPaymentEnabled) setSmartPosOpen(true);
+              const remainingReais = remainingCents / 100;
+              setPaymentReais(remainingReais);
+              if (paymentMethod === "cash") setCashReceivedReais(remainingReais);
+              window.requestAnimationFrame(() => {
+                paymentAmountRef.current?.scrollIntoView({ block: "center" });
+                paymentAmountRef.current?.focus();
+              });
+            }
+
+            function openReceive() {
+              if (integratedPaymentEnabled) {
+                setView("account");
+                setSmartPosOpen(true);
+                return;
+              }
+              prepareFullCashierPayment();
             }
 
             async function submitCart(sendToProduction: boolean) {
@@ -2599,6 +2615,15 @@ export function TabWorkspace({
                       </span>
                     </div>
                     <div className="account-overview__actions">
+                      {cashierPaymentEnabled && remainingCents > 0 && (
+                        <Button
+                          disabled={busy || !tabOpen}
+                          onClick={prepareFullCashierPayment}
+                          size="sm"
+                        >
+                          Receber conta inteira · {formatMoney(remainingCents)}
+                        </Button>
+                      )}
                       {integratedPaymentEnabled && (
                         <Button
                           className="smart-pos-trigger"
@@ -3277,7 +3302,7 @@ export function TabWorkspace({
                             });
                           }}
                         >
-                          <h3>Pagamento parcial</h3>
+                          <h3>Receber pagamento</h3>
                           <p>
                             Pago {formatMoney(paidCents)} · falta {formatMoney(remainingCents)}
                           </p>
@@ -3304,11 +3329,8 @@ export function TabWorkspace({
                             >
                               1 pessoa
                             </Button>
-                            <Button
-                              onClick={() => setPaymentReais(remainingCents / 100)}
-                              type="button"
-                            >
-                              Restante
+                            <Button onClick={prepareFullCashierPayment} type="button">
+                              Conta inteira
                             </Button>
                             <Button
                               onClick={() => {
@@ -3334,6 +3356,7 @@ export function TabWorkspace({
                           <Label>
                             Valor a receber
                             <Input
+                              ref={paymentAmountRef}
                               min={0.01}
                               onChange={(event) => setPaymentReais(Number(event.target.value))}
                               step="0.01"
