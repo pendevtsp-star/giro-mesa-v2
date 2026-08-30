@@ -216,7 +216,12 @@ test("navegação para outro módulo não preserva a rolagem do financeiro", asy
   await page.goto("http://127.0.0.1:3112/#/finance");
   await expect(page.getByRole("heading", { name: "Financeiro" })).toBeVisible();
 
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.evaluate(() => {
+    const spacer = document.createElement("div");
+    spacer.style.height = "200vh";
+    document.body.append(spacer);
+    window.scrollTo(0, document.body.scrollHeight);
+  });
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
   await page.evaluate(() => {
     window.location.hash = "#/dashboard";
