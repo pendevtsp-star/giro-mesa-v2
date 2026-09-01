@@ -877,6 +877,79 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       [],
     );
 
+    const ticketlessReadyAt = new Date();
+    const [ticketlessTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        openedByIdentityId: supportIdentity.id,
+        responsibleIdentityId: supportIdentity.id,
+        label: "Comanda legada sem ticket KDS",
+      })
+      .returning();
+    assert.ok(ticketlessTab);
+    const [ticketlessOrder] = await database.db
+      .insert(posOrders)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tabId: ticketlessTab.id,
+        createdByIdentityId: supportIdentity.id,
+        status: "ready",
+        sentAt: ticketlessReadyAt,
+        readyNotifiedAt: ticketlessReadyAt,
+      })
+      .returning();
+    assert.ok(ticketlessOrder);
+    const [ticketlessItem] = await database.db
+      .insert(posOrderItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        orderId: ticketlessOrder.id,
+        productId: product.id,
+        stationId: null,
+        productName: "Item pronto sem ticket legado",
+        quantity: 1,
+        unitPriceCents: 1_000,
+        grossCents: 1_000,
+        netCents: 1_000,
+        status: "ready",
+      })
+      .returning();
+    assert.ok(ticketlessItem);
+    await assert.rejects(
+      () =>
+        pos.handoffKdsOrder(
+          supportIdentity.id,
+          organizationA.id,
+          unitA.id,
+          ticketlessOrder.id,
+          `ticketless-expedition-${runId}`,
+          { target: "expedition" },
+        ),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "KDS_ORDER_EMPTY",
+    );
+    const ticketlessServed = await pos.handoffKdsOrder(
+      supportIdentity.id,
+      organizationA.id,
+      unitA.id,
+      ticketlessOrder.id,
+      `ticketless-served-${runId}`,
+      { target: "served" },
+    );
+    assert.deepEqual(ticketlessServed.ticketIds, []);
+    const [ticketlessState] = await database.db
+      .select({ orderStatus: posOrders.status, itemStatus: posOrderItems.status })
+      .from(posOrders)
+      .innerJoin(posOrderItems, eq(posOrderItems.orderId, posOrders.id))
+      .where(eq(posOrders.id, ticketlessOrder.id))
+      .limit(1);
+    assert.deepEqual(ticketlessState, { orderStatus: "served", itemStatus: "served" });
+
     const baselineTab = (await pos.getTab(identity.id, organizationA.id, unitA.id, tabId)).tab;
     const baselineTotals = {
       subtotalCents: baselineTab.subtotalCents,

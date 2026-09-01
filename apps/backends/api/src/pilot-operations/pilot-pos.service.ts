@@ -16817,7 +16817,6 @@ export class PilotPosService {
             ),
           );
         const ticketIds = initialTickets.map((ticket) => ticket.id).sort();
-        if (ticketIds.length === 0) throw new ConflictException({ code: "KDS_ORDER_EMPTY" });
         await this.lockKdsScope(tx, organizationId, unitId, [orderId], ticketIds);
         const currentTicketRows = await tx
           .select({ id: posKdsTickets.id })
@@ -16851,6 +16850,63 @@ export class PilotPosService {
         if (!order) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
         if (order.status !== "ready" && order.status !== "served") {
           throw new ConflictException({ code: "KDS_ORDER_NOT_READY", status: order.status });
+        }
+        if (ticketIds.length === 0) {
+          if (input.target !== "served") {
+            throw new ConflictException({ code: "KDS_ORDER_EMPTY" });
+          }
+          const activeItems = await tx
+            .select({ id: posOrderItems.id, status: posOrderItems.status })
+            .from(posOrderItems)
+            .where(
+              and(
+                eq(posOrderItems.organizationId, organizationId),
+                eq(posOrderItems.unitId, unitId),
+                eq(posOrderItems.orderId, orderId),
+                ne(posOrderItems.status, "canceled"),
+              ),
+            );
+          if (activeItems.length === 0) {
+            throw new ConflictException({ code: "KDS_ORDER_EMPTY" });
+          }
+          if (activeItems.some((item) => !["ready", "served"].includes(item.status))) {
+            throw new ConflictException({ code: "KDS_ORDER_NOT_READY" });
+          }
+          if (order.runnerIdentityId && !order.runnerPickedUpAt) {
+            throw new ConflictException({ code: "KDS_ORDER_NOT_PICKED_UP_BY_RUNNER" });
+          }
+          const now = new Date();
+          await this.notifyOrderReadyOnce(tx, identityId, organizationId, unitId, orderId, now);
+          await tx
+            .update(posOrderItems)
+            .set({ status: "served", updatedAt: now })
+            .where(
+              and(
+                eq(posOrderItems.organizationId, organizationId),
+                eq(posOrderItems.unitId, unitId),
+                inArray(
+                  posOrderItems.id,
+                  activeItems.map((item) => item.id),
+                ),
+              ),
+            );
+          await this.syncOrderStatus(tx, identityId, organizationId, unitId, orderId, now);
+          await tx.insert(auditEvents).values({
+            organizationId,
+            unitId,
+            actorIdentityId: identityId,
+            action: "pos.kds.order_handoff",
+            entityType: "order",
+            entityId: orderId,
+            metadata: { target: input.target, reason: input.reason, ticketIds },
+          });
+          await tx.insert(outboxEvents).values({
+            topic: "pos.kds_order_handoff",
+            aggregateType: "order",
+            aggregateId: orderId,
+            payload: { organizationId, unitId, orderId, target: input.target, ticketIds },
+          });
+          return { orderId, ticketIds, target: input.target, state: "served" as const };
         }
         const tickets = await tx
           .select()
