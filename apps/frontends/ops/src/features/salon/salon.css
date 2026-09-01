@@ -4103,13 +4103,18 @@
   padding: 0.65rem;
 }
 
-.workspace-tools--account .action-grid > form:nth-child(3) {
+.workspace-tools--account .cashier-payment-form {
+  grid-column: 1 / -1;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.workspace-tools--account .action-grid > form:nth-child(3) > h3,
-.workspace-tools--account .action-grid > form:nth-child(3) > p,
-.workspace-tools--account .action-grid > form:nth-child(3) > .segmented {
+.workspace-tools--account .cashier-payment-form > h3,
+.workspace-tools--account .cashier-payment-form > p,
+.workspace-tools--account .cashier-payment-form > .cashier-payment-form__shortcuts,
+.workspace-tools--account .cashier-payment-form > .cashier-payment-form__fields,
+.workspace-tools--account .cashier-payment-form > .cash-change-field,
+.workspace-tools--account .cashier-payment-form > .cashier-payment-form__reference,
+.workspace-tools--account .cashier-payment-form > .cashier-payment-form__submit {
   grid-column: 1 / -1;
 }
 

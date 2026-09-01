@@ -795,6 +795,53 @@ test("Salão respeita a operação permitida para cada papel", async ({ browser 
   }
 });
 
+test("Responsável marca pedido pronto como servido na próxima ação", async ({ page }) => {
+  let handoffBody: unknown;
+  let idempotencyKey = "";
+  await mockProductionApi(
+    page,
+    undefined,
+    undefined,
+    {
+      ...floor,
+      serviceCalls: [],
+      tables: floor.tables.map((table) => ({ ...table, accessLevel: "operate" })),
+      tablePhases: [
+        {
+          tableId: "m03",
+          tabId: tab.id,
+          phase: "ready",
+          readyOrderId: "order-3",
+          since: "2026-08-16T12:01:00.000Z",
+        },
+      ],
+    },
+    undefined,
+    undefined,
+    "waiter",
+  );
+  await page.route("**/pilot/kds/orders/order-3/handoff", async (route) => {
+    handoffBody = route.request().postDataJSON();
+    idempotencyKey = route.request().headers()["idempotency-key"] ?? "";
+    await route.fulfill({ json: { orderId: "order-3", target: "served", state: "served" } });
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/salon";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.getByRole("button", { name: "Painel", exact: true }).click();
+  await page.locator(".real-table").filter({ hasText: "Mesa 03" }).click();
+  const dialog = page.getByRole("dialog", { name: "Mesa 03" });
+  await expect(dialog.getByText("Servir pedido", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Marcar como servido" }).click();
+  await expect.poll(() => handoffBody).toEqual({ target: "served" });
+  expect(idempotencyKey).not.toBe("");
+  await expect(page.getByText("Pedido marcado como servido.")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
 test("Atendimento real mantém estado, contexto e layout nos breakpoints críticos", async ({
   page,
 }) => {
@@ -967,6 +1014,27 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(fullPayment).toBeVisible();
   await expect(fullPayment).toContainText("R$ 287,40");
   await fullPayment.click();
+  const cashierPaymentForm = dialog.locator("form.cashier-payment-form");
+  await expect(cashierPaymentForm).toBeVisible();
+  await expect(
+    cashierPaymentForm.getByRole("button", { name: /Conta inteira · R\$ 287,40/ }),
+  ).toBeVisible();
+  const paymentLayout = await cashierPaymentForm.evaluate((form) => {
+    const payment = form.getBoundingClientRect();
+    const grid = form.parentElement;
+    const gridBounds = grid?.getBoundingClientRect();
+    const gridStyle = grid ? getComputedStyle(grid) : null;
+    return {
+      gridLeft: gridBounds?.left ?? 0,
+      gridRight: gridBounds?.right ?? 0,
+      left: payment.left,
+      paddingLeft: Number.parseFloat(gridStyle?.paddingLeft ?? "0"),
+      paddingRight: Number.parseFloat(gridStyle?.paddingRight ?? "0"),
+      right: payment.right,
+    };
+  });
+  expect(paymentLayout.left - paymentLayout.gridLeft).toBeCloseTo(paymentLayout.paddingLeft, 1);
+  expect(paymentLayout.gridRight - paymentLayout.right).toBeCloseTo(paymentLayout.paddingRight, 1);
   await expect(dialog.getByLabel("Valor a receber")).toHaveValue("287.4");
   await expect(dialog.getByLabel("Valor recebido")).toHaveValue("287.4");
   await expect(dialog.getByLabel("Valor a receber")).toBeFocused();

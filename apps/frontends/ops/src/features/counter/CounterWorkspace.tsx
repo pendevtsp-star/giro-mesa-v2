@@ -3252,6 +3252,7 @@ export function TabWorkspace({
                           </Button>
                         </form>
                         <form
+                          className="cashier-payment-form"
                           hidden={view !== "account" || !cashierPaymentEnabled}
                           onSubmit={(event) => {
                             event.preventDefault();
@@ -3306,16 +3307,26 @@ export function TabWorkspace({
                           <p>
                             Pago {formatMoney(paidCents)} · falta {formatMoney(remainingCents)}
                           </p>
-                          <div className="segmented">
+                          <fieldset className="cashier-payment-form__shortcuts">
+                            <legend className="gm-sr-only">Atalhos para receber a conta</legend>
+                            <Button
+                              className="cashier-payment-form__full"
+                              onClick={prepareFullCashierPayment}
+                              type="button"
+                            >
+                              Conta inteira · {formatMoney(remainingCents)}
+                            </Button>
                             <Button
                               onClick={() => setPaymentReais(remainingCents / 400)}
                               type="button"
+                              variant="secondary"
                             >
                               25%
                             </Button>
                             <Button
                               onClick={() => setPaymentReais(remainingCents / 200)}
                               type="button"
+                              variant="secondary"
                             >
                               50%
                             </Button>
@@ -3326,47 +3337,48 @@ export function TabWorkspace({
                                 )
                               }
                               type="button"
+                              variant="secondary"
                             >
                               1 pessoa
-                            </Button>
-                            <Button onClick={prepareFullCashierPayment} type="button">
-                              Conta inteira
                             </Button>
                             <Button
                               onClick={() => {
                                 setPaymentReais(0);
                               }}
                               type="button"
+                              variant="secondary"
                             >
                               Valor livre
                             </Button>
+                          </fieldset>
+                          <div className="cashier-payment-form__fields">
+                            <Label>
+                              Forma de pagamento
+                              <NativeSelect
+                                onChange={(event) =>
+                                  setPaymentMethod(event.target.value as typeof paymentMethod)
+                                }
+                                value={paymentMethod}
+                              >
+                                <option value="cash">Dinheiro</option>
+                                <option value="other">Outro não eletrônico</option>
+                              </NativeSelect>
+                            </Label>
+                            <Label>
+                              Valor a receber
+                              <Input
+                                ref={paymentAmountRef}
+                                min={0.01}
+                                onChange={(event) => setPaymentReais(Number(event.target.value))}
+                                step="0.01"
+                                type="number"
+                                value={paymentReais}
+                              />
+                            </Label>
                           </div>
-                          <Label>
-                            Forma de pagamento
-                            <NativeSelect
-                              onChange={(event) =>
-                                setPaymentMethod(event.target.value as typeof paymentMethod)
-                              }
-                              value={paymentMethod}
-                            >
-                              <option value="cash">Dinheiro</option>
-                              <option value="other">Outro não eletrônico</option>
-                            </NativeSelect>
-                          </Label>
-                          <Label>
-                            Valor a receber
-                            <Input
-                              ref={paymentAmountRef}
-                              min={0.01}
-                              onChange={(event) => setPaymentReais(Number(event.target.value))}
-                              step="0.01"
-                              type="number"
-                              value={paymentReais}
-                            />
-                          </Label>
                           {paymentMethod === "cash" && (
                             <Label className="cash-change-field">
-                              Valor recebido
+                              <span>Valor recebido</span>
                               <Input
                                 min={paymentReais}
                                 onChange={(event) =>
@@ -3384,12 +3396,16 @@ export function TabWorkspace({
                               </strong>
                             </Label>
                           )}
-                          <Input
-                            onChange={(event) => setPaymentReference(event.target.value)}
-                            placeholder="Referência opcional"
-                            value={paymentReference}
-                          />
+                          <Label className="cashier-payment-form__reference">
+                            Referência opcional
+                            <Input
+                              onChange={(event) => setPaymentReference(event.target.value)}
+                              placeholder="Ex.: identificação ou observação"
+                              value={paymentReference}
+                            />
+                          </Label>
                           <Button
+                            className="cashier-payment-form__submit"
                             disabled={
                               busy ||
                               paymentReais <= 0 ||
