@@ -1,5 +1,10 @@
-const CACHE_NAME = "giromesa-ops-shell-v0.2.8-r1";
+const CACHE_NAME = "giromesa-ops-shell-v0.2.8-r2";
 const SCOPE_URL = new URL(self.registration.scope);
+const UUID_ROUTE_VALUE = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
+const OPERATIONAL_PUSH_ROUTE = new RegExp(
+  `^#/(?:salon(?:\\?table=${UUID_ROUTE_VALUE})?|counter(?:\\?tab=${UUID_ROUTE_VALUE})?)$`,
+  "i",
+);
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -28,6 +33,10 @@ function isStaticAsset(request, url) {
     url.pathname.startsWith(`${SCOPE_URL.pathname}assets/`) ||
     url.pathname.startsWith(`${SCOPE_URL.pathname}icons/`)
   );
+}
+
+function operationalPushRoute(value) {
+  return typeof value === "string" && OPERATIONAL_PUSH_ROUTE.test(value) ? value : "#/salon";
 }
 
 self.addEventListener("install", (event) => {
@@ -76,7 +85,7 @@ self.addEventListener("push", (event) => {
   } catch {
     payload = null;
   }
-  const route = payload?.route === "#/counter" ? "#/counter" : "#/salon";
+  const route = operationalPushRoute(payload?.route);
   const title =
     typeof payload?.title === "string" && payload.title.length <= 80
       ? payload.title

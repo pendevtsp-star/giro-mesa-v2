@@ -1167,8 +1167,8 @@ export function OperationalApp({
               identityId={session.identityId}
               installationId={operationalPushInstallationId()}
               onChanged={() => setScopeRevision((value) => value + 1)}
-              onNavigate={(target) => {
-                window.location.hash = routeHref(target);
+              onNavigate={(href) => {
+                window.location.hash = href;
               }}
               organizationId={session.organizationId}
               realtimeStatus={realtimeStatus}

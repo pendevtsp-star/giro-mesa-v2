@@ -40,7 +40,7 @@ export function RealDashboard({
 
   useEffect(() => {
     const refreshVisible = () => {
-      if (document.visibilityState === "visible") remote.retry();
+      if (document.visibilityState === "visible") remote.refreshSilently();
     };
     const timer = window.setInterval(refreshVisible, 60_000);
     document.addEventListener("visibilitychange", refreshVisible);
@@ -48,7 +48,7 @@ export function RealDashboard({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", refreshVisible);
     };
-  }, [remote.retry]);
+  }, [remote.refreshSilently]);
 
   useEffect(() => {
     const nextScope = `${organizationId}:${unitId}`;

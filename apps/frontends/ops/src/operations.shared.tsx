@@ -2,6 +2,7 @@ import { Button, Card } from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProfileId } from "./domain";
 import type { PilotDispatcher, PilotLoader } from "./operational-dispatch";
+import { shouldShowRefreshProgress } from "./remote-refresh";
 
 export interface PilotScope {
   organizationId: string;
@@ -2264,6 +2265,8 @@ export function useRemote<T>(
   const requestIdRef = useRef(0);
   const committedRequestIdRef = useRef(0);
   const scopeKeyRef = useRef(`${scope.organizationId}:${scope.unitId}`);
+  const retryTokenRef = useRef(retryToken);
+  const requestKeyRef = useRef(requestKey);
   loaderRef.current = loader;
   parserRef.current = parser;
   useEffect(() => {
@@ -2280,17 +2283,25 @@ export function useRemote<T>(
     void requestKey;
     const requestId = ++requestIdRef.current;
     const scopeKey = `${scope.organizationId}:${scope.unitId}`;
-    if (scopeKeyRef.current !== scopeKey) {
+    const scopeChanged = scopeKeyRef.current !== scopeKey;
+    const retryChanged = retryTokenRef.current !== retryToken;
+    const resourceChanged = requestKeyRef.current !== requestKey;
+    const showProgress = shouldShowRefreshProgress(readyRef.current, retryChanged, resourceChanged);
+    retryTokenRef.current = retryToken;
+    requestKeyRef.current = requestKey;
+    if (scopeChanged) {
       scopeKeyRef.current = scopeKey;
       readyRef.current = false;
       setLastSuccessfulAt(null);
+      setRefreshing(false);
       setState({ status: "loading" });
-    } else if (readyRef.current) {
+    } else if (showProgress) {
       setRefreshing(true);
     } else {
-      setState({ status: "loading" });
+      setRefreshing(false);
+      if (!readyRef.current) setState({ status: "loading" });
     }
-    setRefreshError(null);
+    if (scopeChanged || showProgress) setRefreshError(null);
     loaderRef
       .current()
       .then(parserRef.current)
@@ -2325,12 +2336,16 @@ export function useRemote<T>(
       });
   }, [requestKey, retryToken, scope.organizationId, scope.refreshToken, scope.unitId]);
   const retry = useCallback(() => setRetryToken((value) => value + 1), []);
-  const refresh = useCallback(async (): Promise<boolean> => {
+  const refresh = useCallback(async (showProgress = true): Promise<boolean> => {
     const expectedScopeKey = scopeKeyRef.current;
     const requestId = ++requestIdRef.current;
-    if (readyRef.current) setRefreshing(true);
-    else setState({ status: "loading" });
-    setRefreshError(null);
+    if (showProgress) {
+      if (readyRef.current) setRefreshing(true);
+      else setState({ status: "loading" });
+      setRefreshError(null);
+    } else if (!readyRef.current) {
+      setState({ status: "loading" });
+    }
     try {
       const data = parserRef.current(await loaderRef.current());
       if (
@@ -2343,6 +2358,7 @@ export function useRemote<T>(
       committedRequestIdRef.current = requestId;
       readyRef.current = true;
       setState({ status: "ready", data });
+      setRefreshError(null);
       setLastSuccessfulAt(new Date().toISOString());
       setRefreshing(false);
       return true;
@@ -2363,7 +2379,8 @@ export function useRemote<T>(
       return false;
     }
   }, []);
-  return { state, retry, refresh, refreshing, refreshError, lastSuccessfulAt };
+  const refreshSilently = useCallback(() => refresh(false), [refresh]);
+  return { state, retry, refresh, refreshSilently, refreshing, refreshError, lastSuccessfulAt };
 }
 
 export function RemoteGate<T>({

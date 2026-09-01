@@ -1137,7 +1137,7 @@ export function RealKdsPage({
     () =>
       subscribeScopeRealtime(
         { organizationId: scope.organizationId, unitId: scope.unitId },
-        remote.refresh,
+        remote.refreshSilently,
         setRealtimeStatus,
         15_000,
         {
@@ -1149,7 +1149,7 @@ export function RealKdsPage({
             ),
         },
       ),
-    [remote.refresh, scope.organizationId, scope.unitId],
+    [remote.refreshSilently, scope.organizationId, scope.unitId],
   );
 
   useEffect(() => {

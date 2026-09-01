@@ -2,6 +2,7 @@ import { Button, Card } from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiClientError } from "./api";
 import type { ProfileId, RouteId } from "./domain";
+import { shouldShowRefreshProgress } from "./remote-refresh";
 
 export interface ManagementScope {
   organizationId: string;
@@ -4461,6 +4462,7 @@ export function useRemote<T>(
   parser: (value: unknown) => T,
 ) {
   const [refresh, setRefresh] = useState(0);
+  const [silentRefresh, setSilentRefresh] = useState(0);
   const [state, setState] = useState<RemoteState<T>>({ status: "loading" });
   const [updating, setUpdating] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -4471,18 +4473,23 @@ export function useRemote<T>(
   const scopeKeyRef = useRef(scopeKey);
   const requestIdRef = useRef(0);
   const hasRequestedRef = useRef(false);
+  const refreshRef = useRef(refresh);
   loaderRef.current = loader;
   parserRef.current = parser;
   useEffect(() => {
     void refresh;
+    void silentRefresh;
     void scope.refreshToken;
     let active = true;
     const requestId = ++requestIdRef.current;
     const scopeChanged = scopeKeyRef.current !== scopeKey;
+    const retryChanged = refreshRef.current !== refresh;
+    refreshRef.current = refresh;
     scopeKeyRef.current = scopeKey;
     if (scopeChanged) readyRef.current = false;
-    setUpdating(readyRef.current);
-    setRefreshError(null);
+    const showProgress = shouldShowRefreshProgress(readyRef.current, retryChanged);
+    setUpdating(showProgress);
+    if (scopeChanged || showProgress) setRefreshError(null);
     setState((prev) => (scopeChanged || prev.status !== "ready" ? { status: "loading" } : prev));
     const bypassReadyCache = hasRequestedRef.current;
     hasRequestedRef.current = true;
@@ -4524,8 +4531,9 @@ export function useRemote<T>(
     return () => {
       active = false;
     };
-  }, [refresh, scope.refreshToken, scopeKey, scope.organizationId, scope.unitId]);
+  }, [refresh, scope.refreshToken, scopeKey, scope.organizationId, scope.unitId, silentRefresh]);
   const retry = useCallback(() => setRefresh((value) => value + 1), []);
+  const refreshSilently = useCallback(() => setSilentRefresh((value) => value + 1), []);
   const update = useCallback(
     (updater: (data: T) => T) =>
       setState((current) =>
@@ -4536,6 +4544,7 @@ export function useRemote<T>(
   return {
     state,
     retry,
+    refreshSilently,
     update,
     updating,
     refreshError,

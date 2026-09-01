@@ -16,6 +16,29 @@ const profiles = [
 ] as const;
 
 async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) {
+  await page.route("**/health", (route) =>
+    route.fulfill({
+      json: {
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "dashboard-e2e",
+        schemaVersion: 73,
+        database: "up",
+        integrations: {},
+        capabilities: [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+        ],
+      },
+    }),
+  );
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
@@ -575,10 +598,26 @@ for (const profile of profiles) {
 
 test("visão geral diferencia dados parciais de operação sem pendências", async ({ page }) => {
   const profile = profiles[1];
+  let holdAutomaticRefresh = false;
+  let signalAutomaticRefresh = () => undefined;
+  let releaseAutomaticRefresh = () => undefined;
+  const automaticRefreshStarted = new Promise<void>((resolve) => {
+    signalAutomaticRefresh = resolve;
+  });
+  const automaticRefreshReleased = new Promise<void>((resolve) => {
+    releaseAutomaticRefresh = resolve;
+  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockDashboardApi(page, profile);
-  await page.route("**/management/overview", (route) =>
-    route.fulfill({
+  await page.route("**/management/overview", async (route) => {
+    const url = new URL(route.request().url());
+    if (holdAutomaticRefresh && !url.searchParams.has("source")) {
+      signalAutomaticRefresh();
+      await automaticRefreshReleased;
+      await route.fulfill({ status: 503, json: { message: "Falha temporária" } });
+      return;
+    }
+    await route.fulfill({
       json: {
         profileId: "manager",
         generatedAt: "2026-08-16T22:30:00.000Z",
@@ -618,8 +657,8 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
         pulse: [],
         quickActions: [],
       },
-    }),
-  );
+    });
+  });
   await page.goto("/#/dashboard");
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
@@ -642,6 +681,17 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
   });
   await refreshAll.click();
   await refreshRequest;
+
+  holdAutomaticRefresh = true;
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await automaticRefreshStarted;
+  await expect(refreshAll).toBeEnabled();
+  await expect(refreshAll).toHaveText("Atualizar dados");
+  await expect(page.getByText("Atualizando dados", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
+  releaseAutomaticRefresh();
+  await expect(page.getByText("Dados desatualizados", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
 
   await expect(page.getByRole("button", { name: /^Tentar / })).toHaveCount(0);
   await page.locator(".dashboard-source-details > summary").click();

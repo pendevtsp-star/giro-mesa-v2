@@ -24,11 +24,23 @@ export type OperationalAttention = {
   detail: string;
   since: string;
   route: "salon" | "counter";
+  tableId?: string;
+  tabId?: string | null;
   sourceId?: string;
   orderId?: string;
   responsibleIdentityId?: string | null;
   isQrOrder?: boolean;
 };
+
+export function operationalAttentionHref(item: OperationalAttention): string {
+  if (item.route === "salon" && item.tableId) {
+    return `#/salon?table=${encodeURIComponent(item.tableId)}`;
+  }
+  if (item.route === "counter" && item.tabId) {
+    return `#/counter?tab=${encodeURIComponent(item.tabId)}`;
+  }
+  return `#/${item.route}`;
+}
 
 const minutesSince = (value: string, now: number) =>
   Math.max(0, Math.floor((now - new Date(value).getTime()) / 60_000));
@@ -142,6 +154,8 @@ export function buildOperationalAttentions(
         detail: `${elapsed} min · SLA ${call.slaMinutes} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
         since: call.createdAt,
         route: call.kind === "bill" && access.counter ? "counter" : "salon",
+        tableId: call.tableId,
+        tabId: call.tabId,
         sourceId: call.id,
         responsibleIdentityId: responsible?.identityId ?? null,
       });
@@ -158,6 +172,8 @@ export function buildOperationalAttentions(
           detail: `Aguardando retirada há ${elapsed} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
           since: phase.since,
           route: "salon",
+          tableId: phase.tableId,
+          tabId: phase.tabId,
           responsibleIdentityId: responsible?.identityId ?? null,
         });
       }
@@ -173,6 +189,8 @@ export function buildOperationalAttentions(
             detail: `Mesa aberta há ${elapsed} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
             since: phase.since,
             route: "salon",
+            tableId: phase.tableId,
+            tabId: phase.tabId,
             responsibleIdentityId: responsible?.identityId ?? null,
           });
         }
@@ -204,6 +222,8 @@ export function buildOperationalAttentions(
           detail: `${itemCount} item(ns) · ${orderElapsed} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
           since: orderSince,
           route: "salon",
+          tableId,
+          tabId: detail.tab.id,
           orderId: order.id,
           responsibleIdentityId: responsible?.identityId ?? null,
           isQrOrder,
@@ -260,7 +280,7 @@ export function OperationalAttentionInbox({
   refreshToken: number;
   realtimeStatus: RealtimeStatus;
   onChanged: () => void;
-  onNavigate: (route: "salon" | "counter") => void;
+  onNavigate: (href: string) => void;
 }) {
   const [items, setItems] = useState<OperationalAttention[]>([]);
   const [open, setOpen] = useState(false);
@@ -328,7 +348,7 @@ export function OperationalAttentionInbox({
                 title: item.title,
                 body: item.detail,
                 tag: item.id,
-                route: `#/${item.route}`,
+                route: operationalAttentionHref(item),
               });
             }
           }
@@ -629,7 +649,7 @@ export function OperationalAttentionInbox({
                         <Button
                           onClick={() => {
                             setOpen(false);
-                            onNavigate(item.route);
+                            onNavigate(operationalAttentionHref(item));
                           }}
                           size="sm"
                         >

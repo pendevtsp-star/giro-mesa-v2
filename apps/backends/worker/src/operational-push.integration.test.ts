@@ -139,7 +139,12 @@ it("targets an active unit operator and removes a 410 subscription", async (cont
       },
     );
     assert.equal(delivered?.delivered, 1);
-    assert.equal(JSON.parse(payloads[0] ?? "{}").title, "Mesa 7 chamou o atendimento");
+    assert.deepEqual(JSON.parse(payloads[0] ?? "{}"), {
+      title: "Mesa 7 chamou o atendimento",
+      body: "Abra a Central Operacional para assumir o chamado.",
+      tag: `call:${call.id}`,
+      route: `#/salon?table=${table.id}`,
+    });
     const expired = await deliverOperationalPush(connection.db, event, async () => {
       throw { statusCode: 410 };
     });

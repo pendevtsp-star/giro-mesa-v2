@@ -842,11 +842,11 @@ export function TabWorkspace({
 
   useEffect(() => {
     const refresh = () => {
-      if (document.visibilityState === "visible" && navigator.onLine) detail.retry();
+      if (document.visibilityState === "visible" && navigator.onLine) detail.refreshSilently();
     };
     const interval = window.setInterval(refresh, 8_000);
     return () => window.clearInterval(interval);
-  }, [detail.retry]);
+  }, [detail.refreshSilently]);
 
   useEffect(() => {
     if (detail.state.status !== "ready") return;

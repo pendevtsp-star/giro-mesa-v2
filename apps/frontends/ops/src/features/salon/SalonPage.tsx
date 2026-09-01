@@ -24,6 +24,7 @@ import {
   useRemote,
   usesQuickServiceMode,
 } from "../../operations.shared";
+import { routeHref } from "../../router";
 import { formatMoney } from "../../rules";
 import { TabWorkspace } from "../counter/CounterWorkspace";
 import {
@@ -122,6 +123,12 @@ export function parseSalonViewContext(
   } catch {
     return fallback;
   }
+}
+
+export function salonTableIdFromHash(hash: string): string | null {
+  const query = hash.split("?", 2)[1];
+  const tableId = query ? new URLSearchParams(query).get("table")?.trim() : undefined;
+  return tableId || null;
 }
 
 export function requiredOperationalRevision(value: number | null, resource: "planta" | "turno") {
@@ -310,13 +317,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   useEffect(() => {
     if (!Number.isFinite(nextTransferBoundary)) return;
     const timer = globalThis.setTimeout(
-      floor.retry,
+      floor.refreshSilently,
       Math.max(0, nextTransferBoundary - Date.now()) + 250,
     );
     return () => globalThis.clearTimeout(timer);
-  }, [nextTransferBoundary, floor.retry]);
+  }, [nextTransferBoundary, floor.refreshSilently]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(
-    restoredViewContext.selectedTableId,
+    (typeof window === "undefined" ? null : salonTableIdFromHash(window.location.hash)) ??
+      restoredViewContext.selectedTableId,
   );
   const [filterStatus, setFilterStatus] = useState<FloorFilter>(restoredViewContext.filterStatus);
   const [roomFilter, setRoomFilter] = useState(restoredViewContext.roomFilter);
@@ -358,7 +366,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
     const updateConnection = () => {
       const connected = navigator.onLine;
       setOnline(connected);
-      if (connected) floor.retry();
+      if (connected) floor.refreshSilently();
     };
     window.addEventListener("online", updateConnection);
     window.addEventListener("offline", updateConnection);
@@ -366,7 +374,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
       window.removeEventListener("online", updateConnection);
       window.removeEventListener("offline", updateConnection);
     };
-  }, [floor.retry]);
+  }, [floor.refreshSilently]);
 
   useEffect(() => {
     if (
@@ -498,6 +506,19 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   >("large_party");
   const [joinReasonNote, setJoinReasonNote] = useState("");
   const [selectedTabId, setSelectedTabId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const syncSelectedTable = () => {
+      const tableId = salonTableIdFromHash(window.location.hash);
+      if (!tableId) return;
+      setSelectedTableId(tableId);
+      setSelectedTabId(null);
+      window.history.replaceState(null, "", routeHref("salon"));
+    };
+    syncSelectedTable();
+    window.addEventListener("hashchange", syncSelectedTable);
+    return () => window.removeEventListener("hashchange", syncSelectedTable);
+  }, []);
 
   const [detachTableId, setDetachTableId] = useState("");
   const [floorFocusId, setFloorFocusId] = useState<string | null>(null);
@@ -2513,6 +2534,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           key={`ready-${readyTable.id}`}
                           onClick={() => selectTable(readyTable)}
                           type="button"
+                          variant="secondary"
                         >
                           <span>
                             <strong>{readyTable.label} · pedido pronto</strong>
@@ -2575,6 +2597,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             setFloorFocusId(targetTableId);
                           }}
                           type="button"
+                          variant="secondary"
                         >
                           <span>
                             <strong>

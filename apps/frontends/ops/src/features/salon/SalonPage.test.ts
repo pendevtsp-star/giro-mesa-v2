@@ -10,6 +10,7 @@ import {
   parseSalonViewContext,
   requiredOperationalRevision,
   runFloorRevisionMutation,
+  salonTableIdFromHash,
   structuralMergePolicy,
   summarizeSalonAttention,
   tableStatusPresentation,
@@ -23,6 +24,13 @@ import {
 
 const salonCss = readFileSync(fileURLToPath(new URL("./salon.css", import.meta.url)), "utf8");
 const appCss = readFileSync(fileURLToPath(new URL("../../styles.css", import.meta.url)), "utf8");
+
+describe("atalho para a mesa", () => {
+  it("lê a mesa vinculada sem confundir outros parâmetros", () => {
+    expect(salonTableIdFromHash("#/salon?table=table-09&origem=attention")).toBe("table-09");
+    expect(salonTableIdFromHash("#/salon?tab=table-09")).toBeNull();
+  });
+});
 
 describe("tableStatusPresentation", () => {
   it("never presents an operational call as a free table", () => {

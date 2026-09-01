@@ -147,9 +147,11 @@
   cursor: pointer;
 }
 
-.gm-pill--button:hover:not(:disabled) {
+.gm-pill--button:hover:not(:disabled),
+button.gm-pill:hover:not(:disabled) {
   border-color: var(--gm-brand);
   background: color-mix(in srgb, var(--gm-brand) 14%, var(--gm-surface));
+  color: var(--gm-brand-strong);
 }
 
 .gm-pill--button:disabled {

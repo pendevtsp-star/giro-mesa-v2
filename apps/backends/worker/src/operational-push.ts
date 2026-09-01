@@ -87,6 +87,7 @@ export function operationalPushMessage(
   callId: string,
   tableLabel: string,
   kind: "assistance" | "bill" | "water" | "other",
+  tableId: string,
 ) {
   const label = tableLabel.slice(0, 40);
   return {
@@ -98,7 +99,7 @@ export function operationalPushMessage(
           : `${label} chamou o atendimento`,
     body: "Abra a Central Operacional para assumir o chamado.",
     tag: `call:${callId}`,
-    route: kind === "bill" ? "#/counter" : "#/salon",
+    route: `#/salon?table=${tableId}`,
   };
 }
 
@@ -233,7 +234,9 @@ export async function deliverOperationalPush(
   } catch {
     throw new OperationalPushDeliveryError("WEB_PUSH_ENCRYPTION_KEY_INVALID", false);
   }
-  const payload = JSON.stringify(operationalPushMessage(callId, call.tableLabel, call.kind));
+  const payload = JSON.stringify(
+    operationalPushMessage(callId, call.tableLabel, call.kind, tableId),
+  );
   let delivered = 0;
   let expired = expiredRows.length;
   let retryableFailure = false;

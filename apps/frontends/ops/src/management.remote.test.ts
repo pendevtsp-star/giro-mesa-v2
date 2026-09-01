@@ -1,5 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { loadManagementRemote } from "./management.shared";
+import { isCurrentRemoteRequest, shouldShowRefreshProgress } from "./remote-refresh";
+
+describe("apresentação da revalidação remota", () => {
+  it("mantém refresh automático silencioso e mostra somente o foreground", () => {
+    expect(shouldShowRefreshProgress(true, false)).toBe(false);
+    expect(shouldShowRefreshProgress(true, true)).toBe(true);
+    expect(shouldShowRefreshProgress(true, false, true)).toBe(true);
+    expect(shouldShowRefreshProgress(false, true)).toBe(false);
+  });
+
+  it("descarta respostas antigas depois de uma nova carga ou troca de escopo", () => {
+    expect(isCurrentRemoteRequest(2, 2, "org:a", "org:a")).toBe(true);
+    expect(isCurrentRemoteRequest(1, 2, "org:a", "org:a")).toBe(false);
+    expect(isCurrentRemoteRequest(2, 2, "org:a", "org:b")).toBe(false);
+  });
+});
 
 describe("loadManagementRemote", () => {
   it("deduplica chamadas em andamento e reutiliza o resultado por poucos segundos", async () => {

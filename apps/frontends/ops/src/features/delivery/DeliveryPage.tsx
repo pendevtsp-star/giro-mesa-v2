@@ -289,7 +289,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
           }),
         );
         orders.update((current) => mergeDeliveryOrders(current, updates));
-        if (hasServerFilter) filteredOrders.retry();
+        if (hasServerFilter) filteredOrders.refreshSilently();
         setLastSyncedAt(new Date().toISOString());
         setSyncWarning("");
       } catch {
@@ -303,7 +303,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     hasServerFilter,
     orders.state,
     orders.update,
-    filteredOrders.retry,
+    filteredOrders.refreshSilently,
     scope.organizationId,
     scope.unitId,
   ]);

@@ -247,8 +247,8 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
       subscribeScopeRealtime(
         { organizationId: scope.organizationId, unitId: scope.unitId },
         async () => {
-          inbox.retry();
-          executions.retry();
+          inbox.refreshSilently();
+          executions.refreshSilently();
           if (selectedId) {
             const page = parseCrmWhatsappMessages(
               await api.growth.whatsappMessages(scope.organizationId, selectedId),
@@ -262,7 +262,13 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
         15_000,
         { shouldInvalidate: (event) => event.topic?.startsWith("growth.whatsapp_") === true },
       ),
-    [scope.organizationId, scope.unitId, selectedId, inbox.retry, executions.retry],
+    [
+      scope.organizationId,
+      scope.unitId,
+      selectedId,
+      inbox.refreshSilently,
+      executions.refreshSilently,
+    ],
   );
 
   async function openConversation(conversation: CrmWhatsappConversation) {

@@ -26,33 +26,35 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
-.gm-button--primary {
+.gm-button--primary:where(:not(.gm-pill)) {
   background: var(--gm-action);
   color: var(--gm-on-action);
 }
-.gm-button--primary:hover:not(:disabled) {
+.gm-button--primary:where(:not(.gm-pill)):hover:not(:disabled) {
   background: var(--gm-action-hover);
+  color: var(--gm-on-action);
 }
-.gm-button--secondary {
+.gm-button--secondary:where(:not(.gm-pill)) {
   background: var(--gm-surface);
   border-color: var(--gm-border);
   color: var(--gm-ink);
 }
-.gm-button--secondary:hover:not(:disabled),
-.gm-button--ghost:hover:not(:disabled) {
+.gm-button--secondary:where(:not(.gm-pill)):hover:not(:disabled),
+.gm-button--ghost:where(:not(.gm-pill)):hover:not(:disabled) {
   background: var(--gm-surface-soft);
   border-color: color-mix(in srgb, var(--gm-border) 55%, var(--gm-muted));
 }
-.gm-button--ghost {
+.gm-button--ghost:where(:not(.gm-pill)) {
   background: transparent;
   color: var(--gm-ink);
 }
-.gm-button--danger {
+.gm-button--danger:where(:not(.gm-pill)) {
   background: var(--gm-danger-action);
   color: var(--gm-on-action);
 }
-.gm-button--danger:hover:not(:disabled) {
+.gm-button--danger:where(:not(.gm-pill)):hover:not(:disabled) {
   background: var(--gm-danger-action-hover);
+  color: var(--gm-on-action);
 }
 .gm-button--sm {
   min-height: 34px;

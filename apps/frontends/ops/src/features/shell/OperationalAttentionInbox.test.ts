@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PosPrintJob } from "../../api";
 import type { PilotFloor } from "../../operations.shared";
-import { buildOperationalAttentions } from "./OperationalAttentionInbox";
+import { buildOperationalAttentions, operationalAttentionHref } from "./OperationalAttentionInbox";
 
 describe("buildOperationalAttentions", () => {
   it("prioritizes overdue calls, ready orders and failed prints", () => {
@@ -47,6 +47,12 @@ describe("buildOperationalAttentions", () => {
     expect(result.map((item) => item.id)).toEqual(["call:call-1", "print:print-1", "ready:tab-1"]);
     expect(result[0]?.priority).toBe("critical");
     expect(result[2]?.priority).toBe("warning");
+    const call = result.find((item) => item.id === "call:call-1");
+    const ready = result.find((item) => item.id === "ready:tab-1");
+    expect(ready && operationalAttentionHref(ready)).toBe("#/salon?table=table-1");
+    expect(call && operationalAttentionHref({ ...call, route: "counter" })).toBe(
+      "#/counter?tab=tab-1",
+    );
   });
 
   it("direciona o chamado ao responsável persistido e prioriza a fila atual", () => {

@@ -449,9 +449,19 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
 
   const statusFilter = page.getByRole("button", { name: /Todas 2/ });
   const viewToggle = page.getByRole("button", { name: "Painel", exact: true });
+  const inactiveStatusFilter = page.getByRole("button", { name: /Livres 1/ });
+  const inactiveViewToggle = page.getByRole("button", { name: "Planta", exact: true });
   await expect(statusFilter).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("box-shadow", "none");
+  await inactiveStatusFilter.hover();
+  await expectWcagAa(page);
+  await inactiveViewToggle.hover();
+  await expectWcagAa(page);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await inactiveStatusFilter.hover();
+  await expectWcagAa(page);
 });
 
 test("Cards das mesas priorizam identificação, contexto e próxima ação", async ({ page }) => {
@@ -834,6 +844,9 @@ test("Responsável marca pedido pronto como servido na próxima ação", async (
     window.location.hash = "#/salon";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
+  const readyTask = page.getByRole("button", { name: /Mesa 03 · pedido pronto/ });
+  await readyTask.hover();
+  await expectWcagAa(page);
   await page.getByRole("button", { name: "Painel", exact: true }).click();
   await page.locator(".real-table").filter({ hasText: "Mesa 03" }).click();
   const dialog = page.getByRole("dialog", { name: "Mesa 03" });

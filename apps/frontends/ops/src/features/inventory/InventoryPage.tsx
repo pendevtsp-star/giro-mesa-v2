@@ -108,8 +108,8 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
       subscribeScopeRealtime(
         { organizationId, unitId },
         async () => {
-          await remote.retry();
-          await returnables.retry();
+          remote.refreshSilently();
+          returnables.refreshSilently();
           return true;
         },
         setRealtimeStatus,
@@ -122,19 +122,19 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             event.topic?.startsWith("management.product-returnable") === true,
         },
       ),
-    [organizationId, remote.retry, returnables.retry, unitId],
+    [organizationId, remote.refreshSilently, returnables.refreshSilently, unitId],
   );
 
   useEffect(() => {
     const replay = async () => {
       if (!navigator.onLine) return;
       const result = await replayInventoryQueue({ organizationId, unitId });
-      if (result.pending === 0) await remote.retry();
+      if (result.pending === 0) remote.refreshSilently();
     };
     void replay();
     window.addEventListener("online", replay);
     return () => window.removeEventListener("online", replay);
-  }, [organizationId, remote.retry, unitId]);
+  }, [organizationId, remote.refreshSilently, unitId]);
 
   function closeDialog() {
     if (busy) return;

@@ -26,6 +26,7 @@ import {
   type TableQrVisualTemplate,
 } from "../../api";
 import type { ManagementScope } from "../../management.shared";
+import { isCurrentRemoteRequest } from "../../remote-refresh";
 import { logoFileError, mediaPayload } from "../settings/settings";
 import {
   canReprintTableQrBatch,
@@ -132,6 +133,10 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
   const [testResults, setTestResults] = useState<Record<string, TableQrTestResult>>({});
   const [lastGeneratedBatch, setLastGeneratedBatch] = useState<TableQrPrintBatch | null>(null);
   const attempts = useRef(new Map<string, { fingerprint: string; key: string }>());
+  const hasLoadedRef = useRef(false);
+  const loadRequestIdRef = useRef(0);
+  const scopeKey = `${scope.organizationId}:${scope.unitId}`;
+  const scopeKeyRef = useRef(scopeKey);
 
   const idempotencyKey = useCallback((operation: string, fingerprint: string) => {
     const current = attempts.current.get(operation);
@@ -145,33 +150,58 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
     attempts.current.delete(operation);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const value = await api.pilot.tableQrLifecycle(scope.organizationId, scope.unitId);
-      setLifecycle(value);
-      setDraft(value.settings);
-      setSelectedIds((current) => {
-        const activeIds = new Set(value.tables.map((table) => table.tableId));
-        const retained = new Set([...current].filter((tableId) => activeIds.has(tableId)));
-        return retained.size > 0 ? retained : activeIds;
-      });
-    } catch (error) {
-      setLoadError({
-        code: error instanceof ApiClientError ? error.code : "TABLE_QR_LOAD_FAILED",
-        message:
-          error instanceof Error ? error.message : "Não foi possível carregar os QR das mesas.",
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [scope.organizationId, scope.unitId]);
+  const load = useCallback(
+    async (showProgress = true) => {
+      const requestId = ++loadRequestIdRef.current;
+      const requestedScopeKey = `${scope.organizationId}:${scope.unitId}`;
+      const isCurrent = () =>
+        isCurrentRemoteRequest(
+          requestId,
+          loadRequestIdRef.current,
+          requestedScopeKey,
+          scopeKeyRef.current,
+        );
+      if (showProgress) setLoading(true);
+      if (showProgress) setLoadError(null);
+      try {
+        const value = await api.pilot.tableQrLifecycle(scope.organizationId, scope.unitId);
+        if (!isCurrent()) return;
+        setLifecycle(value);
+        setDraft(value.settings);
+        setLoadError(null);
+        setSelectedIds((current) => {
+          const activeIds = new Set(value.tables.map((table) => table.tableId));
+          const retained = new Set([...current].filter((tableId) => activeIds.has(tableId)));
+          return retained.size > 0 ? retained : activeIds;
+        });
+        hasLoadedRef.current = true;
+      } catch (error) {
+        if (!isCurrent()) return;
+        setLoadError({
+          code: error instanceof ApiClientError ? error.code : "TABLE_QR_LOAD_FAILED",
+          message:
+            error instanceof Error ? error.message : "Não foi possível carregar os QR das mesas.",
+        });
+      } finally {
+        if (isCurrent() && (showProgress || !hasLoadedRef.current)) setLoading(false);
+      }
+    },
+    [scope.organizationId, scope.unitId],
+  );
 
   useEffect(() => {
     void scope.refreshToken;
-    void load();
-  }, [load, scope.refreshToken]);
+    const scopeChanged = scopeKeyRef.current !== scopeKey;
+    scopeKeyRef.current = scopeKey;
+    if (scopeChanged) {
+      loadRequestIdRef.current += 1;
+      hasLoadedRef.current = false;
+      setLifecycle(null);
+      setDraft(null);
+      setLoading(true);
+    }
+    void load(!hasLoadedRef.current);
+  }, [load, scope.refreshToken, scopeKey]);
 
   const tables = useMemo(() => sortTableQrs(lifecycle?.tables ?? []), [lifecycle?.tables]);
   const filteredTables = useMemo(() => {
