@@ -5,6 +5,7 @@ export function ProductCard({ item, onOpen }: { item: MenuItem; onOpen: () => vo
   return (
     <Button
       type="button"
+      variant="ghost"
       className="menu-card"
       onClick={onOpen}
       aria-label={`${item.name}, ${formatMoney(item.priceCents)}${item.available ? "" : ", indisponível"}`}

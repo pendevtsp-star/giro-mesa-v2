@@ -264,6 +264,7 @@ import type {
   ProductionBatchCompletionInput,
   ProductionBatchInput,
   ProductReturnableClassificationInput,
+  ProductReturnableConfigurationInput,
   ProductReturnableInput,
   PunchLocationInput,
   PurchaseInvoiceConfirmInput,
@@ -5260,7 +5261,7 @@ export class ManagementService {
       openCustodyResult,
       policyRows,
       classifications,
-      resaleProducts,
+      activeCatalogProducts,
       containerItems,
       approvedLosses,
       latestApprovedCounts,
@@ -5465,23 +5466,18 @@ export class ManagementService {
           productName: posProducts.name,
           inventoryItemId: managementInventoryItems.id,
         })
-        .from(managementInventoryItems)
-        .innerJoin(
-          posProducts,
+        .from(posProducts)
+        .leftJoin(
+          managementInventoryItems,
           and(
             eq(posProducts.organizationId, managementInventoryItems.organizationId),
-            eq(posProducts.id, managementInventoryItems.productId),
-          ),
-        )
-        .where(
-          and(
-            eq(managementInventoryItems.organizationId, organizationId),
             eq(managementInventoryItems.unitId, unitId),
+            eq(managementInventoryItems.productId, posProducts.id),
             eq(managementInventoryItems.kind, "resale"),
             eq(managementInventoryItems.active, true),
-            eq(posProducts.active, true),
           ),
-        ),
+        )
+        .where(and(eq(posProducts.organizationId, organizationId), eq(posProducts.active, true))),
       this.database.db
         .select({ id: managementInventoryItems.id, active: managementInventoryItems.active })
         .from(managementInventoryItems)
@@ -5724,10 +5720,16 @@ export class ManagementService {
     const activeContainerIds = new Set(
       containerItems.filter((item) => item.active).map((item) => item.id),
     );
-    const uniqueResaleProducts = [
-      ...new Map(resaleProducts.map((row) => [row.productId, row])).values(),
-    ];
-    const classificationStatus = uniqueResaleProducts.map((product) => {
+    const configuredProductIds = new Set(configurations.map((row) => row.productId));
+    const managedCatalogProducts = [
+      ...new Map(activeCatalogProducts.map((row) => [row.productId, row])).values(),
+    ].filter(
+      (product) =>
+        product.inventoryItemId !== null ||
+        classificationByProduct.has(product.productId) ||
+        configuredProductIds.has(product.productId),
+    );
+    const classificationStatus = managedCatalogProducts.map((product) => {
       const configuration = activeConfigurationByProduct.get(product.productId);
       const persistedStatus = classificationByProduct.get(product.productId);
       const status = persistedStatus ?? (configuration ? "returnable" : "undecided");
@@ -5849,6 +5851,9 @@ export class ManagementService {
       "product-returnable.configure",
       input,
       async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`product-returnable:${organizationId}:${unitId}:${input.productId}`}, 0))`,
+        );
         await this.requireProduct(tx, organizationId, input.productId);
         await this.requireInventoryItem(
           tx,
@@ -5919,6 +5924,153 @@ export class ManagementService {
     );
   }
 
+  async reconcileProductReturnableConfiguration(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    productId: string,
+    idempotencyKey: string,
+    input: ProductReturnableConfigurationInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "product-returnable.reconcile",
+      { productId, ...input },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`product-returnable:${organizationId}:${unitId}:${productId}`}, 0))`,
+        );
+        await this.requireProduct(tx, organizationId, productId);
+        const mappings = [...input.mappings].sort((left, right) =>
+          left.containerInventoryItemId.localeCompare(right.containerInventoryItemId),
+        );
+        for (const mapping of mappings) {
+          await this.requireInventoryItem(
+            tx,
+            organizationId,
+            unitId,
+            mapping.containerInventoryItemId,
+            ["returnable_container"],
+          );
+        }
+        const existingMappings = await tx
+          .select({
+            active: managementProductReturnables.active,
+            containerInventoryItemId: managementProductReturnables.containerInventoryItemId,
+          })
+          .from(managementProductReturnables)
+          .where(
+            and(
+              eq(managementProductReturnables.organizationId, organizationId),
+              eq(managementProductReturnables.unitId, unitId),
+              eq(managementProductReturnables.productId, productId),
+            ),
+          );
+        await tx
+          .update(managementProductReturnables)
+          .set({ active: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(managementProductReturnables.organizationId, organizationId),
+              eq(managementProductReturnables.unitId, unitId),
+              eq(managementProductReturnables.productId, productId),
+              eq(managementProductReturnables.active, true),
+            ),
+          );
+        const reconciledMappings: (typeof managementProductReturnables.$inferSelect)[] = [];
+        for (const mapping of mappings) {
+          const [reconciled] = await tx
+            .insert(managementProductReturnables)
+            .values({
+              organizationId,
+              unitId,
+              productId,
+              containerInventoryItemId: mapping.containerInventoryItemId,
+              quantityPerUnit: String(mapping.quantityPerUnit),
+              depositCents: mapping.depositCents,
+              active: true,
+            })
+            .onConflictDoUpdate({
+              target: [
+                managementProductReturnables.organizationId,
+                managementProductReturnables.unitId,
+                managementProductReturnables.productId,
+                managementProductReturnables.containerInventoryItemId,
+              ],
+              set: {
+                quantityPerUnit: String(mapping.quantityPerUnit),
+                depositCents: mapping.depositCents,
+                active: true,
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
+          if (!reconciled)
+            throw new ConflictException({ code: "RETURNABLE_CONFIGURATION_CONFLICT" });
+          reconciledMappings.push(reconciled);
+        }
+        const [classification] = await tx
+          .insert(managementProductReturnableClassifications)
+          .values({
+            organizationId,
+            unitId,
+            productId,
+            status: input.status,
+            updatedByIdentityId: identityId,
+          })
+          .onConflictDoUpdate({
+            target: [
+              managementProductReturnableClassifications.organizationId,
+              managementProductReturnableClassifications.unitId,
+              managementProductReturnableClassifications.productId,
+            ],
+            set: { status: input.status, updatedByIdentityId: identityId, updatedAt: new Date() },
+          })
+          .returning();
+        if (!classification)
+          throw new ConflictException({ code: "RETURNABLE_CLASSIFICATION_CONFLICT" });
+        const requestedContainerIds = new Set(
+          mappings.map((mapping) => mapping.containerInventoryItemId),
+        );
+        const deactivatedContainerInventoryItemIds = existingMappings
+          .filter(
+            (mapping) =>
+              mapping.active && !requestedContainerIds.has(mapping.containerInventoryItemId),
+          )
+          .map((mapping) => mapping.containerInventoryItemId)
+          .sort();
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.product-returnable.reconciled",
+          "product",
+          productId,
+          {
+            status: input.status,
+            mappings: mappings.map((mapping) => ({
+              containerInventoryItemId: mapping.containerInventoryItemId,
+              quantityPerUnit: String(mapping.quantityPerUnit),
+              depositCents: mapping.depositCents,
+            })),
+            deactivatedContainerInventoryItemIds,
+          },
+        );
+        return {
+          productId,
+          status: classification.status,
+          mappings: reconciledMappings,
+          deactivatedContainerInventoryItemIds,
+        };
+      },
+    );
+  }
+
   async classifyProductReturnable(
     identityId: string,
     organizationId: string,
@@ -5936,6 +6088,9 @@ export class ManagementService {
       "product-returnable.classify",
       { productId, ...input },
       async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`product-returnable:${organizationId}:${unitId}:${productId}`}, 0))`,
+        );
         await this.requireProduct(tx, organizationId, productId);
         const [classification] = await tx
           .insert(managementProductReturnableClassifications)

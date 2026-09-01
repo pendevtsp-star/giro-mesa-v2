@@ -3461,6 +3461,7 @@ export function CatalogExperience({
         editingProductPrice={editingProductPrice}
         editingProductReason={editingProductReason}
         production
+        scope={scope}
         setEditingProduct={setEditingProduct}
         setEditingProductDeliveryPrice={setEditingProductDeliveryPrice}
         setEditingProductPrice={setEditingProductPrice}

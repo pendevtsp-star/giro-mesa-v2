@@ -455,10 +455,14 @@
     background: var(--gm-paper);
     border: 1px solid var(--gm-border);
     border-radius: 12px;
+    box-sizing: border-box;
     grid-column: 2;
     grid-row: 1 / span 20;
     max-height: min(68dvh, 650px);
-    overflow: auto;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     padding: 10px;
     position: sticky;
     top: 8px;
@@ -626,7 +630,7 @@
   }
 
   .cart-preview > .cart-preview__item {
-    align-items: center;
+    align-items: start;
     border-bottom: 1px solid var(--gm-border);
     display: grid;
     gap: 8px;
@@ -672,10 +676,13 @@
   }
 
   .cart-preview__actions {
-    align-items: flex-end;
+    align-items: center;
     display: grid;
-    gap: 3px;
-    justify-items: end;
+    gap: 4px 6px;
+    grid-template-columns: repeat(2, auto);
+    justify-content: end;
+    justify-items: stretch;
+    min-width: 0;
   }
 
   .cart-preview__actions > button {
@@ -721,11 +728,17 @@
     min-height: 28px;
   }
 
-  .cart-preview__submit {
+  .cart-preview__actions > .quantity-stepper {
+    grid-column: 1 / -1;
+    justify-self: end;
+  }
+
+  .cart-preview > .cart-preview__submit {
     display: grid;
     gap: 6px;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
     padding-top: 10px;
+    width: 100%;
   }
 
   .cart-preview__submit .gm-button {
@@ -1423,10 +1436,24 @@
       z-index: 54;
     }
 
-    .cart-preview__submit,
-    .cart-preview__submit .gm-button {
+    .cart-preview > .cart-preview__submit,
+    .cart-preview > .cart-preview__submit .gm-button {
       max-width: 100%;
       min-width: 0;
+    }
+
+    .cart-preview > .cart-preview__item,
+    .cart-preview > .cart-preview__submit {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .cart-preview__actions {
+      justify-content: start;
+      width: 100%;
+    }
+
+    .cart-preview__actions > .quantity-stepper {
+      justify-self: start;
     }
 
     .order-composer > .cart-preview[data-empty="true"] {

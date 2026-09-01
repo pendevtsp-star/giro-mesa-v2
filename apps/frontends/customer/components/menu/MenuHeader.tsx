@@ -1,5 +1,6 @@
 import { Button } from "@giromesa/ui";
 import Image from "next/image";
+import { ThemeSelector } from "./ThemeSelector";
 
 type HubState = "checking" | "online" | "offline";
 
@@ -53,37 +54,37 @@ export function MenuHeader({
             <small className="business-hours">{branding.openingHours}</small>
           )}
         </div>
-        <Button
-          type="button"
-          className="icon-button"
-          aria-label="Ver informações do restaurante"
-          onClick={onInfo}
-        >
-          i
-        </Button>
+        <div className="restaurant-header__controls">
+          <ThemeSelector />
+          <Button
+            type="button"
+            variant="ghost"
+            className="icon-button"
+            aria-label="Ver informações do restaurante"
+            onClick={onInfo}
+          >
+            i
+          </Button>
+        </div>
       </header>
 
-      <div className={`connection-banner ${hub}`} role="status">
-        <span aria-hidden="true">{hub === "online" ? "●" : hub === "checking" ? "◌" : "!"}</span>
-        <div>
-          <strong>
-            {hub === "online" && tableAuthorized
-              ? `${tableLabel ?? "Mesa"} verificada`
-              : hub === "checking"
-                ? "Confirmando atendimento…"
-                : tableAuthorized
-                  ? "Chamados da mesa temporariamente pausados"
-                  : "Cardápio aberto sem identificação da mesa"}
-          </strong>
-          <small>
-            {hub === "online" && tableAuthorized
-              ? "A operação está confirmando chamados e pedidos de conta."
-              : tableAuthorized
-                ? "O cardápio e o checkout público continuam disponíveis quando habilitados."
-                : "Leia o QR da mesa para chamar a equipe; retirada e delivery continuam disponíveis."}
-          </small>
+      {tableAuthorized && (
+        <div className={`connection-banner ${hub}`} role="status">
+          <span aria-hidden="true">{hub === "online" ? "●" : "!"}</span>
+          <div>
+            <strong>
+              {hub === "online"
+                ? `${tableLabel ?? "Mesa"} verificada`
+                : "Chamados da mesa temporariamente pausados"}
+            </strong>
+            <small>
+              {hub === "online"
+                ? "A operação está confirmando chamados e pedidos de conta."
+                : "O cardápio e o checkout público continuam disponíveis quando habilitados."}
+            </small>
+          </div>
         </div>
-      </div>
+      )}
       {(branding?.notice || branding?.address || branding?.phone || branding?.instagram) && (
         <section className="brand-details" aria-label="Informações do estabelecimento">
           {branding.notice && <p className="brand-notice">{branding.notice}</p>}

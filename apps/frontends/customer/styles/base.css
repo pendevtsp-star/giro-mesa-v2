@@ -62,24 +62,25 @@ textarea:focus-visible {
 .menu-app {
   position: relative;
   min-height: 100vh;
-  max-width: 760px;
+  max-width: 960px;
   margin: 0 auto;
   padding-bottom: 120px;
   background: var(--paper);
   box-shadow: 0 0 70px rgba(14, 40, 31, 0.13);
 }
 .restaurant-header {
-  min-height: 126px;
+  min-height: 132px;
   padding: 24px 22px;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 15px;
   overflow: hidden;
   position: relative;
   color: var(--gm-on-action);
   background:
-    radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.26), transparent 32%),
+    linear-gradient(rgba(5, 24, 17, 0.42), rgba(5, 24, 17, 0.42)),
+    radial-gradient(circle at 85% 20%, rgba(216, 163, 74, 0.2), transparent 32%),
     var(--restaurant-brand, var(--green));
   border-bottom: 4px solid var(--restaurant-accent, var(--gm-accent));
 }
@@ -122,21 +123,24 @@ textarea:focus-visible {
 .restaurant-header span {
   margin: 0;
 }
+.restaurant-header__content {
+  min-width: 0;
+}
 .restaurant-header p {
-  color: #c7d3ce;
-  font-size: 10px;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: var(--gm-font-xs);
   text-transform: uppercase;
   letter-spacing: 1.4px;
 }
 .restaurant-header h1 {
   margin: 2px 0;
-  font:
-    27px Georgia,
-    serif;
+  overflow-wrap: anywhere;
+  font: 750 1.65rem / 1.12 var(--gm-display);
+  letter-spacing: -0.02em;
 }
 .restaurant-header span {
-  color: #d9e2de;
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: var(--gm-font-sm);
 }
 .restaurant-header .business-status,
 .restaurant-header .business-hours {
@@ -157,7 +161,37 @@ textarea:focus-visible {
   color: #ffe3db;
 }
 .restaurant-header .business-hours {
-  color: #d9e2de;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.restaurant-header__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gm-space-2);
+}
+.customer-theme-selector {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(5, 24, 17, 0.34);
+  scrollbar-width: none;
+}
+.customer-theme-selector::-webkit-scrollbar {
+  display: none;
+}
+.customer-theme-selector .gm-segmented-control__item {
+  min-height: 36px;
+  padding-inline: 10px;
+  color: rgba(255, 255, 255, 0.82);
+}
+.customer-theme-selector .gm-segmented-control__item:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+.customer-theme-selector .gm-segmented-control__item--active {
+  border-color: transparent;
+  background: var(--gm-surface);
+  color: var(--gm-ink);
 }
 .icon-button {
   width: 44px;

@@ -380,7 +380,7 @@ export function SmartPosPaymentModal({
               (attempt.status === "processing" &&
                 capabilities.supports.cancel &&
                 shellCapabilities?.canCancel === true)) && (
-              <Button disabled={busy} onClick={() => void cancel()} variant="secondary">
+              <Button disabled={busy} onClick={() => void cancel()} variant="danger">
                 Cancelar tentativa
               </Button>
             )}

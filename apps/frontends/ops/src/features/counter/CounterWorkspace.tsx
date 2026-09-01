@@ -158,6 +158,19 @@ export function groupDraftItemsByCourse(items: DraftCartItem[]): DraftCartItem[]
   return [...groups.values()];
 }
 
+export function hasActiveProductionRoute(
+  stationIds: readonly string[],
+  activeStationIds: ReadonlySet<string>,
+) {
+  return stationIds.some((stationId) => activeStationIds.has(stationId));
+}
+
+export function orderSubmissionErrorMessage(createdCount: number, error: unknown) {
+  const message = error instanceof Error ? error.message : "Não foi possível salvar o pedido.";
+  if (!createdCount) return message;
+  return `${createdCount === 1 ? "Pedido salvo em espera, mas não enviado à produção." : `${createdCount} etapas salvas em espera, mas não enviadas à produção.`} ${message}`;
+}
+
 export function canCloseWithoutConsumption(
   totalCents: number,
   paidCents: number,
@@ -473,6 +486,9 @@ export function TabWorkspace({
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
+  const visiblePrintJobs = printJobs.filter(
+    (job) => job.mode !== "account" || job.status !== "printed",
+  );
   const [browserPrintJob, setBrowserPrintJob] = useState<PosPrintJob | null>(null);
   const [reprintReasons, setReprintReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -503,7 +519,9 @@ export function TabWorkspace({
   const [discountReais, setDiscountReais] = useState(0);
   const [moveTargetTabId, setMoveTargetTabId] = useState("");
   const [moveItemId, setMoveItemId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "other">("cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    "cash" | "credit_card" | "debit_card" | "pix" | "other"
+  >("cash");
   const [paymentReais, setPaymentReais] = useState(0);
   const [cashReceivedReais, setCashReceivedReais] = useState(0);
   const [paymentReference, setPaymentReference] = useState("");
@@ -644,23 +662,26 @@ export function TabWorkspace({
       return false;
     }
     try {
-      const pendingConfirmation = await api.pilot.updatePrintJobStatus(
+      const skipsPhysicalConfirmation = printJob.documentType === "partial_statement";
+      const delivered = await api.pilot.updatePrintJobStatus(
         scope.organizationId,
         scope.unitId,
         printJob.id,
         {
-          status: "confirmation_required",
-          error: "PRINTER_RESULT_UNKNOWN",
+          status: skipsPhysicalConfirmation ? "printed" : "confirmation_required",
+          ...(skipsPhysicalConfirmation ? {} : { error: "PRINTER_RESULT_UNKNOWN" }),
           printerId: result?.printerId,
         },
         crypto.randomUUID(),
       );
       updateLocalPrint(localId, {
-        server: pendingConfirmation.printJob,
-        status: "confirmation_required",
+        server: delivered.printJob,
+        status: delivered.printJob.status,
       });
       setFeedback(
-        `${printDocuments[printModeFor(printJob.documentType)].label} enviada${result?.printerId ? ` para ${result.printerId}` : ""}. Confirme a saída física antes de repetir.`,
+        skipsPhysicalConfirmation
+          ? "Pré-conta enviada para impressão."
+          : `${printDocuments[printModeFor(printJob.documentType)].label} enviada${result?.printerId ? ` para ${result.printerId}` : ""}. Confirme a saída física antes de repetir.`,
       );
     } catch {
       updateLocalPrint(localId, { status: "confirmation_required" });
@@ -673,6 +694,29 @@ export function TabWorkspace({
     flushSync(() => setBrowserPrintJob(printJob));
     window.print();
     try {
+      if (printJob.documentType === "partial_statement") {
+        const printing = await api.pilot.updatePrintJobStatus(
+          scope.organizationId,
+          scope.unitId,
+          printJob.id,
+          { status: "printing" },
+          crypto.randomUUID(),
+        );
+        const printed = await api.pilot.updatePrintJobStatus(
+          scope.organizationId,
+          scope.unitId,
+          printJob.id,
+          { status: "printed", printerId: printing.printJob.printerId ?? undefined },
+          crypto.randomUUID(),
+        );
+        updateLocalPrint(localId, {
+          serverId: printJob.id,
+          server: printed.printJob,
+          status: printed.printJob.status,
+        });
+        setFeedback("Pré-conta enviada para impressão.");
+        return;
+      }
       const pendingConfirmation = await api.pilot.updatePrintJobStatus(
         scope.organizationId,
         scope.unitId,
@@ -1013,6 +1057,9 @@ export function TabWorkspace({
         <RemoteGate remote={catalog}>
           {(menu) => {
             const product = menu.products.find((item) => item.id === productId);
+            const activeStationIds = new Set(menu.stations.map((station) => station.id));
+            const canReachProduction = (item: (typeof menu.products)[number]) =>
+              hasActiveProductionRoute(item.stationIds, activeStationIds);
             const normalizedProductSearch = productSearch.trim().toLocaleLowerCase("pt-BR");
             const filteredProducts = menu.products.filter(
               (item) =>
@@ -1035,7 +1082,12 @@ export function TabWorkspace({
             const quickProducts = [...new Set([...favoriteProductIds, ...recentProductIds])]
               .map((id) => menu.products.find((item) => item.id === id))
               .filter((item): item is (typeof menu.products)[number] =>
-                Boolean(item?.active && item.available && item.priceCents !== null),
+                Boolean(
+                  item?.active &&
+                    item.available &&
+                    item.priceCents !== null &&
+                    canReachProduction(item),
+                ),
               )
               .slice(0, 8);
             const unavailableProducts = visibleProducts.filter(
@@ -1143,6 +1195,12 @@ export function TabWorkspace({
                 setDoseClubNotice("Este produto não está disponível no cardápio atual.");
                 return;
               }
+              if (!canReachProduction(selectedProduct)) {
+                setDoseClubNotice(
+                  `${selectedProduct.name} está sem uma estação de produção ativa. Configure a rota no Catálogo.`,
+                );
+                return;
+              }
               if (
                 doseClubDraftQuantity(cart, membership.externalClubId) >= membership.availableDoses
               ) {
@@ -1219,6 +1277,12 @@ export function TabWorkspace({
                 quantity < 1
               )
                 return;
+              if (!canReachProduction(selectedProduct)) {
+                setFeedback(
+                  `${selectedProduct.name} está sem uma estação de produção ativa. Configure a rota no Catálogo.`,
+                );
+                return;
+              }
               const next = {
                 productId: selectedProduct.id,
                 name: selectedProduct.name,
@@ -1279,7 +1343,12 @@ export function TabWorkspace({
               const repeatable = lastOrder.filter((item) => {
                 if (item.doseClub) return false;
                 const selected = menu.products.find((product) => product.id === item.productId);
-                return selected?.active && selected.available && selected.priceCents !== null;
+                return (
+                  selected?.active &&
+                  selected.available &&
+                  selected.priceCents !== null &&
+                  canReachProduction(selected)
+                );
               });
               if (!repeatable.length) {
                 setFeedback("Não há itens disponíveis para repetir.");
@@ -1311,11 +1380,8 @@ export function TabWorkspace({
               }
               if (billCall) {
                 setView("account");
-                setFeedback(
-                  localPrintingEnabled
-                    ? "A conta já foi solicitada. Para outra via, informe o motivo na fila de impressão."
-                    : "A conta já está na fila do caixa.",
-                );
+                if (localPrintingEnabled) await printDocument("account");
+                else setFeedback("A conta já está na fila do caixa.");
                 return;
               }
               setBillRequestPending(true);
@@ -1443,6 +1509,20 @@ export function TabWorkspace({
 
             async function submitCart(sendToProduction: boolean) {
               if (!cart.length) return;
+              const unroutedProducts = [
+                ...new Set(
+                  cart.flatMap((item) => {
+                    const selected = menu.products.find((product) => product.id === item.productId);
+                    return selected && !canReachProduction(selected) ? [selected.name] : [];
+                  }),
+                ),
+              ];
+              if (sendToProduction && unroutedProducts.length) {
+                setFeedback(
+                  `Configure uma estação de produção ativa no Catálogo para: ${unroutedProducts.join(", ")}.`,
+                );
+                return;
+              }
               setBusy(true);
               setFeedback("");
               let createdCount = 0;
@@ -1490,13 +1570,8 @@ export function TabWorkspace({
                       : "Pedido mantido em espera.",
                 );
               } catch (error) {
-                setFeedback(
-                  createdCount
-                    ? `${createdCount} etapa(s) salva(s); os itens restantes continuam no rascunho.`
-                    : error instanceof Error
-                      ? error.message
-                      : "Não foi possível salvar o pedido.",
-                );
+                setFeedback(orderSubmissionErrorMessage(createdCount, error));
+                if (createdCount) setView("order");
               } finally {
                 setBusy(false);
                 detail.retry();
@@ -1673,7 +1748,7 @@ export function TabWorkspace({
                         )
                       }
                       size="sm"
-                      variant="secondary"
+                      variant="danger"
                     >
                       {data.tab.tableId ? "Encerrar Mesa" : "Encerrar sem consumo"}
                     </Button>
@@ -1682,9 +1757,6 @@ export function TabWorkspace({
                 {feedback && (
                   <Toast
                     actionLabel={undoResponsibility ? "Desfazer" : undefined}
-                    duration={
-                      feedback.includes("Não") || feedback.includes("Falha") ? 6_500 : 4_500
-                    }
                     message={feedback}
                     onAction={
                       undoResponsibility
@@ -1769,8 +1841,8 @@ export function TabWorkspace({
                         );
                       }}
                     >
-                      <Label>
-                        Tipo
+                      <Label className="gm-form-field counter-metadata-form__type">
+                        <span>Tipo</span>
                         <NativeSelect
                           onChange={(event) =>
                             setFulfillmentType(event.target.value as typeof fulfillmentType)
@@ -1782,44 +1854,37 @@ export function TabWorkspace({
                           <option value="delivery">Delivery</option>
                         </NativeSelect>
                       </Label>
-                      <Label>
-                        Cliente
+                      <Label className="gm-form-field counter-metadata-form__customer">
+                        <span>Cliente</span>
                         <Input
                           onChange={(event) => setCustomerName(event.target.value)}
                           placeholder={displayLabel}
                           value={customerName}
                         />
                       </Label>
-                      <Label>
-                        Telefone
-                        <Input
-                          inputMode="tel"
-                          onChange={(event) => setCustomerPhone(event.target.value)}
-                          value={customerPhone}
-                        />
-                      </Label>
-                      <Label className="counter-metadata-form__consent inline-form__wide">
-                        <input
-                          className="accent-primary"
-                          checked={readyNotificationConsent}
-                          disabled={!customerPhone.trim()}
-                          onChange={(event) => setReadyNotificationConsent(event.target.checked)}
-                          type="checkbox"
-                        />
-                        Cliente autorizou receber o aviso de pedido pronto
-                      </Label>
-                      <Label className="inline-form__wide">
-                        Observações importantes
-                        <Textarea
-                          maxLength={500}
-                          onChange={(event) => setServiceNotes(event.target.value)}
-                          rows={2}
-                          value={serviceNotes}
-                        />
-                      </Label>
-                      <fieldset className="promised-at-field">
+                      <div className="counter-metadata-form__contact">
+                        <Label className="gm-form-field">
+                          <span>Telefone</span>
+                          <Input
+                            inputMode="tel"
+                            onChange={(event) => setCustomerPhone(event.target.value)}
+                            value={customerPhone}
+                          />
+                        </Label>
+                        <Label className="counter-metadata-form__consent">
+                          <input
+                            className="accent-primary"
+                            checked={readyNotificationConsent}
+                            disabled={!customerPhone.trim()}
+                            onChange={(event) => setReadyNotificationConsent(event.target.checked)}
+                            type="checkbox"
+                          />
+                          Autoriza aviso de pedido pronto
+                        </Label>
+                      </div>
+                      <fieldset className="counter-metadata-form__promise promised-at-field">
                         <legend>Prometido para</legend>
-                        <Label>
+                        <Label className="gm-form-field">
                           <span>Data</span>
                           <Input
                             onChange={(event) => setPromisedDate(event.target.value)}
@@ -1827,7 +1892,7 @@ export function TabWorkspace({
                             value={promisedDate}
                           />
                         </Label>
-                        <Label>
+                        <Label className="gm-form-field">
                           <span>Hora</span>
                           <Input
                             lang="pt-BR"
@@ -1837,9 +1902,18 @@ export function TabWorkspace({
                           />
                         </Label>
                       </fieldset>
+                      <Label className="gm-form-field counter-metadata-form__notes">
+                        <span>Observações importantes</span>
+                        <Textarea
+                          maxLength={500}
+                          onChange={(event) => setServiceNotes(event.target.value)}
+                          rows={2}
+                          value={serviceNotes}
+                        />
+                      </Label>
                       {fulfillmentType === "delivery" && (
-                        <Label className="inline-form__wide">
-                          Endereço de entrega
+                        <Label className="gm-form-field counter-metadata-form__delivery">
+                          <span>Endereço de entrega</span>
                           <Input
                             onChange={(event) => setDeliveryAddress(event.target.value)}
                             required
@@ -1848,8 +1922,8 @@ export function TabWorkspace({
                         </Label>
                       )}
                       {floor && (
-                        <Label>
-                          Responsável
+                        <Label className="gm-form-field counter-metadata-form__responsible">
+                          <span>Responsável</span>
                           <NativeSelect
                             onChange={(event) => setResponsibleIdentityId(event.target.value)}
                             value={responsibleIdentityId}
@@ -1863,48 +1937,50 @@ export function TabWorkspace({
                           </NativeSelect>
                         </Label>
                       )}
-                      <Button disabled={busy} size="sm" type="submit" variant="secondary">
-                        Salvar dados
-                      </Button>
-                      {data.tab.responsibleIdentityId !== scope.identityId && (
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setBusy(true);
-                            setFeedback("");
-                            void api.pilot
-                              .claimTab(scope.organizationId, scope.unitId, tabId, {
-                                expectedVersion: data.tab.version,
-                                responsibleIdentityId: scope.identityId,
-                                reason: "Atendimento assumido na operação",
-                              })
-                              .then((value) => {
-                                const result = record(value);
-                                const changed = parseTab(record(result.tab));
-                                setUndoResponsibility({
-                                  identityId: data.tab.responsibleIdentityId,
-                                  version: changed.version,
-                                });
-                                setResponsibleIdentityId(scope.identityId);
-                                setFeedback("Atendimento atribuído a você.");
-                                detail.retry();
-                                onChanged();
-                              })
-                              .catch((error: unknown) =>
-                                setFeedback(
-                                  error instanceof Error
-                                    ? error.message
-                                    : "Não foi possível assumir o atendimento.",
-                                ),
-                              )
-                              .finally(() => setBusy(false));
-                          }}
-                          size="sm"
-                          type="button"
-                        >
-                          Assumir esta comanda
+                      <div className="counter-metadata-form__actions">
+                        <Button disabled={busy} size="sm" type="submit" variant="secondary">
+                          Salvar dados
                         </Button>
-                      )}
+                        {data.tab.responsibleIdentityId !== scope.identityId && (
+                          <Button
+                            disabled={busy}
+                            onClick={() => {
+                              setBusy(true);
+                              setFeedback("");
+                              void api.pilot
+                                .claimTab(scope.organizationId, scope.unitId, tabId, {
+                                  expectedVersion: data.tab.version,
+                                  responsibleIdentityId: scope.identityId,
+                                  reason: "Atendimento assumido na operação",
+                                })
+                                .then((value) => {
+                                  const result = record(value);
+                                  const changed = parseTab(record(result.tab));
+                                  setUndoResponsibility({
+                                    identityId: data.tab.responsibleIdentityId,
+                                    version: changed.version,
+                                  });
+                                  setResponsibleIdentityId(scope.identityId);
+                                  setFeedback("Atendimento atribuído a você.");
+                                  detail.retry();
+                                  onChanged();
+                                })
+                                .catch((error: unknown) =>
+                                  setFeedback(
+                                    error instanceof Error
+                                      ? error.message
+                                      : "Não foi possível assumir o atendimento.",
+                                  ),
+                                )
+                                .finally(() => setBusy(false));
+                            }}
+                            size="sm"
+                            type="button"
+                          >
+                            Assumir esta comanda
+                          </Button>
+                        )}
+                      </div>
                     </form>
                   </details>
                 )}
@@ -2167,8 +2243,16 @@ export function TabWorkspace({
                           key={item.id}
                         >
                           <Button
-                            aria-label={`Adicionar ${item.name}`}
-                            disabled={!item.available || item.priceCents === null}
+                            aria-label={
+                              canReachProduction(item)
+                                ? `Adicionar ${item.name}`
+                                : `${item.name} sem estação de produção ativa`
+                            }
+                            disabled={
+                              !item.available ||
+                              item.priceCents === null ||
+                              !canReachProduction(item)
+                            }
                             onClick={(event) => {
                               const held = event.currentTarget.dataset.longPressed === "true";
                               delete event.currentTarget.dataset.longPressed;
@@ -2202,7 +2286,11 @@ export function TabWorkspace({
                             <span aria-hidden="true">{item.name.slice(0, 1)}</span>
                             <span>
                               <strong>{item.name}</strong>
-                              <small>{item.description ?? "Sem descrição"}</small>
+                              <small>
+                                {canReachProduction(item)
+                                  ? (item.description ?? "Sem descrição")
+                                  : "Configure uma estação no Catálogo"}
+                              </small>
                             </span>
                             <strong>
                               {item.priceCents === null
@@ -2538,7 +2626,9 @@ export function TabWorkspace({
                                     current.filter((candidate) => candidate.id !== item.id),
                                   );
                                 }}
+                                size="sm"
                                 type="button"
+                                variant="ghost"
                               >
                                 Observação
                               </Button>
@@ -2546,14 +2636,16 @@ export function TabWorkspace({
                             <Button
                               aria-label={`Remover ${item.name}`}
                               onClick={() => removeDraftItem(item)}
+                              size="sm"
                               type="button"
+                              variant="ghost"
                             >
                               Remover
                             </Button>
                           </span>
                         </div>
                       ))}
-                      {cart.length > 0 && (
+                      {cart.length > 0 && !compactHeading && (
                         <div className="cart-preview__submit">
                           <Button
                             disabled={busy}
@@ -2710,7 +2802,7 @@ export function TabWorkspace({
                                 ? "Pedir conta e imprimir"
                                 : "Imprimir pré-conta"}
                       </Button>
-                      {localPrintingEnabled && data.tab.tableId && (
+                      {localPrintingEnabled && data.tab.tableId && !billCall && (
                         <Button onClick={() => printDocument("account")} size="sm" variant="ghost">
                           Só imprimir pré-conta
                         </Button>
@@ -2803,9 +2895,9 @@ export function TabWorkspace({
                         <small>Divisão sugerida e persistida; não registra pagamento.</small>
                       </form>
                     )}
-                    {printJobs.length > 0 && (
+                    {visiblePrintJobs.length > 0 && (
                       <div aria-label="Fila de impressão" className="print-queue" role="status">
-                        {printJobs.map((job) => (
+                        {visiblePrintJobs.map((job) => (
                           <span key={job.id}>
                             <strong>{job.label}</strong>
                             <small>{printStatusLabel(job)}</small>
@@ -3169,7 +3261,7 @@ export function TabWorkspace({
                               )
                             }
                             size="sm"
-                            variant="secondary"
+                            variant="danger"
                           >
                             Encerrar sem imprimir
                           </Button>
@@ -3419,8 +3511,15 @@ export function TabWorkspace({
                                 value={paymentMethod}
                               >
                                 <option value="cash">Dinheiro</option>
-                                <option value="other">Outro não eletrônico</option>
+                                <option value="pix">Pix (registro manual)</option>
+                                <option value="debit_card">Débito (maquininha externa)</option>
+                                <option value="credit_card">Crédito (maquininha externa)</option>
+                                <option value="other">Outro meio de pagamento</option>
                               </NativeSelect>
+                              <small>
+                                Meios eletrônicos devem ser registrados somente após a confirmação
+                                externa.
+                              </small>
                             </Label>
                             <Label>
                               Valor a receber
@@ -3920,7 +4019,7 @@ export function TabWorkspace({
                               : openReceive()
                           }
                           size="sm"
-                          variant="ghost"
+                          variant="primary"
                         >
                           {terminalPaymentMode === "disabled"
                             ? "Pedir conta ao caixa"

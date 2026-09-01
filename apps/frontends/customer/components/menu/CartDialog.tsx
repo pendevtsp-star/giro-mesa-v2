@@ -77,7 +77,6 @@ export function CartDialog({
         <div className="cart-shell">
           <header>
             <div>
-              <p>Sua seleção</p>
               <h2 id="cart-dialog-title">Revisar pedido</h2>
             </div>
             <Button type="button" variant="ghost" aria-label="Fechar seleção" onClick={onClose}>

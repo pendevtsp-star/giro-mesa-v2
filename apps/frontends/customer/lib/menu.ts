@@ -52,12 +52,20 @@ export function cartTotal(
   return lines.reduce((total, line) => total + cartLineTotal(line, fulfillment), 0);
 }
 
+function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
 export function filterMenu(items: MenuItem[], category: string, query: string): MenuItem[] {
-  const normalized = query.trim().toLocaleLowerCase("pt-BR");
+  const normalized = normalizeSearchText(query.trim());
   return items.filter((item) => {
     const inCategory = category === "Todos" || item.category === category;
-    const searchable =
-      `${item.name} ${item.description} ${item.tags?.join(" ") ?? ""}`.toLocaleLowerCase("pt-BR");
+    const searchable = normalizeSearchText(
+      `${item.name} ${item.description} ${item.tags?.join(" ") ?? ""}`,
+    );
     return inCategory && (!normalized || searchable.includes(normalized));
   });
 }

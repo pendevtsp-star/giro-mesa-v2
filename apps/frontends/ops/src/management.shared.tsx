@@ -154,6 +154,15 @@ export interface ReturnableClassificationStatus {
   classification: "returnable" | "non_returnable" | "undecided";
 }
 
+export interface ProductReturnableConfiguration {
+  id: string;
+  productId: string;
+  containerInventoryItemId: string;
+  quantityPerUnit: number;
+  depositCents: number;
+  active: boolean;
+}
+
 export interface StockLocation {
   id: string;
   name: string;
@@ -457,6 +466,7 @@ export interface InventoryData {
 }
 
 export interface ReturnablesData {
+  configurations: ProductReturnableConfiguration[];
   returnables: ReturnablePosition[];
   returnableIncidents: ReturnableIncident[];
   policy: ReturnablePolicy;
@@ -2502,6 +2512,14 @@ export function parseReturnables(value: unknown): ReturnablesData {
       : {};
   return {
     policy: parseReturnablePolicy(payload.policy),
+    configurations: optionalRows(payload, "configurations").map((configuration) => ({
+      id: requiredString(configuration.id),
+      productId: requiredString(configuration.productId),
+      containerInventoryItemId: requiredString(configuration.containerInventoryItemId),
+      quantityPerUnit: numeric(configuration.quantityPerUnit) ?? 0,
+      depositCents: integer(configuration.depositCents),
+      active: configuration.active !== false,
+    })),
     returnables: explicitPositions.length
       ? explicitPositions.map((position) => ({
           inventoryItemId: requiredString(

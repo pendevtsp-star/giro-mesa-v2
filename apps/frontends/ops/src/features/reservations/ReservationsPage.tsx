@@ -279,9 +279,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
   const reservationComposerRef = useRef<HTMLDetailsElement>(null);
-  const reservationNameRef = useRef<HTMLInputElement>(null);
   const waitlistComposerRef = useRef<HTMLDetailsElement>(null);
-  const waitlistNameRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCustomerQuery(customerQuery.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -330,12 +328,11 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       kind === "reservation" ? reservationComposerRef.current : waitlistComposerRef.current;
     const otherComposer =
       kind === "reservation" ? waitlistComposerRef.current : reservationComposerRef.current;
-    const nameInput = kind === "reservation" ? reservationNameRef.current : waitlistNameRef.current;
     if (!composer) return;
     otherComposer?.removeAttribute("open");
     composer.open = true;
     composer.scrollIntoView({ behavior: "smooth", block: "start" });
-    nameInput?.focus({ preventScroll: true });
+    composer.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
   }
 
   async function mutate(id: string, action: () => Promise<unknown>, retry: () => void) {
@@ -553,7 +550,6 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
               <Input
                 minLength={2}
                 onChange={(event) => setGuestName(event.target.value)}
-                ref={reservationNameRef}
                 required
                 value={guestName}
               />
@@ -643,7 +639,6 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
               <Input
                 minLength={2}
                 onChange={(event) => setGuestName(event.target.value)}
-                ref={waitlistNameRef}
                 required
                 value={guestName}
               />
@@ -867,7 +862,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                                     )
                                   }
                                   size="sm"
-                                  variant="ghost"
+                                  variant="danger"
                                 >
                                   Cancelar reserva
                                 </Button>

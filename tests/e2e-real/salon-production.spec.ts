@@ -464,6 +464,27 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
   await expectWcagAa(page);
 });
 
+test("Notificações do sistema desaparecem automaticamente", async ({ page }) => {
+  await mockProductionApi(page);
+  await page.route("**/pilot/tabs/open", (route) =>
+    route.fulfill({ status: 201, json: { id: "tab-opened" } }),
+  );
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/salon";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.locator(".real-table").filter({ hasText: "Mesa 01" }).click();
+  await page
+    .getByRole("dialog", { name: "Mesa 01" })
+    .getByRole("button", { name: "Abrir atendimento e pedir" })
+    .click();
+
+  const toast = page.locator(".gm-toast").filter({ hasText: "Atendimento aberto" });
+  await expect(toast).toBeVisible();
+  await expect(toast).toBeHidden({ timeout: 3_000 });
+});
+
 test("Cards das mesas priorizam identificação, contexto e próxima ação", async ({ page }) => {
   await mockProductionApi(page);
   await page.goto("/");
@@ -1072,6 +1093,19 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(dialog.getByLabel("Valor a receber")).toHaveValue("287.4");
   await expect(dialog.getByLabel("Valor recebido")).toHaveValue("287.4");
   await expect(dialog.getByLabel("Valor a receber")).toBeFocused();
+  const manualMethods = dialog.getByLabel("Forma de pagamento");
+  await expect(manualMethods.locator("option")).toHaveText([
+    "Dinheiro",
+    "Pix (registro manual)",
+    "Débito (maquininha externa)",
+    "Crédito (maquininha externa)",
+    "Outro meio de pagamento",
+  ]);
+  await manualMethods.selectOption("pix");
+  await expect(manualMethods).toHaveValue("pix");
+  await page.setViewportSize({ width: 375, height: 667 });
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
   const firstAccountLine = dialog.locator(".account-line-group").first();
   await firstAccountLine.getByRole("button", { name: /Ações para/ }).click();
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");
@@ -1105,7 +1139,10 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await productDialog.getByRole("button", { name: "Fechar" }).click();
   await expect(productDialog).toBeHidden();
   await dialog.getByRole("button", { name: "Adicionar Café Expresso", exact: true }).click();
-  await expect(dialog.getByRole("button", { name: "Enviar pedido (1)" })).toBeVisible();
+  await expect(
+    dialog.locator(".service-action-dock").getByRole("button", { name: "Enviar pedido (1)" }),
+  ).toBeVisible();
+  await expect(dialog.locator(".cart-preview__submit")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Receber no caixa" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Dados e ações" }).click();
   await expect(dialog.locator(".counter-metadata-form")).toBeVisible();
@@ -1114,6 +1151,12 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await expectNoHorizontalOverflow(page);
+    const metadataColumns = await dialog
+      .locator(".counter-metadata-form")
+      .evaluate((element) =>
+        getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean),
+      );
+    expect(metadataColumns).toHaveLength(viewport.width <= 760 ? 1 : 12);
     const bounds = await dialog.locator(".gm-modal").evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
@@ -1340,9 +1383,7 @@ test("Recepção real mantém estados vazios compactos e orientados à próxima 
   await expectWcagAa(page);
 });
 
-test("Balcão cobra no SmartPOS, imprime pré-conta e não duplica cartão manual", async ({
-  page,
-}) => {
+test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual", async ({ page }) => {
   const pickupTab = {
     ...tab,
     id: "pickup-1",
@@ -1427,6 +1468,12 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e não duplica cartão manua
     };
   });
   await mockProductionApi(page);
+  const printStatusUpdates: string[] = [];
+  await page.route("**/print-jobs/print-job-1/status", async (route) => {
+    const body = route.request().postDataJSON() as { status?: string };
+    if (body.status) printStatusUpdates.push(body.status);
+    await route.fallback();
+  });
   const paymentAttempt = {
     id: "attempt-1",
     tabId: "pickup-1",
@@ -1544,9 +1591,31 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e não duplica cartão manua
     .locator(".cart-preview")
     .evaluate((element) => element.getBoundingClientRect().height);
   expect(cartHeight).toBeLessThanOrEqual(812 * 0.55);
+  const draftSubmitLayout = await page.locator(".cart-preview__submit").evaluate((element) => {
+    const container = element.getBoundingClientRect();
+    const buttons = [...element.querySelectorAll("button")].map((button) =>
+      button.getBoundingClientRect(),
+    );
+    return {
+      allButtonsInside: buttons.every(
+        (button) => button.left >= container.left - 1 && button.right <= container.right + 1,
+      ),
+      columns: getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
+    };
+  });
+  expect(draftSubmitLayout).toEqual({ allButtonsInside: true, columns: 1 });
+  const draftActionTops = await page
+    .locator(".cart-preview__actions")
+    .first()
+    .locator(":scope > .gm-button")
+    .evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
+  expect(Math.max(...draftActionTops) - Math.min(...draftActionTops)).toBeLessThanOrEqual(1);
   await expectNoHorizontalOverflow(page);
-  await cartToggle.click();
-  await page.getByRole("button", { name: "Cobrar na POS", exact: true }).click();
+  await page.getByRole("button", { name: "Remover Salada Giro com descrição extensa" }).click();
+  await page.getByRole("button", { name: "Remover Café Expresso" }).click();
+  const chargeAtPos = page.getByRole("button", { name: "Cobrar na POS", exact: true });
+  await expect(chargeAtPos).toHaveClass(/gm-button--primary/);
+  await chargeAtPos.click();
   const paymentDialog = page.getByRole("dialog", { name: "Cobrar na maquininha" });
   await expect(paymentDialog).toBeVisible();
   await expect(paymentDialog.getByLabel("Valor a cobrar")).toHaveValue("93");
@@ -1579,14 +1648,14 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e não duplica cartão manua
     )
     .toEqual(["attempt-1"]);
   await paymentDialog.getByRole("button", { name: "Voltar à conta" }).click();
-  const manualMethods = page.getByLabel("Forma de pagamento");
-  await expect(manualMethods.locator("option")).toHaveText(["Dinheiro", "Outro não eletrônico"]);
+  await expect(page.locator("form.cashier-payment-form")).toBeHidden();
 
   const printAccount = page.getByRole("button", { name: "Imprimir pré-conta", exact: true });
   await expect(printAccount).toBeEnabled();
   await printAccount.click();
-  await expect(page.getByText("Saída enviada; confirme o papel", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Confirmar saída física" })).toBeVisible();
+  await expect.poll(() => printStatusUpdates).toContain("printed");
+  await expect(page.getByRole("button", { name: "Confirmar saída física" })).toHaveCount(0);
+  await expect(page.locator(".print-queue")).toHaveCount(0);
   await expect(page.getByText(/Não fecha a comanda e não registra pagamento/)).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
@@ -1818,7 +1887,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     "Gerar PDF / Imprimir",
     "Reordenar Categorias",
     "Reajuste em Lote",
-    "Placas QR de Mesas",
+    "Abrir QR das mesas",
   ]) {
     await expect(page.getByText(secondaryAction, { exact: false }).first()).toBeVisible();
   }
@@ -1830,11 +1899,11 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     "Gerar PDF / Imprimir",
     "Reordenar Categorias",
     "Reajuste em Lote",
-    "Placas QR de Mesas",
   ]) {
     await expect(page.getByRole("button", { name: new RegExp(availableButton) })).toBeEnabled();
   }
   await expect(page.getByRole("link", { name: /Identidade & Branding/ })).toBeEnabled();
+  await expect(page.getByRole("link", { name: /Abrir QR das mesas/ })).toBeEnabled();
   await expect(page.locator('.catalog-management-header__import input[type="file"]')).toBeEnabled();
   await expect(page.getByText("Filtro de Dieta & Segurança:")).toBeVisible();
   await expect(page.getByRole("button", { name: "Sem Glúten" })).toBeEnabled();

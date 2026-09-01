@@ -610,8 +610,23 @@ export function operationalApiErrorMessage(
   bodyMessage: unknown,
   requestId?: string,
   retryAfterSeconds?: number,
+  bodyCode?: unknown,
 ) {
   const backendMessage = typeof bodyMessage === "string" ? bodyMessage.trim() : "";
+  const code = typeof bodyCode === "string" ? bodyCode : "";
+  const codedMessage = (
+    {
+      KDS_PRODUCT_ROUTING_CHANGED_RETRY:
+        "A rota de produção mudou durante o envio. Tente enviar novamente.",
+      ORDER_HAS_INACTIVE_STATION:
+        "A estação de produção deste pedido está inativa. Reative-a ou altere a rota no Catálogo.",
+      ORDER_NOT_DRAFT: "Este pedido já foi enviado ou não está mais em espera. Atualize a comanda.",
+      PRODUCT_WITHOUT_STATION:
+        "Este pedido contém produto sem estação de produção. Configure a rota no Catálogo e tente novamente.",
+      PRODUCTION_STATION_DELIVERY_DISABLED:
+        "A estação deste pedido está impedida de receber produção. Ajuste a política da estação e tente novamente.",
+    } as Record<string, string>
+  )[code];
   const technical = /^(?:Cannot\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/|[A-Z_]{3,}:)/i.test(
     backendMessage,
   );
@@ -626,9 +641,10 @@ export function operationalApiErrorMessage(
             ? `Muitas solicitações em sequência. Aguarde${Number.isFinite(retryAfterSeconds) ? ` ${retryAfterSeconds} segundos` : " alguns segundos"} e tente novamente.`
             : status >= 500
               ? "O servidor não conseguiu concluir a consulta. Tente novamente em instantes."
-              : backendMessage && !technical
-                ? backendMessage
-                : `Não foi possível concluir a operação (${status}).`;
+              : (codedMessage ??
+                (backendMessage && !technical
+                  ? backendMessage
+                  : `Não foi possível concluir a operação (${status}).`));
   return `${message}${referenceSuffix(requestId)}`;
 }
 
@@ -672,7 +688,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const retryAfterSeconds = Number.parseInt(response.headers.get("retry-after") ?? "", 10);
       const requestId = response.headers.get("x-request-id")?.trim() || undefined;
       throw new ApiClientError(
-        operationalApiErrorMessage(response.status, body?.message, requestId, retryAfterSeconds),
+        operationalApiErrorMessage(
+          response.status,
+          body?.message,
+          requestId,
+          retryAfterSeconds,
+          body?.code,
+        ),
         response.status,
         body?.code ?? "API_REQUEST_FAILED",
         response.status >= 500 || response.status === 429,
@@ -1831,6 +1853,28 @@ export const api = {
         body,
         idempotencyKey,
       ),
+    configureReturnableProduct: (
+      organizationId: string,
+      unitId: string,
+      productId: string,
+      body: {
+        status: "returnable" | "non_returnable";
+        mappings: Array<{
+          containerInventoryItemId: string;
+          quantityPerUnit: string;
+          depositCents: number;
+        }>;
+      },
+    ) =>
+      idempotentRequest<unknown>(
+        managementPath(
+          organizationId,
+          unitId,
+          `inventory/returnables/products/${encodeURIComponent(productId)}/configuration`,
+        ),
+        "PUT",
+        body,
+      ),
     classifyReturnableProduct: (
       organizationId: string,
       unitId: string,
@@ -2715,6 +2759,7 @@ export const api = {
         reorderQuantity: string;
         leadTimeDays: number;
         allowNegative: boolean;
+        kind?: "ingredient" | "prepared" | "resale" | "reusable" | "returnable_container";
       },
       idempotencyKey?: string,
     ) =>

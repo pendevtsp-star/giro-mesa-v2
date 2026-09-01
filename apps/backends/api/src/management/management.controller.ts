@@ -136,6 +136,7 @@ import {
   type ProductionBatchCompletionInput,
   type ProductionBatchInput,
   type ProductReturnableClassificationInput,
+  type ProductReturnableConfigurationInput,
   type ProductReturnableInput,
   type PurchaseInvoiceConfirmInput,
   type PurchaseListQuery,
@@ -162,6 +163,7 @@ import {
   productionBatchCompletionSchema,
   productionBatchSchema,
   productReturnableClassificationSchema,
+  productReturnableConfigurationSchema,
   productReturnableSchema,
   purchaseInvoiceConfirmSchema,
   purchaseListQuerySchema,
@@ -458,6 +460,26 @@ export class ManagementController {
       request.auth.identityId,
       organizationId,
       unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Put("inventory/returnables/products/:productId/configuration")
+  reconcileProductReturnableConfiguration(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("productId", ParseUUIDPipe) productId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(productReturnableConfigurationSchema))
+    body: ProductReturnableConfigurationInput,
+  ) {
+    return this.management.reconcileProductReturnableConfiguration(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      productId,
       idempotencyKey,
       body,
     );

@@ -314,6 +314,13 @@ export function InventoryWorkspace({
           active={view}
           items={[
             { id: "overview", label: "Visão geral" },
+            {
+              id: "returnables",
+              label: "Vasilhames",
+              count:
+                (data.openCustodies?.length ?? 0) +
+                returnableIncidents.filter((incident) => incident.status === "pending").length,
+            },
             { id: "pending", label: "Pendências", count: data.pendingActions.length },
             {
               id: "planning",
@@ -330,13 +337,6 @@ export function InventoryWorkspace({
               id: "transfers",
               label: "Transferências",
               count: data.transfers.filter((transfer) => transfer.status === "in_transit").length,
-            },
-            {
-              id: "returnables",
-              label: "Vasilhames",
-              count:
-                (data.openCustodies?.length ?? 0) +
-                returnableIncidents.filter((incident) => incident.status === "pending").length,
             },
             { id: "assets", label: "Ativos", count: data.assets.length },
             { id: "controls", label: "Controles", count: data.pendingActions.length },

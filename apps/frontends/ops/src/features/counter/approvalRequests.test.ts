@@ -3,6 +3,8 @@ import { isValidCounterPhone, parseCounterQueue } from "./CounterPage";
 import {
   canCloseWithoutConsumption,
   groupDraftItemsByCourse,
+  hasActiveProductionRoute,
+  orderSubmissionErrorMessage,
   parseStoredCart,
   parseStoredIds,
 } from "./CounterWorkspace";
@@ -86,6 +88,20 @@ describe("atalhos e rascunho operacional", () => {
       ["2"],
       ["3"],
     ]);
+  });
+
+  it("aceita somente uma estação de produção atualmente ativa", () => {
+    const activeStations = new Set(["bar"]);
+
+    expect(hasActiveProductionRoute(["bar"], activeStations)).toBe(true);
+    expect(hasActiveProductionRoute(["cozinha"], activeStations)).toBe(false);
+    expect(hasActiveProductionRoute([], activeStations)).toBe(false);
+  });
+
+  it("mantém visível o motivo quando a criação salva, mas o envio falha", () => {
+    expect(orderSubmissionErrorMessage(1, new Error("Configure a rota no Catálogo."))).toBe(
+      "Pedido salvo em espera, mas não enviado à produção. Configure a rota no Catálogo.",
+    );
   });
 });
 

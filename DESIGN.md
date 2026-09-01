@@ -107,6 +107,7 @@ Use esses padrões antes de criar classes locais equivalentes.
 - Topbar informa conexão/sincronização sem bloquear a tarefa.
 - Operações assíncronas mostram busy no controle de origem e impedem envio duplicado.
 - Toasts distinguem sucesso, informação, alerta e erro; erros usam `role="alert"`.
+- Toasts são transitórios e desaparecem automaticamente após 2 segundos; informações que exigem ação permanecem no campo ou painel de origem.
 - Dados não confirmados não permanecem visualmente como salvos após falha; faça rollback ou recarregue a fonte real.
 - Fluxos somente locais devem exibir “prévia local/não persistido” e nunca mensagem de sucesso persistente.
 - Estados vazios explicam a próxima ação; skeletons preservam a geometria; logs técnicos não substituem mensagens para o operador.

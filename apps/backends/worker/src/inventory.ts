@@ -12,6 +12,7 @@ import {
   managementRecipeVersions,
   managementReportCostSnapshots,
   managementReturnableCustodyMovements,
+  managementReturnablePolicies,
   managementStockBalances,
   outboxEvents,
   posOrderItems,
@@ -953,6 +954,20 @@ export async function consumeOrderSentInventory(
         mapping,
       ]);
     }
+    const [returnablePolicy] =
+      returnableMappings.length === 0
+        ? []
+        : await tx
+            .select({ defaultDueDays: managementReturnablePolicies.defaultDueDays })
+            .from(managementReturnablePolicies)
+            .where(
+              and(
+                eq(managementReturnablePolicies.organizationId, request.organizationId),
+                eq(managementReturnablePolicies.unitId, request.unitId),
+              ),
+            )
+            .limit(1);
+    const defaultReturnableDueDays = returnablePolicy?.defaultDueDays ?? 7;
     for (const orderItem of orderItems) {
       const directPlan = plans.find(
         (plan) => plan.task.orderItemId === orderItem.id && plan.task.componentKind === "direct",
@@ -984,7 +999,9 @@ export async function consumeOrderSentInventory(
               orderItemId: orderItem.id,
               responsibleIdentityId: order.responsibleIdentityId,
               counterpartyName: order.counterpartyName,
-              dueAt: order.promisedAt ?? new Date(order.sentAt.getTime() + 24 * 60 * 60_000),
+              dueAt:
+                order.promisedAt ??
+                new Date(order.sentAt.getTime() + defaultReturnableDueDays * 24 * 60 * 60_000),
               organizationId: request.organizationId,
               quantityDelta: milliToQuantity(
                 (quantityToMilli(mapping.quantityPerUnit) * source.soldQuantityMilli) / 1_000n,

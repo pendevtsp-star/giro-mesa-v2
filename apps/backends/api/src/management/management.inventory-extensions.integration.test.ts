@@ -6,12 +6,16 @@ import {
   managementInventoryClosings,
   managementNfeImportLines,
   managementPeople,
+  managementProductReturnableClassifications,
+  managementProductReturnables,
   managementPurchaseReceipts,
   managementReturnableCustodyMovements,
   managementStockBalances,
   managementSupplierInvoices,
   memberships,
   organizations,
+  posCatalogCategories,
+  posProducts,
   roleBindings,
   units,
 } from "@giromesa/db";
@@ -290,6 +294,157 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       quantity: "5",
       averageCostCents: 200,
     });
+    const secondContainer = await management.createInventoryItem(
+      identity.id,
+      organization.id,
+      unit.id,
+      `container-second-${randomUUID()}`,
+      {
+        name: "Engradado retornável",
+        kind: "returnable_container",
+        unit: "UN",
+        purchaseToStockFactor: "1",
+        minimumQuantity: "0",
+        reorderQuantity: "0",
+        leadTimeDays: 0,
+        allowNegative: false,
+      },
+    );
+    const [returnableCategory] = await database.db
+      .insert(posCatalogCategories)
+      .values({
+        organizationId: organization.id,
+        name: "Bebidas retornáveis",
+        slug: `returnable-${randomUUID()}`,
+      })
+      .returning();
+    assert.ok(returnableCategory);
+    const [returnableProduct] = await database.db
+      .insert(posProducts)
+      .values({
+        organizationId: organization.id,
+        categoryId: returnableCategory.id,
+        name: "Refrigerante retornável",
+        productType: "resale",
+      })
+      .returning();
+    assert.ok(returnableProduct);
+    await assert.rejects(
+      management.reconcileProductReturnableConfiguration(
+        inventoryIdentity.id,
+        organization.id,
+        unit.id,
+        returnableProduct.id,
+        `returnable-config-invalid-container-${randomUUID()}`,
+        {
+          status: "returnable",
+          mappings: [
+            {
+              containerInventoryItemId: storedLine.inventoryItemId,
+              quantityPerUnit: "1",
+              depositCents: 500,
+            },
+          ],
+        },
+      ),
+      hasCode("INVENTORY_ITEM_NOT_FOUND"),
+    );
+    const initialReturnableConfiguration = await management.reconcileProductReturnableConfiguration(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      returnableProduct.id,
+      `returnable-config-initial-${randomUUID()}`,
+      {
+        status: "returnable",
+        mappings: [
+          { containerInventoryItemId: container.id, quantityPerUnit: "1", depositCents: 500 },
+          {
+            containerInventoryItemId: secondContainer.id,
+            quantityPerUnit: "0.500",
+            depositCents: 200,
+          },
+        ],
+      },
+    );
+    assert.equal(initialReturnableConfiguration.mappings.length, 2);
+    const replacedReturnableConfiguration =
+      await management.reconcileProductReturnableConfiguration(
+        inventoryIdentity.id,
+        organization.id,
+        unit.id,
+        returnableProduct.id,
+        `returnable-config-replace-${randomUUID()}`,
+        {
+          status: "returnable",
+          mappings: [
+            {
+              containerInventoryItemId: secondContainer.id,
+              quantityPerUnit: "2",
+              depositCents: 300,
+            },
+          ],
+        },
+      );
+    assert.deepEqual(replacedReturnableConfiguration.deactivatedContainerInventoryItemIds, [
+      container.id,
+    ]);
+    const storedReturnableMappings = await database.db
+      .select()
+      .from(managementProductReturnables)
+      .where(
+        and(
+          eq(managementProductReturnables.organizationId, organization.id),
+          eq(managementProductReturnables.unitId, unit.id),
+          eq(managementProductReturnables.productId, returnableProduct.id),
+        ),
+      );
+    assert.equal(
+      storedReturnableMappings.find((mapping) => mapping.containerInventoryItemId === container.id)
+        ?.active,
+      false,
+    );
+    assert.equal(
+      storedReturnableMappings.find(
+        (mapping) => mapping.containerInventoryItemId === secondContainer.id,
+      )?.quantityPerUnit,
+      "2.000",
+    );
+    await management.reconcileProductReturnableConfiguration(
+      inventoryIdentity.id,
+      organization.id,
+      unit.id,
+      returnableProduct.id,
+      `returnable-config-disable-${randomUUID()}`,
+      { status: "non_returnable", mappings: [] },
+    );
+    const [disabledClassification] = await database.db
+      .select()
+      .from(managementProductReturnableClassifications)
+      .where(
+        and(
+          eq(managementProductReturnableClassifications.organizationId, organization.id),
+          eq(managementProductReturnableClassifications.unitId, unit.id),
+          eq(managementProductReturnableClassifications.productId, returnableProduct.id),
+        ),
+      );
+    assert.equal(disabledClassification?.status, "non_returnable");
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(managementProductReturnables)
+          .where(
+            and(
+              eq(managementProductReturnables.organizationId, organization.id),
+              eq(managementProductReturnables.unitId, unit.id),
+              eq(managementProductReturnables.productId, returnableProduct.id),
+              eq(managementProductReturnables.active, true),
+            ),
+          )
+      ).length,
+      0,
+    );
     const incident = await management.createReturnableIncident(
       identity.id,
       organization.id,
@@ -870,6 +1025,11 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       organization.id,
       unit.id,
     );
+    const classifiedProduct = returnables.classificationStatus.find(
+      (row) => row.productId === returnableProduct.id,
+    );
+    assert.equal(classifiedProduct?.productName, "Refrigerante retornável");
+    assert.equal(classifiedProduct?.status, "non_returnable");
     const custodyInboxRow = returnables.custodyInbox.find(
       (row) => row.issueMovementId === custodyIssueId,
     );

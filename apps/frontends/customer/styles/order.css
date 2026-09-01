@@ -16,7 +16,7 @@
   display: grid;
   place-items: center;
   font-size: 100px;
-  background: linear-gradient(145deg, #e8decf, #c5d1bd);
+  background: var(--gm-surface-soft);
 }
 .product-hero > span {
   width: 100%;
@@ -33,7 +33,7 @@
   height: 40px;
   border: 0;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--gm-surface);
   color: var(--ink);
   font-size: 25px;
   cursor: pointer;
@@ -122,7 +122,7 @@ fieldset label input {
   padding: 14px 25px;
   display: flex;
   gap: 12px;
-  background: rgba(255, 253, 248, 0.96);
+  background: var(--gm-topbar);
   border-top: 1px solid var(--line);
   backdrop-filter: blur(10px);
 }
@@ -131,15 +131,15 @@ fieldset label input {
   align-items: center;
   border: 1px solid var(--gm-border);
   border-radius: 11px;
-  background: white;
+  background: var(--gm-surface);
   overflow: hidden;
 }
 .quantity button {
   width: 37px;
   height: 42px;
   border: 0;
-  background: white;
-  color: var(--green);
+  background: var(--gm-surface);
+  color: var(--gm-brand-strong);
   font-size: 20px;
   cursor: pointer;
 }
@@ -162,7 +162,8 @@ fieldset label input {
   float: right;
 }
 .add-button:disabled {
-  background: #a8aeaa;
+  background: var(--gm-surface-soft);
+  color: var(--gm-muted);
   cursor: not-allowed;
 }
 .cart-dialog {
@@ -182,7 +183,7 @@ fieldset label input {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 253, 248, 0.95);
+  background: var(--gm-topbar);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(12px);
 }
@@ -198,9 +199,8 @@ fieldset label input {
   font-weight: 800;
 }
 .cart-shell header h2 {
-  font:
-    28px Georgia,
-    serif;
+  font: 750 1.65rem / 1.15 var(--gm-display);
+  letter-spacing: -0.025em;
 }
 .cart-shell header button {
   width: 39px;
@@ -232,9 +232,7 @@ fieldset label input {
 }
 .cart-lines h3 {
   margin: 0;
-  font:
-    16px Georgia,
-    serif;
+  font: 700 var(--gm-font-md) / 1.25 var(--gm-display);
 }
 .cart-shell .cart-lines p,
 .cart-shell .cart-lines small {
@@ -320,9 +318,8 @@ fieldset label input {
   margin: 0;
 }
 .checkout-form h3 {
-  font:
-    22px Georgia,
-    serif;
+  font: 750 1.3rem / 1.2 var(--gm-display);
+  letter-spacing: -0.02em;
 }
 .checkout-form .overline {
   margin-bottom: 4px;
@@ -331,13 +328,13 @@ fieldset label input {
   margin-top: 15px;
   padding: 12px;
   border-radius: 10px;
-  background: #edf6f0;
-  color: var(--green);
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
   font-size: 12px;
 }
 .checkout-state-warning {
-  background: #fff1e8;
-  color: #82401e;
+  background: var(--gm-warning-soft);
+  color: var(--gm-warning);
 }
 .fulfillment-options {
   display: grid;
@@ -359,7 +356,7 @@ fieldset label input {
 .fulfillment-options label:has(input:checked) {
   border-color: var(--green);
   box-shadow: 0 0 0 1px var(--green);
-  background: #f1f7f2;
+  background: var(--gm-success-soft);
 }
 .fulfillment-options label:has(input:disabled) {
   opacity: 0.55;
@@ -430,8 +427,8 @@ fieldset label input {
   margin-top: 18px;
   padding: 13px;
   border-radius: 12px;
-  background: #edf6f0;
-  color: var(--green);
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
 }
 .payment-callout div {
   display: grid;
@@ -476,7 +473,7 @@ fieldset label input {
   padding: 26px;
   border: 1px solid var(--gm-border);
   border-radius: 18px;
-  background: #f1f7f2;
+  background: var(--gm-success-soft);
   text-align: center;
 }
 .order-receipt > span {
@@ -499,9 +496,7 @@ fieldset label input {
 }
 .order-receipt h3 {
   margin: 0 0 20px;
-  font:
-    27px Georgia,
-    serif;
+  font: 750 1.55rem / 1.2 var(--gm-display);
   letter-spacing: 0.8px;
 }
 .order-receipt dl {
@@ -571,9 +566,7 @@ fieldset label input {
 }
 .table-order-flow h3,
 .table-order-receipt h3 {
-  font:
-    24px Georgia,
-    serif;
+  font: 750 1.4rem / 1.2 var(--gm-display);
 }
 .table-order-flow > div:first-child > p:last-child,
 .table-order-receipt > span {
@@ -617,7 +610,7 @@ fieldset label input {
   font-weight: 700;
 }
 .place-order:disabled {
-  background: #a5aaa6;
-  color: #f5f5f5;
+  background: var(--gm-surface-soft);
+  color: var(--gm-muted);
   cursor: not-allowed;
 }

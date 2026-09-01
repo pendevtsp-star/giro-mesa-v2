@@ -9092,6 +9092,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/products/{productId}/configuration": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_reconcileProductReturnableConfiguration[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/products/{productId}/configuration": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations["ManagementController_reconcileProductReturnableConfiguration[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/returnables/custody/confirm": {
     parameters: {
       query?: never;
@@ -44660,6 +44692,78 @@ export interface operations {
     };
     responses: {
       201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reconcileProductReturnableConfiguration[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "returnable" | "non_returnable";
+          mappings: {
+            /** Format: uuid */
+            containerInventoryItemId: string;
+            quantityPerUnit: string | number;
+            depositCents: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_reconcileProductReturnableConfiguration[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          status: "returnable" | "non_returnable";
+          mappings: {
+            /** Format: uuid */
+            containerInventoryItemId: string;
+            quantityPerUnit: string | number;
+            depositCents: number;
+          }[];
+        };
+      };
+    };
+    responses: {
+      200: {
         headers: {
           [name: string]: unknown;
         };

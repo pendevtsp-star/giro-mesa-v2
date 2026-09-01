@@ -60,13 +60,6 @@ export function PublicActions({
       >
         <div className="table-actions-heading">
           <div>
-            <p>
-              {ready
-                ? "Mesa verificada"
-                : presenceRequired
-                  ? "Confirmação presencial"
-                  : "Atendimento na mesa"}
-            </p>
             <h2 id="table-actions-title">
               {ready || presenceRequired ? tableLabel : "Use o QR Code da mesa"}
             </h2>

@@ -479,7 +479,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [feedback, setFeedbackState] = useState<{
     message: string;
     tone: "success" | "danger" | "info";
-    persistent?: boolean;
   } | null>(null);
   const [roomName, setRoomName] = useState("");
   const [managedRoomId, setManagedRoomId] = useState("");
@@ -549,17 +548,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [handoverOpen, setHandoverOpen] = useState(false);
   const [handoverAssignments, setHandoverAssignments] = useState<Record<string, string>>({});
   const [handoverReason, setHandoverReason] = useState("Passagem para a próxima equipe");
-  function setFeedback(
-    message: string,
-    tone: "success" | "danger" | "info" = "success",
-    persistent = false,
-  ) {
+  function setFeedback(message: string, tone: "success" | "danger" | "info" = "success") {
     setUndoAction(null);
-    setFeedbackState(message ? { message, tone, persistent } : null);
-  }
-
-  function setCriticalFeedback(message: string) {
-    setFeedback(message, "success", true);
+    setFeedbackState(message ? { message, tone } : null);
   }
 
   function setErrorFeedback(error: unknown, fallback: string) {
@@ -572,7 +563,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
       setFeedback(
         `A configuração do ${resource} mudou em outro terminal. Atualize, revise e salve novamente.`,
         "info",
-        true,
       );
       setUndoAction({
         message: `Atualizar ${resource}`,
@@ -585,11 +575,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
       return;
     }
     const queued = error instanceof QueuedOperationalMutationError;
-    setFeedback(
-      error instanceof Error ? error.message : fallback,
-      queued ? "info" : "danger",
-      true,
-    );
+    setFeedback(error instanceof Error ? error.message : fallback, queued ? "info" : "danger");
     if (queued || (error instanceof ApiClientError && error.retryable)) {
       setUndoAction({
         message: online ? "Atualizar estado" : "Aguardar conexão",
@@ -633,7 +619,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         api.pilot.transferTab(scope.organizationId, scope.unitId, currentTab.id, body, key),
       );
       setSelectedTableId(targetTableId);
-      setCriticalFeedback("Comanda e pedidos transferidos com sucesso para a nova mesa.");
+      setFeedback("Comanda e pedidos transferidos com sucesso para a nova mesa.");
       floor.retry();
     } catch (error) {
       setErrorFeedback(error, "Não foi possível mudar de mesa.");
@@ -1464,7 +1450,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               pilotMutation("open-tab", { body }),
               (key) => api.pilot.openTab(scope.organizationId, scope.unitId, body, key),
             );
-            setCriticalFeedback(
+            setFeedback(
               targetTable.status === "reserved"
                 ? "Chegada confirmada. Uma comanda vazia foi aberta para a reserva."
                 : usesQuickFlow
@@ -1607,7 +1593,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               },
             );
             setTransferDialogOpen(false);
-            setCriticalFeedback(
+            setFeedback(
               `${selectedGroup ? `Grupo com ${selectedGroupTableIds.length} mesas` : table.label} remanejado até ${new Date(Date.now() + transferDurationMinutes * 60_000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`,
             );
             const shiftId = data.activeShift.id;
@@ -2048,7 +2034,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 setFeedback(
                   "Transfira ou confirme a devolução em Estoque > Vasilhames antes de encerrar o turno.",
                   "danger",
-                  true,
                 );
                 return;
               }
@@ -2272,7 +2257,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   })),
                 },
               );
-              setCriticalFeedback(
+              setFeedback(
                 "Mesas aproximadas somente neste turno. Comandas, responsáveis e praças não mudaram.",
               );
               setJoinDialogOpen(false);
@@ -2310,7 +2295,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               pilotMutation("group-tables", { body }),
               (key) => api.pilot.groupTables(scope.organizationId, scope.unitId, body, key),
             );
-            setCriticalFeedback(
+            setFeedback(
               effectiveJoinAccountMode === "single_tab"
                 ? joiningFreeTables
                   ? "Mesas agrupadas. Ao abrir qualquer uma, a comanda será única para o grupo."
@@ -4351,7 +4336,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             {feedback && !joinDialogOpen && (
               <Toast
                 actionLabel={undoAction?.message}
-                duration={feedback.persistent || feedback.tone === "danger" ? 0 : 4_500}
                 message={feedback.message}
                 onAction={undoAction ? () => void runUndoAction() : undefined}
                 onDismiss={() => setFeedback("")}

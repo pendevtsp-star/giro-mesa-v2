@@ -63,6 +63,32 @@ interface Feedback {
   tone: "success" | "danger";
 }
 
+const inventoryViews = new Set<InventoryView>([
+  "overview",
+  "pending",
+  "planning",
+  "balances",
+  "counts",
+  "movements",
+  "lots",
+  "transfers",
+  "returnables",
+  "assets",
+  "controls",
+  "recipes",
+  "settings",
+]);
+
+export function inventoryViewFromUrl(search: string, hash: string): InventoryView {
+  const hashQuery = hash.split("?", 2)[1] ?? "";
+  const requested =
+    new URLSearchParams(hashQuery).get("inventoryView") ??
+    new URLSearchParams(search).get("inventoryView");
+  return requested && inventoryViews.has(requested as InventoryView)
+    ? (requested as InventoryView)
+    : "overview";
+}
+
 function mergeReturnables(inventory: InventoryData, returnables: ReturnablesData | null) {
   if (!returnables) return inventory;
   const { closings, pendingActions, ...returnableState } = returnables;
@@ -85,9 +111,14 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
       name: requiredString(supplier.name),
     })),
   );
-  const [view, setView] = useState<InventoryView>("overview");
+  const [view, setView] = useState<InventoryView>(() =>
+    typeof window === "undefined"
+      ? "overview"
+      : inventoryViewFromUrl(window.location.search, window.location.hash),
+  );
   const [dialog, setDialog] = useState<InventoryDialog | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const [newItemProductId, setNewItemProductId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<StockLocation | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
   const [selectedReview, setSelectedReview] = useState<InventoryReviewRequest | null>(null);
@@ -136,10 +167,18 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
     return () => window.removeEventListener("online", replay);
   }, [organizationId, remote.refreshSilently, unitId]);
 
+  useEffect(() => {
+    const restoreView = () =>
+      setView(inventoryViewFromUrl(window.location.search, window.location.hash));
+    window.addEventListener("hashchange", restoreView);
+    return () => window.removeEventListener("hashchange", restoreView);
+  }, []);
+
   function closeDialog() {
     if (busy) return;
     setDialog(null);
     setSelectedItem(null);
+    setNewItemProductId(null);
     setSelectedLocation(null);
     setSelectedIncidentId(null);
     setSelectedReview(null);
@@ -161,6 +200,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
       setFeedback({ message: success, tone: "success" });
       setDialog(null);
       setSelectedItem(null);
+      setNewItemProductId(null);
       setSelectedLocation(null);
       setSelectedReview(null);
       setSelectedTransfer(null);
@@ -211,6 +251,12 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                   inventory={data}
                   onEditItem={(item) => {
                     setSelectedItem(item);
+                    setNewItemProductId(null);
+                    setDialog("item");
+                  }}
+                  onCreateResaleItem={(productId) => {
+                    setSelectedItem(null);
+                    setNewItemProductId(productId);
                     setDialog("item");
                   }}
                   onOpenIncident={() => setDialog("returnable-incident")}
@@ -258,6 +304,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               }}
               onEditItem={(item) => {
                 setSelectedItem(item);
+                setNewItemProductId(null);
                 setDialog("item");
               }}
               onEditLocation={(location) => {
@@ -329,6 +376,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
               }}
               onOpen={(nextDialog) => {
                 setSelectedItem(null);
+                setNewItemProductId(null);
                 setSelectedLocation(null);
                 setSelectedAsset(null);
                 setDialog(nextDialog);
@@ -388,6 +436,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             />
             <ItemModal
               busy={busy}
+              initialProductId={newItemProductId ?? undefined}
               item={selectedItem}
               onClose={closeDialog}
               onSubmit={(body) =>

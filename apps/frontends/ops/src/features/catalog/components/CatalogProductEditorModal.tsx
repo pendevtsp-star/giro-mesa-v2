@@ -1,8 +1,14 @@
 import { Button, Icon, Input, Label, Modal, NativeSelect, Textarea } from "@giromesa/ui";
 import { type Dispatch, type FormEvent, type SetStateAction, useState } from "react";
-import type { CatalogProduct, PilotCatalog, SpicinessLevel } from "../../../operations.shared";
+import type {
+  CatalogProduct,
+  PilotCatalog,
+  PilotScope,
+  SpicinessLevel,
+} from "../../../operations.shared";
 import { formatMoney } from "../../../rules";
 import { hasCatalogProductionStation, toggleCatalogStationId } from "../catalog.stations";
+import { CatalogReturnablesSection } from "./CatalogReturnablesSection";
 
 type CatalogProductEditorModalProps = {
   autoTranslateProduct: (
@@ -16,6 +22,7 @@ type CatalogProductEditorModalProps = {
   editingProductPrice: string;
   editingProductReason: string;
   production: boolean;
+  scope: PilotScope;
   setEditingProduct: Dispatch<SetStateAction<CatalogProduct | null>>;
   setEditingProductDeliveryPrice: Dispatch<SetStateAction<string>>;
   setEditingProductPrice: Dispatch<SetStateAction<string>>;
@@ -36,6 +43,7 @@ export function CatalogProductEditorModal({
   setEditingProductDeliveryPrice,
   setEditingProductPrice,
   setEditingProductReason,
+  scope,
   uploadProductImage,
   updateProduct,
 }: CatalogProductEditorModalProps) {
@@ -669,6 +677,7 @@ export function CatalogProductEditorModal({
               </Button>
             </div>
           </form>
+          <CatalogReturnablesSection productId={editingProduct.id} scope={scope} />
         </Modal>
       )}
     </>

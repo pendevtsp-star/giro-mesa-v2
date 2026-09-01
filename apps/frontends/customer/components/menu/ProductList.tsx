@@ -14,7 +14,6 @@ export function ProductList({
     <section id="cardapio" className="menu-content" tabIndex={-1}>
       <div className="section-title">
         <div>
-          <p>Descubra a casa</p>
           <h2>{category === "Todos" ? "Nosso cardápio" : category}</h2>
         </div>
         <span>

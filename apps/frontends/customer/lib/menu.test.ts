@@ -63,6 +63,20 @@ test("busca considera nome, descrição e tags", () => {
   assert.equal(filterMenu(menuItems, "Sobremesas", "café")[0]?.id, "chocolate");
 });
 
+test("busca desconsidera acentos", () => {
+  const water: MenuItem = {
+    id: "agua",
+    category: "Bebidas",
+    name: "Água mineral",
+    description: "Sem gás",
+    priceCents: 600,
+    visual: "",
+    available: true,
+  };
+  assert.equal(filterMenu([water], "Todos", "Agua")[0]?.id, "agua");
+  assert.equal(filterMenu(menuItems, "Sobremesas", "cafe")[0]?.id, "chocolate");
+});
+
 test("rejeita cardápio remoto incompleto antes de renderizar", () => {
   assert.equal(normalizePublicMenu({ items: [{ id: "sem-campos" }] }), null);
   assert.deepEqual(normalizePublicMenu({ items: menuItems.slice(0, 1) }), menuItems.slice(0, 1));

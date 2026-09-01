@@ -11,6 +11,7 @@ import {
   managementRecipeComponents,
   managementRecipeVersions,
   managementReturnableCustodyMovements,
+  managementReturnablePolicies,
   managementStockBalances,
   managementStockLocations,
   organizations,
@@ -191,6 +192,12 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
       quantityPerUnit: "1.000",
       unitId: unitA.id,
     });
+    await database.db.insert(managementReturnablePolicies).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      defaultDueDays: 12,
+      updatedByIdentityId: identityA.id,
+    });
     const recipeSwitchAt = new Date(orderSentAt.getTime() + 1);
     const [recipeV1, recipeV2] = await database.db
       .insert(managementRecipeVersions)
@@ -351,6 +358,10 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
     assert.equal(custodyAfterSend[0]?.quantityDelta, "2.000");
     const issuedCustody = custodyAfterSend[0];
     assert.ok(issuedCustody);
+    assert.equal(
+      issuedCustody.dueAt?.toISOString(),
+      new Date(orderSentAt.getTime() + 12 * 24 * 60 * 60_000).toISOString(),
+    );
     await database.db.insert(managementReturnableCustodyMovements).values({
       organizationId: organizationA.id,
       unitId: unitA.id,

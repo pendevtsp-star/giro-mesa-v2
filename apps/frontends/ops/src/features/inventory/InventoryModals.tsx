@@ -213,6 +213,7 @@ export function LocationModal({
 
 export function ItemModal({
   item,
+  initialProductId,
   products,
   suppliers,
   containers,
@@ -222,6 +223,7 @@ export function ItemModal({
   onSubmit,
 }: {
   item: InventoryItem | null;
+  initialProductId?: string;
   products: SelectOption[];
   suppliers: SelectOption[];
   containers: SelectOption[];
@@ -239,9 +241,11 @@ export function ItemModal({
   const [minimum, setMinimum] = useState(String(item?.minimumQuantity ?? 0));
   const [reorder, setReorder] = useState(String(item?.reorderQuantity ?? 0));
   const [leadTime, setLeadTime] = useState(String(item?.leadTimeDays ?? 0));
-  const [productId, setProductId] = useState(item?.productId ?? "");
+  const [productId, setProductId] = useState(item?.productId ?? initialProductId ?? "");
   const [supplierId, setSupplierId] = useState(item?.preferredSupplierId ?? "");
-  const [kind, setKind] = useState<InventoryItemKind>(item?.kind ?? "ingredient");
+  const [kind, setKind] = useState<InventoryItemKind>(
+    item?.kind ?? (initialProductId ? "resale" : "ingredient"),
+  );
   const [containerItemId, setContainerItemId] = useState(item?.returnableContainerItemId ?? "");
   const [returnableQuantity, setReturnableQuantity] = useState(
     String(item?.returnableQuantityPerUnit ?? 1),
@@ -259,13 +263,13 @@ export function ItemModal({
     setMinimum(String(item?.minimumQuantity ?? 0));
     setReorder(String(item?.reorderQuantity ?? 0));
     setLeadTime(String(item?.leadTimeDays ?? 0));
-    setProductId(item?.productId ?? "");
+    setProductId(item?.productId ?? initialProductId ?? "");
     setSupplierId(item?.preferredSupplierId ?? "");
-    setKind(item?.kind ?? "ingredient");
+    setKind(item?.kind ?? (initialProductId ? "resale" : "ingredient"));
     setContainerItemId(item?.returnableContainerItemId ?? "");
     setReturnableQuantity(String(item?.returnableQuantityPerUnit ?? 1));
     setDeposit(item?.returnableDepositCents ? String(item.returnableDepositCents / 100) : "0");
-  }, [item]);
+  }, [initialProductId, item]);
   const valid =
     name.trim().length >= 2 &&
     unit.trim() &&
@@ -281,7 +285,13 @@ export function ItemModal({
       isOpen={open}
       onClose={onClose}
       size="lg"
-      title={item ? "Editar item de estoque" : "Novo item de estoque"}
+      title={
+        item
+          ? "Editar item de estoque"
+          : initialProductId
+            ? "Novo item de revenda"
+            : "Novo item de estoque"
+      }
     >
       <form
         className="gm-form-stack"

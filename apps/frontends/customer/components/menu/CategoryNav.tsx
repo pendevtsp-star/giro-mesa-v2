@@ -26,6 +26,7 @@ export function CategoryNav({
           {categories.map((item) => (
             <Button
               type="button"
+              variant="ghost"
               key={item}
               aria-pressed={category === item}
               onClick={() => onCategory(item)}

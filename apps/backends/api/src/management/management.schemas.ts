@@ -222,6 +222,47 @@ export const productReturnableClassificationSchema = z.object({
   status: z.enum(["returnable", "non_returnable"]),
 });
 
+export const productReturnableConfigurationSchema = z
+  .object({
+    status: z.enum(["returnable", "non_returnable"]),
+    mappings: z
+      .array(
+        z.object({
+          containerInventoryItemId: id,
+          quantityPerUnit: positiveQuantity,
+          depositCents: cents,
+        }),
+      )
+      .max(100),
+  })
+  .superRefine((value, context) => {
+    if (value.status === "returnable" && value.mappings.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mappings"],
+        message: "Produtos retornáveis exigem ao menos um vínculo de vasilhame.",
+      });
+    }
+    if (value.status === "non_returnable" && value.mappings.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mappings"],
+        message: "Produtos não retornáveis não podem manter vínculos de vasilhame.",
+      });
+    }
+    const seen = new Set<string>();
+    value.mappings.forEach((mapping, index) => {
+      if (seen.has(mapping.containerInventoryItemId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["mappings", index, "containerInventoryItemId"],
+          message: "Cada vasilhame deve aparecer uma única vez.",
+        });
+      }
+      seen.add(mapping.containerInventoryItemId);
+    });
+  });
+
 export const returnableIncidentSchema = z
   .object({
     movementId: id.optional(),
@@ -1406,6 +1447,9 @@ export type ReturnableCustodyConfirmBulkInput = z.infer<typeof returnableCustody
 export type ReturnableCustodyHandoffInput = z.infer<typeof returnableCustodyHandoffSchema>;
 export type ProductReturnableClassificationInput = z.infer<
   typeof productReturnableClassificationSchema
+>;
+export type ProductReturnableConfigurationInput = z.infer<
+  typeof productReturnableConfigurationSchema
 >;
 export type ReturnableIncidentInput = z.infer<typeof returnableIncidentSchema>;
 export type ReturnableIncidentReviewInput = z.infer<typeof returnableIncidentReviewSchema>;

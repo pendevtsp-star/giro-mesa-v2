@@ -213,11 +213,18 @@ async function mockInventory(page: Page) {
         },
         configurationHealth: {
           undecidedProductIds: [],
-          unlinkedReturnableProductIds: [],
+          unlinkedReturnableProductIds: ["product-without-item"],
           missingDepositValueProductIds: [],
           inactiveContainerLinkProductIds: [],
         },
-        classificationStatus: [],
+        classificationStatus: [
+          {
+            productId: "product-without-item",
+            productName: "Cerveja 600 ml",
+            status: "returnable",
+            activeLink: null,
+          },
+        ],
         incidents: [],
         supplierExchanges: [],
         lossIndicators: [],
@@ -294,7 +301,8 @@ async function mockInventory(page: Page) {
           canManageAssets: true,
         },
       });
-    if (path.endsWith("/pilot/catalog")) return json({ products: [] });
+    if (path.endsWith("/pilot/catalog"))
+      return json({ products: [{ id: "product-without-item", name: "Cerveja 600 ml" }] });
     if (path.endsWith("/management/suppliers")) return json([]);
     return json({});
   });
@@ -310,11 +318,22 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     [375, "dark"],
   ] as const) {
     await page.setViewportSize({ width, height: 900 });
-    if (page.url().startsWith("http")) {
-      await page.evaluate((value) => localStorage.setItem("giromesa-theme", value), theme);
-      await page.reload();
-    } else await page.goto("http://127.0.0.1:3112/#/inventory");
+    const inventoryUrl = "http://127.0.0.1:3112/#/inventory?inventoryView=returnables";
+    if (!page.url().startsWith("http")) await page.goto(inventoryUrl);
+    await page.evaluate((value) => localStorage.setItem("giromesa-theme", value), theme);
+    await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Estoque" })).toBeVisible();
+    const inventoryTabs = page.getByRole("group", { name: "Seções do estoque" });
+    await expect(inventoryTabs.getByRole("button").nth(0)).toContainText("Visão geral");
+    await expect(inventoryTabs.getByRole("button").nth(1)).toContainText("Vasilhames");
+    await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
+    await page.getByRole("button", { name: "Novo item de revenda" }).click();
+    const resaleItemDialog = page.getByRole("dialog", { name: "Novo item de revenda" });
+    await expect(resaleItemDialog).toBeVisible();
+    await expect(resaleItemDialog.getByRole("combobox", { name: "Tipo de item" })).toHaveValue(
+      "resale",
+    );
+    await page.keyboard.press("Escape");
     await page.getByRole("button", { name: /Controles/ }).click();
     await expect(page.getByRole("heading", { name: "Contagem cega" })).toBeVisible();
     await expect(page.getByText("Temperatura crítica: 11 °C.")).toBeVisible();

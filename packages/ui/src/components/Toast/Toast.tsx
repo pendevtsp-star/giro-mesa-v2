@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../Icon/Icon";
 
+const TOAST_DURATION_MS = 2_000;
+
 export function Toast({
   message,
   tone = "info",
   title,
   onDismiss,
-  duration,
   actionLabel,
   onAction,
 }: {
@@ -17,7 +18,6 @@ export function Toast({
   tone?: "success" | "danger" | "info";
   title?: string;
   onDismiss: () => void;
-  duration?: number;
   actionLabel?: string;
   onAction?: () => void;
 }) {
@@ -28,11 +28,9 @@ export function Toast({
   }, [onDismiss]);
   useEffect(() => {
     if (!message) return;
-    const timeout = duration ?? (tone === "danger" ? 0 : 4000);
-    if (timeout <= 0) return;
-    const t = setTimeout(() => dismissRef.current(), timeout);
+    const t = setTimeout(() => dismissRef.current(), TOAST_DURATION_MS);
     return () => clearTimeout(t);
-  }, [duration, message, tone]);
+  }, [message]);
   useEffect(() => {
     const findOpenDialog = () => {
       const dialogs = document.querySelectorAll("dialog[open]");

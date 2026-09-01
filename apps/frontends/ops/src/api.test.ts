@@ -20,6 +20,20 @@ describe("compatibilidade e erros da API", () => {
     ).toBe("Este recurso não está disponível na versão atual da API. Referência: request-123.");
   });
 
+  it("explica quando um pedido não possui rota de produção", () => {
+    expect(
+      operationalApiErrorMessage(
+        409,
+        undefined,
+        "request-409",
+        undefined,
+        "PRODUCT_WITHOUT_STATION",
+      ),
+    ).toBe(
+      "Este pedido contém produto sem estação de produção. Configure a rota no Catálogo e tente novamente. Referência: request-409.",
+    );
+  });
+
   it("aceita a identidade de release compatível", () => {
     expect(
       apiCompatibilityError({

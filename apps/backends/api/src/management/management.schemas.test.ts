@@ -9,6 +9,7 @@ import {
   overviewPreferencesSchema,
   overviewPriorityActionSchema,
   productReturnableClassificationSchema,
+  productReturnableConfigurationSchema,
   purchaseInvoiceConfirmSchema,
   purchaseOrderSchema,
   purchaseOrderUpdateSchema,
@@ -417,6 +418,45 @@ describe("returnable custody contracts", () => {
     );
     assert.equal(
       productReturnableClassificationSchema.safeParse({ status: "undecided" }).success,
+      false,
+    );
+  });
+
+  it("reconciles complete product configuration without ambiguous container mappings", () => {
+    const mapping = { containerInventoryItemId, quantityPerUnit: "1", depositCents: 500 };
+    assert.equal(
+      productReturnableConfigurationSchema.safeParse({
+        status: "returnable",
+        mappings: [mapping],
+      }).success,
+      true,
+    );
+    assert.equal(
+      productReturnableConfigurationSchema.safeParse({
+        status: "returnable",
+        mappings: [],
+      }).success,
+      false,
+    );
+    assert.equal(
+      productReturnableConfigurationSchema.safeParse({
+        status: "non_returnable",
+        mappings: [mapping],
+      }).success,
+      false,
+    );
+    assert.equal(
+      productReturnableConfigurationSchema.safeParse({
+        status: "non_returnable",
+        mappings: [],
+      }).success,
+      true,
+    );
+    assert.equal(
+      productReturnableConfigurationSchema.safeParse({
+        status: "returnable",
+        mappings: [mapping, mapping],
+      }).success,
       false,
     );
   });

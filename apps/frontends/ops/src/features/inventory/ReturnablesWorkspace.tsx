@@ -41,6 +41,7 @@ interface ReturnablesWorkspaceProps {
   refreshError: string | null;
   onRetry: () => void;
   onEditItem: (item: InventoryItem) => void;
+  onCreateResaleItem: (productId: string) => void;
   onOpenIncident: () => void;
   onOpenSupplierExchange: () => void;
   onReviewIncident: (incidentId: string) => void;
@@ -156,6 +157,7 @@ function ReturnablesReady({
   refreshError,
   onRetry,
   onEditItem,
+  onCreateResaleItem,
   onOpenIncident,
   onOpenSupplierExchange,
   onReviewIncident,
@@ -592,6 +594,7 @@ function ReturnablesReady({
           inventory={inventory}
           issueProducts={issueProducts}
           onEditItem={onEditItem}
+          onCreateResaleItem={onCreateResaleItem}
           policy={policy}
           policyDays={policyDays}
           policyMode={policyMode}
@@ -695,6 +698,7 @@ function ConfigurationCard({
   inventory,
   issueProducts,
   onEditItem,
+  onCreateResaleItem,
   policy,
   policyDays,
   policyMode,
@@ -710,6 +714,7 @@ function ConfigurationCard({
   inventory: InventoryData;
   issueProducts: ReturnablesData["classificationStatus"];
   onEditItem: (item: InventoryItem) => void;
+  onCreateResaleItem: (productId: string) => void;
   policy: { state: RemoteState<ReturnablePolicy>; retry: () => void };
   policyDays: string;
   policyMode: "disabled" | "manual";
@@ -851,7 +856,7 @@ function ConfigurationCard({
                       </Button>
                     </>
                   )}
-                  {item && (
+                  {item ? (
                     <Button
                       disabled={!data.capabilities?.canConfigureReturnables}
                       onClick={() => onEditItem(item)}
@@ -859,6 +864,15 @@ function ConfigurationCard({
                       variant="ghost"
                     >
                       {entry.classification === "undecided" ? "Configurar vínculo" : "Corrigir"}
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={!data.capabilities?.canConfigureReturnables}
+                      onClick={() => onCreateResaleItem(entry.productId)}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      Novo item de revenda
                     </Button>
                   )}
                 </span>

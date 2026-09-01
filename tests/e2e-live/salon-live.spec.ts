@@ -188,8 +188,9 @@ test("opera, unifica, divide e imprime com API compilada e PostgreSQL reais", as
 
   await accountDialog.getByRole("button", { name: "Pedir conta e imprimir" }).click();
   await accountDialog.getByRole("button", { name: "Imprimir agora" }).first().click();
-  await expect(accountDialog.getByText(/confirme o papel/i)).toBeVisible();
-  await expect(accountDialog.getByRole("button", { name: "Confirmar saída física" })).toBeVisible();
+  await expect(accountDialog.getByRole("button", { name: "Confirmar saída física" })).toHaveCount(
+    0,
+  );
 
   await page.reload();
   await expect(page.getByRole("dialog", { name: "Mesa Live 01" })).toBeVisible();
