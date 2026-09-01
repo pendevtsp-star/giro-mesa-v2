@@ -796,8 +796,7 @@ test("Salão respeita a operação permitida para cada papel", async ({ browser 
 });
 
 test("Responsável marca pedido pronto como servido na próxima ação", async ({ page }) => {
-  let handoffBody: unknown;
-  let idempotencyKey = "";
+  const handoffs: Array<{ orderId: string; body: unknown; idempotencyKey: string }> = [];
   await mockProductionApi(
     page,
     undefined,
@@ -811,7 +810,7 @@ test("Responsável marca pedido pronto como servido na próxima ação", async (
           tableId: "m03",
           tabId: tab.id,
           phase: "ready",
-          readyOrderId: "order-3",
+          readyOrderIds: ["order-3", "order-4"],
           since: "2026-08-16T12:01:00.000Z",
         },
       ],
@@ -820,10 +819,14 @@ test("Responsável marca pedido pronto como servido na próxima ação", async (
     undefined,
     "waiter",
   );
-  await page.route("**/pilot/kds/orders/order-3/handoff", async (route) => {
-    handoffBody = route.request().postDataJSON();
-    idempotencyKey = route.request().headers()["idempotency-key"] ?? "";
-    await route.fulfill({ json: { orderId: "order-3", target: "served", state: "served" } });
+  await page.route("**/pilot/kds/orders/*/handoff", async (route) => {
+    const orderId = new URL(route.request().url()).pathname.split("/").at(-2) ?? "";
+    handoffs.push({
+      orderId,
+      body: route.request().postDataJSON(),
+      idempotencyKey: route.request().headers()["idempotency-key"] ?? "",
+    });
+    await route.fulfill({ json: { orderId, target: "served", state: "served" } });
   });
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
@@ -836,9 +839,13 @@ test("Responsável marca pedido pronto como servido na próxima ação", async (
   const dialog = page.getByRole("dialog", { name: "Mesa 03" });
   await expect(dialog.getByText("Servir pedido", { exact: true })).toBeVisible();
   await dialog.getByRole("button", { name: "Marcar como servido" }).click();
-  await expect.poll(() => handoffBody).toEqual({ target: "served" });
-  expect(idempotencyKey).not.toBe("");
-  await expect(page.getByText("Pedido marcado como servido.")).toBeVisible();
+  await expect.poll(() => handoffs).toHaveLength(2);
+  expect(handoffs.map(({ orderId, body }) => ({ orderId, body }))).toEqual([
+    { orderId: "order-3", body: { target: "served" } },
+    { orderId: "order-4", body: { target: "served" } },
+  ]);
+  expect(new Set(handoffs.map(({ idempotencyKey }) => idempotencyKey)).size).toBe(2);
+  await expect(page.getByText("2 pedidos marcados como servidos.")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 

@@ -1503,6 +1503,7 @@ export class PilotPosService {
     const activeOrders = tabs.length
       ? await this.database.db
           .select({
+            id: posOrders.id,
             tabId: posOrders.tabId,
             status: posOrders.status,
             updatedAt: posOrders.updatedAt,
@@ -1561,6 +1562,10 @@ export class PilotPosService {
           tableId: tab.tableId,
           tabId: tab.id,
           phase,
+          readyOrderIds: orders
+            .filter((order) => order.status === "ready")
+            .map((order) => order.id)
+            .sort(),
           since:
             orders.reduce<Date | null>(
               (latest, order) => (!latest || order.updatedAt > latest ? order.updatedAt : latest),
@@ -1821,6 +1826,7 @@ export class PilotPosService {
       tablePhases: tablePhases.map((phase) => ({
         ...phase,
         tabId: fullTabIds.has(phase.tabId) ? phase.tabId : null,
+        readyOrderIds: fullTabIds.has(phase.tabId) ? phase.readyOrderIds : [],
       })),
       staff,
       serviceSections: sections,
@@ -16749,12 +16755,36 @@ export class PilotPosService {
     idempotencyKey: string,
     input: KdsOrderHandoffInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, [
+    const roles = await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
       "waiter",
       "kds",
     ]);
+    if (
+      input.target === "served" &&
+      !roles.some(
+        (row) =>
+          (row.unitId === null || row.unitId === unitId) &&
+          ["owner", "manager", "kds"].includes(row.role),
+      )
+    ) {
+      const [orderScope] = await this.database.db
+        .select({ tabId: posOrders.tabId })
+        .from(posOrders)
+        .where(
+          and(
+            eq(posOrders.organizationId, organizationId),
+            eq(posOrders.unitId, unitId),
+            eq(posOrders.id, orderId),
+          ),
+        )
+        .limit(1);
+      if (!orderScope) throw new NotFoundException({ code: "ORDER_NOT_FOUND" });
+      await this.requireTabOperationalAccess(identityId, organizationId, unitId, [
+        orderScope.tabId,
+      ]);
+    }
     return this.idempotent(
       identityId,
       organizationId,

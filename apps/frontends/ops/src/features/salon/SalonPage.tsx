@@ -818,6 +818,19 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           : data.serviceMode;
         const selectedUsesQuickFlow = usesQuickServiceMode(selectedServiceMode);
         const selectedPhase = table ? servicePhaseForTable(table.id) : undefined;
+        const selectedReadyOrderIds = table
+          ? [
+              ...new Set(
+                data.tablePhases
+                  .filter(
+                    (phase) =>
+                      phase.phase === "ready" &&
+                      (selectedGroup ? selectedGroupTableIds : [table.id]).includes(phase.tableId),
+                  )
+                  .flatMap((phase) => phase.readyOrderIds),
+              ),
+            ]
+          : [];
         const selectedTimeline = table
           ? buildTableTimeline({
               table,
@@ -1758,6 +1771,39 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             setErrorFeedback(error, "Não foi possível atualizar o chamado.");
             return false;
           } finally {
+            setBusy(false);
+          }
+        }
+
+        async function serveReadyOrders(orderIds: string[]) {
+          if (busy || orderIds.length === 0) return;
+          setBusy(true);
+          setFeedback("");
+          try {
+            for (const orderId of orderIds) {
+              await scope.dispatch(
+                "pos.kds.handoff_requested",
+                pilotMutation("handoff-kds-order", { orderId, target: "served" }, "cloud-only"),
+                (key) =>
+                  api.pilot.handoffKds(
+                    scope.organizationId,
+                    scope.unitId,
+                    orderId,
+                    "served",
+                    undefined,
+                    key,
+                  ),
+              );
+            }
+            setFeedback(
+              orderIds.length === 1
+                ? "Pedido marcado como servido."
+                : `${orderIds.length} pedidos marcados como servidos.`,
+            );
+          } catch (error) {
+            setErrorFeedback(error, "Não foi possível marcar todos os pedidos como servidos.");
+          } finally {
+            floor.retry();
             setBusy(false);
           }
         }
@@ -4918,6 +4964,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
                             : "O sistema destaca somente a etapa operacional atual."}
                       </small>
+                      {selectedCanOperate &&
+                        ["owner", "manager", "waiter"].includes(scope.profileId) &&
+                        selectedReadyOrderIds.length > 0 && (
+                          <Button
+                            aria-busy={busy}
+                            disabled={busy}
+                            onClick={() => void serveReadyOrders(selectedReadyOrderIds)}
+                            size="sm"
+                          >
+                            {busy ? "Confirmando…" : "Marcar como servido"}
+                          </Button>
+                        )}
                     </section>
                     <div className="table-operation-strip">
                       <div>

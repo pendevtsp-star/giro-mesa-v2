@@ -810,13 +810,37 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     assert.equal(expeditionTicket?.servedAt, null);
     assert.equal(readyOrder?.status, "ready");
     assert.ok(readyOrder?.readyNotifiedAt);
+    const readyFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
+    assert.deepEqual(readyFloor.tablePhases.find((phase) => phase.tabId === tabId)?.readyOrderIds, [
+      order.id,
+    ]);
     await assert.rejects(() =>
       pos.transitionKds(identity.id, organizationA.id, unitA.id, ticketId, "kds-reverse-0001", {
         state: "ready",
       }),
     );
+    await assert.rejects(
+      () =>
+        pos.handoffKdsOrder(
+          supportIdentity.id,
+          organizationA.id,
+          unitA.id,
+          order.id,
+          "kds-served-outside-assignment-0001",
+          { target: "served" },
+        ),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "TAB_OUTSIDE_OPERATIONAL_ASSIGNMENT",
+    );
+    const tabBeforeService = (await pos.getTab(identity.id, organizationA.id, unitA.id, tabId)).tab;
+    await pos.claimTab(identity.id, organizationA.id, unitA.id, tabId, {
+      expectedVersion: tabBeforeService.version,
+      responsibleIdentityId: supportIdentity.id,
+      reason: "Responsável pelo serviço da mesa",
+    });
     await pos.handoffKdsOrder(
-      identity.id,
+      supportIdentity.id,
       organizationA.id,
       unitA.id,
       order.id,
@@ -847,6 +871,11 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       .limit(1);
     assert.ok(servedTicket?.servedAt);
     assert.equal(servedOrder?.status, "served");
+    const servedFloor = await pos.listFloor(identity.id, organizationA.id, unitA.id);
+    assert.deepEqual(
+      servedFloor.tablePhases.find((phase) => phase.tabId === tabId)?.readyOrderIds,
+      [],
+    );
 
     const baselineTab = (await pos.getTab(identity.id, organizationA.id, unitA.id, tabId)).tab;
     const baselineTotals = {

@@ -356,6 +356,7 @@ export interface PilotFloor {
     tableId: string;
     tabId: string | null;
     phase: "awaiting_order" | "production" | "ready" | "served";
+    readyOrderIds: string[];
     since: string;
   }>;
   staff: Array<{ identityId: string; displayName: string }>;
@@ -1396,6 +1397,7 @@ export function parsePilotFloor(value: unknown): PilotFloor {
         tableId: text(row.tableId),
         tabId: optionalText(row.tabId),
         phase: phase as PilotFloor["tablePhases"][number]["phase"],
+        readyOrderIds: values(row.readyOrderIds).map(text),
         since: text(row.since),
       };
     }),

@@ -240,6 +240,7 @@ describe("contratos operacionais reais", () => {
           tableId: "table-1",
           tabId: "tab-1",
           phase: "ready",
+          readyOrderIds: ["order-1", "order-2"],
           since: "2026-08-15T20:20:00.000Z",
         },
       ],
@@ -295,7 +296,11 @@ describe("contratos operacionais reais", () => {
     expect(floor.tables).toHaveLength(1);
     expect(floor.rooms[0]?.layoutPolygon).toHaveLength(4);
     expect(floor.shiftTableLayouts[0]).toMatchObject({ tableId: "table-1", x: 220, y: 140 });
-    expect(floor.tablePhases[0]).toMatchObject({ tableId: "table-1", phase: "ready" });
+    expect(floor.tablePhases[0]).toMatchObject({
+      tableId: "table-1",
+      phase: "ready",
+      readyOrderIds: ["order-1", "order-2"],
+    });
     expect(floor.serviceCalls[0]).toMatchObject({
       tableId: "table-1",
       printStatus: "confirmation_required",
