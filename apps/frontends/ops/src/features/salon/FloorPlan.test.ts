@@ -9,7 +9,6 @@ import {
   floorPlanPlacementAllowed,
   floorPlanRectanglesOverlap,
   parseFloorPlanViewport,
-  resolveFloorPlanFullscreenTarget,
   zoomFloorPlanViewport,
 } from "./FloorPlan";
 
@@ -212,15 +211,5 @@ describe("floor plan layout", () => {
     expect(floorPlanDensity(121)).toBe("dense");
     expect(floorPlanDensity(300)).toBe("dense");
     expect(floorPlanDensity(500)).toBe("very-dense");
-  });
-
-  it("expands the complete salon operation shell instead of only the SVG plan", () => {
-    const shell = {} as HTMLElement;
-    const plan = {
-      closest: (selector: string) => (selector === "[data-salon-operation-shell]" ? shell : null),
-    } as HTMLElement;
-
-    expect(resolveFloorPlanFullscreenTarget(plan)).toBe(shell);
-    expect(resolveFloorPlanFullscreenTarget(null)).toBeNull();
   });
 });

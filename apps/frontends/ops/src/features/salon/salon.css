@@ -430,10 +430,6 @@
   gap: 0.85rem;
   min-width: 0;
 }
-.salon-fullscreen-bar {
-  display: none;
-}
-
 .salon-hud-signals {
   align-items: center;
   display: flex;
@@ -1818,16 +1814,6 @@
   padding: 0.75rem;
 }
 
-.floor-plan:fullscreen,
-.salon-shell:fullscreen .floor-plan {
-  background: var(--gm-paper);
-  border: 0;
-  border-radius: 0;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right))
-    max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
-}
-
 .floor-plan__toolbar,
 .floor-plan__controls,
 .floor-plan__legend {
@@ -2039,11 +2025,6 @@
   min-height: clamp(480px, 58vh, 680px);
   overflow: hidden;
   position: relative;
-}
-
-.floor-plan:fullscreen .floor-plan__viewport,
-.salon-shell:fullscreen .floor-plan__viewport {
-  min-height: 0;
 }
 
 .floor-plan__svg {
@@ -2811,6 +2792,37 @@
   justify-content: flex-end;
 }
 
+.salon-shift-control {
+  align-items: center;
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+  min-width: 0;
+  padding: var(--gm-space-2) var(--gm-space-3);
+}
+
+.salon-shift-control > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.salon-shift-control small {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+
+.salon-shift-control__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+  justify-content: flex-end;
+}
+
 .salon-recovery-banner {
   align-items: center;
   background: var(--gm-warning-soft);
@@ -2969,25 +2981,9 @@
   gap: 0.05rem;
 }
 
-.salon-shell:fullscreen {
-  grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-.salon-shell:fullscreen > .salon-command-center {
-  max-height: min(40dvh, 360px);
-  overflow: auto;
-}
-
-.salon-shell:fullscreen
-  .salon-command-center
-  > .service-priority-queue[open]
-  .service-priority-queue__items {
-  max-height: 132px;
-  overflow: auto;
-}
-
 @media (max-width: 760px) {
   .salon-command-center__header,
+  .salon-shift-control,
   .salon-next-action,
   .salon-recovery-banner {
     align-items: stretch;
@@ -2996,6 +2992,15 @@
 
   .salon-command-center__health {
     justify-content: flex-start;
+  }
+
+  .salon-shift-control__actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .salon-shift-control__actions > .gm-button {
+    flex: 1 1 140px;
   }
 
   .salon-command-center > .salon-command-bar--real {
@@ -3103,14 +3108,6 @@
 .counter-modal .gm-modal__body,
 .salon-service-modal .gm-modal__body {
   overflow: auto;
-}
-
-.salon-shell:fullscreen .counter-modal .gm-modal {
-  border-radius: 0;
-  height: 100dvh;
-  max-height: none;
-  max-width: none;
-  width: 100vw;
 }
 
 .floor-plan-minimap {
@@ -5144,304 +5141,10 @@
   }
 }
 
-/* Immersive operation mode keeps every salon action inside the fullscreen tree. */
-.salon-shell:fullscreen {
-  background: var(--gm-paper);
-  box-sizing: border-box;
-  color: var(--gm-ink);
-  gap: 0.5rem;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  padding: max(0.55rem, env(safe-area-inset-top)) max(0.55rem, env(safe-area-inset-right))
-    max(0.55rem, env(safe-area-inset-bottom)) max(0.55rem, env(safe-area-inset-left));
-}
-
-.salon-shell:fullscreen .salon-fullscreen-bar {
-  align-items: center;
-  background: color-mix(in srgb, var(--gm-ink) 94%, var(--gm-brand));
-  border: 1px solid color-mix(in srgb, var(--gm-brand) 38%, var(--gm-ink));
-  border-radius: var(--gm-radius-sm);
-  color: white;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  min-height: 44px;
-  padding: 0.4rem 0.55rem 0.4rem 0.75rem;
-}
-
-.salon-shell:fullscreen .salon-fullscreen-bar > span {
-  align-items: center;
-  display: flex;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.salon-shell:fullscreen .salon-fullscreen-bar i {
-  background: var(--gm-success);
-  border: 3px solid rgb(255 255 255 / 18%);
-  border-radius: 50%;
-  box-shadow: 0 0 0 4px rgb(255 255 255 / 8%);
-  flex: 0 0 auto;
-  height: 8px;
-  width: 8px;
-}
-
-.salon-shell:fullscreen .salon-fullscreen-bar small {
-  color: rgb(255 255 255 / 70%);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.salon-shell:fullscreen .salon-fullscreen-bar .gm-button {
-  border-color: rgb(255 255 255 / 24%);
-  color: white;
-  flex: 0 0 auto;
-}
-
-.salon-shell:fullscreen .salon-pulse {
-  gap: 0.4rem;
-  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
-  min-width: 0;
-}
-
-.salon-shell:fullscreen .salon-pulse button {
-  min-height: 44px;
-  padding: 0.35rem 0.65rem;
-}
-
-.salon-shell:fullscreen .salon-pulse strong {
-  font-size: 1.05rem;
-}
-
-.salon-shell:fullscreen .salon-command-bar {
-  gap: 0.45rem;
-  grid-template-columns: minmax(240px, 1fr) minmax(145px, 0.3fr) minmax(145px, 0.3fr) auto;
-  padding: 0.45rem;
-}
-
-.salon-shell:fullscreen .salon-command-bar--real {
-  grid-template-columns: minmax(240px, 1fr) minmax(180px, 230px) auto;
-}
-
-.salon-shell:fullscreen .salon-command-actions,
-.salon-shell:fullscreen .salon-command-bar .gm-button {
-  grid-column: auto;
-  justify-self: auto;
-}
-
-.salon-shell:fullscreen .salon-layout--command-center {
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.salon-shell:fullscreen .salon-floor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  padding: 0.55rem;
-}
-
-.salon-shell:fullscreen .salon-floor__toolbar,
-.salon-shell:fullscreen .join-banner {
-  flex: 0 0 auto;
-}
-
-.salon-shell:fullscreen .floor-plan {
-  flex: 1 1 auto;
-  height: auto;
-  min-height: 0;
-  padding: 0.55rem;
-}
-
-.salon-shell:fullscreen .gm-toast {
-  right: max(0.75rem, env(safe-area-inset-right));
-  top: max(0.75rem, env(safe-area-inset-top));
-}
-
-.salon-shell:fullscreen .gm-modal-backdrop[open] {
-  align-items: stretch;
-  justify-content: flex-end;
-  padding: 0.65rem;
-}
-
-.salon-shell:fullscreen .gm-modal-backdrop::backdrop {
-  backdrop-filter: none;
-  background: rgb(14 25 20 / 34%);
-}
-
-.salon-shell:fullscreen .gm-modal {
-  animation: salon-operation-panel-enter 220ms var(--gm-ease);
-  border-radius: calc(var(--gm-radius-lg) + 4px);
-  height: 100%;
-  max-height: none;
-  max-width: min(560px, 48vw);
-  padding: 1rem;
-}
-
-.salon-shell:fullscreen .gm-modal--xl {
-  max-width: min(720px, 58vw);
-}
-
-@keyframes salon-operation-panel-enter {
-  from {
-    opacity: 0;
-    transform: translateX(18px);
-  }
-}
-
 @media (max-width: 760px) {
-  .salon-shell:fullscreen {
-    gap: 0.4rem;
-    padding: max(0.4rem, env(safe-area-inset-top)) max(0.4rem, env(safe-area-inset-right))
-      max(0.4rem, env(safe-area-inset-bottom)) max(0.4rem, env(safe-area-inset-left));
-  }
-
-  .salon-shell:fullscreen .salon-fullscreen-bar small {
-    display: none;
-  }
-
-  .salon-shell:fullscreen .salon-pulse {
-    display: flex;
-    margin: 0;
-    max-width: none;
-    overflow-x: auto;
-  }
-
-  .salon-shell:fullscreen .salon-pulse button {
-    flex: 0 0 112px;
-  }
-
-  .salon-shell:fullscreen .salon-command-bar,
-  .salon-shell:fullscreen .salon-command-bar--real {
-    align-items: end;
-    display: flex;
-    overflow-x: auto;
-  }
-
-  .salon-shell:fullscreen .salon-search {
-    flex: 0 0 min(72vw, 360px);
-    grid-column: auto;
-  }
-
-  .salon-shell:fullscreen .salon-select {
-    flex: 0 0 168px;
-  }
-
-  .salon-shell:fullscreen .salon-command-actions {
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-  }
-
-  .salon-shell:fullscreen .salon-floor__toolbar,
-  .salon-shell:fullscreen .floor-plan__toolbar {
-    align-items: center;
-    flex-direction: row;
-  }
-
-  .salon-shell:fullscreen .floor-plan__toolbar small {
-    display: none;
-  }
-
-  .salon-shell:fullscreen .floor-plan__controls {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-  }
-
-  .salon-shell:fullscreen .gm-modal-backdrop[open] {
-    align-items: flex-end;
-    padding: 0.35rem;
-  }
-
-  .salon-shell:fullscreen .gm-modal,
-  .salon-shell:fullscreen .gm-modal--xl {
-    animation-name: salon-operation-sheet-enter;
-    border-radius: var(--gm-radius-lg) var(--gm-radius-lg) var(--gm-radius-sm) var(--gm-radius-sm);
-    height: min(88dvh, 820px);
-    max-height: calc(100dvh - 0.7rem);
-    max-width: none;
-  }
-}
-
-@keyframes salon-operation-sheet-enter {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-}
-
-/* Fullscreen keeps the operational HUD and every modal inside the same fullscreen tree. */
-.salon-shell:fullscreen {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-  position: relative;
-}
-
-.salon-shell:fullscreen > .salon-fullscreen-bar,
-.salon-shell:fullscreen > .gm-observability-row,
-.salon-shell:fullscreen > .salon-command-bar,
-.salon-shell:fullscreen .salon-floor__toolbar,
-.salon-shell:fullscreen .join-banner {
-  display: flex;
-}
-
-.salon-shell:fullscreen > .service-priority-queue {
-  background: color-mix(in srgb, var(--gm-surface) 94%, transparent);
-  box-shadow: var(--gm-shadow-sm);
-  max-width: min(390px, calc(100vw - 1.5rem));
-  position: absolute;
-  right: max(0.75rem, env(safe-area-inset-right));
-  top: 7.7rem;
-  z-index: 7;
-}
-
-.salon-shell:fullscreen > .service-priority-queue:not([open]) {
-  width: min(260px, calc(100vw - 1.5rem));
-}
-
-.salon-shell:fullscreen > .service-priority-queue[open] .service-priority-queue__items {
-  max-height: min(56dvh, 540px);
-  overflow-y: auto;
-}
-
-.salon-shell:fullscreen .salon-layout--command-center,
-.salon-shell:fullscreen .salon-floor,
-.salon-shell:fullscreen .floor-plan {
-  height: 100%;
-  min-height: 0;
-}
-
-.salon-shell:fullscreen .floor-plan__viewport {
-  min-height: 0;
-}
-
-@media (max-width: 760px) {
-  .salon-shell:fullscreen .floor-plan__toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .salon-shell:fullscreen .floor-plan__controls {
-    flex-wrap: wrap;
-    max-width: 100%;
-    overflow: visible;
-  }
-
   .floor-plan-minimap > svg {
     height: 82px;
     width: 132px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .salon-shell:fullscreen .gm-modal {
-    animation: none;
   }
 }
 
@@ -6731,12 +6434,6 @@
   }
 }
 
-/* Mesa/comanda stays in the same operation tree as a right drawer on desktop. */
-.salon-shell:fullscreen > .salon-cockpit-bar,
-.salon-shell:fullscreen > .salon-metrics-cockpit {
-  display: none;
-}
-
 @media (max-width: 760px) {
   .salon-service-modal .counter-metadata-form {
     grid-template-columns: minmax(0, 1fr);
@@ -6747,147 +6444,5 @@
   .salon-service-modal .counter-metadata-form > .promised-at-field,
   .salon-service-modal .counter-metadata-form > .gm-button {
     grid-column: 1;
-  }
-}
-
-/* Fullscreen is an operational floor, not the regular page enlarged. */
-.salon-shell:fullscreen {
-  gap: 0.35rem;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  padding: 0.35rem;
-}
-
-.salon-shell:fullscreen > .salon-fullscreen-bar {
-  min-height: 40px;
-}
-
-.salon-fullscreen-bar__actions {
-  align-items: center;
-  display: flex;
-  gap: 0.35rem;
-}
-
-.salon-shell:fullscreen > .salon-command-center {
-  background: transparent;
-  border: 0;
-  gap: 0.3rem;
-  max-height: none;
-  overflow: visible;
-  padding: 0;
-}
-
-.salon-shell:fullscreen .service-priority-queue:not([open]) {
-  display: none;
-}
-
-.salon-shell:fullscreen .service-priority-queue[open] {
-  box-shadow: var(--gm-shadow-lg);
-  left: 0.35rem;
-  margin: 0;
-  max-height: min(320px, 46dvh);
-  overflow: auto;
-  position: fixed;
-  right: 0.35rem;
-  top: 46px;
-  z-index: 30;
-}
-
-.salon-shell:fullscreen
-  .salon-command-center
-  > .service-priority-queue[open]
-  .service-priority-queue__items {
-  max-height: min(230px, 34dvh);
-}
-
-.salon-shell:fullscreen .salon-command-center__header,
-.salon-shell:fullscreen .salon-metrics-cockpit,
-.salon-shell:fullscreen .service-load-panel,
-.salon-shell:fullscreen .salon-view-toggle,
-.salon-shell:fullscreen .salon-command-shortcuts,
-.salon-shell:fullscreen .salon-open-fullscreen,
-.salon-shell:fullscreen .salon-workspace-modes,
-.salon-shell:fullscreen .floor-plan__toolbar > div:first-child,
-.salon-shell:fullscreen .floor-plan-layers,
-.salon-shell:fullscreen .floor-plan-minimap {
-  display: none;
-}
-
-.salon-shell:fullscreen .salon-command-bar--real {
-  background: color-mix(in srgb, var(--gm-surface) 94%, transparent);
-  border-radius: var(--gm-radius-sm);
-  flex-wrap: nowrap;
-  gap: 0.35rem;
-  padding: 0.35rem;
-}
-
-.salon-shell:fullscreen .salon-command-bar--real > .salon-search {
-  flex: 1 1 auto;
-}
-
-.salon-shell:fullscreen .salon-search {
-  padding: 0.35rem;
-}
-
-.salon-shell:fullscreen .salon-search input,
-.salon-shell:fullscreen .salon-filter-menu > summary {
-  min-height: 36px;
-}
-
-.salon-shell:fullscreen .salon-floor {
-  gap: 0.35rem;
-  padding: 0.35rem;
-}
-
-.salon-shell:fullscreen .salon-floor__toolbar {
-  min-height: 38px;
-}
-
-.salon-shell:fullscreen .salon-floor__toolbar > .segmented--scroll {
-  flex: 1 1 auto;
-}
-
-.salon-shell:fullscreen .floor-plan {
-  gap: 0.3rem;
-  padding: 0.25rem;
-}
-
-.salon-shell:fullscreen .floor-plan__toolbar {
-  justify-content: flex-end;
-  min-height: 34px;
-}
-
-.salon-shell:fullscreen .floor-plan__controls {
-  flex-wrap: nowrap;
-}
-
-.salon-shell:fullscreen .floor-plan__controls .gm-button {
-  min-height: 32px;
-  padding-block: 0.25rem;
-}
-
-.salon-shell:fullscreen .floor-plan__viewport {
-  border-radius: var(--gm-radius-sm);
-}
-
-@media (max-width: 760px) {
-  .salon-shell:fullscreen .salon-command-bar--real {
-    overflow: visible;
-  }
-
-  .salon-shell:fullscreen .salon-search {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-
-  .salon-shell:fullscreen .salon-command-bar--real > .salon-filter-menu {
-    flex: 0 0 auto;
-  }
-
-  .salon-shell:fullscreen .salon-floor__toolbar > .segmented--scroll {
-    overflow-x: auto;
-  }
-
-  .salon-shell:fullscreen .floor-plan__controls .gm-button:not([aria-label]) {
-    display: none;
   }
 }

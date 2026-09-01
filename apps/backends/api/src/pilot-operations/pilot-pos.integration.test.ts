@@ -19,6 +19,7 @@ import {
   posKdsBatchAssignments,
   posKdsTicketItems,
   posKdsTickets,
+  posOperationalShifts,
   posOrderItems,
   posOrders,
   posProductAvailability,
@@ -101,6 +102,32 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       .returning();
     assert.ok(membership);
     await database.db.insert(roleBindings).values({ membershipId: membership.id, role: "owner" });
+    const [cleanUnit] = await database.db
+      .insert(units)
+      .values({ organizationId: organizationA.id, name: "Unidade sem pendências" })
+      .returning();
+    assert.ok(cleanUnit);
+    const [cleanShift] = await database.db
+      .insert(posOperationalShifts)
+      .values({
+        organizationId: organizationA.id,
+        unitId: cleanUnit.id,
+        label: "Turno sem pendências",
+        serviceMode: "hybrid",
+        startsAt: new Date(),
+        openedByIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(cleanShift);
+    const cleanClosure = await pos.closeOperationalShift(
+      identity.id,
+      organizationA.id,
+      cleanUnit.id,
+      cleanShift.id,
+      { acknowledgeOpenTabs: false },
+    );
+    assert.equal(cleanClosure.shift.status, "closed");
+    assert.equal(cleanClosure.handover.openTabs, 0);
     const [supportIdentity] = await database.db
       .insert(identities)
       .values({ email: `pilot-waiter+${runId}@example.test`, displayName: "Pilot Waiter" })
@@ -2738,10 +2765,22 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       })
       .returning();
     assert.ok(returnableHandoffIssue);
-    await assert.rejects(() =>
-      pos.closeOperationalShift(identity.id, organizationA.id, unitA.id, shift.id, {
-        acknowledgeOpenTabs: false,
-      }),
+    await assert.rejects(
+      () =>
+        pos.closeOperationalShift(identity.id, organizationA.id, unitA.id, shift.id, {
+          acknowledgeOpenTabs: false,
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof ConflictException);
+        const response = error.getResponse() as {
+          code: string;
+          pending: { openTabs: number; activeTables: number };
+        };
+        assert.equal(response.code, "SHIFT_HAS_PENDING_OPERATIONS");
+        assert.ok(response.pending.openTabs > 0);
+        assert.ok(response.pending.activeTables > 0);
+        return true;
+      },
     );
     await assert.rejects(
       () =>

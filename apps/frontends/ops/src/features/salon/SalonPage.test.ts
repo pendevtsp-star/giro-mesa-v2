@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { ApiClientError } from "../../api";
 import {
@@ -21,9 +19,6 @@ import {
   resolveShiftServiceMode,
   tableNextAction,
 } from "./salon-operations";
-
-const salonCss = readFileSync(fileURLToPath(new URL("./salon.css", import.meta.url)), "utf8");
-const appCss = readFileSync(fileURLToPath(new URL("../../styles.css", import.meta.url)), "utf8");
 
 describe("atalho para a mesa", () => {
   it("lê a mesa vinculada sem confundir outros parâmetros", () => {
@@ -157,17 +152,10 @@ describe("protected salon operation", () => {
     expect(result).toBe("created");
     expect(revisions).toEqual([3, 4]);
   });
-
-  it("keeps the fullscreen HUD and side drawer visible", () => {
-    expect(salonCss).toContain(".salon-shell:fullscreen > .salon-fullscreen-bar");
-    expect(salonCss).toContain(".salon-shell:fullscreen > .salon-command-center");
-    expect(appCss).toContain(".salon-service-modal:not(.salon-service-modal--compact) .gm-modal");
-    expect(salonCss).toContain(".salon-hud-signals");
-  });
 });
 
 describe("salon command center guidance", () => {
-  it("restores the operational view and rejects invalid persisted filters", () => {
+  it("migrates the retired floor view to the panel and rejects invalid persisted filters", () => {
     expect(
       parseSalonViewContext(
         JSON.stringify({
@@ -182,7 +170,7 @@ describe("salon command center guidance", () => {
         "all",
       ),
     ).toMatchObject({
-      view: "floor",
+      view: "map",
       selectedTableId: "table-12",
       filterStatus: "closing",
       roomFilter: "room-2",

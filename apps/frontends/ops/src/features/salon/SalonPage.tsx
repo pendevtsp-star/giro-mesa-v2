@@ -34,7 +34,6 @@ import {
   type FloorPlanPosition,
   type FloorPlanTableDetails,
   type FloorPlanZonePosition,
-  resolveFloorPlanFullscreenTarget,
 } from "./FloorPlan";
 import { MoveTableDialog } from "./MoveTableDialog";
 import { SalonSearch } from "./SalonSearch";
@@ -72,7 +71,7 @@ type SalonTableAccessLevel =
   | null;
 
 type SalonViewContext = {
-  view: "map" | "floor" | "list";
+  view: "map" | "list";
   selectedTableId: string | null;
   filterStatus: FloorFilter;
   roomFilter: string;
@@ -104,13 +103,12 @@ export function parseSalonViewContext(
     query: "",
   };
   if (!raw) return fallback;
-  if (raw === "map" || raw === "floor" || raw === "list") return { ...fallback, view: raw };
+  if (raw === "map" || raw === "list") return { ...fallback, view: raw };
+  if (raw === "floor") return { ...fallback, view: "map" };
   try {
     const saved = JSON.parse(raw) as Partial<SalonViewContext>;
     return {
-      view: ["map", "floor", "list"].includes(saved.view ?? "")
-        ? (saved.view as SalonViewContext["view"])
-        : fallback.view,
+      view: saved.view === "list" ? "list" : "map",
       selectedTableId: typeof saved.selectedTableId === "string" ? saved.selectedTableId : null,
       filterStatus: floorFilters.includes(saved.filterStatus ?? "all")
         ? (saved.filterStatus ?? "all")
@@ -286,7 +284,7 @@ function closeFloatingMenus(root: ParentNode | null, target?: Node) {
 export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const salonShellRef = useRef<HTMLDivElement>(null);
   const viewStorageKey = `giromesa:salon-view:${scope.organizationId}:${scope.unitId}:${scope.profileId}`;
-  const defaultView = scope.profileId === "cashier" ? "floor" : "map";
+  const defaultView = "map";
   const defaultSectionFilter = scope.profileId === "waiter" ? "mine" : "all";
   const [restoredViewContext] = useState(() => {
     try {
@@ -330,7 +328,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [roomFilter, setRoomFilter] = useState(restoredViewContext.roomFilter);
   const [sectionFilter, setSectionFilter] = useState(restoredViewContext.sectionFilter);
   const [query, setQuery] = useState(restoredViewContext.query);
-  const [view, setView] = useState<"map" | "floor" | "list">(restoredViewContext.view);
+  const [view, setView] = useState<"map" | "list">(restoredViewContext.view);
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -440,7 +438,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
       if (event.key === "v" || event.key === "V") {
         event.preventDefault();
-        setView((current) => (current === "map" ? "floor" : current === "floor" ? "list" : "map"));
+        setView((current) => (current === "map" ? "list" : "map"));
         return;
       }
 
@@ -523,7 +521,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [detachTableId, setDetachTableId] = useState("");
   const [floorFocusId, setFloorFocusId] = useState<string | null>(null);
   const [floorEditRequestKey, setFloorEditRequestKey] = useState(0);
-  const [floorOperateRequestKey, setFloorOperateRequestKey] = useState(0);
   const [setupSection, setSetupSection] = useState<"space" | "shift">("space");
   const [shiftSetupStep, setShiftSetupStep] = useState<"sections" | "team" | "open">("sections");
   const [serviceSectionEditorOpen, setServiceSectionEditorOpen] = useState(false);
@@ -618,18 +615,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
       setErrorFeedback(error, "Não foi possível desfazer a ação.");
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function openOperationalFloorFullscreen() {
-    setView("floor");
-    setWorkspaceMode("operate");
-    setJoinMode(false);
-    setJoinSelection([]);
-    setPriorityQueueOpen(false);
-    setFloorOperateRequestKey((current) => current + 1);
-    if (!document.fullscreenElement) {
-      await resolveFloorPlanFullscreenTarget(salonShellRef.current)?.requestFullscreen();
     }
   }
 
@@ -1125,6 +1110,27 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         const turnoverTables = activeTables.filter((item) =>
           ["needs_cleaning", "cleaning"].includes(item.status),
         );
+        const blockingShiftTables = allActiveTables.filter((item) =>
+          ["occupied", "needs_cleaning", "cleaning"].includes(item.status),
+        );
+        const shiftClosureBlockers = [
+          { count: data.openTabs.length, singular: "comanda aberta", plural: "comandas abertas" },
+          { count: activeCalls.length, singular: "chamado pendente", plural: "chamados pendentes" },
+          {
+            count: blockingShiftTables.length,
+            singular: "mesa em atendimento ou limpeza",
+            plural: "mesas em atendimento ou limpeza",
+          },
+          {
+            count: data.shiftTableTransfers.length,
+            singular: "remanejamento ativo",
+            plural: "remanejamentos ativos",
+          },
+        ].filter((item) => item.count > 0);
+        const canCloseShift = shiftClosureBlockers.length === 0;
+        const shiftClosureSummary = shiftClosureBlockers
+          .map((item) => `${item.count} ${item.count === 1 ? item.singular : item.plural}`)
+          .join(" · ");
         const readyTableIds = new Set(
           data.tablePhases
             .filter((phase) => phase.phase === "ready")
@@ -1305,11 +1311,21 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
+        function openShiftReview() {
+          openShiftSetup();
+          if (!preflightBlocked) setShiftSetupStep("open");
+        }
+
+        function openHandover() {
+          setSetupOpen(false);
+          setHandoverAssignments({});
+          setHandoverOpen(true);
+        }
+
         function goToPreflightItem(itemId?: string) {
           if (!itemId) {
             if (data.activeShift) {
               setSetupOpen(false);
-              setView("floor");
               setWorkspaceMode("operate");
             } else {
               setSetupSection("shift");
@@ -1370,7 +1386,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setRoomFilter("all");
           setSectionFilter("all");
           setSetupOpen(false);
-          setView("floor");
           setWorkspaceMode("template");
           setFloorEditRequestKey((current) => current + 1);
         }
@@ -1378,13 +1393,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         function switchWorkspaceMode(mode: "operate" | "space" | "shift") {
           if (mode === "space" && !canEditSpace) return;
           if (mode === "shift" && (!canReorganizeTurn || !data.activeShift)) return;
-          setView("floor");
           setWorkspaceMode(mode);
           setJoinMode(false);
           setJoinSelection([]);
-          if (mode === "operate") {
-            setFloorOperateRequestKey((current) => current + 1);
-          } else {
+          if (mode !== "operate") {
             if (mode === "shift") {
               setShiftEditorTool(canManageShift ? "assign" : "move");
               if (canManageShift) {
@@ -1409,7 +1421,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               filterStatus?: FloorFilter;
               roomFilter?: string;
               sectionFilter?: string;
-              view?: "map" | "list" | "floor";
+              view?: string;
             } | null;
             if (!saved) {
               setFeedback("Nenhum filtro salvo neste dispositivo.", "info");
@@ -1430,7 +1442,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             }
             if (saved.roomFilter) setRoomFilter(saved.roomFilter);
             if (saved.sectionFilter) setSectionFilter(saved.sectionFilter);
-            setView(saved.view === "floor" ? "floor" : saved.view === "list" ? "list" : "map");
+            setView(saved.view === "list" ? "list" : "map");
             setFeedback("Filtro salvo aplicado.");
           } catch {
             localStorage.removeItem(filterStorageKey);
@@ -2022,9 +2034,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             setAssignmentSectionId("");
             setHandoverOpen(false);
             setFeedback(
-              data.openTabs.length
-                ? "Turno encerrado. A passagem das comandas abertas foi registrada."
-                : "Turno encerrado sem comandas pendentes.",
+              acknowledgeOpenTabs
+                ? "Passagem de turno registrada. A próxima equipe continua as pendências."
+                : "Turno encerrado sem pendências operacionais.",
             );
             floor.retry();
           } catch (error) {
@@ -2375,36 +2387,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         }
 
         return (
-          <div className="salon-shell" data-salon-operation-shell ref={salonShellRef}>
-            <div className="salon-fullscreen-bar">
-              <span>
-                <i aria-hidden="true" />
-                <strong>Modo operação</strong>
-                <small>
-                  {floor.refreshing
-                    ? "Sincronizando…"
-                    : floor.lastSuccessfulAt
-                      ? `Confirmado às ${new Date(floor.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
-                      : "Operação sobre a planta"}
-                </small>
-              </span>
-              <div className="salon-fullscreen-bar__actions">
-                {priorityCount > 0 && (
-                  <Button
-                    aria-controls="salon-priority-queue"
-                    aria-expanded={priorityQueueOpen}
-                    onClick={() => setPriorityQueueOpen((current) => !current)}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Prioridades {priorityCount}
-                  </Button>
-                )}
-                <Button onClick={() => void document.exitFullscreen()} size="sm" variant="ghost">
-                  Sair da operação
-                </Button>
-              </div>
-            </div>
+          <div className="salon-shell" ref={salonShellRef}>
             <section aria-label="Central da operação" className="salon-command-center">
               <header
                 aria-live="polite"
@@ -2490,6 +2473,47 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   )}
                 </div>
               </header>
+              {canManageShift && (
+                <section aria-label="Controle do turno" className="salon-shift-control">
+                  <span>
+                    <small>{data.activeShift ? "Turno atual" : "Atendimento"}</small>
+                    <strong>{data.activeShift?.label ?? "Nenhum turno aberto"}</strong>
+                    <small id="salon-shift-close-status">
+                      {!data.activeShift
+                        ? "Abra o turno para distribuir praças e equipe."
+                        : canCloseShift
+                          ? "Sem pendências: o turno pode ser encerrado."
+                          : `${shiftClosureSummary}. Resolva tudo para encerrar ou faça a passagem.`}
+                    </small>
+                  </span>
+                  <div className="salon-shift-control__actions">
+                    {!data.activeShift ? (
+                      <Button onClick={openShiftReview} size="sm">
+                        Abrir turno
+                      </Button>
+                    ) : (
+                      <>
+                        <Button onClick={openHandover} size="sm" variant="secondary">
+                          Passar turno
+                        </Button>
+                        <Button
+                          aria-describedby="salon-shift-close-status"
+                          disabled={busy || !canCloseShift}
+                          onClick={() =>
+                            window.confirm(
+                              "Encerrar o turno sem pendências? Uma nova operação exigirá a abertura de outro turno.",
+                            ) && void closeShift({ acknowledgeOpenTabs: false })
+                          }
+                          size="sm"
+                          variant="danger"
+                        >
+                          Encerrar turno
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </section>
+              )}
               {(!online || floor.refreshError) && (
                 <div className="salon-recovery-banner" role="alert">
                   <Icon name={online ? "refresh" : "alert-circle"} size={16} />
@@ -2593,8 +2617,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           key={group?.id ?? transfer.id}
                           onClick={() => {
                             setSelectedTableId(targetTableId);
-                            setView("floor");
-                            setFloorFocusId(targetTableId);
+                            setView("map");
                           }}
                           type="button"
                           variant="secondary"
@@ -2610,7 +2633,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               Em {minutes} min · abrir para devolver ou renovar a cobertura
                             </small>
                           </span>
-                          <strong>Abrir na planta</strong>
+                          <strong>Localizar no painel</strong>
                         </Button>
                       );
                     })}
@@ -2878,16 +2901,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     <span>Painel</span>
                   </Button>
                   <Button
-                    aria-pressed={view === "floor"}
-                    className="gm-pill"
-                    onClick={() => setView("floor")}
-                    type="button"
-                    title="Planta baixa 2D"
-                  >
-                    <Icon name="salon" size={14} />
-                    <span>Planta</span>
-                  </Button>
-                  <Button
                     aria-pressed={view === "list"}
                     className="gm-pill"
                     onClick={() => setView("list")}
@@ -2898,15 +2911,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     <span>Lista</span>
                   </Button>
                 </fieldset>
-                <Button
-                  className="salon-open-fullscreen"
-                  onClick={() => void openOperationalFloorFullscreen()}
-                  size="sm"
-                  variant="secondary"
-                >
-                  <Icon name="salon" size={14} />
-                  <span>Abrir planta em tela cheia</span>
-                </Button>
                 <Button
                   aria-label="Atalhos de teclado"
                   className="salon-command-shortcuts"
@@ -3741,20 +3745,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               Crie uma praça reutilizável para distribuir a equipe deste turno.
                             </p>
                           )}
-                          <Button
-                            disabled={busy}
-                            onClick={() => {
-                              if (data.openTabs.length) {
-                                setSetupOpen(false);
-                                setHandoverAssignments({});
-                                setHandoverOpen(true);
-                              } else void closeShift({ acknowledgeOpenTabs: false });
-                            }}
-                            type="button"
-                            variant="ghost"
-                          >
-                            Encerrar turno
-                          </Button>
                         </form>
                       )}
 
@@ -4301,8 +4291,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   />
                 </Label>
                 <p className="field-hint">
-                  Pedidos, pagamentos e comandas não serão encerrados. A próxima equipe continua do
-                  ponto exato em que o turno terminou.
+                  {shiftClosureSummary ? `${shiftClosureSummary}. ` : ""}Pedidos, pagamentos e
+                  pendências não serão encerrados. A próxima equipe continua do ponto exato em que o
+                  turno terminou.
                 </p>
                 <div className="table-group-dialog__actions">
                   <Button onClick={() => setHandoverOpen(false)} variant="ghost">
@@ -4329,7 +4320,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       })
                     }
                   >
-                    Registrar e encerrar turno
+                    Registrar passagem de turno
                   </Button>
                 </div>
               </div>
@@ -4397,7 +4388,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     ))}
                   </fieldset>
                   <fieldset className="segmented salon-workspace-modes">
-                    <legend className="gm-sr-only">Modo da planta</legend>
+                    <legend className="gm-sr-only">Modo de trabalho</legend>
                     <Button
                       aria-pressed={workspaceMode === "operate"}
                       onClick={() => switchWorkspaceMode("operate")}
@@ -4438,57 +4429,54 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </div>
                 )}
 
-                {view === "floor" &&
-                  workspaceMode === "shift" &&
-                  data.activeShift &&
-                  canManageShift && (
-                    <section className="shift-paint-toolbar" aria-label="Pintar praça no turno">
-                      <Label>
-                        Praça ativa
-                        <NativeSelect
-                          onChange={(event) => loadAssignmentSection(event.target.value)}
-                          value={assignmentSectionId}
-                        >
-                          <option value="">Selecione</option>
-                          {data.shiftSections.map((section) => (
-                            <option key={section.id} value={section.id}>
-                              {section.name}
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      </Label>
-                      <fieldset className="segmented">
-                        <legend className="gm-sr-only">Ferramenta de organização</legend>
-                        <Button
-                          aria-pressed={shiftEditorTool === "assign"}
-                          onClick={() => setShiftEditorTool("assign")}
-                          type="button"
-                        >
-                          Pintar mesas
-                        </Button>
-                        <Button
-                          aria-pressed={shiftEditorTool === "move"}
-                          onClick={() => setShiftEditorTool("move")}
-                          type="button"
-                        >
-                          Mover mesas
-                        </Button>
-                      </fieldset>
-                      <span>
-                        <strong>{assignmentTableIds.length}</strong> mesa(s) nesta praça, em
-                        qualquer ambiente físico
-                      </span>
-                      <Button
-                        disabled={busy || !assignmentSectionId}
-                        onClick={() => void updateShiftAssignment()}
-                        size="sm"
+                {workspaceMode === "shift" && data.activeShift && canManageShift && (
+                  <section className="shift-paint-toolbar" aria-label="Pintar praça no turno">
+                    <Label>
+                      Praça ativa
+                      <NativeSelect
+                        onChange={(event) => loadAssignmentSection(event.target.value)}
+                        value={assignmentSectionId}
                       >
-                        {busy ? "Salvando…" : "Salvar praças do turno"}
+                        <option value="">Selecione</option>
+                        {data.shiftSections.map((section) => (
+                          <option key={section.id} value={section.id}>
+                            {section.name}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                    <fieldset className="segmented">
+                      <legend className="gm-sr-only">Ferramenta de organização</legend>
+                      <Button
+                        aria-pressed={shiftEditorTool === "assign"}
+                        onClick={() => setShiftEditorTool("assign")}
+                        type="button"
+                      >
+                        Pintar mesas
                       </Button>
-                    </section>
-                  )}
+                      <Button
+                        aria-pressed={shiftEditorTool === "move"}
+                        onClick={() => setShiftEditorTool("move")}
+                        type="button"
+                      >
+                        Mover mesas
+                      </Button>
+                    </fieldset>
+                    <span>
+                      <strong>{assignmentTableIds.length}</strong> mesa(s) nesta praça, em qualquer
+                      ambiente físico
+                    </span>
+                    <Button
+                      disabled={busy || !assignmentSectionId}
+                      onClick={() => void updateShiftAssignment()}
+                      size="sm"
+                    >
+                      {busy ? "Salvando…" : "Salvar praças do turno"}
+                    </Button>
+                  </section>
+                )}
 
-                {view === "floor" && workspaceMode === "template" && (
+                {workspaceMode === "template" && (
                   <section className="shift-paint-toolbar" aria-label="Selecionar mesas da praça">
                     <span>
                       <small>Modelo reutilizável</small>
@@ -4520,9 +4508,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <EmptyState
                     icon={<Icon name="salon" size={28} />}
                     title="Nenhuma mesa encontrada"
-                    description="Ajuste a busca ou os filtros para voltar ao mapa."
+                    description="Ajuste a busca ou os filtros para voltar ao painel."
                   />
-                ) : view === "floor" ? (
+                ) : workspaceMode !== "operate" ? (
                   <FloorPlan
                     canEdit={
                       workspaceMode === "space"
@@ -4622,7 +4610,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           ? saveShiftLayout
                           : saveFloorLayout
                     }
-                    operateRequestKey={floorOperateRequestKey}
                     saveActionLabel={
                       workspaceMode === "shift"
                         ? "Aplicar no turno"
@@ -5073,7 +5060,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   <Button
                                     onClick={() => {
                                       setSelectedTableId(null);
-                                      setView("floor");
                                       setWorkspaceMode("shift");
                                       setFloorFocusId(table.id);
                                       setFloorEditRequestKey((current) => current + 1);
@@ -5092,11 +5078,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 <Button
                                   onClick={() => {
                                     setSelectedTableId(null);
-                                    setView("floor");
+                                    setView("map");
                                     setWorkspaceMode("operate");
                                     setJoinMode(true);
                                     setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
-                                    setFloorFocusId(selectedGroup?.anchorTableId ?? table.id);
                                   }}
                                   size="sm"
                                   variant="ghost"
@@ -5442,7 +5427,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </div>
                   <div className="salon-shortcut-item">
                     <kbd>V</kbd>
-                    <span>Alternar visão (Painel ↔ Planta ↔ Lista)</span>
+                    <span>Alternar visão (Painel ↔ Lista)</span>
                   </div>
                   <div className="salon-shortcut-item">
                     <kbd>J</kbd>

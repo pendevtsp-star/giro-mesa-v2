@@ -531,6 +531,7 @@ export function TabWorkspace({
     version: number;
   } | null>(null);
   const metadataVersionRef = useRef(0);
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
   const paymentAmountRef = useRef<HTMLInputElement>(null);
   const terminalProfile = readActiveTerminalProfile(scope.unitId);
@@ -846,6 +847,27 @@ export function TabWorkspace({
     return () => {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      const menu = moreMenuRef.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      const menu = moreMenuRef.current;
+      if (event.key !== "Escape" || !menu?.open) return;
+      menu.open = false;
+      menu.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
     };
   }, []);
 
@@ -1586,6 +1608,7 @@ export function TabWorkspace({
                   <details
                     className="workspace-tabs__more"
                     data-active={view === "table" || view === "activity"}
+                    ref={moreMenuRef}
                   >
                     <summary>
                       {view === "table" ? "Detalhes" : view === "activity" ? "Histórico" : "Mais"}

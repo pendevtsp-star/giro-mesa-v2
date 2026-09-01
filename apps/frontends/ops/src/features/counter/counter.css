@@ -405,14 +405,19 @@
   }
 
   .workspace-tabs__menu > button {
+    align-items: flex-start;
     background: transparent;
     border: 0;
     border-radius: 7px;
     color: var(--gm-ink);
     cursor: pointer;
     font: inherit;
+    justify-content: flex-start;
+    min-width: 0;
     padding: 8px 9px;
     text-align: left;
+    white-space: normal;
+    width: 100%;
   }
 
   .workspace-tabs__menu > button:hover,

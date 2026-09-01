@@ -589,10 +589,6 @@ export function parseFloorPlanViewport(value: string | null): FloorPlanViewport 
   }
 }
 
-export function resolveFloorPlanFullscreenTarget(element: HTMLElement | null) {
-  return element?.closest<HTMLElement>("[data-salon-operation-shell]") ?? element;
-}
-
 export function FloorPlan({
   items,
   elements = [],
@@ -609,7 +605,6 @@ export function FloorPlan({
   editingDescription = "Arraste as mesas e salve a nova organização.",
   layoutScope = "permanent",
   editRequestKey = 0,
-  operateRequestKey = 0,
   canEditElements = layoutScope === "permanent",
   editorTool = "move",
   editableItemIds,
@@ -635,7 +630,6 @@ export function FloorPlan({
   editingDescription?: string;
   layoutScope?: FloorPlanLayoutScope;
   editRequestKey?: number;
-  operateRequestKey?: number;
   canEditElements?: boolean;
   editorTool?: "move" | "assign";
   editableItemIds?: string[];
@@ -658,7 +652,6 @@ export function FloorPlan({
   const layersRef = useRef<HTMLDetailsElement>(null);
   const focusedIdRef = useRef<string | null>(null);
   const editRequestRef = useRef(0);
-  const operateRequestRef = useRef(0);
   const panRef = useRef<
     | {
         pointerId: number;
@@ -722,7 +715,6 @@ export function FloorPlan({
   });
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
   const [minimapOpen, setMinimapOpen] = useState(true);
   const [layersOpen, setLayersOpen] = useState(false);
   const [layers, setLayers] = useState({ space: true, tables: true, operation: true });
@@ -796,44 +788,6 @@ export function FloorPlan({
     setEditing(true);
     onEditingChange?.(true);
   }, [canEdit, editRequestKey, elements, items, layout, onEditingChange, onSavePositions]);
-
-  useEffect(() => {
-    if (!operateRequestKey || operateRequestRef.current === operateRequestKey) return;
-    operateRequestRef.current = operateRequestKey;
-    setDraftPositions(layout.positions);
-    setDraftGeometry(Object.fromEntries(items.map((item) => [item.id, geometryFor(item)])));
-    setDraftTableDetails(
-      Object.fromEntries(
-        items.map((item) => [
-          item.id,
-          { label: item.label, seats: item.seats, roomId: item.areaId },
-        ]),
-      ),
-    );
-    setDraftElements(elements);
-    setDraftAreaIds(Object.fromEntries(items.map((item) => [item.id, item.areaId])));
-    setDraftZones(layout.zones);
-    setDraftUnpositioned(new Set(layout.unpositionedIds));
-    setSelectedEditorTarget(null);
-    setEditing(false);
-    onEditingChange?.(false);
-  }, [elements, items, layout, onEditingChange, operateRequestKey]);
-
-  useEffect(() => {
-    const onFullscreenChange = () =>
-      setFullscreen(
-        document.fullscreenElement === resolveFloorPlanFullscreenTarget(wrapperRef.current),
-      );
-    onFullscreenChange();
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
-  }, []);
-
-  useEffect(() => {
-    if (fullscreen && contentPoints.length > 0) {
-      setViewport(fitFloorPlanViewport(contentPoints, surfaceAspect));
-    }
-  }, [contentPoints, fullscreen, surfaceAspect]);
 
   useEffect(() => {
     if (!viewportStorageKey || typeof window === "undefined") return;
@@ -1481,7 +1435,7 @@ export function FloorPlan({
       <div className="floor-plan__toolbar">
         <div>
           <span className="floor-plan__title-line">
-            <strong>Planta operacional</strong>
+            <strong>Organização do espaço</strong>
             <em>{layoutScope === "shift" ? "Turno atual" : "Espaço permanente"}</em>
           </span>
           <small>
@@ -1490,7 +1444,6 @@ export function FloorPlan({
         </div>
         <div className="floor-plan__controls">
           {canEdit &&
-            !fullscreen &&
             onSavePositions &&
             (editing ? (
               <>

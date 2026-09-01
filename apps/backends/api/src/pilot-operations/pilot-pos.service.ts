@@ -4265,12 +4265,55 @@ export class PilotPosService {
             eq(posTabs.status, "open"),
           ),
         );
-      if (openTabs.length && !input.acknowledgeOpenTabs) {
+      const [[pendingServiceCalls], [pendingTables], [activeTransfers]] = await Promise.all([
+        tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(posServiceCalls)
+          .where(
+            and(
+              eq(posServiceCalls.organizationId, organizationId),
+              eq(posServiceCalls.unitId, unitId),
+              ne(posServiceCalls.status, "resolved"),
+            ),
+          ),
+        tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(posDiningTables)
+          .where(
+            and(
+              eq(posDiningTables.organizationId, organizationId),
+              eq(posDiningTables.unitId, unitId),
+              eq(posDiningTables.active, true),
+              inArray(posDiningTables.status, ["occupied", "needs_cleaning", "cleaning"]),
+            ),
+          ),
+        tx
+          .select({ count: sql<number>`count(*)::int` })
+          .from(posShiftTableTransfers)
+          .where(
+            and(
+              eq(posShiftTableTransfers.organizationId, organizationId),
+              eq(posShiftTableTransfers.unitId, unitId),
+              eq(posShiftTableTransfers.shiftId, activeShift.id),
+              isNull(posShiftTableTransfers.endedAt),
+            ),
+          ),
+      ]);
+      const pendingOperations = {
+        openTabs: openTabs.length,
+        serviceCalls: Number(pendingServiceCalls?.count ?? 0),
+        activeTables: Number(pendingTables?.count ?? 0),
+        tableTransfers: Number(activeTransfers?.count ?? 0),
+      };
+      if (
+        !input.acknowledgeOpenTabs &&
+        Object.values(pendingOperations).some((count) => count > 0)
+      ) {
         throw new ConflictException({
-          code: "SHIFT_OPEN_TABS_REQUIRE_HANDOVER",
-          message: "Confirme quem continuará responsável pelas comandas antes de encerrar o turno.",
-          openTabs: openTabs.length,
-          totalCents: openTabs.reduce((sum, tab) => sum + tab.totalCents, 0),
+          code: "SHIFT_HAS_PENDING_OPERATIONS",
+          message:
+            "Resolva as pendências da operação ou registre uma passagem de turno antes de encerrar.",
+          pending: pendingOperations,
         });
       }
       const handoverBySource = new Map(

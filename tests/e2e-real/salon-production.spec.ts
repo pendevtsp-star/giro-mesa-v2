@@ -450,7 +450,7 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
   const statusFilter = page.getByRole("button", { name: /Todas 2/ });
   const viewToggle = page.getByRole("button", { name: "Painel", exact: true });
   const inactiveStatusFilter = page.getByRole("button", { name: /Livres 1/ });
-  const inactiveViewToggle = page.getByRole("button", { name: "Planta", exact: true });
+  const inactiveViewToggle = page.getByRole("button", { name: "Lista", exact: true });
   await expect(statusFilter).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("box-shadow", "none");
@@ -581,6 +581,16 @@ test("Configuração de praças guia revisão, equipe e abertura sem duplicar o 
     window.location.hash = "#/salon";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
+  const shiftControl = page.getByRole("region", { name: "Controle do turno" });
+  await expect(shiftControl.getByText("Nenhum turno aberto")).toBeVisible();
+  await shiftControl.getByRole("button", { name: "Abrir turno" }).click();
+  await expect(page.getByRole("dialog", { name: "Configurar atendimento" })).toContainText(
+    "Revisão final",
+  );
+  await page
+    .getByRole("dialog", { name: "Configurar atendimento" })
+    .getByRole("button", { name: "Fechar" })
+    .click();
   await page.getByRole("button", { name: /Prontidão \d\/4/ }).click();
 
   const dialog = page.getByRole("dialog", { name: "Configurar atendimento" });
@@ -680,6 +690,17 @@ test("Praças existentes são atribuídas aos garçons em um fluxo direto", asyn
     window.location.hash = "#/salon";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
+  const shiftControl = page.getByRole("region", { name: "Controle do turno" });
+  await expect(shiftControl.getByRole("button", { name: "Passar turno" })).toBeVisible();
+  await expect(shiftControl.getByRole("button", { name: "Encerrar turno" })).toBeDisabled();
+  await expect(shiftControl).toContainText("comanda aberta");
+  await expect(shiftControl).toContainText("chamados pendentes");
+  await shiftControl.getByRole("button", { name: "Passar turno" }).click();
+  const handoverDialog = page.getByRole("dialog", { name: "Passagem de turno" });
+  await expect(
+    handoverDialog.getByRole("button", { name: "Registrar passagem de turno" }),
+  ).toBeVisible();
+  await handoverDialog.getByRole("button", { name: "Fechar" }).click();
   await page.getByRole("button", { name: /Prontidão \d\/4/ }).click();
 
   const dialog = page.getByRole("dialog", { name: "Configurar atendimento" });
@@ -941,51 +962,27 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(page.locator(".salon-filter-menu")).not.toHaveAttribute("open", "");
   await expect(page.getByRole("button", { name: "Organizar salão" })).toHaveCount(0);
   await expect(page.getByLabel("Mais ações do salão")).toHaveCount(0);
-  await page.getByRole("button", { name: "Planta", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Planta", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Abrir planta em tela cheia" })).toHaveCount(0);
+  await expect(page.getByText("Modo operação", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Editar espaço", exact: true }).click();
+  await expect(page.getByText("Organização do espaço", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Operar", exact: true }).click();
+  await expect(page.locator(".real-table").first()).toBeVisible();
   await page.getByRole("button", { name: "Juntar mesas", exact: true }).click();
-  const selectedFloorTable = page.locator(".floor-plan-table").filter({ hasText: "Mesa 03" });
-  const originalFill = await selectedFloorTable
-    .locator(".floor-plan-table__surface")
-    .evaluate((element) => getComputedStyle(element).fill);
-  await selectedFloorTable.click();
-  await expect(selectedFloorTable).toHaveClass(/floor-plan-table--selected/);
-  await expect(selectedFloorTable.locator(".floor-plan-table__selection")).toContainText("1");
-  await expect
-    .poll(() =>
-      selectedFloorTable
-        .locator(".floor-plan-table__surface")
-        .evaluate((element) => getComputedStyle(element).fill),
-    )
-    .not.toBe(originalFill);
+  const selectedPanelTable = page.locator(".real-table").filter({ hasText: "Mesa 03" });
+  await selectedPanelTable.click();
+  await expect(selectedPanelTable).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Lista", exact: true }).click();
+  await expect(page.locator(".salon-fast-list-row").filter({ hasText: "Mesa 03" })).toHaveClass(
+    /selected/,
+  );
   await page.getByRole("button", { name: "Painel", exact: true }).click();
   await expect(page.locator(".real-table").filter({ hasText: "Mesa 03" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await page.getByRole("button", { name: "Lista", exact: true }).click();
-  await expect(page.locator(".salon-fast-list-row").filter({ hasText: "Mesa 03" })).toHaveClass(
-    /selected/,
-  );
-  await page.getByRole("button", { name: "Planta", exact: true }).click();
-  await page.getByRole("button", { name: "Abrir planta em tela cheia" }).click();
-  await expect(page.getByText("Modo operação", { exact: true })).toBeVisible();
-  await expect(page.locator(".salon-command-center__header")).toBeHidden();
-  await expect(page.locator(".salon-view-toggle")).toBeHidden();
-  await expect(page.locator(".salon-workspace-modes")).toBeHidden();
-  await expect(page.locator(".floor-plan-layers")).toBeHidden();
-  await expect(page.locator(".floor-plan-minimap")).toBeHidden();
-  await expect(page.locator(".salon-search")).toBeVisible();
-  await expect(page.locator(".service-priority-queue")).toBeHidden();
-  await page.getByRole("button", { name: "Prioridades 2" }).click();
-  await expect(page.locator(".service-priority-queue")).toBeVisible();
-  await page.getByRole("button", { name: "Prioridades 2" }).click();
-  await expect(page.locator(".service-priority-queue")).toBeHidden();
-  const operationalFloorHeight = await page
-    .locator(".floor-plan__viewport")
-    .evaluate((element) => element.getBoundingClientRect().height / window.innerHeight);
-  expect(operationalFloorHeight).toBeGreaterThan(0.7);
-  await page.getByRole("button", { name: "Sair da operação" }).click();
-  await page.getByRole("button", { name: "Painel", exact: true }).click();
+  await page.getByRole("button", { name: "Cancelar junção", exact: true }).click();
   const availableTable = page.locator(".real-table").filter({ hasText: "Mesa 01" });
   await availableTable.click();
   const openingDialog = page.getByRole("dialog", { name: "Mesa 01" });
@@ -1022,6 +1019,23 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   });
   expect(desktopDrawerBounds.width).toBeLessThanOrEqual(720);
   expect(desktopDrawerBounds.viewportWidth - desktopDrawerBounds.right).toBeLessThanOrEqual(1);
+  const moreMenu = dialog.locator(".workspace-tabs__more");
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await moreMenu.locator("summary").click();
+    await expect(moreMenu).toHaveAttribute("open", "");
+    const textOffsets = await moreMenu
+      .locator(".workspace-tabs__menu > button > span")
+      .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().left));
+    expect(Math.max(...textOffsets) - Math.min(...textOffsets)).toBeLessThanOrEqual(1);
+    await dialog.locator(".gm-modal__header").click();
+    await expect(moreMenu).not.toHaveAttribute("open", "");
+    await expectNoHorizontalOverflow(page);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await expect(dialog.getByText("Preparar conta", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Linha do tempo da mesa", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Online", { exact: true })).toHaveCount(0);
