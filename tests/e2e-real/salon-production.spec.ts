@@ -1179,9 +1179,28 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
   );
 
   await page.setViewportSize({ width: 1440, height: 900 });
+  const quickOpenForm = page.locator(".counter-open-form");
   const formColumns = await page
     .locator(".counter-open-form")
     .evaluate((form) => getComputedStyle(form).gridTemplateColumns.trim().split(/\s+/).length);
+  const primaryControls = [
+    quickOpenForm.locator("select"),
+    page.getByLabel("Nome do cliente", { exact: true }),
+  ];
+  const fieldFillRatios = await Promise.all(
+    primaryControls.map((control) =>
+      control.evaluate((element) => {
+        const label = element.closest("label");
+        return label
+          ? element.getBoundingClientRect().width / label.getBoundingClientRect().width
+          : 0;
+      }),
+    ),
+  );
+  const [nameBounds, actionBounds] = await Promise.all([
+    primaryControls[1].boundingBox(),
+    page.getByRole("button", { name: "Abrir e pedir" }).boundingBox(),
+  ]);
   const searchWidthRatio = await page
     .locator(".counter-queue-tools .gm-search-field")
     .evaluate((search) => {
@@ -1189,13 +1208,20 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
       return queue ? search.getBoundingClientRect().width / queue.getBoundingClientRect().width : 0;
     });
   expect(formColumns).toBe(3);
+  expect(Math.min(...fieldFillRatios)).toBeGreaterThan(0.95);
+  expect(
+    Math.abs(
+      (nameBounds?.y ?? 0) +
+        (nameBounds?.height ?? 0) -
+        ((actionBounds?.y ?? 0) + (actionBounds?.height ?? 0)),
+    ),
+  ).toBeLessThan(2);
   expect(searchWidthRatio).toBeGreaterThan(0.9);
   await page.setViewportSize({ width: 375, height: 812 });
 
   await page.getByText("Prazo e identificação").click();
   await expect(page.getByLabel("Data")).toHaveAttribute("type", "date");
   await expect(page.getByLabel("Telefone")).toBeVisible();
-  const quickOpenForm = page.locator(".counter-open-form");
 
   for (const viewport of [
     { width: 375, height: 812 },
@@ -1233,6 +1259,8 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
     }
   }
 
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await expectNoHorizontalOverflow(page);
   await expectWcagAa(page);
 });
 

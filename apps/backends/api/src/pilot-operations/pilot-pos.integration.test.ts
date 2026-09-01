@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   identities,
   managementInventoryItems,
+  managementPeople,
   managementReturnableCustodyHandoffs,
   managementReturnableCustodyMovements,
   managementReturnablePolicies,
@@ -118,6 +119,14 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       membershipId: supportMembership.id,
       unitId: unitA.id,
       role: "waiter",
+    });
+    await database.db.insert(managementPeople).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      identityId: supportIdentity.id,
+      name: "João Garçom",
+      roleLabel: "Garçom",
+      updatedByIdentityId: identity.id,
     });
     const createScopedActor = async (
       emailPrefix: string,
@@ -257,6 +266,10 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       ],
     });
     const floorWithLayout = await pos.listFloor(identity.id, organizationA.id, unitA.id);
+    assert.equal(
+      floorWithLayout.staff.find((person) => person.identityId === supportIdentity.id)?.displayName,
+      "João Garçom",
+    );
     const positionedTable = floorWithLayout.tables.find((candidate) => candidate.id === table.id);
     assert.equal(positionedTable?.layoutX, 240);
     assert.equal(positionedTable?.layoutY, 180);

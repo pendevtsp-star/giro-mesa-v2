@@ -26,6 +26,7 @@ import {
   managementInventoryItems,
   managementInventoryReservations,
   managementOperationalLosses,
+  managementPeople,
   managementRecipeComponents,
   managementRecipeVersions,
   managementReturnableCustodyHandoffs,
@@ -1456,16 +1457,28 @@ export class PilotPosService {
           ),
         ),
       this.database.db
-        .selectDistinct({ identityId: identities.id, displayName: identities.displayName })
+        .selectDistinct({
+          identityId: identities.id,
+          displayName: sql<string>`coalesce(${managementPeople.name}, ${identities.displayName})`,
+        })
         .from(memberships)
         .innerJoin(identities, eq(identities.id, memberships.identityId))
         .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .leftJoin(
+          managementPeople,
+          and(
+            eq(managementPeople.organizationId, organizationId),
+            eq(managementPeople.unitId, unitId),
+            eq(managementPeople.identityId, identities.id),
+          ),
+        )
         .where(
           and(
             eq(memberships.organizationId, organizationId),
             eq(memberships.status, "active"),
             or(isNull(roleBindings.unitId), eq(roleBindings.unitId, unitId)),
             inArray(roleBindings.role, ["owner", "manager", "waiter", "cashier"]),
+            or(isNull(managementPeople.id), eq(managementPeople.active, true)),
           ),
         ),
       this.database.db

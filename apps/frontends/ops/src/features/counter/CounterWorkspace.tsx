@@ -158,6 +158,15 @@ export function groupDraftItemsByCourse(items: DraftCartItem[]): DraftCartItem[]
   return [...groups.values()];
 }
 
+export function canCloseWithoutConsumption(
+  totalCents: number,
+  paidCents: number,
+  activeItemCount: number,
+  draftItemCount: number,
+) {
+  return totalCents === 0 && paidCents === 0 && activeItemCount === 0 && draftItemCount === 0;
+}
+
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -1023,6 +1032,12 @@ export function TabWorkspace({
             const paymentSummary = summarizeTabPayments(data.payments);
             const paidCents = paymentSummary.paidCents;
             const remainingCents = Math.max(0, data.tab.totalCents - paidCents);
+            const closesWithoutConsumption = canCloseWithoutConsumption(
+              data.tab.totalCents,
+              paidCents,
+              activeItems.length,
+              cart.length,
+            );
             const currentTable = floor?.tables.find((table) => table.id === data.tab.tableId);
             const currentRoom = floor?.rooms.find((room) => room.id === currentTable?.roomId);
             const responsible = floor?.staff.find(
@@ -1621,6 +1636,26 @@ export function TabWorkspace({
                     </div>
                   </details>
                 </nav>
+                {tabOpen && closesWithoutConsumption && (
+                  <div className="account-close-actions">
+                    <Button
+                      disabled={busy}
+                      onClick={() =>
+                        window.confirm(
+                          `Fechar ${displayLabel} sem consumo? A mesa seguirá para limpeza.`,
+                        ) &&
+                        void mutate(
+                          () => closeTabWithReturnableCheck({ printRequested: false }),
+                          "Atendimento encerrado.",
+                        )
+                      }
+                      size="sm"
+                      variant="secondary"
+                    >
+                      {data.tab.tableId ? "Encerrar Mesa" : "Encerrar sem consumo"}
+                    </Button>
+                  </div>
+                )}
                 {feedback && (
                   <Toast
                     actionLabel={undoResponsibility ? "Desfazer" : undefined}

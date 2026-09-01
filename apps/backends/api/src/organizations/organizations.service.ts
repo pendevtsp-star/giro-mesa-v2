@@ -497,7 +497,6 @@ export class OrganizationsService {
         .where(
           and(
             eq(membershipInvitations.tokenHash, hashToken(input.token)),
-            eq(membershipInvitations.email, identity.email),
             isNull(membershipInvitations.acceptedAt),
             gt(membershipInvitations.expiresAt, new Date()),
           ),
@@ -508,6 +507,12 @@ export class OrganizationsService {
           code: "INVALID_INVITATION",
           message: "Convite inválido, expirado ou destinado a outro e-mail.",
         });
+      if (invitation.email !== identity.email) {
+        throw new ConflictException({
+          code: "INVITATION_ACCOUNT_MISMATCH",
+          message: "Entre com a conta do e-mail que recebeu o convite.",
+        });
+      }
       await tx.execute(
         sql`select person_id from management_person_access where invitation_id=${invitation.id}::uuid for update`,
       );

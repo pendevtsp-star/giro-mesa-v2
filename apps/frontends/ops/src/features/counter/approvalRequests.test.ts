@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { isValidCounterPhone, parseCounterQueue } from "./CounterPage";
-import { groupDraftItemsByCourse, parseStoredCart, parseStoredIds } from "./CounterWorkspace";
+import {
+  canCloseWithoutConsumption,
+  groupDraftItemsByCourse,
+  parseStoredCart,
+  parseStoredIds,
+} from "./CounterWorkspace";
 
 describe("atalhos e rascunho operacional", () => {
+  it("só permite fechar sem consumo quando conta, pagamentos e itens estão zerados", () => {
+    expect(canCloseWithoutConsumption(0, 0, 0, 0)).toBe(true);
+    expect(canCloseWithoutConsumption(0, 0, 0, 1)).toBe(false);
+    expect(canCloseWithoutConsumption(0, 0, 1, 0)).toBe(false);
+    expect(canCloseWithoutConsumption(0, 1, 0, 0)).toBe(false);
+  });
+
   it("restaura apenas itens e identificadores válidos", () => {
     expect(
       parseStoredCart(

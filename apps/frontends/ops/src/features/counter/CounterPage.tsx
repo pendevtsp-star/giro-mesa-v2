@@ -288,7 +288,7 @@ export function RealCounterPage({
                     className="inline-form counter-open-form"
                     onSubmit={(event) => void open(event)}
                   >
-                    <Label>
+                    <Label className="grid gap-1.5">
                       Atendimento
                       <NativeSelect
                         onChange={(event) =>
@@ -301,10 +301,10 @@ export function RealCounterPage({
                         <option value="delivery">Delivery</option>
                       </NativeSelect>
                     </Label>
-                    <div className="counter-field">
+                    <div className="counter-field gap-3">
                       {customerOptions ? (
                         <>
-                          <Label>
+                          <Label className="grid gap-1.5">
                             Buscar cliente cadastrado
                             <Input
                               autoComplete="off"
@@ -352,7 +352,7 @@ export function RealCounterPage({
                           </Button>
                         </small>
                       )}
-                      <Label>
+                      <Label className="grid gap-1.5">
                         Nome do cliente
                         <Input
                           onChange={(event) => {
@@ -371,7 +371,7 @@ export function RealCounterPage({
                       <summary>Prazo e identificação</summary>
                       <div>
                         <div className="counter-field">
-                          <Label>
+                          <Label className="grid gap-1.5">
                             Telefone
                             <Input
                               aria-describedby={phoneError ? "counter-phone-error" : undefined}
@@ -405,7 +405,7 @@ export function RealCounterPage({
                             </small>
                           )}
                         </div>
-                        <Label>
+                        <Label className="items-start rounded-md border border-border bg-muted p-3 leading-snug">
                           <input
                             className="accent-primary"
                             checked={readyNotificationConsent}
@@ -423,7 +423,7 @@ export function RealCounterPage({
                             className="promised-at-field"
                           >
                             <legend>Prometido para</legend>
-                            <Label>
+                            <Label className="grid gap-1.5">
                               <span>Data</span>
                               <Input
                                 aria-invalid={Boolean(promisedAtError)}
@@ -435,7 +435,7 @@ export function RealCounterPage({
                                 value={promisedDate}
                               />
                             </Label>
-                            <Label>
+                            <Label className="grid gap-1.5">
                               <span>Hora</span>
                               <Input
                                 aria-invalid={Boolean(promisedAtError)}
@@ -456,7 +456,7 @@ export function RealCounterPage({
                           </fieldset>
                         )}
                         {fulfillmentType === "delivery" && (
-                          <Label className="inline-form__wide">
+                          <Label className="inline-form__wide grid gap-1.5">
                             Endereço
                             <Input
                               onChange={(event) => setDeliveryAddress(event.target.value)}
@@ -465,7 +465,7 @@ export function RealCounterPage({
                             />
                           </Label>
                         )}
-                        <Label>
+                        <Label className="grid gap-1.5">
                           Referência interna
                           <Input
                             onChange={(event) => setLabel(event.target.value)}
@@ -473,7 +473,7 @@ export function RealCounterPage({
                             value={label}
                           />
                         </Label>
-                        <Label>
+                        <Label className="grid gap-1.5">
                           Pessoas
                           <Input
                             min={1}

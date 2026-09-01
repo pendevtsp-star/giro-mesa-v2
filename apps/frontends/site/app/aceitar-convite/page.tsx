@@ -10,6 +10,7 @@ export default function AcceptInvitationPage() {
   const [message, setMessage] = useState("");
   const [authenticationRequired, setAuthenticationRequired] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
+  const [accountMismatch, setAccountMismatch] = useState(false);
   const [platformInvitation, setPlatformInvitation] = useState(false);
   const [completed, setCompleted] = useState(false);
 
@@ -24,12 +25,21 @@ export default function AcceptInvitationPage() {
     else setMessage("Este link de convite é inválido ou está incompleto.");
   }, []);
 
+  const returnTo = token
+    ? platformInvitation
+      ? `/aceitar-convite#platform=${encodeURIComponent(token)}`
+      : `/aceitar-convite?token=${encodeURIComponent(token)}`
+    : "";
+  const authQuery = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
+  const authTarget = platformInvitation ? `#returnTo=${encodeURIComponent(returnTo)}` : authQuery;
+
   async function accept() {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
     if (!apiUrl || !token) {
       setMessage("O serviço de convites ainda não está configurado neste ambiente.");
       return;
     }
+    setAccountMismatch(false);
     setMessage("Validando convite…");
     try {
       const endpoint = platformInvitation
@@ -53,6 +63,18 @@ export default function AcceptInvitationPage() {
           setMessage("Ative a autenticação em dois fatores para concluir o acesso ao backoffice.");
           return;
         }
+        if (
+          payload?.code === "INVITATION_ACCOUNT_MISMATCH" ||
+          payload?.code === "PERSON_IDENTITY_ALREADY_LINKED"
+        ) {
+          setAccountMismatch(true);
+          setMessage(
+            payload.code === "PERSON_IDENTITY_ALREADY_LINKED"
+              ? "Esta conta já representa outra pessoa nesta unidade. Entre com outro e-mail ou revise o vínculo em Pessoas."
+              : "Você está conectado em outra conta. Entre com o e-mail que recebeu o convite.",
+          );
+          return;
+        }
         throw new Error("Convite recusado");
       }
       setCompleted(true);
@@ -66,6 +88,24 @@ export default function AcceptInvitationPage() {
     }
   }
 
+  async function switchAccount() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+    if (!apiUrl || !returnTo) {
+      setMessage("O serviço de autenticação ainda não está configurado neste ambiente.");
+      return;
+    }
+    setMessage("Saindo da conta atual…");
+    const response = await fetch(`${apiUrl}/v1/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => null);
+    if (response && (response.ok || response.status === 401)) {
+      window.location.assign(`/login${authQuery}`);
+      return;
+    }
+    setMessage("Não foi possível trocar de conta enquanto esta sessão possui uma operação aberta.");
+  }
+
   function openOperations() {
     const base = resolveOpsUrl(process.env.NEXT_PUBLIC_OPS_URL, window.location.origin);
     const destination = base && platformInvitation ? `${base.replace(/\/$/, "")}#/platform` : base;
@@ -73,21 +113,13 @@ export default function AcceptInvitationPage() {
     else setMessage("O destino operacional ainda não está configurado.");
   }
 
-  const returnTo = token
-    ? platformInvitation
-      ? `/aceitar-convite#platform=${encodeURIComponent(token)}`
-      : `/aceitar-convite?token=${encodeURIComponent(token)}`
-    : "";
-  const authQuery = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : "";
-  const authTarget = platformInvitation ? `#returnTo=${encodeURIComponent(returnTo)}` : authQuery;
-
   return (
     <main id="conteudo" className="single-auth-page">
       <section className="auth-box">
         <p className="eyebrow">Equipe GiroMesa</p>
         <h1>Aceitar convite</h1>
         <p>O convite é pessoal e só funciona com a conta vinculada ao e-mail que o recebeu.</p>
-        {!completed && !authenticationRequired && !mfaRequired && (
+        {!completed && !authenticationRequired && !mfaRequired && !accountMismatch && (
           <Button
             className="button button-primary"
             type="button"
@@ -95,6 +127,11 @@ export default function AcceptInvitationPage() {
             disabled={!token}
           >
             Validar e aceitar convite
+          </Button>
+        )}
+        {accountMismatch && (
+          <Button className="button button-primary" type="button" onClick={switchAccount}>
+            Entrar com outro e-mail
           </Button>
         )}
         {authenticationRequired && (

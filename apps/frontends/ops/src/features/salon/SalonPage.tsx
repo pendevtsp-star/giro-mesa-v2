@@ -3435,8 +3435,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             </NativeSelect>
                           </Label>
                           <p className="field-hint action-form__wide">
-                            Ao reaproveitar a equipe anterior, ela será priorizada. Este titular é
-                            usado quando não houver atribuição anterior.
+                            Somente pessoas com convite aceito e acesso ativo nesta unidade aparecem
+                            aqui. Ao reaproveitar a equipe anterior, ela será priorizada.
                           </p>
                           <fieldset className="service-section-table-picker action-form__wide">
                             <legend>Mesas da praça</legend>

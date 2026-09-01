@@ -84,6 +84,41 @@ test("email links expose complete reset, invitation and opt-out actions", async 
   await expect(page.getByRole("button", { name: /confirmar cancelamento/i })).toBeEnabled();
 });
 
+test("convite permite trocar a sessão autenticada com outro e-mail", async ({ page }) => {
+  const token = "b".repeat(43);
+  let logoutRequested = false;
+  await page.route(
+    "http://localhost:3200/v1/organizations/membership-invitations/accept",
+    (route) =>
+      route.fulfill({
+        status: 409,
+        contentType: "application/json",
+        headers: {
+          "Access-Control-Allow-Origin": siteUrl,
+          "Access-Control-Allow-Credentials": "true",
+        },
+        body: JSON.stringify({ code: "INVITATION_ACCOUNT_MISMATCH" }),
+      }),
+  );
+  await page.route("http://localhost:3200/v1/auth/logout", (route) => {
+    logoutRequested = true;
+    return route.fulfill({
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": siteUrl,
+        "Access-Control-Allow-Credentials": "true",
+      },
+    });
+  });
+
+  await page.goto(`${siteUrl}/aceitar-convite?token=${token}`);
+  await page.getByRole("button", { name: /validar e aceitar/i }).click();
+  await expect(page.getByText(/conectado em outra conta/i)).toBeVisible();
+  await page.getByRole("button", { name: "Entrar com outro e-mail" }).click();
+  await page.waitForURL(/\/login\?returnTo=/);
+  expect(logoutRequested).toBe(true);
+});
+
 test("account creation requires legal consent before Google or password signup", async ({
   page,
 }) => {

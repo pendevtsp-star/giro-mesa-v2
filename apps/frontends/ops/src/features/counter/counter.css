@@ -63,7 +63,15 @@
   }
 
   .counter-operation--idle .counter-open-form {
-    grid-template-columns: minmax(180px, 0.7fr) minmax(260px, 1fr) auto;
+    grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) auto;
+  }
+
+  :where(.counter-operation--idle .counter-open-form > .counter-field) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  :where(.counter-operation--idle .counter-open-form > .counter-field > small) {
+    grid-column: 1 / -1;
   }
 
   .counter-operation--idle .counter-open-form > .gm-button {
@@ -163,9 +171,9 @@
   }
 
   .counter-stage-filter button[aria-pressed="true"] {
-    background: var(--gm-brand);
-    border-color: var(--gm-brand);
-    color: white;
+    background: var(--gm-action);
+    border-color: var(--gm-action);
+    color: var(--gm-on-action);
   }
 
   .counter-stage-filter button[data-stage="delivered"]:not([aria-pressed="true"]) {
@@ -1297,6 +1305,10 @@
   @container counter-operation (max-width: 760px) {
     .counter-operation--idle .counter-open-form {
       grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    }
+
+    :where(.counter-operation--idle .counter-open-form > .counter-field) {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .counter-operation--idle .counter-open-form > .gm-button {
