@@ -38,20 +38,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:cb31e18bff700f574bead3da38f908f11bf64fb8",
+    "artifact": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119",
     "migration": {
-      "id": "0075_platform_staff_invitations",
+      "id": "0076_edge_hub_pairing",
       "status": "applied",
-      "evidence": "git:cb31e18bff700f574bead3da38f908f11bf64fb8"
+      "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:cb31e18bff700f574bead3da38f908f11bf64fb8"
+        "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:cb31e18bff700f574bead3da38f908f11bf64fb8"
+        "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
       }
     }
   },
