@@ -6,112 +6,112 @@
       "appliedBefore": "0026_doseclub_integration",
       "appliedBeforeWhen": "1786493658116",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0042_shallow_lenny_balinger",
       "appliedBeforeWhen": "1787029862431",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0045_strong_pride",
       "appliedBeforeWhen": "1787256690924",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0053_petite_trauma",
       "appliedBeforeWhen": "1787373316439",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0074_crm_operational_inbox",
       "appliedBeforeWhen": "1787709600000",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0075_platform_staff_invitations",
       "appliedBeforeWhen": "1787796000000",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0076_edge_hub_pairing",
       "appliedBeforeWhen": "1788307200000",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     },
     {
       "appliedBefore": "0077_people_multi_role_access",
       "appliedBeforeWhen": "1788310800000",
       "appliedAfter": "0077_people_multi_role_access",
-      "recoveryMigration": "0045_strong_pride",
-      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "recoveryMigration": "0076_edge_hub_pairing",
+      "recoveryArtifact": "git:da383540b6b5c30a73dfc32a756bb80fbd290e76",
       "testedUpgrade": true,
       "evidence": {
-        "path": "docs/evidence/recovery/5421ce-validation.json",
-        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
-        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
-        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+        "path": "docs/evidence/recovery/da3835-validation.json",
+        "sha256": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
+        "testReportDigest": "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b"
       }
     }
   ]

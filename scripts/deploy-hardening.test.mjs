@@ -672,10 +672,10 @@ test("pre-migration backup binds the migration actually applied in the source da
   );
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
-    assert.equal(transition.recoveryMigration, "0045_strong_pride");
-    assert.equal(transition.recoveryArtifact, "git:5421cefb866576183119b265fcaa9f042745e591");
+    assert.equal(transition.recoveryMigration, "0076_edge_hub_pairing");
+    assert.equal(transition.recoveryArtifact, "git:da383540b6b5c30a73dfc32a756bb80fbd290e76");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/32503278065$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/33684885012$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });

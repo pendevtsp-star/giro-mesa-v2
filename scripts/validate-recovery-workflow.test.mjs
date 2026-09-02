@@ -89,74 +89,74 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
   assert.equal(transition.appliedAfter, matrix.targetMigration);
-  assert.equal(transition.recoveryMigration, "0045_strong_pride");
-  assert.equal(transition.recoveryArtifact, "git:5421cefb866576183119b265fcaa9f042745e591");
+  assert.equal(transition.recoveryMigration, "0076_edge_hub_pairing");
+  assert.equal(transition.recoveryArtifact, "git:da383540b6b5c30a73dfc32a756bb80fbd290e76");
   assert.equal(transition.testedUpgrade, true);
-  assert.equal(transition.evidence.path, "docs/evidence/recovery/5421ce-validation.json");
+  assert.equal(transition.evidence.path, "docs/evidence/recovery/da3835-validation.json");
   assert.equal(
     transition.evidence.sha256,
-    "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
+    "sha256:c3b03ebe40cf129a7f9a5b59ffee86e7086e76e2b168bac95ec6a04cc1a10b0b",
   );
   assert.equal(
     transition.evidence.workflowRun,
-    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
+    "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/33684885012",
   );
   assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   assert.equal(previousProductionTransition.appliedBefore, "0042_shallow_lenny_balinger");
   assert.equal(previousProductionTransition.appliedBeforeWhen, "1787029862431");
   assert.equal(previousProductionTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(previousProductionTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousProductionTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(previousProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(previousProductionTransition.testedUpgrade, true);
   assert.deepEqual(previousProductionTransition.evidence, transition.evidence);
   assert.equal(currentProductionTransition.appliedBefore, "0045_strong_pride");
   assert.equal(currentProductionTransition.appliedBeforeWhen, "1787256690924");
   assert.equal(currentProductionTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(currentProductionTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(currentProductionTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(currentProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(currentProductionTransition.testedUpgrade, true);
   assert.deepEqual(currentProductionTransition.evidence, transition.evidence);
   assert.equal(latestProductionTransition.appliedBefore, "0053_petite_trauma");
   assert.equal(latestProductionTransition.appliedBeforeWhen, "1787373316439");
   assert.equal(latestProductionTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(latestProductionTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(latestProductionTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(latestProductionTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(latestProductionTransition.testedUpgrade, true);
   assert.deepEqual(latestProductionTransition.evidence, transition.evidence);
   assert.equal(previousAppTransition.appliedBefore, "0074_crm_operational_inbox");
   assert.equal(previousAppTransition.appliedBeforeWhen, "1787709600000");
   assert.equal(previousAppTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(previousAppTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousAppTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(previousAppTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(previousAppTransition.testedUpgrade, true);
   assert.deepEqual(previousAppTransition.evidence, transition.evidence);
   assert.equal(appOnlyTransition.appliedBefore, "0075_platform_staff_invitations");
   assert.equal(appOnlyTransition.appliedBeforeWhen, "1787796000000");
   assert.equal(appOnlyTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(appOnlyTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(appOnlyTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(appOnlyTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(appOnlyTransition.testedUpgrade, true);
   assert.deepEqual(appOnlyTransition.evidence, transition.evidence);
   assert.equal(previousTargetTransition.appliedBefore, "0076_edge_hub_pairing");
   assert.equal(previousTargetTransition.appliedBeforeWhen, "1788307200000");
   assert.equal(previousTargetTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(previousTargetTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousTargetTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(previousTargetTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(previousTargetTransition.testedUpgrade, true);
   assert.deepEqual(previousTargetTransition.evidence, transition.evidence);
   assert.equal(currentTargetTransition.appliedBefore, matrix.targetMigration);
   assert.equal(currentTargetTransition.appliedBeforeWhen, "1788310800000");
   assert.equal(currentTargetTransition.appliedAfter, matrix.targetMigration);
-  assert.equal(currentTargetTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(currentTargetTransition.recoveryMigration, "0076_edge_hub_pairing");
   assert.equal(currentTargetTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(currentTargetTransition.testedUpgrade, true);
   assert.deepEqual(currentTargetTransition.evidence, transition.evidence);
   const evidence = JSON.parse(
-    readFileSync(join(root, "docs", "evidence", "recovery", "5421ce-validation.json"), "utf8"),
+    readFileSync(join(root, "docs", "evidence", "recovery", "da3835-validation.json"), "utf8"),
   );
-  assert.equal(evidence.targetMigration, "0045_strong_pride");
-  assert.deepEqual(evidence.schemaLevels, [45]);
-  assert.equal(evidence.runtime.schemaLevel, 45);
+  assert.equal(evidence.targetMigration, "0077_people_multi_role_access");
+  assert.deepEqual(evidence.schemaLevels, [76, 77]);
+  assert.equal(evidence.runtime.schemaLevel, 77);
   for (const scriptPath of [entrypointPath, provenancePath]) {
     const script = readFileSync(scriptPath, "utf8");
     assert.match(script, /evidence\.get\("schemaLevels"\) == expected_levels/);
@@ -166,5 +166,7 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.match(publish, /recovery evidence hash mismatch/);
   assert.match(publish, /exactly one recovery artifact and evidence are allowed/);
   assert.match(publish, /duplicate recovery source transition/);
+  assert.match(publish, /expected_levels/);
+  assert.match(publish, /value\.get\("schemaLevels"\)!=expected_levels/);
   assert.doesNotMatch(publish, /len\(transitions\)!=1/);
 });
