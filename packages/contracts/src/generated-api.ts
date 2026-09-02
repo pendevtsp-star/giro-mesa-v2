@@ -2212,6 +2212,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/edge-hub-installer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_downloadEdgeHubInstaller[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/edge-hub-installer": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_downloadEdgeHubInstaller[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pilot-feedback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_recordEdgeHubPilotFeedback[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pilot-feedback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_recordEdgeHubPilotFeedback[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/membership-invitations": {
     parameters: {
       query?: never;
@@ -22789,6 +22853,12 @@ export interface operations {
             /** Format: date-time */
             expiresAt: string;
             installerUrl: string | null;
+            installer: {
+              /** @enum {string} */
+              channel: "pilot" | "stable";
+              version: string;
+              sha256: string;
+            } | null;
           };
         };
       };
@@ -22826,8 +22896,118 @@ export interface operations {
             /** Format: date-time */
             expiresAt: string;
             installerUrl: string | null;
+            installer: {
+              /** @enum {string} */
+              channel: "pilot" | "stable";
+              version: string;
+              sha256: string;
+            } | null;
           };
         };
+      };
+    };
+  };
+  "OrganizationsController_downloadEdgeHubInstaller[0]": {
+    parameters: {
+      query: {
+        pairingId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OrganizationsController_downloadEdgeHubInstaller[1]": {
+    parameters: {
+      query: {
+        pairingId: string;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OrganizationsController_recordEdgeHubPilotFeedback[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          deviceId: string;
+          /** @enum {string} */
+          experience: "easy" | "minor_difficulty" | "blocked";
+          comment?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "OrganizationsController_recordEdgeHubPilotFeedback[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          deviceId: string;
+          /** @enum {string} */
+          experience: "easy" | "minor_difficulty" | "blocked";
+          comment?: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -52443,7 +52623,7 @@ export interface operations {
             /** Format: email */
             email: string;
             /** @enum {string} */
-            role:
+            role?:
               | "owner"
               | "manager"
               | "waiter"
@@ -52455,6 +52635,20 @@ export interface operations {
               | "inventory"
               | "finance"
               | "accountant";
+            roles?: (
+              | "owner"
+              | "manager"
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+              | "finance"
+              | "accountant"
+            )[];
+            expectedRevision?: number;
             reauth?: {
               currentPassword?: string;
               mfaCode?: string;
@@ -52516,7 +52710,7 @@ export interface operations {
             /** Format: email */
             email: string;
             /** @enum {string} */
-            role:
+            role?:
               | "owner"
               | "manager"
               | "waiter"
@@ -52528,6 +52722,20 @@ export interface operations {
               | "inventory"
               | "finance"
               | "accountant";
+            roles?: (
+              | "owner"
+              | "manager"
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+              | "finance"
+              | "accountant"
+            )[];
+            expectedRevision?: number;
             reauth?: {
               currentPassword?: string;
               mfaCode?: string;
@@ -53038,6 +53246,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -53067,6 +53276,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -53610,6 +53820,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -53637,6 +53848,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -53750,7 +53962,7 @@ export interface operations {
           /** Format: uuid */
           unitId: string;
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -53762,6 +53974,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -53796,7 +54022,7 @@ export interface operations {
           /** Format: uuid */
           unitId: string;
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -53808,6 +54034,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -53841,6 +54081,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
           reauth?: {
             currentPassword?: string;
             mfaCode?: string;
@@ -53873,6 +54114,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
           reauth?: {
             currentPassword?: string;
             mfaCode?: string;
@@ -53906,7 +54148,7 @@ export interface operations {
           /** Format: email */
           email: string;
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -53918,6 +54160,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reauth?: {
             currentPassword?: string;
             mfaCode?: string;
@@ -53951,7 +54207,7 @@ export interface operations {
           /** Format: email */
           email: string;
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -53963,6 +54219,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reauth?: {
             currentPassword?: string;
             mfaCode?: string;
@@ -54036,6 +54306,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54063,6 +54334,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54090,7 +54362,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -54102,6 +54374,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -54134,7 +54420,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          role:
+          role?:
             | "owner"
             | "manager"
             | "waiter"
@@ -54146,6 +54432,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -54178,6 +54478,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54205,6 +54506,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54244,6 +54546,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -54288,6 +54604,20 @@ export interface operations {
             | "inventory"
             | "finance"
             | "accountant";
+          roles?: (
+            | "owner"
+            | "manager"
+            | "waiter"
+            | "cashier"
+            | "receptionist"
+            | "busser"
+            | "kds"
+            | "delivery"
+            | "inventory"
+            | "finance"
+            | "accountant"
+          )[];
+          expectedRevision?: number;
           reason: string;
           reauth?: {
             currentPassword?: string;
@@ -54388,6 +54718,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54415,6 +54746,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54442,6 +54774,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };
@@ -54469,6 +54802,7 @@ export interface operations {
       content: {
         "application/json": {
           reason: string;
+          expectedRevision?: number;
         };
       };
     };

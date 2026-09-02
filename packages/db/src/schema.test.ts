@@ -62,6 +62,7 @@ import {
   managementNfeImports,
   managementPeople,
   managementPersonAccess,
+  managementPersonRoleAssignments,
   managementProductionBatches,
   managementProductionBatchInputs,
   managementProductReturnableClassifications,
@@ -744,6 +745,10 @@ describe("database schema", () => {
     assert.ok(managementPersonAccess.invitationId);
     assert.ok(managementPersonAccess.membershipId);
     assert.ok(managementPersonAccess.roleBindingId);
+    assert.ok(managementPersonAccess.revision);
+    assert.ok(managementPersonRoleAssignments.role);
+    assert.ok(managementPersonRoleAssignments.roleBindingId);
+    assert.ok(managementPersonRoleAssignments.provenance);
     assert.ok(terminalOperatorPins.pinHash);
     assert.ok(terminalSessions.organizationId);
     assert.ok(terminalSessions.unitId);
@@ -768,6 +773,17 @@ describe("database schema", () => {
     );
     assert.match(multiunitMigration, /management_person_access_person_unit_pk/);
     assert.match(multiunitMigration, /DROP CONSTRAINT "management_person_access_pkey"/);
+
+    const multiRoleMigration = await readFile(
+      new URL("../drizzle/0077_people_multi_role_access.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(multiRoleMigration, /CREATE TABLE "management_person_role_assignments"/);
+    assert.match(
+      multiRoleMigration,
+      /FOREIGN KEY \("person_id"\) REFERENCES "public"\."management_people"\("id"\)/,
+    );
+    assert.match(multiRoleMigration, /backfill_binding/);
     assert.match(multiunitMigration, /ADD COLUMN "device_id"/);
   });
 

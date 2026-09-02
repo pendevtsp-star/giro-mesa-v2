@@ -22,6 +22,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
 #else
         public string Email { get; set; }
 #endif
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The reauth property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -32,6 +34,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
 #endif
         /// <summary>The role property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_role? Role { get; set; }
+        /// <summary>The roles property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_roles?>? Roles { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_roles?> Roles { get; set; }
+#endif
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody"/> and sets the default values.
         /// </summary>
@@ -58,8 +68,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "email", n => { Email = n.GetStringValue(); } },
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "reauth", n => { Reauth = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_reauth>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_reauth.CreateFromDiscriminatorValue); } },
                 { "role", n => { Role = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_role>(); } },
+                { "roles", n => { Roles = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_roles>()?.AsList(); } },
             };
         }
         /// <summary>
@@ -70,8 +82,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("email", Email);
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_reauth>("reauth", Reauth);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_role>("role", Role);
+            writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Invite.InvitePostRequestBody_roles>("roles", Roles);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

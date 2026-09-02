@@ -1969,6 +1969,7 @@ export function CatalogExperience({
             Preço Salão (R$)
             <Input
               inputMode="decimal"
+              data-currency="brl"
               onChange={(event) => setPrice(event.target.value)}
               placeholder="0,00"
               required
@@ -1979,6 +1980,7 @@ export function CatalogExperience({
             Preço Delivery (Opcional)
             <Input
               inputMode="decimal"
+              data-currency="brl"
               onChange={(event) => setDeliveryPrice(event.target.value)}
               placeholder="Ex: 35,00"
               value={deliveryPrice}
@@ -1990,6 +1992,7 @@ export function CatalogExperience({
               : "Custo Unitário / Insumos (R$)"}
             <Input
               inputMode="decimal"
+              data-currency="brl"
               onChange={(event) => setCost(event.target.value)}
               placeholder="Ex: 8,50"
               value={cost}

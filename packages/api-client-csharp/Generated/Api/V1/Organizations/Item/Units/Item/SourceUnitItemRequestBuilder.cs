@@ -2,7 +2,9 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Devices;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubInstaller;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPairings;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPilotFeedback;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Integrations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management;
@@ -32,10 +34,20 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder(PathParameters, RequestAdapter);
         }
+        /// <summary>The edgeHubInstaller property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubInstaller.EdgeHubInstallerRequestBuilder EdgeHubInstaller
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubInstaller.EdgeHubInstallerRequestBuilder(PathParameters, RequestAdapter);
+        }
         /// <summary>The edgeHubPairings property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsRequestBuilder EdgeHubPairings
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The edgeHubPilotFeedback property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPilotFeedback.EdgeHubPilotFeedbackRequestBuilder EdgeHubPilotFeedback
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.EdgeHubPilotFeedback.EdgeHubPilotFeedbackRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The fiscal property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal

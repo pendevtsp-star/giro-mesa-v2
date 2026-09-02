@@ -4,115 +4,115 @@
 
 Directory-based community: apps/backends
 
-- **Size**: 3902 nodes
-- **Cohesion**: 0.2181
+- **Size**: 3959 nodes
+- **Cohesion**: 0.2180
 - **Dominant Language**: typescript
 
 ## Members
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| Cycle | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 53-53 |
-| CheckoutResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 55-61 |
-| CheckoutReservation | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 63-72 |
-| BillingService | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 75-1181 |
-| constructor | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 76-79 |
-| access | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 81-104 |
-| summary | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 106-322 |
-| createUpgradeQuote | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 324-489 |
-| createCheckout | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 491-907 |
-| receiveAsaasWebhook | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 909-930 |
-| applyEvent | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 932-985 |
-| requireOwner | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 987-989 |
-| lockOrganization | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 991-998 |
-| onlinePaymentsEnabled | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1000-1007 |
-| asaasConfiguration | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1009-1048 |
-| createAsaasCheckout | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1050-1147 |
-| callback | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1073-1077 |
-| idempotencyConflict | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1149-1154 |
-| publicCheckoutStatus | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1156-1163 |
-| unavailableReason | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.service.ts | 1165-1180 |
-| describe:Asaas webhook@L8 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.webhook.test.ts | 8-52 |
-| it:rejects an invalid access token@L9 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.webhook.test.ts | 9-26 |
-| it:acknowledges a duplicate without publishing another outbox event@L28 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/billing.webhook.test.ts | 28-51 |
-| InternalKeyGuard | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/internal-key.guard.ts | 12-33 |
-| canActivate | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/billing/internal-key.guard.ts | 13-32 |
-| CatalogController | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 13-68 |
-| constructor | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 14-14 |
-| catalog | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 19-31 |
-| experimentImpression | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 34-55 |
-| trialApplication | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 58-62 |
-| contact | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.controller.ts | 65-67 |
-| CatalogModule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.module.ts | 6-6 |
-| CatalogService | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 40-406 |
-| constructor | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 41-41 |
-| publicCatalog | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 43-204 |
-| resolveMedia | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 132-143 |
-| recordExperimentImpression | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 206-257 |
-| createTrialApplication | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 259-285 |
-| createContactRequest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 287-310 |
-| validateAttribution | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 312-362 |
-| validatedExperimentAttribution | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/catalog.service.ts | 364-405 |
-| CommercialExecutor | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial-publication.ts | 4-4 |
-| activateDueCommercialCatalog | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial-publication.ts | 7-47 |
-| describe:commercial promotion rules@L9 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.test.ts | 9-103 |
-| it:uses the best eligible promotion without applying code-only campaigns implicitly@L10 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.test.ts | 10-63 |
-| it:rejects overlapping automatic windows for the same plan and cycle@L65 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.test.ts | 65-89 |
-| it:assigns one stable content-only experiment variant@L91 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.test.ts | 91-102 |
-| CommercialPromotionRule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.ts | 3-16 |
-| automaticPromotionsOverlap | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.ts | 18-43 |
-| resolveCommercialPromotion | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/catalog/commercial.rules.ts | 45-88 |
+| test:exposes OpenAPI only outside production@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.test.ts | 5-9 |
+| test:boots the complete Nest application graph@L11 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.test.ts | 11-21 |
+| shouldExposeOpenApi | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 21-22 |
+| createApplication | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 24-118 |
+| document | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 89-89 |
+| realtimeHandler | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 94-109 |
+| AppModule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app.module.ts | 39-39 |
+| it:keeps opaque browser session tokens confined to the HttpOnly cookie@L7 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.test.ts | 7-56 |
+| AuthController | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 59-334 |
+| constructor | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 60-60 |
+| register | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 63-71 |
+| login | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 75-86 |
+| verifyMfaChallenge | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 90-98 |
+| verifyOAuthMfa | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 102-114 |
+| mfaStatus | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 118-120 |
+| beginMfaSetup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 124-126 |
+| confirmMfaSetup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 130-139 |
+| disableMfa | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 144-149 |
+| logout | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 154-162 |
+| me | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 166-168 |
+| requestReset | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 172-177 |
+| confirmReset | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 181-185 |
+| googleLogin | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 188-190 |
+| googleSignup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 193-202 |
+| googleStart | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 205-216 |
+| googlePrepare | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 221-230 |
+| googleCallback | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 233-272 |
+| googleDisabled | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 274-279 |
+| startGoogle | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 281-287 |
+| prepareGoogle | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 289-299 |
+| googleConfig | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 301-305 |
+| siteTarget | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 307-313 |
+| absoluteTarget | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 315-329 |
+| redirect | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 331-333 |
+| AuthModule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.module.ts | 13-13 |
+| AuthContext | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 50-60 |
+| tokenHash | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 62-62 |
+| AuthService | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 65-883 |
+| constructor | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 66-66 |
+| register | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 68-124 |
+| login | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 126-145 |
+| authenticateGoogle | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 147-229 |
+| verifyMfaChallenge | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 231-359 |
+| mfaStatus | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 361-368 |
+| beginMfaSetup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 370-402 |
+| confirmMfaSetup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 404-458 |
+| disableMfa | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 460-504 |
+| authenticate | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 506-527 |
+| verifyStepUp | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 529-591 |
+| revoke | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 593-605 |
 
-*... and 3600 more members.*
+*... and 3909 more members.*
 
 ## Execution Flows
 
+- **googleCallback** (criticality: 0.90, depth: 4)
+- **create** (criticality: 0.84, depth: 4)
 - **tableSessionStatus** (criticality: 0.84, depth: 3)
-- **assignPersonUnitAccess** (criticality: 0.81, depth: 6)
+- **login** (criticality: 0.83, depth: 4)
+- **close** (criticality: 0.81, depth: 2)
 - **consumption** (criticality: 0.80, depth: 4)
+- **verifyMfaChallenge** (criticality: 0.80, depth: 4)
 - **tableSession** (criticality: 0.80, depth: 4)
-- **removePersonUnitAccess** (criticality: 0.78, depth: 6)
-- **cancelTeamInvitation** (criticality: 0.77, depth: 6)
-- **revokeTeamMember** (criticality: 0.77, depth: 6)
-- **invitePersonAccess** (criticality: 0.77, depth: 6)
-- **updatePersonAccess** (criticality: 0.76, depth: 6)
-- **reactivatePersonAccess** (criticality: 0.76, depth: 6)
-- *... and 93 more flows.*
+- **verifyOAuthMfa** (criticality: 0.79, depth: 4)
+- **assignPersonUnitAccess** (criticality: 0.79, depth: 7)
+- *... and 122 more flows.*
 
 ## Dependencies
 
 ### Outgoing
 
-- `eq` (5917 edge(s))
-- `where` (2351 edge(s))
-- `and` (1918 edge(s))
-- `from` (1809 edge(s))
-- `select` (1522 edge(s))
-- `equal` (1326 edge(s))
-- `Param` (1164 edge(s))
-- `ParseUUIDPipe` (1141 edge(s))
-- `values` (1044 edge(s))
-- `limit` (971 edge(s))
-- `insert` (926 edge(s))
-- `map` (829 edge(s))
-- `returning` (621 edge(s))
-- `set` (588 edge(s))
-- `Req` (508 edge(s))
+- `eq` (6143 edge(s))
+- `where` (2464 edge(s))
+- `and` (1992 edge(s))
+- `from` (1890 edge(s))
+- `select` (1587 edge(s))
+- `equal` (1417 edge(s))
+- `Param` (1195 edge(s))
+- `ParseUUIDPipe` (1172 edge(s))
+- `values` (1150 edge(s))
+- `insert` (1030 edge(s))
+- `limit` (1020 edge(s))
+- `map` (848 edge(s))
+- `returning` (679 edge(s))
+- `set` (628 edge(s))
+- `update` (548 edge(s))
 
 ### Incoming
 
-- `equal` (1321 edge(s))
-- `eq` (438 edge(s))
-- `ok` (413 edge(s))
-- `values` (360 edge(s))
-- `insert` (360 edge(s))
-- `where` (304 edge(s))
-- `returning` (262 edge(s))
-- `randomUUID` (231 edge(s))
-- `from` (230 edge(s))
-- `deepEqual` (211 edge(s))
-- `select` (209 edge(s))
-- `safeParse` (205 edge(s))
-- `rejects` (159 edge(s))
+- `equal` (1412 edge(s))
+- `eq` (456 edge(s))
+- `ok` (438 edge(s))
+- `values` (390 edge(s))
+- `insert` (390 edge(s))
+- `where` (324 edge(s))
+- `returning` (284 edge(s))
+- `from` (239 edge(s))
+- `deepEqual` (237 edge(s))
+- `randomUUID` (236 edge(s))
+- `select` (218 edge(s))
+- `safeParse` (208 edge(s))
+- `rejects` (174 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-schemas.ts` (119 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/management/management.schemas.ts` (118 edge(s))

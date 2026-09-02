@@ -4419,6 +4419,7 @@ export const managementPersonAccess = pgTable(
     roleBindingId: uuid("role_binding_id").references(() => roleBindings.id, {
       onDelete: "set null",
     }),
+    revision: integer("revision").notNull().default(1),
     statusChangedAt: timestamp("status_changed_at", { withTimezone: true }),
     statusChangedByIdentityId: uuid("status_changed_by_identity_id").references(
       () => identities.id,
@@ -4449,6 +4450,54 @@ export const managementPersonAccess = pgTable(
     check(
       "management_person_access_status_check",
       sql`${table.status} in ('pending','active','suspended','canceled','terminated')`,
+    ),
+  ],
+);
+
+export const managementPersonRoleAssignments = pgTable(
+  "management_person_role_assignments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    personId: uuid("person_id").notNull(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    role: roleName("role").notNull(),
+    roleBindingId: uuid("role_binding_id"),
+    provenance: varchar("provenance", { length: 32 })
+      .$type<"legacy_access" | "backfill_binding" | "people_invite" | "people_admin">()
+      .notNull()
+      .default("people_admin"),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("management_person_role_assignment_scope_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.personId,
+      table.role,
+    ),
+    uniqueIndex("management_person_role_assignment_binding_unique")
+      .on(table.roleBindingId)
+      .where(sql`${table.roleBindingId} is not null`),
+    index("management_person_role_assignment_person_idx").on(table.organizationId, table.personId),
+    foreignKey({
+      name: "management_person_role_assignment_person_fk",
+      columns: [table.personId],
+      foreignColumns: [managementPeople.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_person_role_assignment_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "management_person_role_assignment_binding_fk",
+      columns: [table.roleBindingId],
+      foreignColumns: [roleBindings.id],
+    }).onDelete("set null"),
+    check(
+      "management_person_role_assignment_provenance_check",
+      sql`${table.provenance} in ('legacy_access','backfill_binding','people_invite','people_admin')`,
     ),
   ],
 );

@@ -39,6 +39,7 @@ import {
   type TimeTrackingReport,
   useRemote,
 } from "../../management.shared";
+import { accessRolesRequireStepUp, toggleAccessRole } from "./people-access";
 import { TimeTrackingAuditPanel } from "./TimeTrackingAuditPanel";
 import { TimeTrackingLocationControls } from "./TimeTrackingLocationControls";
 
@@ -134,7 +135,9 @@ type AccessAction =
   | { kind: "cancel"; personId: string }
   | { kind: "suspend"; personId: string }
   | { kind: "reactivate"; personId: string };
-type UnitAccessAction = { kind: "assign" } | { kind: "remove"; unitId: string; role: AccessRole };
+type UnitAccessAction =
+  | { kind: "assign" }
+  | { kind: "remove"; unitId: string; roles: AccessRole[]; revision: number | null };
 
 const accessRoles: Array<{ value: AccessRole; label: string; description: string }> = [
   { value: "manager", label: "Gerente", description: "Equipe, turno e aprovações" },
@@ -171,6 +174,49 @@ const accessRoleHighlights: Record<AccessRole, string[]> = {
   accountant: ["Documentos fiscais", "Pacotes contábeis", "Solicitações"],
 };
 
+function AccessRolesPicker({
+  id,
+  options,
+  selected,
+  unitLabel,
+  onChange,
+}: {
+  id: string;
+  options: typeof accessRoles;
+  selected: AccessRole[];
+  unitLabel: string;
+  onChange: (roles: AccessRole[]) => void;
+}) {
+  return (
+    <fieldset aria-describedby={`${id}-context`}>
+      <legend>Funções autorizadas</legend>
+      <p className="form-hint" id={`${id}-context`}>
+        Unidade: <strong>{unitLabel}</strong>. Marque todas as funções liberadas para este
+        funcionário.
+      </p>
+      {options.map((role) => (
+        <label className="people-access-toggle" key={role.value}>
+          <input
+            checked={selected.includes(role.value)}
+            onChange={(event) =>
+              onChange(toggleAccessRole(selected, role.value, event.target.checked))
+            }
+            type="checkbox"
+            value={role.value}
+          />
+          <span>
+            <strong>{role.label}</strong>
+            <small>{role.description}</small>
+          </span>
+        </label>
+      ))}
+      {!selected.length && (
+        <small className="form-hint">Selecione ao menos uma função para habilitar o acesso.</small>
+      )}
+    </fieldset>
+  );
+}
+
 function auditActionLabel(action: string) {
   return (
     {
@@ -181,7 +227,7 @@ function auditActionLabel(action: string) {
       "management.person.access.invited": "Convite enviado",
       "management.person.access.resent": "Convite reenviado",
       "management.person.access.canceled": "Convite cancelado",
-      "management.person.access.role-changed": "Perfil alterado",
+      "management.person.access.role-changed": "Funções alteradas",
       "management.person.access.suspended": "Acesso suspenso",
       "management.person.access.reactivated": "Acesso reativado",
       "management.person.access.accepted": "Convite aceito",
@@ -206,9 +252,13 @@ function accessRoleLabel(role: string | null) {
   return accessRoles.find((item) => item.value === role)?.label ?? role ?? "Sem perfil";
 }
 
+function accessRolesLabel(roles: readonly string[]) {
+  return roles.length ? roles.map((role) => accessRoleLabel(role)).join(", ") : "Sem funções";
+}
+
 function accessActionTitle(action: AccessAction | null) {
   if (action?.kind === "invite") return "Conceder acesso";
-  if (action?.kind === "change-role") return "Alterar perfil";
+  if (action?.kind === "change-role") return "Alterar funções";
   if (action?.kind === "cancel") return "Cancelar convite";
   if (action?.kind === "suspend") return "Suspender acesso";
   return "Reativar acesso";
@@ -220,10 +270,10 @@ function accessActionCopy(action: AccessAction | null) {
   if (action?.kind === "suspend")
     return "O login será bloqueado imediatamente. O cadastro, escalas e registros serão preservados.";
   if (action?.kind === "reactivate")
-    return "O funcionário voltará a acessar esta unidade com o perfil selecionado.";
+    return "O funcionário voltará a acessar esta unidade com todas as funções selecionadas.";
   if (action?.kind === "change-role")
-    return "A nova permissão passa a valer nas próximas requisições do usuário.";
-  return "Enviaremos um convite para o e-mail informado com o perfil selecionado.";
+    return "O novo conjunto passa a valer integralmente nas próximas requisições do usuário.";
+  return "Enviaremos um único convite para o e-mail informado com as funções selecionadas.";
 }
 
 function useOnlineStatus() {
@@ -343,13 +393,13 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const [isCreatePersonOpen, setIsCreatePersonOpen] = useState(false);
   const [accessAction, setAccessAction] = useState<AccessAction | null>(null);
   const [accessEmail, setAccessEmail] = useState("");
-  const [accessRole, setAccessRole] = useState<AccessRole>("waiter");
+  const [selectedAccessRoles, setSelectedAccessRoles] = useState<AccessRole[]>([]);
   const [accessReason, setAccessReason] = useState("");
   const [reauthMethod, setReauthMethod] = useState<"password" | "mfa">("password");
   const [reauthValue, setReauthValue] = useState("");
   const [unitAccessAction, setUnitAccessAction] = useState<UnitAccessAction | null>(null);
   const [unitAccessUnitId, setUnitAccessUnitId] = useState("");
-  const [unitAccessRole, setUnitAccessRole] = useState<AccessRole>("waiter");
+  const [unitAccessRoles, setUnitAccessRoles] = useState<AccessRole[]>([]);
   const [unitAccessReason, setUnitAccessReason] = useState("");
   const [editPersonName, setEditPersonName] = useState("");
   const [editPersonRole, setEditPersonRole] = useState("");
@@ -360,7 +410,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const [employmentCode, setEmploymentCode] = useState("");
   const [personAccessEnabled, setPersonAccessEnabled] = useState(false);
   const [personEmail, setPersonEmail] = useState("");
-  const [personAccessRole, setPersonAccessRole] = useState<AccessRole>("waiter");
+  const [personAccessRoles, setPersonAccessRoles] = useState<AccessRole[]>([]);
   const [schedulePersonId, setSchedulePersonId] = useState("");
   const [scheduleStart, setScheduleStart] = useState("");
   const [scheduleEnd, setScheduleEnd] = useState("");
@@ -505,38 +555,43 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     return directory.state.status === "ready" ? directory.state.data.items : [];
   }, [directory.state]);
   const selectedPerson = selectedPersonId ? personById.get(selectedPersonId) : undefined;
+  const selectedPersonAccessRoles = selectedPerson?.access.roles ?? [];
   const canManageSelectedAccess =
-    !selectedPerson?.access.role ||
-    scope.profileId === "owner" ||
-    managerGrantableAccessRoles.has(selectedPerson.access.role as AccessRole);
+    !selectedPersonAccessRoles.length ||
+    selectedPersonAccessRoles.every((role) =>
+      grantableAccessRoles.some((grantable) => grantable.value === role),
+    );
+  const currentUnitLabel =
+    accessOverview.status === "ready"
+      ? (accessOverview.data.units.find((unit) => unit.id === scope.unitId)?.name ?? scope.unitId)
+      : scope.unitId;
   function failAction(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     setActionError(message);
     setFeedback({ message, tone: "danger" });
   }
-  function stepUpFor(role: AccessRole) {
-    if (!sensitiveAccessRoles.has(role)) return undefined;
+  function stepUpFor(roles: readonly AccessRole[]) {
+    if (!roles.some((role) => sensitiveAccessRoles.has(role))) return undefined;
     return reauthMethod === "mfa"
       ? { mfaCode: reauthValue.trim() }
       : { currentPassword: reauthValue };
   }
-  function accessActionStepUpRole() {
-    const currentRole = accessAction
-      ? personById.get(accessAction.personId)?.access.role
+  function accessActionStepUpRoles() {
+    const current = accessAction
+      ? (personById.get(accessAction.personId)?.access.roles as AccessRole[] | undefined)
       : undefined;
-    return accessAction?.kind === "change-role" &&
-      currentRole &&
-      sensitiveAccessRoles.has(currentRole as AccessRole)
-      ? (currentRole as AccessRole)
-      : accessRole;
+    return accessAction?.kind === "change-role"
+      ? [...new Set([...(current ?? []), ...selectedAccessRoles])]
+      : selectedAccessRoles;
   }
-  function stepUpFields(role: AccessRole) {
-    if (!sensitiveAccessRoles.has(role)) return null;
+  function stepUpFields(roles: readonly AccessRole[]) {
+    if (!roles.some((role) => sensitiveAccessRoles.has(role))) return null;
     return (
       <fieldset>
         <legend>Confirmação de segurança</legend>
         <p className="form-hint">
-          Este perfil acessa dados ou ações sensíveis. Confirme sua identidade para continuar.
+          Uma das funções selecionadas acessa dados ou ações sensíveis. Confirme sua identidade para
+          continuar.
         </p>
         <div className="gm-form-grid">
           <label className="gm-field">
@@ -615,6 +670,10 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       failAction(null, "Conecte-se para cadastrar ou convidar um funcionário.");
       return;
     }
+    if (personAccessEnabled && !personAccessRoles.length) {
+      failAction(null, "Selecione ao menos uma função autorizada para habilitar o acesso.");
+      return;
+    }
     setActionId("new-person");
     setActionError("");
     try {
@@ -625,8 +684,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
         access: personAccessEnabled
           ? {
               email: personEmail.trim().toLowerCase(),
-              role: personAccessRole,
-              reauth: stepUpFor(personAccessRole),
+              roles: personAccessRoles,
+              reauth: stepUpFor(personAccessRoles),
             }
           : undefined,
       });
@@ -635,12 +694,12 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       setEmploymentCode("");
       setPersonAccessEnabled(false);
       setPersonEmail("");
-      setPersonAccessRole("waiter");
+      setPersonAccessRoles([]);
       setReauthValue("");
       setIsCreatePersonOpen(false);
       setFeedback({
         message: personAccessEnabled
-          ? "Funcionário cadastrado e convite enviado."
+          ? `Funcionário cadastrado e convite enviado com ${accessRolesLabel(personAccessRoles)}.`
           : "Funcionário cadastrado sem acesso ao sistema.",
         tone: "success",
       });
@@ -708,10 +767,12 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   function openAccessAction(kind: AccessAction["kind"], person: Person) {
     setAccessAction({ kind, personId: person.id } as AccessAction);
     setAccessEmail(person.access.email ?? "");
-    setAccessRole(
-      grantableAccessRoles.some((item) => item.value === person.access.role)
-        ? (person.access.role as AccessRole)
-        : "waiter",
+    setSelectedAccessRoles(
+      kind === "invite"
+        ? []
+        : person.access.roles.filter((role): role is AccessRole =>
+            grantableAccessRoles.some((item) => item.value === role),
+          ),
     );
     setAccessReason("");
     setReauthMethod("password");
@@ -727,6 +788,15 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     }
     const person = personById.get(accessAction.personId);
     if (!person) return;
+    if (
+      (accessAction.kind === "invite" ||
+        accessAction.kind === "change-role" ||
+        accessAction.kind === "reactivate") &&
+      !selectedAccessRoles.length
+    ) {
+      failAction(null, "Selecione ao menos uma função autorizada.");
+      return;
+    }
     const actionKey = `access-${accessAction.kind}-${person.id}`;
     setActionId(actionKey);
     setActionError("");
@@ -734,45 +804,45 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       if (accessAction.kind === "invite") {
         await api.management.invitePersonAccess(scope.organizationId, scope.unitId, person.id, {
           email: accessEmail.trim().toLowerCase(),
-          role: accessRole,
-          reauth: stepUpFor(accessRole),
+          roles: selectedAccessRoles,
+          expectedRevision: person.access.revision ?? undefined,
+          reauth: stepUpFor(selectedAccessRoles),
         });
       } else if (accessAction.kind === "change-role") {
         await api.management.updatePersonAccess(scope.organizationId, scope.unitId, person.id, {
-          role: accessRole,
+          roles: selectedAccessRoles,
           reason: accessReason.trim(),
-          reauth: stepUpFor(accessActionStepUpRole()),
+          expectedRevision: person.access.revision ?? undefined,
+          reauth: stepUpFor(accessActionStepUpRoles()),
         });
       } else if (accessAction.kind === "cancel") {
-        await api.management.cancelPersonAccess(
-          scope.organizationId,
-          scope.unitId,
-          person.id,
-          accessReason.trim(),
-        );
+        await api.management.cancelPersonAccess(scope.organizationId, scope.unitId, person.id, {
+          reason: accessReason.trim(),
+          expectedRevision: person.access.revision ?? undefined,
+        });
       } else if (accessAction.kind === "suspend") {
-        await api.management.suspendPersonAccess(
-          scope.organizationId,
-          scope.unitId,
-          person.id,
-          accessReason.trim(),
-        );
+        await api.management.suspendPersonAccess(scope.organizationId, scope.unitId, person.id, {
+          reason: accessReason.trim(),
+          expectedRevision: person.access.revision ?? undefined,
+        });
       } else {
         await api.management.reactivatePersonAccess(scope.organizationId, scope.unitId, person.id, {
-          role: accessRole,
+          roles: selectedAccessRoles,
           reason: accessReason.trim(),
-          reauth: stepUpFor(accessRole),
+          expectedRevision: person.access.revision ?? undefined,
+          reauth: stepUpFor(selectedAccessRoles),
         });
       }
       const messages: Record<AccessAction["kind"], string> = {
-        invite: "Convite de acesso enviado.",
-        "change-role": "Perfil de acesso atualizado.",
+        invite: `Convite enviado com ${accessRolesLabel(selectedAccessRoles)}.`,
+        "change-role": `Funções autorizadas atualizadas: ${accessRolesLabel(selectedAccessRoles)}.`,
         cancel: "Convite cancelado.",
         suspend: "Acesso suspenso.",
-        reactivate: "Acesso reativado.",
+        reactivate: `Acesso reativado com ${accessRolesLabel(selectedAccessRoles)}.`,
       };
       setFeedback({ message: messages[accessAction.kind], tone: "success" });
       setAccessAction(null);
+      setSelectedAccessRoles([]);
       setAccessReason("");
       setReauthValue("");
       remote.retry();
@@ -832,7 +902,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   async function submitUnitAccess(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!unitAccessAction || !selectedPersonId) return;
-    const role = unitAccessAction.kind === "remove" ? unitAccessAction.role : unitAccessRole;
+    const roles = unitAccessAction.kind === "remove" ? unitAccessAction.roles : unitAccessRoles;
+    if (unitAccessAction.kind === "assign" && !roles.length) {
+      failAction(null, "Selecione ao menos uma função autorizada.");
+      return;
+    }
     setActionId("unit-access");
     setActionError("");
     try {
@@ -843,23 +917,31 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
           selectedPersonId,
           {
             unitId: unitAccessUnitId,
-            role,
+            roles,
             reason: unitAccessReason.trim(),
-            reauth: stepUpFor(role),
+            reauth: stepUpFor(roles),
           },
         );
-        setFeedback({ message: "Acesso liberado na nova unidade.", tone: "success" });
+        setFeedback({
+          message: `Acesso liberado com ${accessRolesLabel(roles)}.`,
+          tone: "success",
+        });
       } else {
         await api.management.removePersonUnitAccess(
           scope.organizationId,
           scope.unitId,
           selectedPersonId,
           unitAccessAction.unitId,
-          { reason: unitAccessReason.trim(), reauth: stepUpFor(role) },
+          {
+            reason: unitAccessReason.trim(),
+            expectedRevision: unitAccessAction.revision ?? undefined,
+            reauth: stepUpFor(roles),
+          },
         );
         setFeedback({ message: "Acesso da unidade removido.", tone: "success" });
       }
       setUnitAccessAction(null);
+      setUnitAccessRoles([]);
       setUnitAccessReason("");
       setReauthValue("");
       loadAccessOverview(selectedPersonId);
@@ -1642,10 +1724,10 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               <Card className="people-list-card">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Perfis fixos</p>
-                    <h2>O que cada perfil libera</h2>
+                    <p className="eyebrow">Funções acumuláveis</p>
+                    <h2>O que cada função libera</h2>
                   </div>
-                  <Badge tone="info">Sem permissões avulsas</Badge>
+                  <Badge tone="info">Conjunto por unidade</Badge>
                 </div>
                 <div className="management-list">
                   {grantableAccessRoles.map((role) => (
@@ -2069,6 +2151,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 onClick={() => {
                   setReauthValue("");
                   setReauthMethod("password");
+                  setPersonAccessEnabled(false);
+                  setPersonAccessRoles([]);
                   setActionError("");
                   setIsCreatePersonOpen(true);
                 }}
@@ -3293,6 +3377,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     checked={personAccessEnabled}
                     onChange={(event) => {
                       setPersonAccessEnabled(event.target.checked);
+                      if (!event.target.checked) setPersonAccessRoles([]);
                       setReauthValue("");
                     }}
                     type="checkbox"
@@ -3315,29 +3400,19 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         value={personEmail}
                       />
                     </label>
-                    <label className="gm-field">
-                      Perfil de acesso
-                      <NativeSelect
-                        onChange={(event) => {
-                          setPersonAccessRole(event.target.value as AccessRole);
-                          setReauthValue("");
-                        }}
-                        value={personAccessRole}
-                      >
-                        {grantableAccessRoles.map((role) => (
-                          <option key={role.value} value={role.value}>
-                            {role.label}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                      <small className="form-hint">
-                        {accessRoles.find((role) => role.value === personAccessRole)?.description ??
-                          "Acesso completo da organização"}
-                      </small>
-                    </label>
+                    <AccessRolesPicker
+                      id="new-person-access-roles"
+                      onChange={(roles) => {
+                        setPersonAccessRoles(roles);
+                        setReauthValue("");
+                      }}
+                      options={grantableAccessRoles}
+                      selected={personAccessRoles}
+                      unitLabel={scope.unitId}
+                    />
                   </div>
                 )}
-                {personAccessEnabled && stepUpFields(personAccessRole)}
+                {personAccessEnabled && stepUpFields(personAccessRoles)}
               </fieldset>
               {actionError && (
                 <p className="people-page__error" role="alert">
@@ -3365,8 +3440,9 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     personName.trim().length < 2 ||
                     roleLabel.trim().length < 1 ||
                     (personAccessEnabled && !personEmail.trim()) ||
+                    (personAccessEnabled && !personAccessRoles.length) ||
                     (personAccessEnabled &&
-                      sensitiveAccessRoles.has(personAccessRole) &&
+                      accessRolesRequireStepUp([], personAccessRoles, sensitiveAccessRoles) &&
                       !reauthValue.trim())
                   }
                   type="submit"
@@ -3412,36 +3488,21 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               {(accessAction?.kind === "invite" ||
                 accessAction?.kind === "change-role" ||
                 accessAction?.kind === "reactivate") && (
-                <label className="gm-field">
-                  Perfil de acesso
-                  <NativeSelect
-                    onChange={(event) => {
-                      setAccessRole(event.target.value as AccessRole);
-                      setReauthValue("");
-                    }}
-                    value={accessRole}
-                  >
-                    {grantableAccessRoles.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                  <small className="form-hint">
-                    {accessRoles.find((role) => role.value === accessRole)?.description ??
-                      "Acesso completo da organização"}
-                  </small>
-                  <ul className="people-permission-preview">
-                    {accessRoleHighlights[accessRole].map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                </label>
+                <AccessRolesPicker
+                  id="person-access-roles"
+                  onChange={(roles) => {
+                    setSelectedAccessRoles(roles);
+                    setReauthValue("");
+                  }}
+                  options={grantableAccessRoles}
+                  selected={selectedAccessRoles}
+                  unitLabel={currentUnitLabel}
+                />
               )}
               {(accessAction?.kind === "invite" ||
                 accessAction?.kind === "change-role" ||
                 accessAction?.kind === "reactivate") &&
-                stepUpFields(accessActionStepUpRole())}
+                stepUpFields(accessActionStepUpRoles())}
               {accessAction?.kind !== "invite" && (
                 <label className="gm-field">
                   Motivo
@@ -3477,7 +3538,15 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     ((accessAction?.kind === "invite" ||
                       accessAction?.kind === "change-role" ||
                       accessAction?.kind === "reactivate") &&
-                      sensitiveAccessRoles.has(accessActionStepUpRole()) &&
+                      !selectedAccessRoles.length) ||
+                    ((accessAction?.kind === "invite" ||
+                      accessAction?.kind === "change-role" ||
+                      accessAction?.kind === "reactivate") &&
+                      accessRolesRequireStepUp(
+                        [],
+                        accessActionStepUpRoles(),
+                        sensitiveAccessRoles,
+                      ) &&
                       !reauthValue.trim())
                   }
                   type="submit"
@@ -3535,27 +3604,19 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         ))}
                     </NativeSelect>
                   </label>
-                  <label className="gm-field">
-                    Perfil nesta unidade
-                    <NativeSelect
-                      onChange={(event) => {
-                        setUnitAccessRole(event.target.value as AccessRole);
-                        setReauthValue("");
-                      }}
-                      value={unitAccessRole}
-                    >
-                      {grantableAccessRoles.map((role) => (
-                        <option key={role.value} value={role.value}>
-                          {role.label}
-                        </option>
-                      ))}
-                    </NativeSelect>
-                    <ul className="people-permission-preview">
-                      {accessRoleHighlights[unitAccessRole].map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </label>
+                  <AccessRolesPicker
+                    id="unit-access-roles"
+                    onChange={(roles) => {
+                      setUnitAccessRoles(roles);
+                      setReauthValue("");
+                    }}
+                    options={grantableAccessRoles}
+                    selected={unitAccessRoles}
+                    unitLabel={
+                      accessOverview.data.units.find((unit) => unit.id === unitAccessUnitId)
+                        ?.name ?? unitAccessUnitId
+                    }
+                  />
                 </>
               )}
               {unitAccessAction?.kind === "remove" && (
@@ -3575,7 +3636,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 />
               </label>
               {stepUpFields(
-                unitAccessAction?.kind === "remove" ? unitAccessAction.role : unitAccessRole,
+                unitAccessAction?.kind === "remove" ? unitAccessAction.roles : unitAccessRoles,
               )}
               {actionError && (
                 <p className="people-page__error" role="alert">
@@ -3597,8 +3658,13 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     actionId === "unit-access" ||
                     unitAccessReason.trim().length < 5 ||
                     (unitAccessAction?.kind === "assign" && !unitAccessUnitId) ||
-                    (sensitiveAccessRoles.has(
-                      unitAccessAction?.kind === "remove" ? unitAccessAction.role : unitAccessRole,
+                    (unitAccessAction?.kind === "assign" && !unitAccessRoles.length) ||
+                    (accessRolesRequireStepUp(
+                      [],
+                      unitAccessAction?.kind === "remove"
+                        ? unitAccessAction.roles
+                        : unitAccessRoles,
+                      sensitiveAccessRoles,
                     ) &&
                       !reauthValue.trim())
                   }
@@ -3782,12 +3848,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       {accessStatusMeta[selectedPerson?.access.status ?? "none"].label}
                     </Badge>
                   </div>
-                  {selectedPerson?.access.role && (
+                  {!!selectedPersonAccessRoles.length && (
                     <p className="people-access-card__meta">
-                      Perfil: <strong>{accessRoleLabel(selectedPerson.access.role)}</strong>
-                      {selectedPerson.access.expiresAt
+                      Funções autorizadas:{" "}
+                      <strong>{accessRolesLabel(selectedPersonAccessRoles)}</strong>
+                      {selectedPerson?.access.expiresAt
                         ? ` · Expira em ${dateLabel(selectedPerson.access.expiresAt)}`
                         : ""}
+                    </p>
+                  )}
+                  {selectedPerson?.access.status === "pending" && (
+                    <p className="people-access-card__meta">
+                      O mesmo PIN será configurado após o aceite e valerá para todas as funções.
                     </p>
                   )}
                   {data.canManage && selectedPerson && canManageSelectedAccess && (
@@ -3833,7 +3905,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                             size="sm"
                             variant="secondary"
                           >
-                            Alterar perfil
+                            Alterar funções
                           </Button>
                           <Button
                             disabled={!online || actionId !== ""}
@@ -3875,7 +3947,9 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       <div className="people-access-card__header">
                         <div>
                           <h4>Unidades liberadas</h4>
-                          <p>Uma identidade, com perfil independente em cada unidade.</p>
+                          <p>
+                            Uma identidade, com funções autorizadas independentes em cada unidade.
+                          </p>
                         </div>
                         {data.canManage &&
                           selectedPerson?.access.status === "active" &&
@@ -3901,7 +3975,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                                 );
                                 if (!target) return;
                                 setUnitAccessUnitId(target.id);
-                                setUnitAccessRole("waiter");
+                                setUnitAccessRoles([]);
                                 setUnitAccessReason("");
                                 setReauthMethod("password");
                                 setReauthValue("");
@@ -3922,7 +3996,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                               <span>
                                 <strong>{assignment.unitName}</strong>
                                 <small>
-                                  {accessRoleLabel(assignment.access.role)}
+                                  {accessRolesLabel(assignment.access.roles)}
                                   {assignment.primary ? " · unidade principal" : ""}
                                   {assignment.delivery
                                     ? ` · convite ${
@@ -3953,7 +4027,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                                     setUnitAccessAction({
                                       kind: "remove",
                                       unitId: assignment.unitId,
-                                      role: (assignment.access.role ?? "waiter") as AccessRole,
+                                      roles: assignment.access.roles as AccessRole[],
+                                      revision: assignment.access.revision,
                                     });
                                   }}
                                   size="sm"
@@ -3968,7 +4043,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       <div className="people-access-card__header">
                         <div>
                           <h4>Histórico de acesso</h4>
-                          <p>Convites, perfis e desligamentos com responsável identificado.</p>
+                          <p>Convites, funções e desligamentos com responsável identificado.</p>
                         </div>
                       </div>
                       <div className="management-list">

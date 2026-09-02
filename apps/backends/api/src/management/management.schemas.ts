@@ -1024,6 +1024,14 @@ export const personAccessRoleSchema = z.enum([
 ]);
 
 const personAccessEmailSchema = z.string().trim().toLowerCase().email().max(254);
+const personAccessRolesSchema = z
+  .array(personAccessRoleSchema)
+  .min(1)
+  .max(personAccessRoleSchema.options.length)
+  .refine((roles) => new Set(roles).size === roles.length, {
+    message: "Não repita uma função de acesso.",
+  });
+const personAccessExpectedRevisionSchema = z.number().int().positive().optional();
 
 export const personAccessStepUpSchema = z
   .object({
@@ -1037,33 +1045,126 @@ export const personAccessStepUpSchema = z
     message: "Confirme com a senha atual ou com um código MFA.",
   });
 
-export const personAccessInviteSchema = z.object({
-  email: personAccessEmailSchema,
-  role: personAccessRoleSchema,
-  reauth: personAccessStepUpSchema.optional(),
-});
+export const personAccessInviteSchema = z
+  .object({
+    email: personAccessEmailSchema,
+    role: personAccessRoleSchema.optional(),
+    roles: personAccessRolesSchema.optional(),
+    expectedRevision: personAccessExpectedRevisionSchema,
+    reauth: personAccessStepUpSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.role && !value.roles) {
+      context.addIssue({
+        code: "custom",
+        message: "Selecione ao menos uma função.",
+        path: ["roles"],
+      });
+    }
+    if (value.role && value.roles && value.roles[0] !== value.role) {
+      context.addIssue({
+        code: "custom",
+        message: "A função legada deve ser a primeira função selecionada.",
+        path: ["role"],
+      });
+    }
+  })
+  .transform((value) => {
+    const roles = value.roles ?? (value.role ? [value.role] : []);
+    const [role] = roles;
+    if (!role) throw new Error("Person access role validation failed");
+    return { ...value, role, roles };
+  });
 
-export const personAccessRoleUpdateSchema = z.object({
-  role: personAccessRoleSchema,
-  reason: z.string().trim().min(5).max(1_000),
-  reauth: personAccessStepUpSchema.optional(),
-});
+export const personAccessRoleUpdateSchema = z
+  .object({
+    role: personAccessRoleSchema.optional(),
+    roles: personAccessRolesSchema.optional(),
+    expectedRevision: personAccessExpectedRevisionSchema,
+    reason: z.string().trim().min(5).max(1_000),
+    reauth: personAccessStepUpSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.role && !value.roles) {
+      context.addIssue({
+        code: "custom",
+        message: "Selecione ao menos uma função.",
+        path: ["roles"],
+      });
+    }
+    if (value.role && value.roles && value.roles[0] !== value.role) {
+      context.addIssue({
+        code: "custom",
+        message: "A função legada deve ser a primeira função selecionada.",
+        path: ["role"],
+      });
+    }
+  })
+  .transform((value) => {
+    const roles = value.roles ?? (value.role ? [value.role] : []);
+    const [role] = roles;
+    if (!role) throw new Error("Person access role validation failed");
+    return { ...value, role, roles };
+  });
 
-export const personAccessReactivateSchema = z.object({
-  role: personAccessRoleSchema.optional(),
-  reason: z.string().trim().min(5).max(1_000),
-  reauth: personAccessStepUpSchema.optional(),
-});
+export const personAccessReactivateSchema = z
+  .object({
+    role: personAccessRoleSchema.optional(),
+    roles: personAccessRolesSchema.optional(),
+    expectedRevision: personAccessExpectedRevisionSchema,
+    reason: z.string().trim().min(5).max(1_000),
+    reauth: personAccessStepUpSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.role && value.roles && value.roles[0] !== value.role) {
+      context.addIssue({
+        code: "custom",
+        message: "A função legada deve ser a primeira função selecionada.",
+        path: ["role"],
+      });
+    }
+  })
+  .transform((value) => {
+    const roles = value.roles ?? (value.role ? [value.role] : undefined);
+    const role = roles?.[0];
+    return role ? { ...value, role, roles } : value;
+  });
 
-export const personUnitAccessSchema = z.object({
-  unitId: id,
-  role: personAccessRoleSchema,
-  reason: z.string().trim().min(5).max(1_000),
-  reauth: personAccessStepUpSchema.optional(),
-});
+export const personUnitAccessSchema = z
+  .object({
+    unitId: id,
+    role: personAccessRoleSchema.optional(),
+    roles: personAccessRolesSchema.optional(),
+    expectedRevision: personAccessExpectedRevisionSchema,
+    reason: z.string().trim().min(5).max(1_000),
+    reauth: personAccessStepUpSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.role && !value.roles) {
+      context.addIssue({
+        code: "custom",
+        message: "Selecione ao menos uma função.",
+        path: ["roles"],
+      });
+    }
+    if (value.role && value.roles && value.roles[0] !== value.role) {
+      context.addIssue({
+        code: "custom",
+        message: "A função legada deve ser a primeira função selecionada.",
+        path: ["role"],
+      });
+    }
+  })
+  .transform((value) => {
+    const roles = value.roles ?? (value.role ? [value.role] : []);
+    const [role] = roles;
+    if (!role) throw new Error("Person access role validation failed");
+    return { ...value, role, roles };
+  });
 
 export const personUnitAccessRemovalSchema = z.object({
   reason: z.string().trim().min(5).max(1_000),
+  expectedRevision: personAccessExpectedRevisionSchema,
   reauth: personAccessStepUpSchema.optional(),
 });
 
@@ -1093,6 +1194,7 @@ export const personUpdateSchema = personFieldsSchema
 
 export const personStatusSchema = z.object({
   reason: z.string().trim().min(5).max(1_000),
+  expectedRevision: personAccessExpectedRevisionSchema,
 });
 
 export const peopleListQuerySchema = z.object({

@@ -1,7 +1,18 @@
-import type { ComponentProps } from "react";
+import type { ChangeEvent, ComponentProps } from "react";
 import { cn } from "../../lib/utils";
 
-export function Input({ className, type, ...props }: ComponentProps<"input">) {
+type InputProps = ComponentProps<"input"> & { "data-currency"?: "brl" };
+
+function formatBrazilianCurrencyInput(value: string): string {
+  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  if (!digits) return "";
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(digits) / 100);
+}
+
+export function Input({ className, type, onChange, ...props }: InputProps) {
   const isChoice = type === "checkbox" || type === "radio";
 
   return (
@@ -16,6 +27,11 @@ export function Input({ className, type, ...props }: ComponentProps<"input">) {
       data-slot="input"
       type={type}
       {...props}
+      onChange={(event: ChangeEvent<HTMLInputElement>) => {
+        if (props["data-currency"] === "brl")
+          event.currentTarget.value = formatBrazilianCurrencyInput(event.currentTarget.value);
+        onChange?.(event);
+      }}
     />
   );
 }

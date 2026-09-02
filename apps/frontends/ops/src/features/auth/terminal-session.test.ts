@@ -32,6 +32,12 @@ describe("terminal session projection", () => {
       unitId: "unit-1",
     });
     expect(session?.profile.permissions).toContain("salon.operate");
+    expect(session?.profile.permissions).toEqual([
+      "dashboard.view",
+      "salon.operate",
+      "counter.operate",
+      "kds.operate",
+    ]);
     expect(session?.profile.permissions).not.toContain("people.manage");
     expect(session?.profile.permissions).not.toContain("finance.manage");
     expect(session?.profile.permissions).not.toContain("catalog.manage");

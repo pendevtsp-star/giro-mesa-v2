@@ -951,6 +951,16 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await commandDialog.getByRole("button", { name: "Fechar" }).click();
   await page.getByRole("button", { name: "Recolher menu lateral" }).click();
   await expect(page.locator(".sidebar")).toHaveClass(/sidebar--collapsed/);
+  const collapsedSidebar = page.locator(".sidebar--collapsed");
+  expect(
+    await collapsedSidebar
+      .locator("summary.nav-group__title, summary.nav-section__title")
+      .evaluateAll((titles) => titles.every((title) => getComputedStyle(title).display === "none")),
+  ).toBe(true);
+  await expect(collapsedSidebar.getByRole("link", { name: "Mesas e comandas" })).toHaveAttribute(
+    "title",
+    "Mesas e comandas",
+  );
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem("giromesa_sidebar_collapsed")))
     .toBe("true");

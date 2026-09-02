@@ -1,3 +1,4 @@
+import { createReadStream } from "node:fs";
 import {
   type AcceptMembershipInviteInput,
   acceptMembershipInviteSchema,
@@ -7,11 +8,13 @@ import {
   createOrganizationSchema,
   type EdgeHubPairingCreateInput,
   type EdgeHubPairingRedeemInput,
+  type EdgeHubPilotFeedbackInput,
   type EnrollDeviceInput,
   edgeHubPairingCreateResponseSchema,
   edgeHubPairingCreateSchema,
   edgeHubPairingRedeemResponseSchema,
   edgeHubPairingRedeemSchema,
+  edgeHubPilotFeedbackSchema,
   enrollDeviceSchema,
   establishmentSettingsHistoryEntrySchema,
   establishmentSettingsSchema,
@@ -39,10 +42,14 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
+  Res,
+  StreamableFile,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
+import type { FastifyReply } from "fastify";
 import { z } from "zod";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
@@ -244,6 +251,47 @@ export class OrganizationsController {
     @Body(new ZodPipe(edgeHubPairingCreateSchema)) body: EdgeHubPairingCreateInput,
   ) {
     return this.organizationsService.createEdgeHubPairing(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      body,
+    );
+  }
+
+  @Get(":organizationId/units/:unitId/edge-hub-installer")
+  async downloadEdgeHubInstaller(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Query("pairingId", ParseUUIDPipe) pairingId: string,
+    @Res({ passthrough: true }) response: FastifyReply,
+  ) {
+    const installer = await this.organizationsService.prepareEdgeHubInstallerDownload(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      pairingId,
+    );
+    response.header("Cache-Control", "private, no-store");
+    response.header("Content-Disposition", `attachment; filename="${installer.filename}"`);
+    response.header("Content-Length", String(installer.size));
+    response.header("Content-Type", "application/vnd.microsoft.portable-executable");
+    response.header("X-Content-Type-Options", "nosniff");
+    response.header("X-GiroMesa-Installer-Channel", installer.channel);
+    response.header("X-GiroMesa-Installer-Sha256", installer.sha256);
+    response.header("X-GiroMesa-Installer-Version", installer.version);
+    return new StreamableFile(createReadStream(installer.filePath));
+  }
+
+  @ApiBody({ schema: toOpenApiSchema(edgeHubPilotFeedbackSchema) })
+  @Post(":organizationId/units/:unitId/edge-hub-pilot-feedback")
+  recordEdgeHubPilotFeedback(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(edgeHubPilotFeedbackSchema)) body: EdgeHubPilotFeedbackInput,
+  ) {
+    return this.organizationsService.recordEdgeHubPilotFeedback(
       request.auth.identityId,
       organizationId,
       unitId,

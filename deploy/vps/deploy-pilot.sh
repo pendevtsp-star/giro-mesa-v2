@@ -37,7 +37,7 @@ provenance_script="$release_dir/deploy/vps/verify-image-provenance.sh"
 for file in "$compose_file" "$images_file" "$observability_file" "$backup_script" "$fiscal_storage_check" "$fiscal_schema_check" "$fiscal_release_manifest" "$release_package" "$provenance_script"; do
   if [[ ! -f $file ]]; then echo "DEPLOY_FILE_REQUIRED:$file" >&2; exit 1; fi
 done
-for tool in docker python3 tar sha256sum curl readlink; do
+for tool in docker python3 tar sha256sum curl readlink awk; do
   if ! command -v "$tool" >/dev/null 2>&1; then echo "DEPLOY_TOOL_REQUIRED:$tool" >&2; exit 1; fi
 done
 
@@ -56,6 +56,24 @@ if "\n" in value or "\r" in value: raise SystemExit(1)
 print(value, end="")
 PY
 }
+
+installer_host_path=$(read_env_key EDGE_HUB_INSTALLER_HOST_PATH)
+expected_installer_host_path=$root/shared/edge-hub-installer
+if [[ $installer_host_path != "$expected_installer_host_path" ]]; then
+  echo "EDGE_HUB_INSTALLER_HOST_PATH_INVALID" >&2
+  exit 1
+fi
+mkdir -p "$installer_host_path"
+chmod 750 "$installer_host_path"
+installer_version=$(read_env_key EDGE_HUB_WINDOWS_INSTALLER_VERSION)
+installer_sha256=$(read_env_key EDGE_HUB_WINDOWS_INSTALLER_SHA256)
+installer_organizations=$(read_env_key EDGE_HUB_PILOT_ORGANIZATION_IDS)
+if [[ -n $installer_version || -n $installer_sha256 || -n $installer_organizations ]]; then
+  installer_file=$installer_host_path/GiroMesa-Conector-Setup.exe
+  [[ -f $installer_file && ! -L $installer_file ]] || { echo "EDGE_HUB_INSTALLER_FILE_REQUIRED" >&2; exit 1; }
+  actual_installer_sha256=$(sha256sum "$installer_file" | awk '{print $1}')
+  [[ $actual_installer_sha256 == "${installer_sha256,,}" ]] || { echo "EDGE_HUB_INSTALLER_SHA256_MISMATCH" >&2; exit 1; }
+fi
 
 python3 - "$fiscal_release_manifest" "$release_package" "$env_file" <<'PY'
 import base64, datetime, json, pathlib, re, sys

@@ -5,6 +5,7 @@ import { api } from "../../api";
 import {
   currencyToCents,
   dateLabel,
+  formatCurrencyInput,
   type ManagementScope,
   operationalKey,
   parseCash,
@@ -632,8 +633,11 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                         <label>
                           Valor
                           <Input
+                            data-currency="brl"
                             inputMode="decimal"
-                            onChange={(event) => setMovementAmount(event.target.value)}
+                            onChange={(event) =>
+                              setMovementAmount(formatCurrencyInput(event.target.value))
+                            }
                             placeholder="0,00"
                             required
                             value={movementAmount}
@@ -689,7 +693,9 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                           Valor
                           <Input
                             inputMode="decimal"
-                            onChange={(event) => setTransferAmount(event.target.value)}
+                            onChange={(event) =>
+                              setTransferAmount(formatCurrencyInput(event.target.value))
+                            }
                             placeholder="0,00"
                             required
                             value={transferAmount}
@@ -729,7 +735,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                           <Input
                             inputMode="decimal"
                             onChange={(event) => {
-                              setCounted(event.target.value);
+                              setCounted(formatCurrencyInput(event.target.value));
                               setConfirmClose(false);
                             }}
                             placeholder="0,00"
@@ -747,7 +753,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                                 onChange={(event) => {
                                   setTenderCounts((current) => ({
                                     ...current,
-                                    [method]: event.target.value,
+                                    [method]: formatCurrencyInput(event.target.value),
                                   }));
                                   setConfirmClose(false);
                                 }}
@@ -869,7 +875,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                       Fundo de caixa (R$)
                       <Input
                         inputMode="decimal"
-                        onChange={(event) => setOpening(event.target.value)}
+                        onChange={(event) => setOpening(formatCurrencyInput(event.target.value))}
                         placeholder="0,00"
                         required
                         value={opening}

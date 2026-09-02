@@ -172,6 +172,12 @@ elif len(qr_table_token_secret.strip()) < 32:
 
 runtime_defaults = {
     "MEDIA_ROOT": "/app/data/media",
+    "EDGE_HUB_INSTALLER_HOST_PATH": "/srv/apps/giromesa-v2/shared/edge-hub-installer",
+    "EDGE_HUB_WINDOWS_INSTALLER_PATH": "/app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe",
+    "EDGE_HUB_WINDOWS_INSTALLER_CHANNEL": "pilot",
+    "EDGE_HUB_WINDOWS_INSTALLER_VERSION": "",
+    "EDGE_HUB_WINDOWS_INSTALLER_SHA256": "",
+    "EDGE_HUB_PILOT_ORGANIZATION_IDS": "",
     "SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS": "300",
     "NEXT_PUBLIC_REDE_STORE_URL": "",
     "NEXT_PUBLIC_PAYGO_STORE_URL": "",
@@ -183,6 +189,28 @@ for name, default in runtime_defaults.items():
         additions[name] = default
 if values.get("MEDIA_ROOT", "/app/data/media") != "/app/data/media":
     print("MEDIA_ROOT_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("EDGE_HUB_INSTALLER_HOST_PATH", "/srv/apps/giromesa-v2/shared/edge-hub-installer") != "/srv/apps/giromesa-v2/shared/edge-hub-installer":
+    print("EDGE_HUB_INSTALLER_HOST_PATH_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("EDGE_HUB_WINDOWS_INSTALLER_PATH", "/app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe") != "/app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe":
+    print("EDGE_HUB_WINDOWS_INSTALLER_PATH_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+if values.get("EDGE_HUB_WINDOWS_INSTALLER_CHANNEL", "pilot") not in {"pilot", "stable"}:
+    print("EDGE_HUB_WINDOWS_INSTALLER_CHANNEL_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+installer_sha256 = values.get("EDGE_HUB_WINDOWS_INSTALLER_SHA256", "")
+if installer_sha256 and not re.fullmatch(r"[a-fA-F0-9]{64}", installer_sha256):
+    print("EDGE_HUB_WINDOWS_INSTALLER_SHA256_INVALID", file=sys.stderr)
+    raise SystemExit(1)
+installer_version = values.get("EDGE_HUB_WINDOWS_INSTALLER_VERSION", "").strip()
+installer_organizations = values.get("EDGE_HUB_PILOT_ORGANIZATION_IDS", "").strip()
+installer_enabled = bool(installer_version or installer_sha256 or installer_organizations)
+if installer_enabled and (not installer_version or not installer_sha256):
+    print("EDGE_HUB_INSTALLER_METADATA_INCOMPLETE", file=sys.stderr)
+    raise SystemExit(1)
+if installer_enabled and values.get("EDGE_HUB_WINDOWS_INSTALLER_CHANNEL", "pilot") == "pilot" and not installer_organizations:
+    print("EDGE_HUB_PILOT_ORGANIZATION_IDS_REQUIRED", file=sys.stderr)
     raise SystemExit(1)
 smartpos_skew = values.get("SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS", "300")
 if not smartpos_skew.isascii() or not smartpos_skew.isdigit() or not 30 <= int(smartpos_skew) <= 900:

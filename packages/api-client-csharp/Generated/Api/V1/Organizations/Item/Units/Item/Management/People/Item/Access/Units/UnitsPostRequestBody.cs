@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The reason property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -32,6 +34,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
 #endif
         /// <summary>The role property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_role? Role { get; set; }
+        /// <summary>The roles property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_roles?>? Roles { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_roles?> Roles { get; set; }
+#endif
         /// <summary>The unitId property</summary>
         public Guid? UnitId { get; set; }
         /// <summary>
@@ -59,9 +69,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
                 { "reauth", n => { Reauth = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_reauth>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_reauth.CreateFromDiscriminatorValue); } },
                 { "role", n => { Role = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_role>(); } },
+                { "roles", n => { Roles = n.GetCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_roles>()?.AsList(); } },
                 { "unitId", n => { UnitId = n.GetGuidValue(); } },
             };
         }
@@ -72,9 +84,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("reason", Reason);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_reauth>("reauth", Reauth);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_role>("role", Role);
+            writer.WriteCollectionOfEnumValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.UnitsPostRequestBody_roles>("roles", Roles);
             writer.WriteGuidValue("unitId", UnitId);
             writer.WriteAdditionalData(AdditionalData);
         }

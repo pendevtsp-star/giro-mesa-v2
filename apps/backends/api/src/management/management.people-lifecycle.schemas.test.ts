@@ -45,7 +45,25 @@ describe("people lifecycle schemas", () => {
       roleLabel: "Garçonete",
       access: { email: " ANA@EXAMPLE.COM ", role: "waiter" },
     });
-    assert.deepEqual(person.access, { email: "ana@example.com", role: "waiter" });
+    assert.deepEqual(person.access, {
+      email: "ana@example.com",
+      role: "waiter",
+      roles: ["waiter"],
+    });
+    assert.deepEqual(
+      personAccessInviteSchema.parse({
+        email: "ana@example.com",
+        roles: ["waiter", "cashier"],
+      }).roles,
+      ["waiter", "cashier"],
+    );
+    assert.equal(
+      personAccessInviteSchema.safeParse({
+        email: "ana@example.com",
+        roles: ["waiter", "waiter"],
+      }).success,
+      false,
+    );
     assert.equal(
       personAccessInviteSchema.safeParse({ email: "invalido", role: "cashier" }).success,
       false,
@@ -72,7 +90,7 @@ describe("people lifecycle schemas", () => {
     assert.equal(
       personUnitAccessSchema.safeParse({
         unitId: "00000000-0000-4000-8000-000000000001",
-        role: "manager",
+        roles: ["manager", "finance"],
         reason: "Cobertura da unidade",
         reauth: { mfaCode: "123456" },
       }).success,

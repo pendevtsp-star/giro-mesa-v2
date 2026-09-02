@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "targetMigration": "0076_edge_hub_pairing",
+  "targetMigration": "0077_people_multi_role_access",
   "transitions": [
     {
       "appliedBefore": "0026_doseclub_integration",
       "appliedBeforeWhen": "1786493658116",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -19,7 +19,7 @@
     {
       "appliedBefore": "0042_shallow_lenny_balinger",
       "appliedBeforeWhen": "1787029862431",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -33,7 +33,7 @@
     {
       "appliedBefore": "0045_strong_pride",
       "appliedBeforeWhen": "1787256690924",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -47,7 +47,7 @@
     {
       "appliedBefore": "0053_petite_trauma",
       "appliedBeforeWhen": "1787373316439",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -61,7 +61,7 @@
     {
       "appliedBefore": "0074_crm_operational_inbox",
       "appliedBeforeWhen": "1787709600000",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -75,7 +75,7 @@
     {
       "appliedBefore": "0075_platform_staff_invitations",
       "appliedBeforeWhen": "1787796000000",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,
@@ -89,7 +89,21 @@
     {
       "appliedBefore": "0076_edge_hub_pairing",
       "appliedBeforeWhen": "1788307200000",
-      "appliedAfter": "0076_edge_hub_pairing",
+      "appliedAfter": "0077_people_multi_role_access",
+      "recoveryMigration": "0045_strong_pride",
+      "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
+      "testedUpgrade": true,
+      "evidence": {
+        "path": "docs/evidence/recovery/5421ce-validation.json",
+        "sha256": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0",
+        "workflowRun": "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/32503278065",
+        "testReportDigest": "sha256:2fe6505087b0a66fa2388c3a29b2ff425d905680ef6ced6cf8c15dce5f5ba9d0"
+      }
+    },
+    {
+      "appliedBefore": "0077_people_multi_role_access",
+      "appliedBeforeWhen": "1788310800000",
+      "appliedAfter": "0077_people_multi_role_access",
       "recoveryMigration": "0045_strong_pride",
       "recoveryArtifact": "git:5421cefb866576183119b265fcaa9f042745e591",
       "testedUpgrade": true,

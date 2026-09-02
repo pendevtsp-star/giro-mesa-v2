@@ -365,6 +365,7 @@ export function CashAdministrationPanels({
                 Aprovação acima de (R$)
                 <Input
                   inputMode="decimal"
+                  data-currency="brl"
                   onChange={(event) => setMovementThreshold(event.target.value)}
                   value={movementThreshold}
                 />
@@ -373,6 +374,7 @@ export function CashAdministrationPanels({
                 Divergência crítica acima de (R$)
                 <Input
                   inputMode="decimal"
+                  data-currency="brl"
                   onChange={(event) => setDifferenceThreshold(event.target.value)}
                   value={differenceThreshold}
                 />

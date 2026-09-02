@@ -74,8 +74,8 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0076_edge_hub_pairing");
-  assert.equal(matrix.transitions.length, 7);
+  assert.equal(matrix.targetMigration, "0077_people_multi_role_access");
+  assert.equal(matrix.transitions.length, 8);
   const [
     transition,
     previousProductionTransition,
@@ -83,6 +83,7 @@ test("privileged recovery authorization binds the versioned evidence file", () =
     latestProductionTransition,
     previousAppTransition,
     appOnlyTransition,
+    previousTargetTransition,
     currentTargetTransition,
   ] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
@@ -136,8 +137,15 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(appOnlyTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(appOnlyTransition.testedUpgrade, true);
   assert.deepEqual(appOnlyTransition.evidence, transition.evidence);
+  assert.equal(previousTargetTransition.appliedBefore, "0076_edge_hub_pairing");
+  assert.equal(previousTargetTransition.appliedBeforeWhen, "1788307200000");
+  assert.equal(previousTargetTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(previousTargetTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(previousTargetTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(previousTargetTransition.testedUpgrade, true);
+  assert.deepEqual(previousTargetTransition.evidence, transition.evidence);
   assert.equal(currentTargetTransition.appliedBefore, matrix.targetMigration);
-  assert.equal(currentTargetTransition.appliedBeforeWhen, "1788307200000");
+  assert.equal(currentTargetTransition.appliedBeforeWhen, "1788310800000");
   assert.equal(currentTargetTransition.appliedAfter, matrix.targetMigration);
   assert.equal(currentTargetTransition.recoveryMigration, "0045_strong_pride");
   assert.equal(currentTargetTransition.recoveryArtifact, transition.recoveryArtifact);

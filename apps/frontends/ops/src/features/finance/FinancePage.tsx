@@ -572,7 +572,13 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                         </label>
                         <label>
                           Valor da parcela
-                          <Input inputMode="decimal" name="amount" placeholder="0,00" required />
+                          <Input
+                            data-currency="brl"
+                            inputMode="decimal"
+                            name="amount"
+                            placeholder="0,00"
+                            required
+                          />
                         </label>
                         <label className="finance-wide">
                           Descrição
@@ -1047,6 +1053,7 @@ function EntryPanel({
               Valor
               <Input
                 inputMode="decimal"
+                data-currency="brl"
                 onChange={(event) => onSettlementAmount(event.target.value)}
                 required
                 value={settlementAmount}
@@ -1294,6 +1301,7 @@ function SettingsPanel({
             }
             disabled={!canConfigure}
             inputMode="decimal"
+            data-currency="brl"
             name="threshold"
             placeholder="Sem limite"
           />

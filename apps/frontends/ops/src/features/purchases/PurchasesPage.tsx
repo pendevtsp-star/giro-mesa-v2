@@ -1030,6 +1030,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                               <span>Custo unitário (R$)</span>
                               <Input
                                 inputMode="decimal"
+                                data-currency="brl"
                                 onChange={(event) =>
                                   patchLine(line.key, { unitCost: event.target.value })
                                 }
@@ -1292,6 +1293,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                         <span>Total de tributos (R$)</span>
                         <Input
                           inputMode="decimal"
+                          data-currency="brl"
                           onChange={(event) => setInvoiceTaxTotal(event.target.value)}
                           value={invoiceTaxTotal}
                         />
@@ -1359,6 +1361,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                       <span>Tolerância para conciliação (R$)</span>
                       <Input
                         inputMode="decimal"
+                        data-currency="brl"
                         onChange={(event) => setInvoiceTolerance(event.target.value)}
                         value={invoiceTolerance}
                       />
@@ -1367,6 +1370,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                       <span>Valor da fatura (R$)</span>
                       <Input
                         inputMode="decimal"
+                        data-currency="brl"
                         onChange={(event) => setInvoiceAmount(event.target.value)}
                         required
                         value={invoiceAmount}
@@ -1388,6 +1392,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                                 <span>Quantidade</span>
                                 <Input
                                   inputMode="decimal"
+                                  data-currency="brl"
                                   onChange={(event) =>
                                     setInvoiceLineDrafts((all) => ({
                                       ...all,

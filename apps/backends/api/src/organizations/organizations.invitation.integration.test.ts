@@ -5,6 +5,7 @@ import {
   identities,
   managementPeople,
   managementPersonAccess,
+  managementPersonRoleAssignments,
   membershipInvitations,
   memberships,
   organizations,
@@ -106,18 +107,64 @@ it("links an invited person and exposes the employee name to the floor", async (
       statusChangedByIdentityId: owner.id,
       statusChangeReason: "Convite enviado.",
     });
+    await database.db.insert(managementPersonRoleAssignments).values([
+      {
+        personId: person.id,
+        organizationId: organization.id,
+        unitId: unit.id,
+        role: "waiter",
+        provenance: "people_invite",
+      },
+      {
+        personId: person.id,
+        organizationId: organization.id,
+        unitId: unit.id,
+        role: "cashier",
+        provenance: "people_invite",
+      },
+    ]);
 
     await assert.rejects(
       () => organizationService.acceptInvite(owner.id, { token }),
       (error) => errorCode(error) === "INVITATION_ACCOUNT_MISMATCH",
     );
-    await organizationService.acceptInvite(waiter.id, { token });
+    const accepted = await organizationService.acceptInvite(waiter.id, { token });
 
     const [linkedPerson] = await database.db
       .select({ identityId: managementPeople.identityId })
       .from(managementPeople)
       .where(eq(managementPeople.id, person.id));
     assert.equal(linkedPerson?.identityId, waiter.id);
+    const bindings = await database.db
+      .select({ role: roleBindings.role })
+      .from(roleBindings)
+      .where(eq(roleBindings.membershipId, accepted.membershipId));
+    assert.deepEqual(bindings.map((binding) => binding.role).sort(), ["cashier", "waiter"]);
+    const extraToken = randomUUID().replaceAll("-", "") + randomUUID().replaceAll("-", "");
+    await database.db.insert(membershipInvitations).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      email: waiter.email,
+      role: "delivery",
+      tokenHash: createHash("sha256").update(extraToken).digest("hex"),
+      invitedByIdentityId: owner.id,
+      expiresAt: new Date(Date.now() + 60_000),
+    });
+    await assert.rejects(
+      () => organizationService.acceptInvite(waiter.id, { token: extraToken }),
+      (error) => errorCode(error) === "PERSON_ROLE_ASSIGNMENT_REQUIRED",
+    );
+    const assignments = await database.db
+      .select({
+        role: managementPersonRoleAssignments.role,
+        roleBindingId: managementPersonRoleAssignments.roleBindingId,
+      })
+      .from(managementPersonRoleAssignments)
+      .where(eq(managementPersonRoleAssignments.personId, person.id));
+    assert.equal(
+      assignments.every((assignment) => Boolean(assignment.roleBindingId)),
+      true,
+    );
     const floor = await pos.listFloor(owner.id, organization.id, unit.id);
     assert.equal(
       floor.staff.find((candidate) => candidate.identityId === waiter.id)?.displayName,

@@ -565,6 +565,7 @@ function LossesArea({ data, onRefresh, scope }: AreaProps) {
                 <Input
                   id="loss-amount"
                   inputMode="decimal"
+                  data-currency="brl"
                   onChange={(event) => setAmount(event.target.value)}
                   placeholder="Usa o saldo da comanda quando vazio"
                   value={amount}
@@ -788,18 +789,20 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
                       <Input
                         aria-label={`Início da faixa ${index + 1}`}
                         inputMode="decimal"
+                        data-currency="brl"
                         onChange={(event) =>
                           updateTier(index, {
                             minimumCents: Math.max(0, currencyToCents(event.target.value)),
                           })
                         }
-                        value={(tier.minimumCents / 100).toFixed(2)}
+                        value={formatMoney(tier.minimumCents).replace(/^R\$\s*/, "")}
                       />
                     </TableCell>
                     <TableCell>
                       <Input
                         aria-label={`Fim da faixa ${index + 1}`}
                         inputMode="decimal"
+                        data-currency="brl"
                         onChange={(event) =>
                           updateTier(index, {
                             maximumCents: event.target.value.trim()
@@ -809,7 +812,9 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
                         }
                         placeholder="Sem limite"
                         value={
-                          tier.maximumCents === null ? "" : (tier.maximumCents / 100).toFixed(2)
+                          tier.maximumCents === null
+                            ? ""
+                            : formatMoney(tier.maximumCents).replace(/^R\$\s*/, "")
                         }
                       />
                     </TableCell>
@@ -831,6 +836,7 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
                       <Input
                         aria-label={`Valor da recompensa ${index + 1}`}
                         inputMode="decimal"
+                        data-currency={tier.rewardType === "fixed" ? "brl" : undefined}
                         onChange={(event) =>
                           updateTier(index, {
                             rewardValue:
@@ -842,7 +848,7 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
                         value={
                           tier.rewardType === "percentage"
                             ? String(tier.rewardValue / 100)
-                            : (tier.rewardValue / 100).toFixed(2)
+                            : formatMoney(tier.rewardValue).replace(/^R\$\s*/, "")
                         }
                       />
                     </TableCell>

@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { it } from "node:test";
-import { identities, memberships, organizations, roleBindings, units } from "@giromesa/db";
+import {
+  identities,
+  managementPeople,
+  managementPersonAccess,
+  managementPersonRoleAssignments,
+  memberships,
+  organizations,
+  roleBindings,
+  units,
+} from "@giromesa/db";
+import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
@@ -146,6 +156,221 @@ it("enforces People policy and serializes overlapping schedules and closures", a
       ),
       true,
     );
+  } finally {
+    await database.onModuleDestroy();
+  }
+});
+
+it("keeps multiple People roles atomic across suspend and reactivate", async (context) => {
+  const databaseUrl = process.env.MANAGEMENT_DATABASE_URL;
+  if (!databaseUrl) {
+    context.skip("MANAGEMENT_DATABASE_URL not configured");
+    return;
+  }
+  process.env.DATABASE_URL = databaseUrl;
+  const database = new DatabaseService();
+  try {
+    const scope = new ScopeService(database);
+    const management = new ManagementService(database, scope);
+    const suffix = randomUUID();
+    const [organization] = await database.db
+      .insert(organizations)
+      .values({
+        legalName: "People multi-role test",
+        tradeName: "People multi-role test",
+        document: suffix.replaceAll("-", "").slice(0, 14),
+      })
+      .returning();
+    assert.ok(organization);
+    const [unit, secondUnit] = await database.db
+      .insert(units)
+      .values([
+        { organizationId: organization.id, name: "People multi-role unit" },
+        { organizationId: organization.id, name: "People multi-role second unit" },
+      ])
+      .returning();
+    assert.ok(unit && secondUnit);
+    const [owner, employee] = await database.db
+      .insert(identities)
+      .values([
+        { email: `multi-owner-${suffix}@example.test`, displayName: "Owner" },
+        { email: `multi-employee-${suffix}@example.test`, displayName: "Employee" },
+      ])
+      .returning();
+    assert.ok(owner && employee);
+    const [ownerMembership, employeeMembership] = await database.db
+      .insert(memberships)
+      .values([
+        { identityId: owner.id, organizationId: organization.id, status: "active" },
+        { identityId: employee.id, organizationId: organization.id, status: "active" },
+      ])
+      .returning();
+    assert.ok(ownerMembership && employeeMembership);
+    const [ownerBinding, employeeBinding] = await database.db
+      .insert(roleBindings)
+      .values([
+        { membershipId: ownerMembership.id, role: "owner" },
+        { membershipId: employeeMembership.id, unitId: unit.id, role: "waiter" },
+      ])
+      .returning();
+    assert.ok(ownerBinding && employeeBinding);
+    const [person] = await database.db
+      .insert(managementPeople)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        identityId: employee.id,
+        name: "Pessoa multifunção",
+        roleLabel: "Atendimento",
+      })
+      .returning();
+    assert.ok(person);
+    await database.db.insert(managementPersonAccess).values({
+      personId: person.id,
+      organizationId: organization.id,
+      unitId: unit.id,
+      email: employee.email,
+      role: "waiter",
+      status: "active",
+      membershipId: employeeMembership.id,
+      roleBindingId: employeeBinding.id,
+    });
+    await database.db.insert(managementPersonRoleAssignments).values({
+      personId: person.id,
+      organizationId: organization.id,
+      unitId: unit.id,
+      role: "waiter",
+      roleBindingId: employeeBinding.id,
+      provenance: "people_admin",
+    });
+
+    const updated = await management.updatePersonAccess(
+      owner.id,
+      organization.id,
+      unit.id,
+      person.id,
+      {
+        role: "waiter",
+        roles: ["waiter", "cashier"],
+        expectedRevision: 1,
+        reason: "Cobertura de atendimento e caixa",
+      },
+    );
+    assert.deepEqual(updated.roles, ["waiter", "cashier"]);
+    assert.equal(updated.revision, 2);
+    await assert.rejects(
+      () =>
+        management.updatePersonAccess(owner.id, organization.id, unit.id, person.id, {
+          role: "waiter",
+          roles: ["waiter"],
+          reason: "Cliente antigo sem revisão",
+        }),
+      (error) => errorCode(error) === "PERSON_ACCESS_CHANGED",
+    );
+
+    const [globalBinding] = await database.db
+      .insert(roleBindings)
+      .values({ membershipId: employeeMembership.id, role: "delivery" })
+      .returning();
+    assert.ok(globalBinding);
+    await assert.rejects(
+      () =>
+        management.suspendPersonAccess(owner.id, organization.id, unit.id, person.id, {
+          reason: "Suspensão operacional autorizada",
+          expectedRevision: 2,
+        }),
+      (error) => errorCode(error) === "PERSON_GLOBAL_ACCESS_REVIEW_REQUIRED",
+    );
+    await database.db.delete(roleBindings).where(eq(roleBindings.id, globalBinding.id));
+
+    const suspended = await management.suspendPersonAccess(
+      owner.id,
+      organization.id,
+      unit.id,
+      person.id,
+      { reason: "Suspensão operacional autorizada", expectedRevision: 2 },
+    );
+    assert.equal(suspended.revision, 3);
+    assert.deepEqual(suspended.roles, ["waiter", "cashier"]);
+    const reactivated = await management.reactivatePersonAccess(
+      owner.id,
+      organization.id,
+      unit.id,
+      person.id,
+      { reason: "Retorno operacional autorizado", expectedRevision: 3 },
+    );
+    assert.equal(reactivated.revision, 4);
+    assert.deepEqual(reactivated.roles, ["waiter", "cashier"]);
+
+    const secondUnitAccess = await management.assignPersonUnitAccess(
+      owner.id,
+      organization.id,
+      unit.id,
+      person.id,
+      {
+        unitId: secondUnit.id,
+        role: "waiter",
+        roles: ["waiter", "cashier"],
+        reason: "Cobertura em segunda unidade",
+      },
+    );
+    assert.deepEqual(secondUnitAccess.roles, ["waiter", "cashier"]);
+
+    const [orphanBinding] = await database.db
+      .insert(roleBindings)
+      .values({
+        membershipId: employeeMembership.id,
+        unitId: unit.id,
+        role: "delivery",
+      })
+      .returning();
+    assert.ok(orphanBinding);
+    await assert.rejects(
+      () =>
+        management.updatePersonAccess(owner.id, organization.id, unit.id, person.id, {
+          role: "waiter",
+          roles: ["waiter", "cashier"],
+          expectedRevision: 4,
+          reason: "Tentativa com vínculo órfão",
+        }),
+      (error) => errorCode(error) === "PERSON_ROLE_ASSIGNMENT_REQUIRED",
+    );
+    await database.db.delete(roleBindings).where(eq(roleBindings.id, orphanBinding.id));
+    await assert.rejects(
+      () =>
+        management.changePersonStatus(owner.id, organization.id, unit.id, person.id, false, {
+          reason: "Desligamento com revisão antiga",
+          expectedRevision: 3,
+        }),
+      (error) => errorCode(error) === "PERSON_ACCESS_CHANGED",
+    );
+    const [offboardingGlobalBinding] = await database.db
+      .insert(roleBindings)
+      .values({ membershipId: employeeMembership.id, role: "delivery" })
+      .returning();
+    assert.ok(offboardingGlobalBinding);
+    await assert.rejects(
+      () =>
+        management.changePersonStatus(owner.id, organization.id, unit.id, person.id, false, {
+          reason: "Desligamento com acesso global",
+        }),
+      (error) => errorCode(error) === "PERSON_GLOBAL_ACCESS_REVIEW_REQUIRED",
+    );
+    await database.db.delete(roleBindings).where(eq(roleBindings.id, offboardingGlobalBinding.id));
+    const offboarded = await management.changePersonStatus(
+      owner.id,
+      organization.id,
+      unit.id,
+      person.id,
+      false,
+      { reason: "Desligamento confirmado", expectedRevision: 4 },
+    );
+    assert.equal(offboarded.active, false);
+    const remainingAssignments = await database.db
+      .select({ id: managementPersonRoleAssignments.id })
+      .from(managementPersonRoleAssignments)
+      .where(eq(managementPersonRoleAssignments.personId, person.id));
+    assert.equal(remainingAssignments.length, 0);
   } finally {
     await database.onModuleDestroy();
   }

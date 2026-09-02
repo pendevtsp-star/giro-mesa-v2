@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0076_edge_hub_pairing",
+  "requiredAppliedMigration": "0077_people_multi_role_access",
   "transitions": [],
   "fullRestore": {
     "required": true,

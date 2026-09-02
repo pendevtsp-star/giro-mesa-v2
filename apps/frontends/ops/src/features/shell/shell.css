@@ -1084,8 +1084,8 @@
   display: none;
 }
 
-.sidebar--collapsed .nav-group__title,
-.sidebar--collapsed .nav-section__title {
+.sidebar.sidebar--collapsed .nav-group > summary.nav-group__title,
+.sidebar.sidebar--collapsed .nav-section > summary.nav-section__title {
   display: none;
 }
 .sidebar--collapsed .nav-group > .nav-group__items,

@@ -294,6 +294,7 @@ export function CatalogProductEditorModal({
               <Label className="gm-field">
                 Preço Salão & Balcão (R$) *
                 <Input
+                  data-currency="brl"
                   value={editingProductPrice}
                   onChange={(e) => setEditingProductPrice(e.target.value)}
                   placeholder="Ex: 38,90"
@@ -304,6 +305,7 @@ export function CatalogProductEditorModal({
               <Label className="gm-field">
                 Preço Delivery (R$)
                 <Input
+                  data-currency="brl"
                   value={editingProductDeliveryPrice}
                   onChange={(e) => setEditingProductDeliveryPrice(e.target.value)}
                   placeholder="Ex: 44,90"

@@ -1290,7 +1290,22 @@ export const edgeHubPairingCreateResponseSchema = z.object({
   code: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
   expiresAt: z.iso.datetime({ offset: true }),
   installerUrl: z.url().nullable(),
+  installer: z
+    .object({
+      channel: z.enum(["pilot", "stable"]),
+      version: z.string().trim().min(1).max(64),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/),
+    })
+    .nullable(),
 });
+
+export const edgeHubPilotFeedbackSchema = z
+  .object({
+    deviceId: idSchema,
+    experience: z.enum(["easy", "minor_difficulty", "blocked"]),
+    comment: z.string().trim().max(1000).optional(),
+  })
+  .strict();
 
 export const edgeHubPairingRedeemResponseSchema = z.object({
   deviceId: idSchema,
@@ -2013,6 +2028,7 @@ export type SelfServiceOrganizationInput = z.infer<typeof selfServiceOrganizatio
 export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;
 export type EdgeHubPairingCreateInput = z.infer<typeof edgeHubPairingCreateSchema>;
 export type EdgeHubPairingRedeemInput = z.infer<typeof edgeHubPairingRedeemSchema>;
+export type EdgeHubPilotFeedbackInput = z.infer<typeof edgeHubPilotFeedbackSchema>;
 export type InviteMembershipInput = z.infer<typeof inviteMembershipSchema>;
 export type OperationalCapability = z.infer<typeof operationalCapabilitySchema>;
 export type AcceptMembershipInviteInput = z.infer<typeof acceptMembershipInviteSchema>;

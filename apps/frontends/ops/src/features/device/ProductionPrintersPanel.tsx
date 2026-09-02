@@ -14,6 +14,8 @@ import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } fro
 import {
   api,
   type EdgeHubPairing,
+  type EdgeHubPilotExperience,
+  edgeHubInstallerDownloadUrl,
   type ProductionPrinter,
   type ProductionPrinterHub,
   type ProductionPrintingPolicy,
@@ -152,6 +154,10 @@ export function ProductionPrintersPanel({
   const [setupStep, setSetupStep] = useState<ProductionSetupStep | null>(null);
   const [computerLabel, setComputerLabel] = useState("Computador da unidade");
   const [pairing, setPairing] = useState<EdgeHubPairing | null>(null);
+  const [installerDownloadStarted, setInstallerDownloadStarted] = useState(false);
+  const [pilotExperience, setPilotExperience] = useState<EdgeHubPilotExperience>("easy");
+  const [pilotComment, setPilotComment] = useState("");
+  const [pilotFeedbackSent, setPilotFeedbackSent] = useState(false);
   const inFlightRef = useRef(new Set<string>());
 
   const loadCloud = useCallback(async () => {
@@ -263,6 +269,27 @@ export function ProductionPrintersPanel({
         : productionSetupReadiness([], [], [], false),
     [cloud, routingReady],
   );
+  const testedPrinter =
+    cloud.status === "ready"
+      ? cloud.printers.find((printer) => Boolean(printer.lastTestAt))
+      : undefined;
+  const pilotDeviceId =
+    testedPrinter?.hubId ??
+    (cloud.status === "ready"
+      ? (cloud.hubs.find((hub) => hub.online)?.id ?? cloud.hubs[0]?.id)
+      : undefined);
+  const installationMilestones =
+    cloud.status === "ready"
+      ? [
+          {
+            complete: installerDownloadStarted || cloud.hubs.length > 0,
+            label: "Download iniciado",
+          },
+          { complete: cloud.hubs.length > 0, label: "Conector instalado" },
+          { complete: cloud.printers.length > 0, label: "Impressora configurada" },
+          { complete: Boolean(testedPrinter), label: "Teste impresso" },
+        ]
+      : [];
 
   useEffect(() => {
     if (cloud.status === "ready" && setupStep === null) {
@@ -307,6 +334,44 @@ export function ProductionPrintersPanel({
       setToast({ tone: "success", message: "Código copiado." });
     } catch {
       setToast({ tone: "info", message: "Selecione o código e copie manualmente." });
+    }
+  }
+
+  function downloadInstaller() {
+    if (!pairing) return;
+    const url =
+      pairing.installerUrl ??
+      edgeHubInstallerDownloadUrl(organizationId, unitId, pairing.pairingId);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.rel = "noopener noreferrer";
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setInstallerDownloadStarted(true);
+  }
+
+  async function submitPilotFeedback(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!pilotDeviceId) return;
+    const actionKey = `edge-hub-pilot-feedback:${pilotDeviceId}`;
+    if (!beginAction(actionKey)) return;
+    try {
+      await api.submitEdgeHubPilotFeedback(organizationId, unitId, {
+        deviceId: pilotDeviceId,
+        experience: pilotExperience,
+        ...(pilotComment.trim() ? { comment: pilotComment.trim() } : {}),
+      });
+      setPilotFeedbackSent(true);
+      setPilotComment("");
+      setToast({ tone: "success", message: "Obrigado. O retorno do teste foi registrado." });
+    } catch (error) {
+      setToast({
+        tone: "danger",
+        message: errorMessage(error, "Não foi possível registrar o retorno do teste."),
+      });
+    } finally {
+      finishAction(actionKey);
     }
   }
 
@@ -597,6 +662,23 @@ export function ProductionPrintersPanel({
             </Card>
           </section>
 
+          {(pairing || cloud.hubs.length > 0) && (
+            <Card className="production-installation-progress">
+              <div>
+                <strong>Progresso da instalação</strong>
+                <small>O GiroMesa confirma automaticamente cada etapa concluída.</small>
+              </div>
+              <ol aria-label="Etapas da instalação do Conector GiroMesa">
+                {installationMilestones.map((milestone, index) => (
+                  <li data-complete={milestone.complete} key={milestone.label}>
+                    <span aria-hidden="true">{milestone.complete ? "✓" : index + 1}</span>
+                    {milestone.label}
+                  </li>
+                ))}
+              </ol>
+            </Card>
+          )}
+
           {activeStep === "computer" && (
             <section className="production-setup-panel" aria-labelledby="production-computer-title">
               <div className="production-printers__section-heading">
@@ -613,13 +695,30 @@ export function ProductionPrintersPanel({
               </div>
               {cloud.hubs.length === 0 ? (
                 <Card className="production-pairing">
-                  <div>
-                    <strong>Instale o Conector GiroMesa</strong>
-                    <p>
-                      Baixe no computador que ficará ligado na unidade. O instalador pedirá apenas o
-                      código mostrado aqui.
-                    </p>
+                  <div className="production-pairing__heading">
+                    <div>
+                      <strong>Instale o Conector GiroMesa</strong>
+                      <p>
+                        Baixe no computador que ficará ligado na unidade. O instalador pedirá apenas
+                        o código mostrado aqui.
+                      </p>
+                    </div>
+                    {pairing?.installer?.channel === "pilot" && (
+                      <Badge tone="warning">Versão piloto</Badge>
+                    )}
                   </div>
+                  {pairing?.installer?.channel === "pilot" && (
+                    <Callout tone="warning">
+                      Esta versão é exclusiva para o teste autorizado desta unidade. O Windows pode
+                      informar que o editor ainda não é reconhecido publicamente; prossiga somente
+                      com o arquivo baixado por esta tela.
+                    </Callout>
+                  )}
+                  {!pairing && (
+                    <p>
+                      Primeiro gere o código. Depois, use o botão de download que aparecerá aqui.
+                    </p>
+                  )}
                   <FormField htmlFor="production-computer-label" label="Nome do computador">
                     <Input
                       id="production-computer-label"
@@ -629,23 +728,17 @@ export function ProductionPrintersPanel({
                     />
                   </FormField>
                   <div className="production-pairing__actions">
-                    {pairing?.installerUrl ? (
-                      <Button
-                        onClick={() =>
-                          window.open(
-                            pairing.installerUrl as string,
-                            "_blank",
-                            "noopener,noreferrer",
-                          )
-                        }
-                        variant="secondary"
-                      >
-                        Baixar para Windows
+                    {pairing?.installer || pairing?.installerUrl ? (
+                      <Button onClick={downloadInstaller}>
+                        {pairing.installer?.channel === "pilot"
+                          ? "Baixar versão piloto"
+                          : "Baixar para Windows"}
                       </Button>
                     ) : null}
                     <Button
                       disabled={busyAction === "edge-hub-pairing"}
                       onClick={() => void createComputerPairing()}
+                      variant={pairing ? "secondary" : "primary"}
                     >
                       {busyAction === "edge-hub-pairing" ? "Criando…" : "Gerar código de conexão"}
                     </Button>
@@ -657,7 +750,19 @@ export function ProductionPrintersPanel({
                       <Button onClick={() => void copyPairingCode()} size="sm" variant="secondary">
                         Copiar código
                       </Button>
-                      {!pairing.installerUrl && (
+                      {pairing.installer && (
+                        <dl className="production-installer-details">
+                          <div>
+                            <dt>Versão</dt>
+                            <dd>{pairing.installer.version}</dd>
+                          </div>
+                          <div>
+                            <dt>Código de verificação (SHA-256)</dt>
+                            <dd>{pairing.installer.sha256}</dd>
+                          </div>
+                        </dl>
+                      )}
+                      {!pairing.installerUrl && !pairing.installer && (
                         <small>
                           O download ainda não está disponível. Entre em contato com o suporte.
                         </small>
@@ -665,6 +770,20 @@ export function ProductionPrintersPanel({
                     </div>
                   ) : (
                     <small>O código vale por 5 minutos e funciona uma única vez.</small>
+                  )}
+                  {pairing?.installer?.channel === "pilot" && (
+                    <div className="production-pilot-instructions">
+                      <strong>Depois do download</strong>
+                      <ol>
+                        <li>Abra o arquivo GiroMesa-Conector-Setup-PILOTO.exe.</li>
+                        <li>
+                          Se o Windows mostrar um aviso, confira se o arquivo veio desta tela e se o
+                          código de verificação corresponde ao informado acima.
+                        </li>
+                        <li>Autorize a instalação e informe o código de conexão.</li>
+                        <li>Aguarde esta página confirmar que o computador está conectado.</li>
+                      </ol>
+                    </div>
                   )}
                 </Card>
               ) : (
@@ -814,6 +933,58 @@ export function ProductionPrintersPanel({
                     </Card>
                   ))}
                 </div>
+              )}
+              {pairing?.installer?.channel === "pilot" && testedPrinter && pilotDeviceId && (
+                <Card className="production-pilot-feedback">
+                  <div>
+                    <strong>Como foi instalar e imprimir o teste?</strong>
+                    <p>
+                      Seu retorno fica registrado para melhorarmos a instalação antes da versão
+                      oficial.
+                    </p>
+                  </div>
+                  {pilotFeedbackSent && (
+                    <Callout tone="success">
+                      Retorno registrado. Você pode enviar novamente se encontrar outra dificuldade.
+                    </Callout>
+                  )}
+                  <form onSubmit={(event) => void submitPilotFeedback(event)}>
+                    <FormField htmlFor="production-pilot-experience" label="Experiência">
+                      <NativeSelect
+                        id="production-pilot-experience"
+                        onChange={(event) =>
+                          setPilotExperience(event.target.value as EdgeHubPilotExperience)
+                        }
+                        value={pilotExperience}
+                      >
+                        <option value="easy">Consegui sem dificuldade</option>
+                        <option value="minor_difficulty">Consegui, mas tive dificuldade</option>
+                        <option value="blocked">Não consegui concluir</option>
+                      </NativeSelect>
+                    </FormField>
+                    <FormField
+                      htmlFor="production-pilot-comment"
+                      label="Conte onde teve dificuldade (opcional)"
+                    >
+                      <Textarea
+                        id="production-pilot-comment"
+                        maxLength={1000}
+                        onChange={(event) => setPilotComment(event.target.value)}
+                        rows={3}
+                        value={pilotComment}
+                      />
+                    </FormField>
+                    <Button
+                      disabled={busyAction === `edge-hub-pilot-feedback:${pilotDeviceId}`}
+                      size="sm"
+                      type="submit"
+                    >
+                      {busyAction === `edge-hub-pilot-feedback:${pilotDeviceId}`
+                        ? "Enviando…"
+                        : "Enviar retorno"}
+                    </Button>
+                  </form>
+                </Card>
               )}
             </section>
           )}

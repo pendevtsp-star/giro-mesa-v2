@@ -525,6 +525,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 onChange={(event) => setLoyaltyMinimum(event.target.value)}
                 required
                 value={loyaltyMinimum}
+                data-currency="brl"
               />
             </label>
             <Button
@@ -567,6 +568,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               <Input
                 aria-invalid={couponValue.length > 0 && couponInvalid}
                 inputMode="decimal"
+                data-currency={couponType === "fixed" ? "brl" : undefined}
                 onChange={(event) => setCouponValue(event.target.value)}
                 required
                 value={couponValue}
@@ -641,6 +643,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 <Input
                   aria-invalid={segmentThreshold.length > 0 && thresholdInvalid}
                   inputMode="decimal"
+                  data-currency={segmentKind === "minimum_spend_cents" ? "brl" : undefined}
                   onChange={(event) => setSegmentThreshold(event.target.value)}
                   required
                   value={segmentThreshold}

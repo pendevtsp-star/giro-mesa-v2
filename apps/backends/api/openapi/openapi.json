@@ -13669,13 +13669,47 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "installer": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": [
+                                "pilot",
+                                "stable"
+                              ]
+                            },
+                            "version": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            }
+                          },
+                          "required": [
+                            "channel",
+                            "version",
+                            "sha256"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
                     "pairingId",
                     "code",
                     "expiresAt",
-                    "installerUrl"
+                    "installerUrl",
+                    "installer"
                   ]
                 }
               }
@@ -13767,17 +13801,259 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "installer": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "channel": {
+                              "type": "string",
+                              "enum": [
+                                "pilot",
+                                "stable"
+                              ]
+                            },
+                            "version": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            }
+                          },
+                          "required": [
+                            "channel",
+                            "version",
+                            "sha256"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
                     "pairingId",
                     "code",
                     "expiresAt",
-                    "installerUrl"
+                    "installerUrl",
+                    "installer"
                   ]
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/edge-hub-installer": {
+      "get": {
+        "operationId": "OrganizationsController_downloadEdgeHubInstaller[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pairingId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/edge-hub-installer": {
+      "get": {
+        "operationId": "OrganizationsController_downloadEdgeHubInstaller[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pairingId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pilot-feedback": {
+      "post": {
+        "operationId": "OrganizationsController_recordEdgeHubPilotFeedback[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "experience": {
+                    "type": "string",
+                    "enum": [
+                      "easy",
+                      "minor_difficulty",
+                      "blocked"
+                    ]
+                  },
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "deviceId",
+                  "experience"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pilot-feedback": {
+      "post": {
+        "operationId": "OrganizationsController_recordEdgeHubPilotFeedback[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "deviceId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "experience": {
+                    "type": "string",
+                    "enum": [
+                      "easy",
+                      "minor_difficulty",
+                      "blocked"
+                    ]
+                  },
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "deviceId",
+                  "experience"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
           }
         },
         "tags": [
@@ -99466,6 +99742,33 @@
                           "accountant"
                         ]
                       },
+                      "roles": {
+                        "minItems": 1,
+                        "maxItems": 11,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "manager",
+                            "waiter",
+                            "cashier",
+                            "receptionist",
+                            "busser",
+                            "kds",
+                            "delivery",
+                            "inventory",
+                            "finance",
+                            "accountant"
+                          ]
+                        }
+                      },
+                      "expectedRevision": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      },
                       "reauth": {
                         "type": "object",
                         "properties": {
@@ -99482,8 +99785,7 @@
                       }
                     },
                     "required": [
-                      "email",
-                      "role"
+                      "email"
                     ]
                   }
                 },
@@ -99616,6 +99918,33 @@
                           "accountant"
                         ]
                       },
+                      "roles": {
+                        "minItems": 1,
+                        "maxItems": 11,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "owner",
+                            "manager",
+                            "waiter",
+                            "cashier",
+                            "receptionist",
+                            "busser",
+                            "kds",
+                            "delivery",
+                            "inventory",
+                            "finance",
+                            "accountant"
+                          ]
+                        }
+                      },
+                      "expectedRevision": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      },
                       "reauth": {
                         "type": "object",
                         "properties": {
@@ -99632,8 +99961,7 @@
                       }
                     },
                     "required": [
-                      "email",
-                      "role"
+                      "email"
                     ]
                   }
                 },
@@ -100709,6 +101037,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -100776,6 +101110,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -102051,6 +102391,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -102110,6 +102456,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -102342,6 +102694,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reason": {
                     "type": "string",
                     "minLength": 5,
@@ -102364,7 +102743,6 @@
                 },
                 "required": [
                   "unitId",
-                  "role",
                   "reason"
                 ]
               }
@@ -102438,6 +102816,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reason": {
                     "type": "string",
                     "minLength": 5,
@@ -102460,7 +102865,6 @@
                 },
                 "required": [
                   "unitId",
-                  "role",
                   "reason"
                 ]
               }
@@ -102525,6 +102929,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   },
                   "reauth": {
                     "type": "object",
@@ -102606,6 +103016,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   },
                   "reauth": {
                     "type": "object",
@@ -102697,6 +103113,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reauth": {
                     "type": "object",
                     "properties": {
@@ -102713,8 +103156,7 @@
                   }
                 },
                 "required": [
-                  "email",
-                  "role"
+                  "email"
                 ]
               }
             }
@@ -102788,6 +103230,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reauth": {
                     "type": "object",
                     "properties": {
@@ -102804,8 +103273,7 @@
                   }
                 },
                 "required": [
-                  "email",
-                  "role"
+                  "email"
                 ]
               }
             }
@@ -102939,6 +103407,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -102998,6 +103472,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103069,6 +103549,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reason": {
                     "type": "string",
                     "minLength": 5,
@@ -103090,7 +103597,6 @@
                   }
                 },
                 "required": [
-                  "role",
                   "reason"
                 ]
               }
@@ -103159,6 +103665,33 @@
                       "accountant"
                     ]
                   },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
                   "reason": {
                     "type": "string",
                     "minLength": 5,
@@ -103180,7 +103713,6 @@
                   }
                 },
                 "required": [
-                  "role",
                   "reason"
                 ]
               }
@@ -103237,6 +103769,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103296,6 +103834,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103366,6 +103910,33 @@
                       "finance",
                       "accountant"
                     ]
+                  },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   },
                   "reason": {
                     "type": "string",
@@ -103455,6 +104026,33 @@
                       "finance",
                       "accountant"
                     ]
+                  },
+                  "roles": {
+                    "minItems": 1,
+                    "maxItems": 11,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "manager",
+                        "waiter",
+                        "cashier",
+                        "receptionist",
+                        "busser",
+                        "kds",
+                        "delivery",
+                        "inventory",
+                        "finance",
+                        "accountant"
+                      ]
+                    }
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   },
                   "reason": {
                     "type": "string",
@@ -103759,6 +104357,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103818,6 +104422,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103877,6 +104487,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [
@@ -103936,6 +104552,12 @@
                     "type": "string",
                     "minLength": 5,
                     "maxLength": 1000
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
                   }
                 },
                 "required": [

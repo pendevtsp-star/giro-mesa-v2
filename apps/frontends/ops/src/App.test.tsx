@@ -95,6 +95,30 @@ describe("experiência operacional", () => {
     expect(resolveInitialOperationalRoute("#/counter", "salon", cashier)).toBe("counter");
   });
 
+  it("limita navegacao e links diretos no terminal sem restringir o navegador comum", () => {
+    const owner = operationalSession("owner");
+    const terminal: Session = {
+      ...owner,
+      terminalMode: true,
+      profile: {
+        ...owner.profile,
+        permissions: ["dashboard.view", "salon.operate", "counter.operate", "kds.operate"],
+      },
+    };
+    const terminalHtml = renderToStaticMarkup(
+      <OperationalApp onLogout={() => {}} session={terminal} />,
+    );
+
+    expect(terminalHtml).toContain('href="#/salon"');
+    expect(terminalHtml).toContain('href="#/counter"');
+    expect(terminalHtml).toContain('href="#/kds/station"');
+    expect(terminalHtml).not.toContain('href="#/inventory"');
+    expect(terminalHtml).not.toContain('href="#/people"');
+    expect(terminalHtml).not.toContain('href="#/settings"');
+    expect(resolveInitialOperationalRoute("#/inventory", null, terminal)).toBe("dashboard");
+    expect(resolveInitialOperationalRoute("#/inventory", null, owner)).toBe("inventory");
+  });
+
   it("expõe configurações do KDS somente para perfis com gestão do Cardápio", () => {
     const ownerHtml = renderToStaticMarkup(
       <OperationalApp onLogout={() => {}} session={operationalSession("owner")} />,

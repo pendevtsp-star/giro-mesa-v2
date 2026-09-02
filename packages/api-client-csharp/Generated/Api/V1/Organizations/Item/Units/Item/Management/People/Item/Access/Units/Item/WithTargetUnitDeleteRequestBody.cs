@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The reason property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -55,6 +57,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
                 { "reauth", n => { Reauth = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.Item.WithTargetUnitDeleteRequestBody_reauth>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.Item.WithTargetUnitDeleteRequestBody_reauth.CreateFromDiscriminatorValue); } },
             };
@@ -66,6 +69,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("reason", Reason);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.Item.Access.Units.Item.WithTargetUnitDeleteRequestBody_reauth>("reauth", Reauth);
             writer.WriteAdditionalData(AdditionalData);

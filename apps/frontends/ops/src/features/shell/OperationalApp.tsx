@@ -897,10 +897,12 @@ export function OperationalApp({
   function renderNavItem(item: (typeof navItems)[number]) {
     return (
       <a
+        aria-label={sidebarIsCollapsed ? item.label : undefined}
         aria-current={route === item.route ? "page" : undefined}
         className={route === item.route ? "active" : ""}
         href={navigationHref(item)}
         key={item.route}
+        title={sidebarIsCollapsed ? item.label : undefined}
       >
         <span aria-hidden="true" className="nav-icon">
           <Icon name={item.icon} size={18} />
@@ -932,6 +934,7 @@ export function OperationalApp({
       <div className={`nav-submenu ${active ? "nav-submenu--active" : ""}`} key={item.route}>
         <div className="nav-submenu__parent">
           <a
+            aria-label={sidebarIsCollapsed ? item.label : undefined}
             aria-current={active && sidebarIsCollapsed ? "page" : undefined}
             className={active ? "active" : ""}
             href={kdsAreaHref(lastKdsOperationalArea)}

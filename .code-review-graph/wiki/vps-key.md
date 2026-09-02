@@ -5,18 +5,13 @@
 Directory-based community: deploy/vps
 
 - **Size**: 15 nodes
-- **Cohesion**: 0.0151
+- **Cohesion**: 0.0145
 - **Dominant Language**: bash
 
 ## Members
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| read_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 20-38 |
-| require_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 40-49 |
-| write_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 51-58 |
-| read_env_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 44-58 |
-| recover_mutators | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 303-372 |
 | read_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/ensure-cloudflare-dns.sh | 7-16 |
 | read_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/preserve-legacy-providers.sh | 20-36 |
 | write_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/preserve-legacy-providers.sh | 38-43 |
@@ -27,6 +22,11 @@ Directory-based community: deploy/vps
 | views | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 6-13 |
 | valid | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 16-57 |
 | cleanup_attestation_stage | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/verify-image-provenance.sh | 30-30 |
+| read_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 20-38 |
+| require_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 40-49 |
+| write_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 51-58 |
+| read_env_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 44-58 |
+| recover_mutators | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 321-390 |
 
 ## Execution Flows
 
@@ -54,8 +54,8 @@ No execution flows pass through this community.
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh` (86 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh` (6 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh` (92 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh` (10 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/rollback-app.sh` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/preserve-legacy-providers.sh` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/ensure-cloudflare-dns.sh` (3 edge(s))

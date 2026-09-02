@@ -1323,6 +1323,7 @@ function ZoneModal({
           <span>Taxa (R$)</span>
           <Input
             inputMode="decimal"
+            data-currency="brl"
             onChange={(event) => setFee(event.target.value)}
             required
             value={fee}
@@ -1332,6 +1333,7 @@ function ZoneModal({
           <span>Pedido mínimo (R$)</span>
           <Input
             inputMode="decimal"
+            data-currency="brl"
             onChange={(event) => setMinimum(event.target.value)}
             required
             value={minimum}

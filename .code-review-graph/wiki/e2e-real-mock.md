@@ -5,7 +5,7 @@
 Directory-based community: tests/e2e-real
 
 - **Size**: 112 nodes
-- **Cohesion**: 0.0402
+- **Cohesion**: 0.0394
 - **Dominant Language**: typescript
 
 ## Members
@@ -63,7 +63,7 @@ Directory-based community: tests/e2e-real
 | test:KDS mantém cancelamento visível até a cozinha confirmar ciência@L911 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/kds-production.spec.ts | 911-923 |
 | test:KDS exige confirmação e PIN gerencial para cancelar um ticket@L925 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/kds-production.spec.ts | 925-949 |
 
-*... and 31 more members.*
+*... and 62 more members.*
 
 ## Execution Flows
 
@@ -73,36 +73,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `expect` (329 edge(s))
-- `getByRole` (326 edge(s))
-- `click` (190 edge(s))
-- `toBeVisible` (141 edge(s))
-- `fulfill` (108 edge(s))
-- `getByLabel` (103 edge(s))
-- `getByText` (79 edge(s))
-- `fill` (73 edge(s))
-- `endsWith` (68 edge(s))
-- `locator` (56 edge(s))
-- `postDataJSON` (52 edge(s))
-- `toBe` (51 edge(s))
-- `poll` (45 edge(s))
-- `push` (42 edge(s))
-- `first` (33 edge(s))
+- `expect` (565 edge(s))
+- `getByRole` (511 edge(s))
+- `click` (303 edge(s))
+- `toBeVisible` (220 edge(s))
+- `fulfill` (144 edge(s))
+- `locator` (133 edge(s))
+- `getByLabel` (130 edge(s))
+- `getByText` (127 edge(s))
+- `endsWith` (89 edge(s))
+- `fill` (79 edge(s))
+- `evaluate` (72 edge(s))
+- `postDataJSON` (67 edge(s))
+- `toBe` (66 edge(s))
+- `request` (54 edge(s))
+- `poll` (52 edge(s))
 
 ### Incoming
 
-- `expect` (321 edge(s))
-- `getByRole` (316 edge(s))
-- `click` (185 edge(s))
-- `toBeVisible` (137 edge(s))
-- `getByLabel` (103 edge(s))
-- `getByText` (79 edge(s))
-- `fill` (73 edge(s))
-- `locator` (55 edge(s))
-- `toBe` (47 edge(s))
-- `poll` (45 edge(s))
-- `first` (33 edge(s))
-- `selectOption` (33 edge(s))
-- `toEqual` (27 edge(s))
-- `toContainText` (26 edge(s))
-- `toHaveCount` (24 edge(s))
+- `expect` (555 edge(s))
+- `getByRole` (501 edge(s))
+- `click` (298 edge(s))
+- `toBeVisible` (216 edge(s))
+- `locator` (132 edge(s))
+- `getByLabel` (130 edge(s))
+- `getByText` (127 edge(s))
+- `fill` (79 edge(s))
+- `evaluate` (64 edge(s))
+- `toBe` (61 edge(s))
+- `poll` (52 edge(s))
+- `setViewportSize` (50 edge(s))
+- `toHaveCount` (44 edge(s))
+- `first` (44 edge(s))
+- `toContainText` (39 edge(s))

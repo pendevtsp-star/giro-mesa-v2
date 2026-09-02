@@ -27,18 +27,6 @@ Directory-based community: scripts
 | createStoredZip | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 97-137 |
 | writeSignedBackup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 139-187 |
 | addFile | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 141-149 |
-| isRecord | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 14-14 |
-| hasText | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 15-15 |
-| immutableReference | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 16-18 |
-| validEncryptionKey | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 20-29 |
-| validateFiscalReleaseManifest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 31-91 |
-| validateFiscalEnvironment | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 93-132 |
-| nonEmpty | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 134-140 |
-| validateRecoveryCoverage | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 142-148 |
-| checkFiscalRelease | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 150-184 |
-| read | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 154-154 |
-| main | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 186-194 |
-| digest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.test.mjs | 24-24 |
 | mount_source | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 19-21 |
 | assert_mount | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 23-31 |
 | cleanup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 38-44 |
@@ -62,6 +50,18 @@ Directory-based community: scripts
 | parseHttpsUrl | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 21-29 |
 | sameUrl | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 31-34 |
 | normalized | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 32-32 |
+| validateSmartPosReleaseManifest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 36-113 |
+| validateSmartPosEnvironment | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 115-152 |
+| fileIsPresent | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 154-160 |
+| checkSmartPosRelease | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 162-246 |
+| read | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 166-166 |
+| main | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs | 248-256 |
+| blockedProvider | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.test.mjs | 12-20 |
+| read | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 5-5 |
+| requireText | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 6-8 |
+| validateWorkflowBuildArgs | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 10-51 |
+| indentation | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 67-67 |
+| validateWorkflowActionPins | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 53-62 |
 
 *... and 30 more members.*
 

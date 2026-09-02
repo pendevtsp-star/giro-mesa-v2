@@ -1472,7 +1472,9 @@ export type PersonAccessStatus = "none" | "pending" | "expired" | "active" | "su
 export interface PersonAccess {
   status: PersonAccessStatus;
   email: string | null;
+  roles: string[];
   role: string | null;
+  revision: number | null;
   invitationId: string | null;
   expiresAt: string | null;
   membershipId: string | null;
@@ -3999,12 +4001,23 @@ function parsePerson(person: Row): Person {
     access: {
       status: accessStatus as PersonAccessStatus,
       email: rawAccess ? optionalString(rawAccess.email) : null,
+      roles: rawAccess ? parsePersonAccessRoles(rawAccess) : [],
       role: rawAccess ? optionalString(rawAccess.role) : null,
+      revision: rawAccess && rawAccess.revision !== undefined ? integer(rawAccess.revision) : null,
       invitationId: rawAccess ? optionalString(rawAccess.invitationId) : null,
       expiresAt: rawAccess ? optionalString(rawAccess.expiresAt) : null,
       membershipId: rawAccess ? optionalString(rawAccess.membershipId) : null,
     },
   };
+}
+
+function parsePersonAccessRoles(access: Row): string[] {
+  if (access.roles === undefined) {
+    const legacyRole = optionalString(access.role);
+    return legacyRole ? [legacyRole] : [];
+  }
+  if (!Array.isArray(access.roles)) throw new InvalidManagementPayloadError();
+  return [...new Set(access.roles.map(requiredString))];
 }
 
 function parsePersonAccessValue(value: unknown): PersonAccess {
@@ -4016,7 +4029,9 @@ function parsePersonAccessValue(value: unknown): PersonAccess {
   return {
     status: status as PersonAccessStatus,
     email: optionalString(access.email),
+    roles: parsePersonAccessRoles(access),
     role: optionalString(access.role),
+    revision: access.revision === undefined ? null : integer(access.revision),
     invitationId: optionalString(access.invitationId),
     expiresAt: optionalString(access.expiresAt),
     membershipId: optionalString(access.membershipId),
@@ -4632,6 +4647,17 @@ export function dateLabel(value: string | null): string {
 export function currencyToCents(value: string): number {
   const amount = Number(value.trim().replace(/\./g, "").replace(",", "."));
   return Number.isFinite(amount) ? Math.round(amount * 100) : -1;
+}
+
+/** Formats a digit-only BRL entry without ever sending a floating-point value to the API. */
+export function formatCurrencyInput(value: string): string {
+  const digits = value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  if (!digits) return "";
+  const cents = Number(digits);
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
 }
 
 export function operationalKey(prefix: string): string {

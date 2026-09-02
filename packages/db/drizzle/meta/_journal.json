@@ -540,6 +540,13 @@
       "when": 1788307200000,
       "tag": "0076_edge_hub_pairing",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1788310800000,
+      "tag": "0077_people_multi_role_access",
+      "breakpoints": true
     }
   ]
 }

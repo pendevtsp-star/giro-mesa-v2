@@ -205,6 +205,15 @@ class HealthController {
   @ApiOkResponse({ schema: toOpenApiSchema(apiHealthResponseSchema) })
   async health() {
     await this.readiness.assertReady();
+    const edgeHubInstallerChannel = process.env.EDGE_HUB_WINDOWS_INSTALLER_CHANNEL?.trim();
+    const edgeHubInstallerConfigured = Boolean(
+      (process.env.EDGE_HUB_WINDOWS_INSTALLER_PATH?.trim() ||
+        process.env.EDGE_HUB_WINDOWS_INSTALLER_URL?.trim()) &&
+        process.env.EDGE_HUB_WINDOWS_INSTALLER_VERSION?.trim() &&
+        /^[a-fA-F0-9]{64}$/.test(process.env.EDGE_HUB_WINDOWS_INSTALLER_SHA256?.trim() ?? "") &&
+        (edgeHubInstallerChannel !== "pilot" ||
+          process.env.EDGE_HUB_PILOT_ORGANIZATION_IDS?.trim()),
+    );
     return {
       status: "ok",
       version: "2.0.0",
@@ -224,9 +233,7 @@ class HealthController {
             ? "configured_unit_status_required"
             : "disabled",
         focus: "edge_capability_required",
-        edgeHubInstaller: process.env.EDGE_HUB_WINDOWS_INSTALLER_URL
-          ? "configured_not_homologated"
-          : "disabled",
+        edgeHubInstaller: edgeHubInstallerConfigured ? "configured_not_homologated" : "disabled",
         paygo: "external_homologation_required",
       },
     };

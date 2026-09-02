@@ -1,9 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
 import type {
   AcceptMembershipInviteInput,
   CreateOrganizationInput,
   EdgeHubPairingCreateInput,
   EdgeHubPairingRedeemInput,
+  EdgeHubPilotFeedbackInput,
   EnrollDeviceInput,
   InviteMembershipInput,
   SelfServiceOrganizationInput,
@@ -18,6 +21,7 @@ import {
   legalEntities,
   managementPeople,
   managementPersonAccess,
+  managementPersonRoleAssignments,
   membershipInvitations,
   memberships,
   onboardingRecords,
@@ -40,6 +44,7 @@ import {
 import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { smartPosInstallationLockKey } from "../pilot-operations/pilot-smartpos.service.js";
+import { edgeHubInstallerConfig, publicEdgeHubInstaller } from "./edge-hub-installer-config.js";
 import { projectBrandingSummary } from "./establishment-settings.service.js";
 import { shapeOrganizationScopes } from "./organization-scopes.js";
 import { ScopeService } from "./scope.service.js";
@@ -51,14 +56,10 @@ function pairingCode() {
   return [...randomBytes(8)].map((byte) => PAIRING_ALPHABET[byte & 31]).join("");
 }
 
-function installerUrl() {
-  const configured = process.env.EDGE_HUB_WINDOWS_INSTALLER_URL;
-  if (!configured) return null;
-  const url = new URL(configured);
-  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
-    throw new Error("EDGE_HUB_WINDOWS_INSTALLER_URL must use HTTPS in production");
-  }
-  return url.toString();
+async function sha256File(filePath: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(filePath)) hash.update(chunk);
+  return hash.digest("hex");
 }
 
 @Injectable()
@@ -405,6 +406,7 @@ export class OrganizationsService {
     }
     const code = pairingCode();
     const expiresAt = new Date(Date.now() + input.expiresInSeconds * 1_000);
+    const installer = edgeHubInstallerConfig(organizationId);
     return this.database.db.transaction(async (tx) => {
       const [pairing] = await tx
         .insert(edgeHubPairingCodes)
@@ -427,8 +429,141 @@ export class OrganizationsService {
         entityId: pairing.id,
         metadata: { label: input.label, expiresAt },
       });
-      return { pairingId: pairing.id, code, expiresAt, installerUrl: installerUrl() };
+      return {
+        pairingId: pairing.id,
+        code,
+        expiresAt,
+        installerUrl: installer?.publicUrl ?? null,
+        installer: installer ? publicEdgeHubInstaller(installer) : null,
+      };
     });
+  }
+
+  async prepareEdgeHubInstallerDownload(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    pairingId: string,
+  ) {
+    const roles = await this.scope.requireOrganizationRole(identityId, organizationId, [
+      "owner",
+      "manager",
+    ]);
+    if (!roles.some((row) => row.unitId === null || row.unitId === unitId)) {
+      throw new NotFoundException();
+    }
+
+    const installer = edgeHubInstallerConfig(organizationId);
+    if (!installer?.filePath) {
+      throw new NotFoundException({
+        code: "EDGE_HUB_INSTALLER_NOT_AVAILABLE",
+        message: "O instalador ainda não está disponível para esta unidade.",
+      });
+    }
+    const [pairing] = await this.database.db
+      .select({ id: edgeHubPairingCodes.id })
+      .from(edgeHubPairingCodes)
+      .where(
+        and(
+          eq(edgeHubPairingCodes.id, pairingId),
+          eq(edgeHubPairingCodes.organizationId, organizationId),
+          eq(edgeHubPairingCodes.unitId, unitId),
+          gt(edgeHubPairingCodes.expiresAt, new Date()),
+        ),
+      )
+      .limit(1);
+    if (!pairing) {
+      throw new ConflictException({
+        code: "EDGE_HUB_PAIRING_INVALID_OR_EXPIRED",
+        message: "Gere um novo código de conexão antes de baixar o instalador.",
+      });
+    }
+
+    let file: Awaited<ReturnType<typeof stat>>;
+    try {
+      file = await stat(installer.filePath);
+    } catch {
+      throw new ServiceUnavailableException({
+        code: "EDGE_HUB_INSTALLER_FILE_UNAVAILABLE",
+        message: "O arquivo do instalador não está disponível no momento.",
+      });
+    }
+    if (!file.isFile() || file.size < 1 || file.size > 256 * 1024 * 1024) {
+      throw new ServiceUnavailableException({ code: "EDGE_HUB_INSTALLER_FILE_INVALID" });
+    }
+    if ((await sha256File(installer.filePath)) !== installer.sha256) {
+      throw new ServiceUnavailableException({
+        code: "EDGE_HUB_INSTALLER_INTEGRITY_FAILED",
+        message: "A verificação de segurança do instalador falhou.",
+      });
+    }
+
+    await this.database.db.insert(auditEvents).values({
+      organizationId,
+      unitId,
+      actorIdentityId: identityId,
+      action: "device.edge_hub_installer_downloaded",
+      entityType: "device_pairing",
+      entityId: pairing.id,
+      metadata: {
+        channel: installer.channel,
+        sha256: installer.sha256,
+        version: installer.version,
+      },
+    });
+    return {
+      channel: installer.channel,
+      filePath: installer.filePath,
+      filename:
+        installer.channel === "pilot"
+          ? "GiroMesa-Conector-Setup-PILOTO.exe"
+          : "GiroMesa-Conector-Setup.exe",
+      sha256: installer.sha256,
+      size: file.size,
+      version: installer.version,
+    };
+  }
+
+  async recordEdgeHubPilotFeedback(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: EdgeHubPilotFeedbackInput,
+  ) {
+    const roles = await this.scope.requireOrganizationRole(identityId, organizationId, [
+      "owner",
+      "manager",
+    ]);
+    if (!roles.some((row) => row.unitId === null || row.unitId === unitId)) {
+      throw new NotFoundException();
+    }
+    const [device] = await this.database.db
+      .select({ id: deviceEnrollments.id })
+      .from(deviceEnrollments)
+      .where(
+        and(
+          eq(deviceEnrollments.id, input.deviceId),
+          eq(deviceEnrollments.organizationId, organizationId),
+          eq(deviceEnrollments.unitId, unitId),
+          isNull(deviceEnrollments.revokedAt),
+        ),
+      )
+      .limit(1);
+    if (!device) throw new NotFoundException();
+
+    await this.database.db.insert(auditEvents).values({
+      organizationId,
+      unitId,
+      actorIdentityId: identityId,
+      action: "device.edge_hub_pilot_feedback",
+      entityType: "device",
+      entityId: device.id,
+      metadata: {
+        experience: input.experience,
+        ...(input.comment ? { comment: input.comment } : {}),
+      },
+    });
+    return { accepted: true as const };
   }
 
   async redeemEdgeHubPairing(input: EdgeHubPairingRedeemInput) {
@@ -627,15 +762,27 @@ export class OrganizationsService {
           message: "Entre com a conta do e-mail que recebeu o convite.",
         });
       }
-      await tx.execute(
-        sql`select person_id from management_person_access where invitation_id=${invitation.id}::uuid for update`,
-      );
-      const [personAccess] = await tx
+      let [personAccess] = await tx
         .select()
         .from(managementPersonAccess)
         .where(eq(managementPersonAccess.invitationId, invitation.id))
         .limit(1);
       if (personAccess) {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${personAccess.organizationId}:${personAccess.personId}`}, 0))`,
+        );
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${personAccess.organizationId}:${personAccess.unitId}:${personAccess.personId}`}, 0))`,
+        );
+        await tx.execute(
+          sql`select person_id from management_person_access where invitation_id=${invitation.id}::uuid for update`,
+        );
+        [personAccess] = await tx
+          .select()
+          .from(managementPersonAccess)
+          .where(eq(managementPersonAccess.invitationId, invitation.id))
+          .limit(1);
+        if (!personAccess) throw new BadRequestException({ code: "INVALID_INVITATION" });
         const [person] = await tx
           .select({ id: managementPeople.id, active: managementPeople.active })
           .from(managementPeople)
@@ -669,6 +816,20 @@ export class OrganizationsService {
         if (linkedElsewhere && linkedElsewhere.id !== personAccess.personId) {
           throw new ConflictException({ code: "PERSON_IDENTITY_ALREADY_LINKED" });
         }
+      } else if (invitation.unitId) {
+        const [linkedPerson] = await tx
+          .select({ id: managementPeople.id })
+          .from(managementPeople)
+          .where(
+            and(
+              eq(managementPeople.organizationId, invitation.organizationId),
+              eq(managementPeople.identityId, identityId),
+            ),
+          )
+          .limit(1);
+        if (linkedPerson) {
+          throw new ConflictException({ code: "PERSON_ROLE_ASSIGNMENT_REQUIRED" });
+        }
       }
       const [membership] = await tx
         .insert(memberships)
@@ -684,34 +845,100 @@ export class OrganizationsService {
         })
         .returning();
       if (!membership) throw new Error("Membership was not activated");
-      const role = personAccess?.role ?? invitation.role;
-      const [createdBinding] = await tx
-        .insert(roleBindings)
-        .values({ membershipId: membership.id, unitId: invitation.unitId, role })
-        .onConflictDoNothing()
-        .returning({ id: roleBindings.id });
-      const [roleBinding] = createdBinding
-        ? [createdBinding]
-        : await tx
-            .select({ id: roleBindings.id })
-            .from(roleBindings)
+      const assignments = personAccess
+        ? await tx
+            .select()
+            .from(managementPersonRoleAssignments)
             .where(
               and(
-                eq(roleBindings.membershipId, membership.id),
-                invitation.unitId === null
-                  ? isNull(roleBindings.unitId)
-                  : eq(roleBindings.unitId, invitation.unitId),
-                eq(roleBindings.role, role),
+                eq(managementPersonRoleAssignments.organizationId, personAccess.organizationId),
+                eq(managementPersonRoleAssignments.unitId, personAccess.unitId),
+                eq(managementPersonRoleAssignments.personId, personAccess.personId),
               ),
             )
-            .limit(1);
-      if (!roleBinding) throw new Error("Role binding was not activated");
+        : [];
+      if (
+        personAccess &&
+        (!assignments.length ||
+          !assignments.some((assignment) => assignment.role === personAccess.role) ||
+          assignments.some((assignment) => assignment.roleBindingId))
+      ) {
+        throw new ConflictException({ code: "PERSON_ROLE_ASSIGNMENT_REQUIRED" });
+      }
+      const roles = personAccess
+        ? [
+            personAccess.role,
+            ...assignments
+              .map((assignment) => assignment.role)
+              .filter((role) => role !== personAccess.role)
+              .sort(),
+          ]
+        : [invitation.role];
+      if (personAccess) {
+        const [orphanBinding] = await tx
+          .select({ id: roleBindings.id })
+          .from(roleBindings)
+          .where(
+            and(
+              eq(roleBindings.membershipId, membership.id),
+              eq(roleBindings.unitId, personAccess.unitId),
+            ),
+          )
+          .limit(1);
+        if (orphanBinding) {
+          throw new ConflictException({ code: "PERSON_ROLE_ASSIGNMENT_REQUIRED" });
+        }
+      }
+      const activatedBindings: Array<{ id: string; role: (typeof roles)[number] }> = [];
+      for (const role of roles) {
+        const [createdBinding] = await tx
+          .insert(roleBindings)
+          .values({ membershipId: membership.id, unitId: invitation.unitId, role })
+          .onConflictDoNothing()
+          .returning({ id: roleBindings.id });
+        const [roleBinding] = createdBinding
+          ? [createdBinding]
+          : await tx
+              .select({ id: roleBindings.id })
+              .from(roleBindings)
+              .where(
+                and(
+                  eq(roleBindings.membershipId, membership.id),
+                  invitation.unitId === null
+                    ? isNull(roleBindings.unitId)
+                    : eq(roleBindings.unitId, invitation.unitId),
+                  eq(roleBindings.role, role),
+                ),
+              )
+              .limit(1);
+        if (!roleBinding) throw new Error("Role binding was not activated");
+        activatedBindings.push({ ...roleBinding, role });
+      }
       await tx
         .update(membershipInvitations)
         .set({ acceptedAt: new Date() })
         .where(eq(membershipInvitations.id, invitation.id));
       if (personAccess) {
         const changedAt = new Date();
+        const [primaryBinding] = activatedBindings;
+        if (!primaryBinding) throw new Error("Role binding was not activated");
+        for (const binding of activatedBindings) {
+          const [updatedAssignment] = await tx
+            .update(managementPersonRoleAssignments)
+            .set({ roleBindingId: binding.id, updatedAt: changedAt })
+            .where(
+              and(
+                eq(managementPersonRoleAssignments.organizationId, personAccess.organizationId),
+                eq(managementPersonRoleAssignments.unitId, personAccess.unitId),
+                eq(managementPersonRoleAssignments.personId, personAccess.personId),
+                eq(managementPersonRoleAssignments.role, binding.role),
+              ),
+            )
+            .returning({ id: managementPersonRoleAssignments.id });
+          if (!updatedAssignment) {
+            throw new ConflictException({ code: "PERSON_ROLE_ASSIGNMENT_REQUIRED" });
+          }
+        }
         await tx
           .update(managementPeople)
           .set({ identityId, updatedByIdentityId: identityId, updatedAt: changedAt })
@@ -721,11 +948,12 @@ export class OrganizationsService {
           .set({
             status: "active",
             membershipId: membership.id,
-            roleBindingId: roleBinding.id,
+            roleBindingId: primaryBinding.id,
             statusChangedAt: changedAt,
             statusChangedByIdentityId: identityId,
             statusChangeReason: "Convite aceito.",
             updatedAt: changedAt,
+            revision: sql`${managementPersonAccess.revision} + 1`,
           })
           .where(eq(managementPersonAccess.invitationId, invitation.id));
         await tx.insert(auditEvents).values({
@@ -735,7 +963,7 @@ export class OrganizationsService {
           action: "management.person.access.accepted",
           entityType: "person_access",
           entityId: personAccess.personId,
-          metadata: { membershipId: membership.id, role },
+          metadata: { membershipId: membership.id, roles },
         });
         await tx.insert(outboxEvents).values({
           topic: "management.person.access.accepted",
@@ -746,7 +974,7 @@ export class OrganizationsService {
             unitId: invitation.unitId,
             identityId,
             membershipId: membership.id,
-            role,
+            roles,
           },
         });
       }

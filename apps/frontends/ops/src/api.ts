@@ -110,7 +110,14 @@ export interface EdgeHubPairing {
   code: string;
   expiresAt: string;
   installerUrl: string | null;
+  installer: {
+    channel: "pilot" | "stable";
+    version: string;
+    sha256: string;
+  } | null;
 }
+
+export type EdgeHubPilotExperience = "easy" | "minor_difficulty" | "blocked";
 
 export interface PosPrintJob {
   id: string;
@@ -633,6 +640,8 @@ export function operationalApiErrorMessage(
         "Este pedido contém produto sem estação de produção. Configure a rota no Catálogo e tente novamente.",
       PRODUCTION_STATION_DELIVERY_DISABLED:
         "A estação deste pedido está impedida de receber produção. Ajuste a política da estação e tente novamente.",
+      PERSON_ACCESS_CHANGED:
+        "Outro responsável alterou este acesso. Suas escolhas foram preservadas; revise os dados atualizados e tente novamente.",
     } as Record<string, string>
   )[code];
   const technical = /^(?:Cannot\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/|[A-Z_]{3,}:)/i.test(
@@ -660,6 +669,14 @@ const baseUrl = (import.meta.env.VITE_API_URL ?? "http://localhost:3200").replac
 
 export function configuredApiBaseUrl() {
   return baseUrl;
+}
+
+export function edgeHubInstallerDownloadUrl(
+  organizationId: string,
+  unitId: string,
+  pairingId: string,
+): string {
+  return `${baseUrl}/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/edge-hub-installer?pairingId=${encodeURIComponent(pairingId)}`;
 }
 
 export function resolveSecurityUrl(
@@ -869,6 +886,15 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ label, expiresInSeconds: 300 }),
       },
+    ),
+  submitEdgeHubPilotFeedback: (
+    organizationId: string,
+    unitId: string,
+    body: { deviceId: string; experience: EdgeHubPilotExperience; comment?: string },
+  ) =>
+    request<{ accepted: true }>(
+      `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/edge-hub-pilot-feedback`,
+      { method: "POST", body: JSON.stringify(body) },
     ),
   createSelfServiceOrganization: (body: SelfServiceOrganizationInput) =>
     request<unknown>("/v1/organizations/self-service", {
@@ -3154,7 +3180,7 @@ export const api = {
         identityId?: string;
         access?: {
           email: string;
-          role: string;
+          roles: string[];
           reauth?: { currentPassword?: string; mfaCode?: string };
         };
       },
@@ -3169,7 +3195,8 @@ export const api = {
       personId: string,
       body: {
         email: string;
-        role: string;
+        roles: string[];
+        expectedRevision?: number;
         reauth?: { currentPassword?: string; mfaCode?: string };
       },
     ) =>
@@ -3194,7 +3221,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       personId: string,
-      reason: string,
+      body: { reason: string; expectedRevision?: number },
     ) =>
       request<unknown>(
         managementPath(
@@ -3202,15 +3229,16 @@ export const api = {
           unitId,
           `people/${encodeURIComponent(personId)}/access/cancel`,
         ),
-        { method: "POST", body: JSON.stringify({ reason }) },
+        { method: "POST", body: JSON.stringify(body) },
       ),
     updatePersonAccess: (
       organizationId: string,
       unitId: string,
       personId: string,
       body: {
-        role: string;
+        roles: string[];
         reason: string;
+        expectedRevision?: number;
         reauth?: { currentPassword?: string; mfaCode?: string };
       },
     ) =>
@@ -3222,7 +3250,7 @@ export const api = {
       organizationId: string,
       unitId: string,
       personId: string,
-      reason: string,
+      body: { reason: string; expectedRevision?: number },
     ) =>
       request<unknown>(
         managementPath(
@@ -3230,15 +3258,16 @@ export const api = {
           unitId,
           `people/${encodeURIComponent(personId)}/access/suspend`,
         ),
-        { method: "POST", body: JSON.stringify({ reason }) },
+        { method: "POST", body: JSON.stringify(body) },
       ),
     reactivatePersonAccess: (
       organizationId: string,
       unitId: string,
       personId: string,
       body: {
-        role?: string;
+        roles?: string[];
         reason: string;
+        expectedRevision?: number;
         reauth?: { currentPassword?: string; mfaCode?: string };
       },
     ) =>
@@ -3288,8 +3317,9 @@ export const api = {
       personId: string,
       body: {
         unitId: string;
-        role: string;
+        roles: string[];
         reason: string;
+        expectedRevision?: number;
         reauth?: { currentPassword?: string; mfaCode?: string };
       },
     ) =>
@@ -3308,6 +3338,7 @@ export const api = {
       targetUnitId: string,
       body: {
         reason: string;
+        expectedRevision?: number;
         reauth?: { currentPassword?: string; mfaCode?: string };
       },
     ) =>

@@ -337,6 +337,7 @@ export function CatalogPromotionsModal({
                   placeholder="Preço Promocional do Combo (R$)"
                   aria-label="Preço promocional do combo"
                   inputMode="decimal"
+                  data-currency="brl"
                   value={comboPrice}
                   onChange={(event) => setComboPrice(event.target.value)}
                   className="catalog-control-36"

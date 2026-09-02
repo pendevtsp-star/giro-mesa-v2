@@ -540,7 +540,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0076_edge_hub_pairing");
+  assert.equal(matrix.requiredAppliedMigration, "0077_people_multi_role_access");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -653,7 +653,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0076_edge_hub_pairing");
+  assert.equal(recovery.targetMigration, "0077_people_multi_role_access");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -667,6 +667,7 @@ test("pre-migration backup binds the migration actually applied in the source da
       { appliedBefore: "0074_crm_operational_inbox", appliedBeforeWhen: "1787709600000" },
       { appliedBefore: "0075_platform_staff_invitations", appliedBeforeWhen: "1787796000000" },
       { appliedBefore: "0076_edge_hub_pairing", appliedBeforeWhen: "1788307200000" },
+      { appliedBefore: "0077_people_multi_role_access", appliedBeforeWhen: "1788310800000" },
     ],
   );
   for (const transition of recovery.transitions) {

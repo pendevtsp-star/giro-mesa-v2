@@ -73,6 +73,8 @@ describe("dados gerenciais reais", () => {
       status: "none",
       email: null,
       role: null,
+      roles: [],
+      revision: null,
       invitationId: null,
       expiresAt: null,
       membershipId: null,

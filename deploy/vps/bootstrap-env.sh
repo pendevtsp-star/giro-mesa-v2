@@ -170,6 +170,12 @@ write_key CORS_ORIGINS https://giromesa.com.br,https://www.giromesa.com.br,https
 write_key SESSION_SECRET "$session_secret"
 write_key QR_TABLE_TOKEN_SECRET "$qr_table_token_secret"
 write_key MEDIA_ROOT /app/data/media
+write_key EDGE_HUB_INSTALLER_HOST_PATH /srv/apps/giromesa-v2/shared/edge-hub-installer
+write_key EDGE_HUB_WINDOWS_INSTALLER_PATH /app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe
+write_key EDGE_HUB_WINDOWS_INSTALLER_CHANNEL pilot
+write_key EDGE_HUB_WINDOWS_INSTALLER_VERSION ""
+write_key EDGE_HUB_WINDOWS_INSTALLER_SHA256 ""
+write_key EDGE_HUB_PILOT_ORGANIZATION_IDS ""
 write_key MFA_ENCRYPTION_KEY "$mfa_key"
 write_key OUTBOX_ENCRYPTION_KEY "$outbox_key"
 write_key FISCAL_RELEASE_ENV homologation

@@ -24,6 +24,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings
 #endif
         /// <summary>The expiresAt property</summary>
         public DateTimeOffset? ExpiresAt { get; set; }
+        /// <summary>The installer property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer? Installer { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer Installer { get; set; }
+#endif
         /// <summary>The installerUrl property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -61,6 +69,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings
             {
                 { "code", n => { Code = n.GetStringValue(); } },
                 { "expiresAt", n => { ExpiresAt = n.GetDateTimeOffsetValue(); } },
+                { "installer", n => { Installer = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer.CreateFromDiscriminatorValue); } },
                 { "installerUrl", n => { InstallerUrl = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installerUrl>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installerUrl.CreateFromDiscriminatorValue); } },
                 { "pairingId", n => { PairingId = n.GetGuidValue(); } },
             };
@@ -74,9 +83,67 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("code", Code);
             writer.WriteDateTimeOffsetValue("expiresAt", ExpiresAt);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer>("installer", Installer);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installerUrl>("installerUrl", InstallerUrl);
             writer.WriteGuidValue("pairingId", PairingId);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class EdgeHubPairingsPostResponse_installer : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1? EdgeHubPairingsPostResponseInstallerMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1 EdgeHubPairingsPostResponseInstallerMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember2? EdgeHubPairingsPostResponseInstallerMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember2 EdgeHubPairingsPostResponseInstallerMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse.EdgeHubPairingsPostResponse_installer();
+                result.EdgeHubPairingsPostResponseInstallerMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1();
+                result.EdgeHubPairingsPostResponseInstallerMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(EdgeHubPairingsPostResponseInstallerMember1 != null || EdgeHubPairingsPostResponseInstallerMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(EdgeHubPairingsPostResponseInstallerMember1, EdgeHubPairingsPostResponseInstallerMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerMember1>(null, EdgeHubPairingsPostResponseInstallerMember1, EdgeHubPairingsPostResponseInstallerMember2);
+            }
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsPostResponse_installerUrlMember1"/>, <see cref="string"/>

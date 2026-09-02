@@ -14,6 +14,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The expectedRevision property</summary>
+        public int? ExpectedRevision { get; set; }
         /// <summary>The reason property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -47,6 +49,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedRevision", n => { ExpectedRevision = n.GetIntValue(); } },
                 { "reason", n => { Reason = n.GetStringValue(); } },
             };
         }
@@ -57,6 +60,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedRevision", ExpectedRevision);
             writer.WriteStringValue("reason", Reason);
             writer.WriteAdditionalData(AdditionalData);
         }

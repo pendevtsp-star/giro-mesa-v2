@@ -54,6 +54,7 @@ import {
   managementPayablePayments,
   managementPeople,
   managementPersonAccess,
+  managementPersonRoleAssignments,
   managementProductionBatches,
   managementProductionBatchInputs,
   managementProductReturnableClassifications,
@@ -353,6 +354,12 @@ const TIME_TRACKING_READ_ROLES = ["owner", "manager", "finance"] as const;
 const PERSON_ACCESS_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const personAccessInvitationHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
+const personAccessKey = (personId: string, unitId: string) => `${personId}:${unitId}`;
+function firstPersonAccessRole(roles: readonly PersonAccessRole[]) {
+  const [role] = roles;
+  if (!role) throw new BadRequestException({ code: "PERSON_ACCESS_ROLE_REQUIRED" });
+  return role;
+}
 const CHANNEL_LABELS = { dine_in: "Salão", pickup: "Retirada", delivery: "Delivery" } as const;
 const PAYMENT_LABELS = {
   cash: "Dinheiro",
@@ -365,6 +372,7 @@ const PAYMENT_LABELS = {
 
 type PersonAccessRead = typeof managementPersonAccess.$inferSelect & {
   invitationExpiresAt: Date | null;
+  roles: PersonAccessRole[];
 };
 
 function personAccessView(access: PersonAccessRead | undefined) {
@@ -375,6 +383,8 @@ function personAccessView(access: PersonAccessRead | undefined) {
     status,
     email: access.email,
     role: access.role,
+    roles: access.roles,
+    revision: access.revision,
     invitationId: access.invitationId ?? undefined,
     expiresAt: access.invitationExpiresAt?.toISOString(),
     membershipId: access.membershipId ?? undefined,
@@ -1207,6 +1217,142 @@ export class ManagementService {
     await this.auth.verifyStepUp(identityId, proof);
   }
 
+  private assertPersonAccessRoles(actorRole: ManagementRole, roles: readonly PersonAccessRole[]) {
+    for (const role of roles) this.assertPersonAccessGrant(actorRole, role);
+  }
+
+  private async requireSensitiveRolesStepUp(
+    identityId: string,
+    roles: readonly PersonAccessRole[],
+    proof?: { currentPassword?: string; mfaCode?: string },
+  ) {
+    const sensitiveRole = roles.find((role) => SENSITIVE_PERSON_ACCESS_ROLES.has(role));
+    if (sensitiveRole) await this.requireSensitiveAccessStepUp(identityId, sensitiveRole, proof);
+  }
+
+  private assertPersonAccessRevision(access: { revision: number }, expectedRevision?: number) {
+    if (expectedRevision !== undefined && access.revision !== expectedRevision) {
+      throw new ConflictException({
+        code: "PERSON_ACCESS_CHANGED",
+        message:
+          "O acesso foi alterado por outro responsável. Atualize os dados e tente novamente.",
+      });
+    }
+  }
+
+  private async lockPersonAccessScope(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+  ) {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${personId}`}, 0))`,
+    );
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${unitId}:${personId}`}, 0))`,
+    );
+  }
+
+  private async personRoleSets(
+    source: Transaction | Database,
+    accesses: Array<typeof managementPersonAccess.$inferSelect>,
+  ) {
+    const result = new Map<string, PersonAccessRole[]>();
+    if (!accesses.length) return result;
+    const [firstAccess] = accesses;
+    if (!firstAccess) return result;
+    const organizationId = firstAccess.organizationId;
+    const personIds = [...new Set(accesses.map((access) => access.personId))];
+    const membershipIds = [
+      ...new Set(
+        accesses
+          .map((access) => access.membershipId)
+          .filter((membershipId): membershipId is string => Boolean(membershipId)),
+      ),
+    ];
+    const [assignments, bindings] = await Promise.all([
+      source
+        .select({
+          personId: managementPersonRoleAssignments.personId,
+          unitId: managementPersonRoleAssignments.unitId,
+          role: managementPersonRoleAssignments.role,
+          roleBindingId: managementPersonRoleAssignments.roleBindingId,
+        })
+        .from(managementPersonRoleAssignments)
+        .where(
+          and(
+            eq(managementPersonRoleAssignments.organizationId, organizationId),
+            inArray(managementPersonRoleAssignments.personId, personIds),
+          ),
+        ),
+      membershipIds.length
+        ? source
+            .select({
+              id: roleBindings.id,
+              membershipId: roleBindings.membershipId,
+              unitId: roleBindings.unitId,
+              role: roleBindings.role,
+            })
+            .from(roleBindings)
+            .where(
+              and(
+                inArray(roleBindings.membershipId, membershipIds),
+                isNotNull(roleBindings.unitId),
+              ),
+            )
+        : Promise.resolve([]),
+    ]);
+    const assignmentsByAccess = new Map<string, typeof assignments>();
+    for (const assignment of assignments) {
+      const key = personAccessKey(assignment.personId, assignment.unitId);
+      assignmentsByAccess.set(key, [...(assignmentsByAccess.get(key) ?? []), assignment]);
+    }
+
+    for (const access of accesses) {
+      if (!["pending", "active", "suspended"].includes(access.status)) continue;
+      const key = personAccessKey(access.personId, access.unitId);
+      const owned = assignmentsByAccess.get(key) ?? [];
+      const exactBindings = access.membershipId
+        ? bindings.filter(
+            (binding) =>
+              binding.membershipId === access.membershipId && binding.unitId === access.unitId,
+          )
+        : [];
+      const bindingById = new Map(exactBindings.map((binding) => [binding.id, binding]));
+      const activeAssignmentsValid =
+        access.status !== "active" ||
+        (Boolean(access.membershipId) &&
+          owned.length === exactBindings.length &&
+          owned.every((assignment) => {
+            const binding = assignment.roleBindingId
+              ? bindingById.get(assignment.roleBindingId)
+              : undefined;
+            return binding?.role === assignment.role;
+          }));
+      const inactiveAssignmentsValid =
+        access.status === "active" ||
+        (exactBindings.length === 0 && owned.every((assignment) => !assignment.roleBindingId));
+      const assignedRoles = owned.map((assignment) => assignment.role);
+      if (
+        !owned.length ||
+        !assignedRoles.includes(access.role) ||
+        !activeAssignmentsValid ||
+        !inactiveAssignmentsValid
+      ) {
+        throw new ConflictException({
+          code: "PERSON_ROLE_ASSIGNMENT_REQUIRED",
+          message: "Os acessos desta pessoa precisam ser revisados antes de continuar.",
+        });
+      }
+      result.set(key, [
+        access.role,
+        ...assignedRoles.filter((role) => role !== access.role).sort(),
+      ]);
+    }
+    return result;
+  }
+
   private async personAccessRows(
     source: Transaction | Database,
     organizationId: string,
@@ -1231,9 +1377,16 @@ export class ManagementService {
           inArray(managementPersonAccess.personId, personIds),
         ),
       );
+    const rolesByAccess = await this.personRoleSets(
+      source,
+      rows.map((row) => row.access),
+    );
     return rows.map((row) => ({
       ...row.access,
       invitationExpiresAt: row.invitationExpiresAt,
+      roles: rolesByAccess.get(personAccessKey(row.access.personId, row.access.unitId)) ?? [
+        row.access.role,
+      ],
     }));
   }
 
@@ -1407,6 +1560,7 @@ export class ManagementService {
     if (current?.membershipId && ["active", "suspended"].includes(current.status)) {
       throw new ConflictException({ code: "PERSON_ACCESS_ALREADY_LINKED" });
     }
+    if (current) this.assertPersonAccessRevision(current, input.expectedRevision);
     if (current?.status === "pending" && !replace) {
       throw new ConflictException({ code: "PERSON_ACCESS_INVITATION_PENDING" });
     }
@@ -1430,7 +1584,7 @@ export class ManagementService {
         organizationId,
         unitId,
         email: input.email,
-        role: input.role,
+        role: firstPersonAccessRole(input.roles),
         tokenHash: personAccessInvitationHash(token),
         invitedByIdentityId: actorIdentityId,
         expiresAt,
@@ -1441,7 +1595,7 @@ export class ManagementService {
     const changedAt = new Date();
     const accessValues = {
       email: input.email,
-      role: input.role,
+      role: firstPersonAccessRole(input.roles),
       status: "pending" as const,
       invitationId: invitation.id,
       membershipId: null,
@@ -1454,7 +1608,10 @@ export class ManagementService {
     const [access] = current
       ? await tx
           .update(managementPersonAccess)
-          .set(accessValues)
+          .set({
+            ...accessValues,
+            revision: sql`${managementPersonAccess.revision} + 1`,
+          })
           .where(
             and(
               eq(managementPersonAccess.organizationId, organizationId),
@@ -1468,6 +1625,14 @@ export class ManagementService {
           .values({ personId, organizationId, unitId, ...accessValues })
           .returning();
     if (!access) throw new Error("Person access was not created");
+    await this.replacePersonRoleAssignments(
+      tx,
+      organizationId,
+      unitId,
+      personId,
+      input.roles,
+      "people_invite",
+    );
 
     const encryption = encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
     await tx.insert(outboxEvents).values({
@@ -1492,9 +1657,9 @@ export class ManagementService {
       replace ? "management.person.access.resent" : "management.person.access.invited",
       "person_access",
       personId,
-      { invitationId: invitation.id, email: input.email, role: input.role },
+      { invitationId: invitation.id, email: input.email, roles: input.roles },
     );
-    return personAccessView({ ...access, invitationExpiresAt: expiresAt });
+    return personAccessView({ ...access, invitationExpiresAt: expiresAt, roles: input.roles });
   }
 
   private async lockedPersonAccess(
@@ -1503,6 +1668,7 @@ export class ManagementService {
     unitId: string,
     personId: string,
   ) {
+    await this.lockPersonAccessScope(tx, organizationId, unitId, personId);
     await tx.execute(
       sql`select person_id from management_person_access where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and person_id=${personId}::uuid for update`,
     );
@@ -1518,7 +1684,56 @@ export class ManagementService {
       )
       .limit(1);
     if (!access) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
-    return access;
+    const roles = await this.personRoleSets(tx, [access]);
+    return {
+      ...access,
+      roles: roles.get(personAccessKey(personId, unitId)) ?? [access.role],
+    };
+  }
+
+  private async replacePersonRoleAssignments(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    personId: string,
+    roles: readonly PersonAccessRole[],
+    provenance: "legacy_access" | "backfill_binding" | "people_invite" | "people_admin",
+    roleBindingIds = new Map<PersonAccessRole, string>(),
+  ) {
+    await tx
+      .delete(managementPersonRoleAssignments)
+      .where(
+        and(
+          eq(managementPersonRoleAssignments.organizationId, organizationId),
+          eq(managementPersonRoleAssignments.unitId, unitId),
+          eq(managementPersonRoleAssignments.personId, personId),
+        ),
+      );
+    await tx.insert(managementPersonRoleAssignments).values(
+      roles.map((role) => ({
+        organizationId,
+        unitId,
+        personId,
+        role,
+        roleBindingId: roleBindingIds.get(role) ?? null,
+        provenance,
+      })),
+    );
+  }
+
+  private async assertNoGlobalPersonAccess(tx: Transaction, membershipId: string | null) {
+    if (!membershipId) return;
+    const [globalBinding] = await tx
+      .select({ id: roleBindings.id })
+      .from(roleBindings)
+      .where(and(eq(roleBindings.membershipId, membershipId), isNull(roleBindings.unitId)))
+      .limit(1);
+    if (globalBinding) {
+      throw new ConflictException({
+        code: "PERSON_GLOBAL_ACCESS_REVIEW_REQUIRED",
+        message: "A pessoa possui acesso global. Revise esse vínculo antes de continuar.",
+      });
+    }
   }
 
   private async ensurePersonRoleBinding(
@@ -20778,6 +20993,10 @@ export class ManagementService {
     const deliveryByInvitation = new Map(
       deliveries.map((delivery) => [delivery.invitationId, delivery]),
     );
+    const rolesByAccess = await this.personRoleSets(
+      this.database.db,
+      accessRows.map((row) => row.access),
+    );
 
     return {
       units: organizationUnits,
@@ -20792,6 +21011,9 @@ export class ManagementService {
           access: personAccessView({
             ...row.access,
             invitationExpiresAt: row.invitationExpiresAt,
+            roles: rolesByAccess.get(personAccessKey(row.access.personId, row.access.unitId)) ?? [
+              row.access.role,
+            ],
           }),
           delivery: delivery
             ? {
@@ -20857,12 +21079,10 @@ export class ManagementService {
       input.unitId,
       PEOPLE_ROLES,
     );
-    this.assertPersonAccessGrant(targetActorRole, input.role);
-    await this.requireSensitiveAccessStepUp(identityId, input.role, input.reauth);
+    this.assertPersonAccessRoles(targetActorRole, input.roles);
+    await this.requireSensitiveRolesStepUp(identityId, input.roles, input.reauth);
     return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${input.unitId}:${personId}`}, 0))`,
-      );
+      await this.lockPersonAccessScope(tx, organizationId, input.unitId, personId);
       const [person] = await tx
         .select({ id: managementPeople.id, identityId: managementPeople.identityId })
         .from(managementPeople)
@@ -20922,23 +21142,39 @@ export class ManagementService {
       if (!sourceAccess?.membershipId) {
         throw new ConflictException({ code: "PERSON_ACCESS_MUST_BE_ACTIVE" });
       }
+      await this.personRoleSets(tx, [sourceAccess]);
       if (existing && existing.status !== "terminated" && existing.status !== "canceled") {
         throw new ConflictException({ code: "PERSON_UNIT_ACCESS_ALREADY_EXISTS" });
       }
-      const roleBindingId = await this.ensurePersonRoleBinding(
-        tx,
-        sourceAccess.membershipId,
-        input.unitId,
-        input.role,
-      );
+      if (existing) this.assertPersonAccessRevision(existing, input.expectedRevision);
+      const [orphanBinding] = await tx
+        .select({ id: roleBindings.id })
+        .from(roleBindings)
+        .where(
+          and(
+            eq(roleBindings.membershipId, sourceAccess.membershipId),
+            eq(roleBindings.unitId, input.unitId),
+          ),
+        )
+        .limit(1);
+      if (orphanBinding) {
+        throw new ConflictException({ code: "PERSON_ROLE_ASSIGNMENT_REQUIRED" });
+      }
+      const roleBindingIds = new Map<PersonAccessRole, string>();
+      for (const role of input.roles) {
+        roleBindingIds.set(
+          role,
+          await this.ensurePersonRoleBinding(tx, sourceAccess.membershipId, input.unitId, role),
+        );
+      }
       const changedAt = new Date();
       const values = {
         email: sourceAccess.email,
-        role: input.role,
+        role: firstPersonAccessRole(input.roles),
         status: "active" as const,
         invitationId: null,
         membershipId: sourceAccess.membershipId,
-        roleBindingId,
+        roleBindingId: roleBindingIds.get(firstPersonAccessRole(input.roles)),
         statusChangedAt: changedAt,
         statusChangedByIdentityId: identityId,
         statusChangeReason: input.reason,
@@ -20947,7 +21183,7 @@ export class ManagementService {
       if (existing) {
         await tx
           .update(managementPersonAccess)
-          .set(values)
+          .set({ ...values, revision: sql`${managementPersonAccess.revision} + 1` })
           .where(
             and(
               eq(managementPersonAccess.personId, personId),
@@ -20962,6 +21198,15 @@ export class ManagementService {
           ...values,
         });
       }
+      await this.replacePersonRoleAssignments(
+        tx,
+        organizationId,
+        input.unitId,
+        personId,
+        input.roles,
+        "people_admin",
+        roleBindingIds,
+      );
       await this.revokeIdentitySessions(tx, person.identityId);
       await this.record(
         tx,
@@ -20971,9 +21216,14 @@ export class ManagementService {
         "management.person.access.unit-assigned",
         "person_access",
         personId,
-        { role: input.role, reason: input.reason, sourceUnitId: unitId },
+        { roles: input.roles, reason: input.reason, sourceUnitId: unitId },
       );
-      return { assigned: true, unitId: input.unitId, role: input.role };
+      return {
+        assigned: true,
+        unitId: input.unitId,
+        role: firstPersonAccessRole(input.roles),
+        roles: input.roles,
+      };
     });
   }
 
@@ -20993,9 +21243,6 @@ export class ManagementService {
       PEOPLE_ROLES,
     );
     return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${targetUnitId}:${personId}`}, 0))`,
-      );
       const [person] = await tx
         .select({ primaryUnitId: managementPeople.unitId, identityId: managementPeople.identityId })
         .from(managementPeople)
@@ -21015,11 +21262,29 @@ export class ManagementService {
         });
       }
       const access = await this.lockedPersonAccess(tx, organizationId, targetUnitId, personId);
-      this.assertPersonAccessGrant(targetActorRole, access.role);
-      await this.requireSensitiveAccessStepUp(identityId, access.role, input.reauth);
-      if (access.roleBindingId) {
-        await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+      this.assertPersonAccessRevision(access, input.expectedRevision);
+      this.assertPersonAccessRoles(targetActorRole, access.roles);
+      await this.requireSensitiveRolesStepUp(identityId, access.roles, input.reauth);
+      await this.assertNoGlobalPersonAccess(tx, access.membershipId);
+      if (access.membershipId) {
+        await tx
+          .delete(roleBindings)
+          .where(
+            and(
+              eq(roleBindings.membershipId, access.membershipId),
+              eq(roleBindings.unitId, targetUnitId),
+            ),
+          );
       }
+      await tx
+        .delete(managementPersonRoleAssignments)
+        .where(
+          and(
+            eq(managementPersonRoleAssignments.organizationId, organizationId),
+            eq(managementPersonRoleAssignments.unitId, targetUnitId),
+            eq(managementPersonRoleAssignments.personId, personId),
+          ),
+        );
       const changedAt = new Date();
       await tx
         .update(managementPersonAccess)
@@ -21030,6 +21295,7 @@ export class ManagementService {
           statusChangedByIdentityId: identityId,
           statusChangeReason: input.reason,
           updatedAt: changedAt,
+          revision: sql`${managementPersonAccess.revision} + 1`,
         })
         .where(
           and(
@@ -21065,7 +21331,7 @@ export class ManagementService {
         "management.person.access.unit-removed",
         "person_access",
         personId,
-        { role: access.role, reason: input.reason, sourceUnitId: unitId },
+        { roles: access.roles, reason: input.reason, sourceUnitId: unitId },
       );
       return { removed: true, unitId: targetUnitId };
     });
@@ -21079,8 +21345,8 @@ export class ManagementService {
   ) {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
     if (input.access) {
-      this.assertPersonAccessGrant(actorRole, input.access.role);
-      await this.requireSensitiveAccessStepUp(identityId, input.access.role, input.access.reauth);
+      this.assertPersonAccessRoles(actorRole, input.access.roles);
+      await this.requireSensitiveRolesStepUp(identityId, input.access.roles, input.access.reauth);
     }
     if (input.identityId && input.access) {
       throw new BadRequestException({
@@ -21162,12 +21428,10 @@ export class ManagementService {
     input: PersonAccessInviteInput,
   ) {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
-    this.assertPersonAccessGrant(actorRole, input.role);
-    await this.requireSensitiveAccessStepUp(identityId, input.role, input.reauth);
+    this.assertPersonAccessRoles(actorRole, input.roles);
+    await this.requireSensitiveRolesStepUp(identityId, input.roles, input.reauth);
     return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${unitId}:${personId}`}, 0))`,
-      );
+      await this.lockPersonAccessScope(tx, organizationId, unitId, personId);
       return this.createPersonAccessInvitation(
         tx,
         identityId,
@@ -21188,11 +21452,8 @@ export class ManagementService {
   ) {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
     return this.database.db.transaction(async (tx) => {
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${unitId}:${personId}`}, 0))`,
-      );
       const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
-      this.assertPersonAccessGrant(actorRole, access.role);
+      this.assertPersonAccessRoles(actorRole, access.roles);
       if (access.status !== "pending") {
         throw new ConflictException({ code: "PERSON_ACCESS_NOT_PENDING" });
       }
@@ -21202,7 +21463,7 @@ export class ManagementService {
         organizationId,
         unitId,
         personId,
-        { email: access.email, role: access.role },
+        { email: access.email, role: access.role, roles: access.roles },
         true,
       );
     });
@@ -21218,7 +21479,8 @@ export class ManagementService {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
     return this.database.db.transaction(async (tx) => {
       const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
-      this.assertPersonAccessGrant(actorRole, access.role);
+      this.assertPersonAccessRevision(access, input.expectedRevision);
+      this.assertPersonAccessRoles(actorRole, access.roles);
       if (access.status !== "pending") {
         throw new ConflictException({ code: "PERSON_ACCESS_NOT_PENDING" });
       }
@@ -21242,12 +21504,22 @@ export class ManagementService {
           statusChangedByIdentityId: identityId,
           statusChangeReason: input.reason,
           updatedAt: changedAt,
+          revision: sql`${managementPersonAccess.revision} + 1`,
         })
         .where(
           and(
             eq(managementPersonAccess.organizationId, organizationId),
             eq(managementPersonAccess.unitId, unitId),
             eq(managementPersonAccess.personId, personId),
+          ),
+        );
+      await tx
+        .delete(managementPersonRoleAssignments)
+        .where(
+          and(
+            eq(managementPersonRoleAssignments.organizationId, organizationId),
+            eq(managementPersonRoleAssignments.unitId, unitId),
+            eq(managementPersonRoleAssignments.personId, personId),
           ),
         );
       await this.record(
@@ -21258,7 +21530,7 @@ export class ManagementService {
         "management.person.access.canceled",
         "person_access",
         personId,
-        { reason: input.reason, invitationId: access.invitationId },
+        { reason: input.reason, invitationId: access.invitationId, roles: access.roles },
       );
       return { status: "none" as const };
     });
@@ -21272,22 +21544,26 @@ export class ManagementService {
     input: PersonAccessRoleUpdateInput,
   ) {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
-    this.assertPersonAccessGrant(actorRole, input.role);
     return this.database.db.transaction(async (tx) => {
       const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
-      await this.requireSensitiveAccessStepUp(
+      this.assertPersonAccessRevision(access, input.expectedRevision);
+      if (access.roles.length > 1 && input.expectedRevision === undefined) {
+        throw new ConflictException({ code: "PERSON_ACCESS_CHANGED" });
+      }
+      this.assertPersonAccessRoles(actorRole, [...new Set([...access.roles, ...input.roles])]);
+      await this.requireSensitiveRolesStepUp(
         identityId,
-        SENSITIVE_PERSON_ACCESS_ROLES.has(access.role) ? access.role : input.role,
+        [...new Set([...access.roles, ...input.roles])],
         input.reauth,
       );
       if (access.status === "canceled" || access.status === "terminated") {
         throw new ConflictException({ code: "PERSON_ACCESS_INACTIVE" });
       }
-      let roleBindingId = access.roleBindingId;
+      const roleBindingIds = new Map<PersonAccessRole, string>();
       if (access.status === "pending" && access.invitationId) {
         await tx
           .update(membershipInvitations)
-          .set({ role: input.role })
+          .set({ role: firstPersonAccessRole(input.roles) })
           .where(
             and(
               eq(membershipInvitations.id, access.invitationId),
@@ -21297,26 +21573,41 @@ export class ManagementService {
       }
       if (access.status === "active") {
         if (!access.membershipId) throw new ConflictException({ code: "PERSON_ACCESS_CORRUPT" });
-        if (access.roleBindingId) {
-          await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+        await tx
+          .delete(roleBindings)
+          .where(
+            and(
+              eq(roleBindings.membershipId, access.membershipId),
+              eq(roleBindings.unitId, unitId),
+            ),
+          );
+        for (const role of input.roles) {
+          roleBindingIds.set(
+            role,
+            await this.ensurePersonRoleBinding(tx, access.membershipId, unitId, role),
+          );
         }
-        roleBindingId = await this.ensurePersonRoleBinding(
-          tx,
-          access.membershipId,
-          unitId,
-          input.role,
-        );
       }
+      await this.replacePersonRoleAssignments(
+        tx,
+        organizationId,
+        unitId,
+        personId,
+        input.roles,
+        access.status === "pending" ? "people_invite" : "people_admin",
+        roleBindingIds,
+      );
       const changedAt = new Date();
       const [updated] = await tx
         .update(managementPersonAccess)
         .set({
-          role: input.role,
-          roleBindingId,
+          role: firstPersonAccessRole(input.roles),
+          roleBindingId: roleBindingIds.get(firstPersonAccessRole(input.roles)) ?? null,
           statusChangedAt: changedAt,
           statusChangedByIdentityId: identityId,
           statusChangeReason: input.reason,
           updatedAt: changedAt,
+          revision: sql`${managementPersonAccess.revision} + 1`,
         })
         .where(
           and(
@@ -21340,7 +21631,7 @@ export class ManagementService {
         "management.person.access.role-changed",
         "person_access",
         personId,
-        { previousRole: access.role, role: input.role, reason: input.reason },
+        { previousRoles: access.roles, roles: input.roles, reason: input.reason },
       );
       if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
       const [invitation] = updated.invitationId
@@ -21353,6 +21644,7 @@ export class ManagementService {
       return personAccessView({
         ...updated,
         invitationExpiresAt: invitation?.expiresAt ?? null,
+        roles: input.roles,
       });
     });
   }
@@ -21367,14 +21659,33 @@ export class ManagementService {
     const actorRole = await this.requireRole(identityId, organizationId, unitId, PEOPLE_ROLES);
     return this.database.db.transaction(async (tx) => {
       const access = await this.lockedPersonAccess(tx, organizationId, unitId, personId);
-      this.assertPersonAccessGrant(actorRole, access.role);
+      this.assertPersonAccessRevision(access, input.expectedRevision);
+      this.assertPersonAccessRoles(actorRole, access.roles);
       if (access.status !== "active") {
         throw new ConflictException({ code: "PERSON_ACCESS_NOT_ACTIVE" });
       }
-      if (access.roleBindingId) {
-        await tx.delete(roleBindings).where(eq(roleBindings.id, access.roleBindingId));
+      await this.assertNoGlobalPersonAccess(tx, access.membershipId);
+      if (access.membershipId) {
+        await tx
+          .delete(roleBindings)
+          .where(
+            and(
+              eq(roleBindings.membershipId, access.membershipId),
+              eq(roleBindings.unitId, unitId),
+            ),
+          );
       }
       const changedAt = new Date();
+      await tx
+        .update(managementPersonRoleAssignments)
+        .set({ roleBindingId: null, updatedAt: changedAt })
+        .where(
+          and(
+            eq(managementPersonRoleAssignments.organizationId, organizationId),
+            eq(managementPersonRoleAssignments.unitId, unitId),
+            eq(managementPersonRoleAssignments.personId, personId),
+          ),
+        );
       const [updated] = await tx
         .update(managementPersonAccess)
         .set({
@@ -21384,6 +21695,7 @@ export class ManagementService {
           statusChangedByIdentityId: identityId,
           statusChangeReason: input.reason,
           updatedAt: changedAt,
+          revision: sql`${managementPersonAccess.revision} + 1`,
         })
         .where(
           and(
@@ -21408,10 +21720,10 @@ export class ManagementService {
         "management.person.access.suspended",
         "person_access",
         personId,
-        { reason: input.reason, role: access.role },
+        { reason: input.reason, roles: access.roles },
       );
       if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
-      return personAccessView({ ...updated, invitationExpiresAt: null });
+      return personAccessView({ ...updated, invitationExpiresAt: null, roles: access.roles });
     });
   }
 
@@ -21428,9 +21740,17 @@ export class ManagementService {
       if (access.status !== "suspended") {
         throw new ConflictException({ code: "PERSON_ACCESS_NOT_SUSPENDED" });
       }
-      const targetRole = input.role ?? access.role;
-      this.assertPersonAccessGrant(actorRole, targetRole);
-      await this.requireSensitiveAccessStepUp(identityId, targetRole, input.reauth);
+      this.assertPersonAccessRevision(access, input.expectedRevision);
+      if (access.roles.length > 1 && input.expectedRevision === undefined) {
+        throw new ConflictException({ code: "PERSON_ACCESS_CHANGED" });
+      }
+      const targetRoles = input.roles ?? access.roles;
+      this.assertPersonAccessRoles(actorRole, [...new Set([...access.roles, ...targetRoles])]);
+      await this.requireSensitiveRolesStepUp(
+        identityId,
+        [...new Set([...access.roles, ...targetRoles])],
+        input.reauth,
+      );
       if (!access.membershipId) throw new ConflictException({ code: "PERSON_ACCESS_CORRUPT" });
       const [person] = await tx
         .select({ active: managementPeople.active, identityId: managementPeople.identityId })
@@ -21449,23 +21769,34 @@ export class ManagementService {
         .update(memberships)
         .set({ status: "active", updatedAt: new Date() })
         .where(eq(memberships.id, access.membershipId));
-      const roleBindingId = await this.ensurePersonRoleBinding(
+      const roleBindingIds = new Map<PersonAccessRole, string>();
+      for (const role of targetRoles) {
+        roleBindingIds.set(
+          role,
+          await this.ensurePersonRoleBinding(tx, access.membershipId, unitId, role),
+        );
+      }
+      await this.replacePersonRoleAssignments(
         tx,
-        access.membershipId,
+        organizationId,
         unitId,
-        targetRole,
+        personId,
+        targetRoles,
+        "people_admin",
+        roleBindingIds,
       );
       const changedAt = new Date();
       const [updated] = await tx
         .update(managementPersonAccess)
         .set({
           status: "active",
-          role: targetRole,
-          roleBindingId,
+          role: firstPersonAccessRole(targetRoles),
+          roleBindingId: roleBindingIds.get(firstPersonAccessRole(targetRoles)),
           statusChangedAt: changedAt,
           statusChangedByIdentityId: identityId,
           statusChangeReason: input.reason,
           updatedAt: changedAt,
+          revision: sql`${managementPersonAccess.revision} + 1`,
         })
         .where(
           and(
@@ -21484,10 +21815,10 @@ export class ManagementService {
         "management.person.access.reactivated",
         "person_access",
         personId,
-        { reason: input.reason, role: targetRole },
+        { reason: input.reason, roles: targetRoles },
       );
       if (!updated) throw new NotFoundException({ code: "PERSON_ACCESS_NOT_FOUND" });
-      return personAccessView({ ...updated, invitationExpiresAt: null });
+      return personAccessView({ ...updated, invitationExpiresAt: null, roles: targetRoles });
     });
   }
 
@@ -21502,6 +21833,9 @@ export class ManagementService {
     return this.database.db.transaction(async (tx) => {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`person-status:${organizationId}:${unitId}:${personId}`}, 0))`,
+      );
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${personId}`}, 0))`,
       );
       await tx.execute(
         sql`select id from management_people where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${personId}::uuid for update`,
@@ -21591,6 +21925,9 @@ export class ManagementService {
         sql`select pg_advisory_xact_lock(hashtextextended(${`person-status:${organizationId}:${unitId}:${personId}`}, 0))`,
       );
       await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`person-access:${organizationId}:${personId}`}, 0))`,
+      );
+      await tx.execute(
         sql`select id from management_people where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${personId}::uuid for update`,
       );
       const [person] = await tx
@@ -21614,6 +21951,11 @@ export class ManagementService {
             eq(managementPersonAccess.personId, personId),
           ),
         );
+      const rolesByAccess = await this.personRoleSets(tx, accesses);
+      const currentUnitAccess = accesses.find((access) => access.unitId === unitId);
+      if (currentUnitAccess) {
+        this.assertPersonAccessRevision(currentUnitAccess, input.expectedRevision);
+      }
       if (!active) {
         if (actorRole !== "owner" && accesses.some((access) => access.unitId !== unitId)) {
           throw new ForbiddenException({
@@ -21621,7 +21963,13 @@ export class ManagementService {
             message: "Somente o proprietário pode desligar uma pessoa com acesso multiunidade.",
           });
         }
-        for (const access of accesses) this.assertPersonAccessGrant(actorRole, access.role);
+        for (const access of accesses) {
+          const roles = rolesByAccess.get(personAccessKey(access.personId, access.unitId)) ?? [
+            access.role,
+          ];
+          this.assertPersonAccessRoles(actorRole, roles);
+          await this.assertNoGlobalPersonAccess(tx, access.membershipId);
+        }
       }
       if (
         person.active === active &&
@@ -21675,13 +22023,26 @@ export class ManagementService {
               ),
             );
         }
-        const roleBindingIds = accesses
-          .map((access) => access.roleBindingId)
-          .filter((id): id is string => Boolean(id));
-        if (roleBindingIds.length) {
-          await tx.delete(roleBindings).where(inArray(roleBindings.id, roleBindingIds));
+        for (const access of accesses) {
+          if (!access.membershipId) continue;
+          await tx
+            .delete(roleBindings)
+            .where(
+              and(
+                eq(roleBindings.membershipId, access.membershipId),
+                eq(roleBindings.unitId, access.unitId),
+              ),
+            );
         }
         if (accesses.length) {
+          await tx
+            .delete(managementPersonRoleAssignments)
+            .where(
+              and(
+                eq(managementPersonRoleAssignments.organizationId, organizationId),
+                eq(managementPersonRoleAssignments.personId, personId),
+              ),
+            );
           await tx
             .update(managementPersonAccess)
             .set({
@@ -21691,6 +22052,7 @@ export class ManagementService {
               statusChangedByIdentityId: identityId,
               statusChangeReason: input.reason,
               updatedAt: changedAt,
+              revision: sql`${managementPersonAccess.revision} + 1`,
             })
             .where(
               and(
@@ -21742,24 +22104,19 @@ export class ManagementService {
               .where(eq(roleBindings.membershipId, legacyMembership.id));
             if (bindings.some((binding) => binding.unitId === null)) {
               throw new ConflictException({
-                code: "PERSON_ACCESS_REVIEW_REQUIRED",
+                code: "PERSON_GLOBAL_ACCESS_REVIEW_REQUIRED",
                 message: "O usuário possui acesso global; revise o vínculo antes do desligamento.",
               });
             }
             const unitBindingIds = bindings
               .filter((binding) => binding.unitId === unitId)
               .map((binding) => binding.id);
-            if (unitBindingIds.length > 1) {
+            if (unitBindingIds.length) {
               throw new ConflictException({
-                code: "PERSON_ACCESS_REVIEW_REQUIRED",
+                code: "PERSON_ROLE_ASSIGNMENT_REQUIRED",
                 message:
                   "O usuário possui mais de um perfil nesta unidade; revise o vínculo antes do desligamento.",
               });
-            }
-            const unitBinding = bindings.find((binding) => binding.unitId === unitId);
-            if (unitBinding) this.assertPersonAccessGrant(actorRole, unitBinding.role);
-            if (unitBindingIds.length) {
-              await tx.delete(roleBindings).where(inArray(roleBindings.id, unitBindingIds));
             }
             await this.disableMembershipWithoutRoles(tx, legacyMembership.id);
           }

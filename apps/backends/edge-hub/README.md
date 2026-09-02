@@ -16,6 +16,8 @@ Serviço local da unidade. Ele recebe os comandos operacionais, persiste-os ante
 
 O workflow `publish-edge-hub.yml` publica `GiroMesa-Conector-Setup.exe` somente em tags `edge-hub-v*`. A publicação falha se `EDGE_HUB_CODESIGN_PFX_BASE64` ou `EDGE_HUB_CODESIGN_PASSWORD` não estiverem configurados, e verifica com `SignTool` tanto o serviço incorporado quanto o instalador final. Configure `EDGE_HUB_WINDOWS_INSTALLER_URL` na API com a URL HTTPS do ativo publicado. O instalador pede apenas o código exibido no GiroMesa, registra `GiroMesaEdgeHub` com início automático e configura reinício após falhas.
 
+Enquanto a assinatura pública não estiver disponível, o piloto controlado usa arquivo privado, SHA-256 obrigatório e allowlist de organizações. O procedimento fica em `docs/runbooks/edge-hub-pilot-installer.md`; ele não substitui a assinatura oficial nem autoriza distribuição ampla.
+
 Um arquivo SQLite antigo sem criptografia não é convertido automaticamente. Antes da atualização, exporte-o para um novo banco SQLCipher com `sqlcipher_export`, valide a cópia e substitua o arquivo em uma janela de manutenção. Guarde um backup protegido até validar a nova instalação.
 
 ## Sincronização Cloud ↔ Edge
