@@ -8,7 +8,7 @@ SET "target_audience" = CASE
     WHERE membership."identity_id" = request."created_by_identity_id"
       AND membership."organization_id" = request."organization_id"
       AND membership."status" = 'active'
-      AND binding."role" = 'accountant'
+      AND binding."role"::text = 'accountant'
       AND (binding."unit_id" IS NULL OR binding."unit_id" = request."unit_id")
   ) THEN 'establishment'
   ELSE 'accountant'
