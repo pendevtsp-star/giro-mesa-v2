@@ -39,20 +39,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119",
+    "artifact": "git:641fb525a750769f6626bb6ea3d3f8c8c2c74b7f",
     "migration": {
-      "id": "0076_edge_hub_pairing",
+      "id": "0077_people_multi_role_access",
       "status": "applied",
-      "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
+      "evidence": "git:641fb525a750769f6626bb6ea3d3f8c8c2c74b7f"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
+        "evidence": "git:641fb525a750769f6626bb6ea3d3f8c8c2c74b7f"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:702c1a88fe10d55c1aae59faae1a8e4ea0dd9119"
+        "evidence": "git:641fb525a750769f6626bb6ea3d3f8c8c2c74b7f"
       }
     }
   },
