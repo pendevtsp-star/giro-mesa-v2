@@ -176,6 +176,66 @@
   gap: var(--gm-space-2);
 }
 
+.production-setup-steps {
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: var(--gm-space-1);
+}
+
+.production-setup-steps ol {
+  display: grid;
+  gap: var(--gm-space-2);
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  list-style: none;
+  margin: 0;
+  min-width: 780px;
+  padding: 0;
+}
+
+.production-setup-steps button {
+  align-items: center;
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-muted);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+  gap: var(--gm-space-2);
+  min-height: 44px;
+  padding: var(--gm-space-2) var(--gm-space-3);
+  text-align: left;
+  width: 100%;
+}
+
+.production-setup-step__index {
+  align-items: center;
+  background: var(--gm-surface-soft);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 24px;
+  height: 24px;
+  justify-content: center;
+}
+
+.production-setup-steps button[data-complete="true"] .production-setup-step__index {
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
+}
+
+.production-setup-steps button[aria-current="step"] {
+  border-color: var(--gm-action);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gm-action) 18%, transparent);
+  color: var(--gm-ink);
+}
+
+.production-setup-steps button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--gm-focus) 40%, transparent);
+  outline-offset: 2px;
+}
+
 .production-printers__summary {
   display: grid;
   gap: var(--gm-space-3);
@@ -206,10 +266,109 @@
 }
 
 .production-printers__layout > section,
-.production-edge {
+.production-edge,
+.production-setup-panel,
+.production-routing {
   display: grid;
   gap: var(--gm-space-3);
   min-width: 0;
+}
+
+.production-computers,
+.production-routing__list {
+  display: grid;
+  gap: var(--gm-space-2);
+}
+
+.production-computers > .gm-card,
+.production-routing__row {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+  min-width: 0;
+  padding: var(--gm-space-3);
+}
+
+.production-computer__info,
+.production-routing__row label {
+  display: grid;
+  gap: var(--gm-space-1);
+  min-width: 0;
+}
+
+.production-computers small,
+.production-routing__row small {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+
+.production-connection-guide {
+  display: grid;
+  gap: var(--gm-space-2);
+  padding: var(--gm-space-4);
+}
+
+.production-pairing {
+  display: grid;
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-4);
+}
+
+.production-pairing p,
+.production-pairing small {
+  color: var(--gm-muted);
+  margin: var(--gm-space-1) 0 0;
+}
+
+.production-pairing__actions,
+.production-pairing__code {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.production-pairing__code {
+  background: var(--gm-surface-subtle);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  padding: var(--gm-space-3);
+}
+
+.production-pairing__code strong {
+  font-family: var(--gm-mono);
+  font-size: var(--gm-font-xl);
+  letter-spacing: 0.14em;
+}
+
+.production-pairing__code small {
+  flex-basis: 100%;
+}
+
+.production-connection-guide ul {
+  display: grid;
+  gap: var(--gm-space-2);
+  margin: 0;
+  padding-left: var(--gm-space-5);
+}
+
+.production-routing__row .gm-select {
+  flex: 0 1 340px;
+  min-width: 230px;
+}
+
+.production-routing__actions,
+.production-setup-navigation {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-2);
+  justify-content: flex-end;
+}
+
+.production-setup-navigation {
+  border-top: 1px solid var(--gm-border);
+  padding-top: var(--gm-space-3);
 }
 
 .production-printers__cards {
@@ -372,6 +531,17 @@
   margin: 0;
 }
 
+.production-printer-form__advanced {
+  display: grid;
+  gap: var(--gm-space-3);
+}
+
+.production-printer-form__advanced > p {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  margin: var(--gm-space-2) 0;
+}
+
 .production-printer-form__grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -468,6 +638,21 @@
   .production-printer-form__actions,
   .production-printer-form__actions .gm-button {
     width: 100%;
+  }
+
+  .production-routing__row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .production-routing__row .gm-select {
+    flex-basis: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .production-setup-navigation .gm-button {
+    flex: 1;
   }
 
   .production-readiness,

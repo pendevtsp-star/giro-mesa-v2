@@ -1,0 +1,111 @@
+name: Publish signed Edge Hub installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["edge-hub-v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          dotnet-version: 10.0.x
+      - name: Require tagged releases to come from main
+        if: startsWith(github.ref, 'refs/tags/edge-hub-v')
+        shell: pwsh
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw "The release tag must point to a commit on main." }
+      - name: Test the Edge Hub
+        shell: pwsh
+        run: dotnet test apps/backends/edge-hub.tests/GiroMesa.EdgeHub.Tests.csproj --configuration Release
+      - name: Require the production signing certificate
+        shell: pwsh
+        env:
+          CODE_SIGNING_PFX_BASE64: ${{ secrets.EDGE_HUB_CODESIGN_PFX_BASE64 }}
+          CODE_SIGNING_PASSWORD: ${{ secrets.EDGE_HUB_CODESIGN_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:CODE_SIGNING_PASSWORD)) {
+            throw "The Edge Hub signing certificate is required."
+          }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\edge-hub-signing.pfx", [Convert]::FromBase64String($env:CODE_SIGNING_PFX_BASE64))
+      - name: Publish the Windows service
+        shell: pwsh
+        run: >-
+          dotnet publish apps/backends/edge-hub/GiroMesa.EdgeHub.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:IncludeAllContentForSelfExtract=true
+          --output artifacts/edge-hub
+      - name: Locate SignTool
+        id: signtool
+        shell: pwsh
+        run: |
+          $tool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse |
+            Where-Object FullName -Match '\\x64\\signtool\.exe$' |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $tool) { throw "SignTool was not found." }
+          "path=$tool" >> $env:GITHUB_OUTPUT
+      - name: Sign and verify the service payload
+        shell: pwsh
+        env:
+          SIGNTOOL: ${{ steps.signtool.outputs.path }}
+          CODE_SIGNING_PASSWORD: ${{ secrets.EDGE_HUB_CODESIGN_PASSWORD }}
+        run: |
+          & $env:SIGNTOOL sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\edge-hub-signing.pfx" /p $env:CODE_SIGNING_PASSWORD artifacts/edge-hub/GiroMesa.EdgeHub.exe
+          if ($LASTEXITCODE -ne 0) { throw "Service signing failed." }
+          & $env:SIGNTOOL verify /pa artifacts/edge-hub/GiroMesa.EdgeHub.exe
+          if ($LASTEXITCODE -ne 0) { throw "Service signature verification failed." }
+      - name: Build the installer with the signed payload
+        shell: pwsh
+        run: >-
+          dotnet publish apps/backends/edge-hub-installer/GiroMesa.EdgeHub.Installer.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -p:PublishInstaller=true
+          -p:EdgeHubPayload="$env:GITHUB_WORKSPACE\artifacts\edge-hub\GiroMesa.EdgeHub.exe"
+          -p:EdgeHubApiBaseUrl=https://api.giromesa.com.br
+          --output artifacts/installer
+      - name: Sign, verify and hash the installer
+        shell: pwsh
+        env:
+          SIGNTOOL: ${{ steps.signtool.outputs.path }}
+          CODE_SIGNING_PASSWORD: ${{ secrets.EDGE_HUB_CODESIGN_PASSWORD }}
+        run: |
+          $source = "artifacts\installer\GiroMesa.Conector.Setup.exe"
+          $target = "artifacts\GiroMesa-Conector-Setup.exe"
+          Copy-Item -LiteralPath $source -Destination $target
+          & $env:SIGNTOOL sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\edge-hub-signing.pfx" /p $env:CODE_SIGNING_PASSWORD $target
+          if ($LASTEXITCODE -ne 0) { throw "Installer signing failed." }
+          & $env:SIGNTOOL verify /pa $target
+          if ($LASTEXITCODE -ne 0) { throw "Installer signature verification failed." }
+          (Get-FileHash -Algorithm SHA256 $target).Hash.ToLowerInvariant() + "  GiroMesa-Conector-Setup.exe" | Set-Content artifacts/GiroMesa-Conector-Setup.exe.sha256 -Encoding ascii
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: giromesa-edge-hub-${{ github.ref_name }}
+          path: |
+            artifacts/GiroMesa-Conector-Setup.exe
+            artifacts/GiroMesa-Conector-Setup.exe.sha256
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish the tagged release asset
+        if: startsWith(github.ref, 'refs/tags/edge-hub-v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create $env:GITHUB_REF_NAME
+          artifacts/GiroMesa-Conector-Setup.exe
+          artifacts/GiroMesa-Conector-Setup.exe.sha256
+          --verify-tag --latest --generate-notes

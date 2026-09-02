@@ -6,7 +6,21 @@ using GiroMesa.EdgeHub.Security;
 using GiroMesa.EdgeHub.Storage;
 using GiroMesa.EdgeHub.Sync;
 
+var machineConfiguration = MachineConfigurationStore.TryLoad();
 var builder = WebApplication.CreateBuilder(args);
+if (machineConfiguration is not null)
+{
+    builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+    {
+        ["Hub:UnitId"] = machineConfiguration.UnitId,
+        ["Hub:DataDirectory"] = machineConfiguration.DataDirectory,
+        ["Hub:DatabaseKey"] = machineConfiguration.DatabaseKey,
+        ["Hub:CloudApiBaseUrl"] = machineConfiguration.CloudApiBaseUrl,
+        ["Hub:CloudSyncKey"] = machineConfiguration.CloudSyncKey,
+    });
+    builder.Configuration.AddEnvironmentVariables();
+    builder.Configuration.AddCommandLine(args);
+}
 builder.Host.UseWindowsService(options => options.ServiceName = "GiroMesa Edge Hub");
 builder.Services.Configure<HubOptions>(builder.Configuration.GetSection(HubOptions.Section));
 builder.Services.AddSingleton<HubStore>();

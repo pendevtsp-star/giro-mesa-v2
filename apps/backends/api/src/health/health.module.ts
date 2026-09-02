@@ -17,7 +17,7 @@ import { InternalKeyGuard } from "../billing/internal-key.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
 
-export const RELEASE_SCHEMA_VERSION = 75;
+export const RELEASE_SCHEMA_VERSION = 76;
 export const RELEASE_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -30,6 +30,7 @@ export const RELEASE_CAPABILITIES = [
   "platform_commercial_site_v1",
   "crm_evolution_go_v1",
   "crm_operational_inbox_v1",
+  "edge_hub_pairing_v1",
 ] satisfies ApiCapability[];
 
 export function releaseBuildSha() {
@@ -125,6 +126,7 @@ export class DatabaseReadinessService {
           whatsappMessages: string | null;
           crmAutomations: string | null;
           crmQuickReplies: string | null;
+          edgeHubPairings: string | null;
         }
       | undefined;
     try {
@@ -135,6 +137,7 @@ export class DatabaseReadinessService {
         whatsappMessages: string | null;
         crmAutomations: string | null;
         crmQuickReplies: string | null;
+        edgeHubPairings: string | null;
       }>(
         sql`select
           to_regclass('public.management_time_tracking_settings')::text as management,
@@ -142,7 +145,8 @@ export class DatabaseReadinessService {
           to_regclass('public.pos_operational_push_subscriptions')::text as "operationalPush",
           to_regclass('public.growth_whatsapp_messages')::text as "whatsappMessages",
           to_regclass('public.growth_crm_automation_rules')::text as "crmAutomations",
-          to_regclass('public.growth_crm_quick_replies')::text as "crmQuickReplies"`,
+          to_regclass('public.growth_crm_quick_replies')::text as "crmQuickReplies",
+          to_regclass('public.edge_hub_pairing_codes')::text as "edgeHubPairings"`,
       );
     } catch (error) {
       this.logger.error(
@@ -161,6 +165,7 @@ export class DatabaseReadinessService {
       !readiness?.whatsappMessages ? "growth_whatsapp_messages" : null,
       !readiness?.crmAutomations ? "growth_crm_automation_rules" : null,
       !readiness?.crmQuickReplies ? "growth_crm_quick_replies" : null,
+      !readiness?.edgeHubPairings ? "edge_hub_pairing_codes" : null,
     ].filter((value): value is string => Boolean(value));
     if (missingRelations.length > 0) {
       throw new ServiceUnavailableException({
@@ -219,6 +224,9 @@ class HealthController {
             ? "configured_unit_status_required"
             : "disabled",
         focus: "edge_capability_required",
+        edgeHubInstaller: process.env.EDGE_HUB_WINDOWS_INSTALLER_URL
+          ? "configured_not_homologated"
+          : "disabled",
         paygo: "external_homologation_required",
       },
     };

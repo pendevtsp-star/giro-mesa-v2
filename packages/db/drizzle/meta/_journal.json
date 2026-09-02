@@ -533,6 +533,13 @@
       "when": 1787796000000,
       "tag": "0075_platform_staff_invitations",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1788307200000,
+      "tag": "0076_edge_hub_pairing",
+      "breakpoints": true
     }
   ]
 }

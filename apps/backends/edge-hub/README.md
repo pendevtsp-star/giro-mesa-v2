@@ -9,7 +9,12 @@ Serviço local da unidade. Ele recebe os comandos operacionais, persiste-os ante
 - As demais rotas exigem `X-GiroMesa-Device-Token`.
 - O banco local usa SQLCipher v4 e o processo falha de forma segura se `Hub:DatabaseKey` estiver ausente, tiver menos de 32 caracteres ou se o provedor de criptografia não estiver carregado.
 - `Hub:CloudSyncKey` autentica o hub na nuvem e deve ser tratado como segredo. A API guarda apenas o hash SHA-256 da chave entregue uma única vez no cadastro do dispositivo.
-- Produção exige certificado TLS local e armazenamento protegido das configurações pelo instalador Windows. Configure os segredos por cofre do instalador/serviço ou por `Hub__DatabaseKey` e `Hub__CloudSyncKey`; nunca os grave no repositório ou em logs.
+- No fluxo normal, o gerente gera um código de 8 caracteres válido por 5 minutos. O instalador resgata o código uma única vez, gera a chave do banco local e protege ambas as credenciais com DPAPI no escopo da máquina. A pasta fica acessível somente para `SYSTEM` e administradores.
+- `Hub__DatabaseKey` e `Hub__CloudSyncKey` permanecem disponíveis somente para desenvolvimento e recuperação controlada; nunca os grave no repositório ou em logs.
+
+## Instalador Windows
+
+O workflow `publish-edge-hub.yml` publica `GiroMesa-Conector-Setup.exe` somente em tags `edge-hub-v*`. A publicação falha se `EDGE_HUB_CODESIGN_PFX_BASE64` ou `EDGE_HUB_CODESIGN_PASSWORD` não estiverem configurados, e verifica com `SignTool` tanto o serviço incorporado quanto o instalador final. Configure `EDGE_HUB_WINDOWS_INSTALLER_URL` na API com a URL HTTPS do ativo publicado. O instalador pede apenas o código exibido no GiroMesa, registra `GiroMesaEdgeHub` com início automático e configura reinício após falhas.
 
 Um arquivo SQLite antigo sem criptografia não é convertido automaticamente. Antes da atualização, exporte-o para um novo banco SQLCipher com `sqlcipher_export`, valide a cópia e substitua o arquivo em uma janela de manutenção. Guarde um backup protegido até validar a nova instalação.
 

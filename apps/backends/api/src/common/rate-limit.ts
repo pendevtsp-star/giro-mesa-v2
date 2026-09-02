@@ -32,6 +32,11 @@ export function requestRateLimit(method: string, url: string) {
     return { bucket: "evolution-webhook", max: 300 } as const;
   if (
     method.toUpperCase() === "POST" &&
+    /^\/(?:api\/)?v1\/device\/edge-hub-pairings\/redeem$/.test(path)
+  )
+    return { bucket: "edge-hub-pairing", max: 10 } as const;
+  if (
+    method.toUpperCase() === "POST" &&
     /^\/(?:api\/v1\/public|public\/v1)\/menus\/[^/]+\/table-session$/.test(path)
   )
     return { bucket: "public-table-session", max: 10 } as const;

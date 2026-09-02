@@ -29,6 +29,7 @@ export const apiCapabilitySchema = z.enum([
   "platform_commercial_site_v1",
   "crm_evolution_go_v1",
   "crm_operational_inbox_v1",
+  "edge_hub_pairing_v1",
 ]);
 
 export const apiHealthResponseSchema = z
@@ -1267,6 +1268,37 @@ export const enrollDeviceSchema = z.object({
   certificateFingerprint: z.string().trim().min(32).max(128).optional(),
 });
 
+export const edgeHubPairingCreateSchema = z
+  .object({
+    label: z.string().trim().min(2).max(120),
+    expiresInSeconds: z.number().int().min(120).max(900).default(300),
+  })
+  .strict();
+
+export const edgeHubPairingRedeemSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-HJ-NP-Z2-9]{8}$/),
+  })
+  .strict();
+
+export const edgeHubPairingCreateResponseSchema = z.object({
+  pairingId: idSchema,
+  code: z.string().regex(/^[A-HJ-NP-Z2-9]{8}$/),
+  expiresAt: z.iso.datetime({ offset: true }),
+  installerUrl: z.url().nullable(),
+});
+
+export const edgeHubPairingRedeemResponseSchema = z.object({
+  deviceId: idSchema,
+  organizationId: idSchema,
+  unitId: idSchema,
+  syncKey: z.string().min(32).max(128),
+});
+
 export const inviteMembershipSchema = z.object({
   email: emailSchema,
   role: z.enum([
@@ -1979,6 +2011,8 @@ export type ConfirmPasswordResetInput = z.infer<typeof confirmPasswordResetSchem
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type SelfServiceOrganizationInput = z.infer<typeof selfServiceOrganizationSchema>;
 export type EnrollDeviceInput = z.infer<typeof enrollDeviceSchema>;
+export type EdgeHubPairingCreateInput = z.infer<typeof edgeHubPairingCreateSchema>;
+export type EdgeHubPairingRedeemInput = z.infer<typeof edgeHubPairingRedeemSchema>;
 export type InviteMembershipInput = z.infer<typeof inviteMembershipSchema>;
 export type OperationalCapability = z.infer<typeof operationalCapabilitySchema>;
 export type AcceptMembershipInviteInput = z.infer<typeof acceptMembershipInviteSchema>;

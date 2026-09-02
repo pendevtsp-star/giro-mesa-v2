@@ -42,7 +42,7 @@ Worker ────────────> outbox do banco + provedores extern
 | Operação piloto API | `apps/backends/api/src/pilot-operations/` | `pilot-pos.service.ts`, `pilot-catalog.service.ts`, schemas e controllers |
 | Banco | `packages/db/src/schema.ts` | `operations-schema.ts`, `management-schema.ts`, `growth-schema.ts`, `drizzle/` |
 | Worker | `apps/backends/worker/src/main.ts` | consumidores/outbox no mesmo workspace |
-| Edge Hub | `apps/backends/edge-hub/Program.cs` | serviços locais e `apps/backends/edge-hub.tests` |
+| Edge Hub | `apps/backends/edge-hub/Program.cs` | serviços locais, `apps/backends/edge-hub-installer` e `apps/backends/edge-hub.tests` |
 | Shell MAUI | `apps/native/ops-shell/GiroMesa.OpsShell.csproj` | `MauiProgram.cs`, `MainPage*`, `Resources/Raw/wwwroot` |
 | Design system | `packages/ui/src/index.ts`, `src/index.css` | `tokens/`, `themes/`, `components/`, `patterns.css` |
 | Contratos | `packages/contracts/src/index.ts` | `generated-api.ts`; origem OpenAPI em `apps/backends/api/openapi` |
@@ -75,6 +75,7 @@ Worker ────────────> outbox do banco + provedores extern
 | Alterar componente visual | `packages/ui` e consumidor | lint/typecheck/test do UI + light/dark/mobile |
 | Alterar deploy | Dockerfile, `.github/workflows`, `deploy/vps`, `infra` | build da imagem/configuração afetada |
 | Alterar shell nativo | `apps/native/ops-shell`, bundle Ops | build Ops, `sync-ops-bundle.ps1`, build .NET quando SDK existir |
+| Alterar Conector Windows | API `organizations`, Edge Hub, `edge-hub-installer` e `publish-edge-hub.yml` | migration + pareamento de uso único + testes API/.NET + assinatura Authenticode verificada |
 
 ## Testes ativos
 

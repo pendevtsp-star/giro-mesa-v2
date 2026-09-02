@@ -161,7 +161,7 @@ async function mockProductionApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "e2e-real",
-        schemaVersion: 73,
+        schemaVersion: 76,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -172,6 +172,7 @@ async function mockProductionApi(
           "public_menu_cover_image_v1",
           "platform_backoffice_v1",
           "platform_commercial_site_v1",
+          "edge_hub_pairing_v1",
         ],
         database: "up",
         integrations: {},
@@ -1103,8 +1104,44 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   ]);
   await manualMethods.selectOption("pix");
   await expect(manualMethods).toHaveValue("pix");
+  await manualMethods.selectOption("cash");
   await page.setViewportSize({ width: 375, height: 667 });
   await expectNoHorizontalOverflow(page);
+  const mobilePaymentLayout = await dialog.evaluate((root) => {
+    const title = root.querySelector<HTMLElement>('[data-slot="dialog-title"]');
+    const description = root.querySelector<HTMLElement>(".gm-modal__description");
+    const fields = root.querySelector<HTMLElement>(".cashier-payment-form__fields");
+    const labels = fields ? [...fields.querySelectorAll<HTMLElement>("label")] : [];
+    const controls = fields ? [...fields.querySelectorAll<HTMLElement>("select, input")] : [];
+    const titleBounds = title?.getBoundingClientRect();
+    const descriptionBounds = description?.getBoundingClientRect();
+    const fieldBounds = fields?.getBoundingClientRect();
+    return {
+      controlsFit: controls.every((control) => {
+        const bounds = control.getBoundingClientRect();
+        return (
+          bounds.left >= (fieldBounds?.left ?? 0) - 1 &&
+          bounds.right <= (fieldBounds?.right ?? 0) + 1
+        );
+      }),
+      descriptionBelowTitle:
+        (descriptionBounds?.top ?? 0) >= (titleBounds?.bottom ?? Number.POSITIVE_INFINITY) - 1,
+      fieldColumns: fields
+        ? getComputedStyle(fields).gridTemplateColumns.split(" ").filter(Boolean).length
+        : 0,
+      labelsStacked: labels.every(
+        (label, index) =>
+          index === 0 ||
+          label.getBoundingClientRect().top >= labels[index - 1].getBoundingClientRect().bottom - 1,
+      ),
+      titleHeight: titleBounds?.height ?? Number.POSITIVE_INFINITY,
+    };
+  });
+  expect(mobilePaymentLayout.titleHeight).toBeLessThan(48);
+  expect(mobilePaymentLayout.descriptionBelowTitle).toBe(true);
+  expect(mobilePaymentLayout.fieldColumns).toBe(1);
+  expect(mobilePaymentLayout.labelsStacked).toBe(true);
+  expect(mobilePaymentLayout.controlsFit).toBe(true);
   await page.setViewportSize({ width: 1440, height: 900 });
   const firstAccountLine = dialog.locator(".account-line-group").first();
   await firstAccountLine.getByRole("button", { name: /Ações para/ }).click();
@@ -1660,12 +1697,12 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
   await expectNoHorizontalOverflow(page);
 });
 
-test("Gestão SmartPOS pareia terminal e mostra saúde fail-closed em tela estreita", async ({
-  page,
-}) => {
+test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", async ({ page }) => {
   const installationId = "00000000-0000-4000-8000-000000000111";
   const certificationId = "00000000-0000-4000-8000-000000000222";
   let pairingBody: unknown = null;
+  let edgePairingBody: unknown = null;
+  let edgeHubConnected = false;
   await page.addInitScript(() => localStorage.setItem("giromesa-theme", "dark"));
   await mockProductionApi(page);
   await page.route("**/pilot/installations/*/payment-capabilities", (route) =>
@@ -1771,6 +1808,40 @@ test("Gestão SmartPOS pareia terminal e mostra saúde fail-closed em tela estre
   await page.route("**/pilot/payment-homologation-runs", (route) =>
     route.fulfill({ json: { runs: [] } }),
   );
+  await page.route("**/pilot/production-printers", (route) =>
+    route.fulfill({
+      json: {
+        printers: [],
+        hubs: edgeHubConnected
+          ? [
+              {
+                id: "00000000-0000-4000-8000-000000000333",
+                label: "Computador da cozinha",
+                lastSeenAt: new Date().toISOString(),
+                online: true,
+              },
+            ]
+          : [],
+      },
+    }),
+  );
+  await page.route("**/edge-hub-pairings", async (route) => {
+    edgePairingBody = route.request().postDataJSON();
+    edgeHubConnected = true;
+    await route.fulfill({
+      status: 201,
+      json: {
+        pairingId: "00000000-0000-4000-8000-000000000444",
+        code: "EDGE2345",
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+        installerUrl: "https://downloads.giromesa.com.br/GiroMesa-Conector-Setup.exe",
+      },
+    });
+  });
+  await page.route("**/pilot/production-printing/stations", (route) =>
+    route.fulfill({ json: { stations: [] } }),
+  );
+  await page.route("**/pilot/print-jobs?**", (route) => route.fulfill({ json: [] }));
 
   await page.goto("/");
   await page.evaluate(() => {
@@ -1780,7 +1851,27 @@ test("Gestão SmartPOS pareia terminal e mostra saúde fail-closed em tela estre
   await page.setViewportSize({ width: 360, height: 640 });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(
-    page.getByRole("heading", { level: 1, name: "SmartPOS e dispositivos" }),
+    page.getByRole("heading", { level: 1, name: "Equipamentos e produção" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Preparar pedidos na tela e na impressora" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Conecte o computador da unidade" }),
+  ).toBeVisible();
+  await page.getByLabel("Nome do computador").fill("Computador da cozinha");
+  await page.getByRole("button", { name: "Gerar código de conexão" }).click();
+  await expect(page.getByText("EDGE2345", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Baixar para Windows" })).toBeVisible();
+  expect(edgePairingBody).toEqual({
+    label: "Computador da cozinha",
+    expiresInSeconds: 300,
+  });
+  await page.getByRole("button", { name: "Atualizar", exact: true }).click();
+  await expect(page.getByText("Computador da cozinha", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar impressora" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Adicione e teste as impressoras" }),
   ).toBeVisible();
   await expect(page.getByText("Comanda 18 sem resultado")).toBeVisible();
   await expect(page.getByText("Bloqueio preventivo do suporte")).toBeVisible();

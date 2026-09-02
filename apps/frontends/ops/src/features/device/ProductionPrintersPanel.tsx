@@ -4,6 +4,7 @@ import {
   Callout,
   Card,
   FormField,
+  Input,
   Modal,
   NativeSelect,
   Textarea,
@@ -12,6 +13,7 @@ import {
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
+  type EdgeHubPairing,
   type ProductionPrinter,
   type ProductionPrinterHub,
   type ProductionPrintingPolicy,
@@ -30,6 +32,7 @@ import {
   ProductionPrinterForm,
   productionPrinterInput,
 } from "./ProductionPrinterForm";
+import { ProductionRoutingSetup } from "./ProductionRoutingSetup";
 import { ProductionStationPolicies } from "./ProductionStationPolicies";
 import {
   type LocalPrintQueueJob,
@@ -38,6 +41,12 @@ import {
   parsePrinterDiagnostics,
 } from "./printer-diagnostics";
 import { productionPrintJobAction } from "./production-print-job-actions";
+import {
+  firstIncompleteProductionStep,
+  type ProductionSetupStep,
+  productionSetupReadiness,
+  productionSetupSteps,
+} from "./production-setup";
 
 type CloudState =
   | { status: "restricted" }
@@ -74,7 +83,7 @@ function statusTone(status: string): "neutral" | "info" | "warning" | "success" 
 
 function statusLabel(status: string): string {
   const labels: Record<string, string> = {
-    accepted: "Aceita pelo Edge",
+    accepted: "Recebida pelo computador",
     applied: "Aplicada",
     confirmation_required: "Confirmar saída física",
     error: "Com erro",
@@ -139,6 +148,10 @@ export function ProductionPrintersPanel({
     tone: "success" | "danger" | "info";
   } | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [routingReady, setRoutingReady] = useState(false);
+  const [setupStep, setSetupStep] = useState<ProductionSetupStep | null>(null);
+  const [computerLabel, setComputerLabel] = useState("Computador da unidade");
+  const [pairing, setPairing] = useState<EdgeHubPairing | null>(null);
   const inFlightRef = useRef(new Set<string>());
 
   const loadCloud = useCallback(async () => {
@@ -197,7 +210,7 @@ export function ProductionPrintersPanel({
       if (!diagnostics?.success) {
         setEdge({
           status: "error",
-          message: `O Edge não entregou o diagnóstico (${diagnostics?.errorCode ?? "indisponível"}).`,
+          message: "O computador não entregou a conferência das impressoras.",
         });
         return;
       }
@@ -209,7 +222,7 @@ export function ProductionPrintersPanel({
     } catch (error) {
       setEdge({
         status: "error",
-        message: errorMessage(error, "Não foi possível consultar o Edge deste terminal."),
+        message: errorMessage(error, "Não foi possível consultar este computador."),
       });
     }
   }, [runtime.embedded]);
@@ -222,6 +235,18 @@ export function ProductionPrintersPanel({
     void loadEdge();
   }, [loadEdge]);
 
+  useEffect(() => {
+    if (
+      !pairing ||
+      Date.parse(pairing.expiresAt) <= Date.now() ||
+      cloud.status !== "ready" ||
+      cloud.hubs.length > 0
+    )
+      return;
+    const refresh = window.setInterval(() => void loadCloud(), 5_000);
+    return () => window.clearInterval(refresh);
+  }, [cloud, loadCloud, pairing]);
+
   const failedJobs = useMemo(
     () =>
       cloud.status === "ready"
@@ -231,6 +256,22 @@ export function ProductionPrintersPanel({
         : 0,
     [cloud],
   );
+  const setupReadiness = useMemo(
+    () =>
+      cloud.status === "ready"
+        ? productionSetupReadiness(cloud.hubs, cloud.printers, cloud.stations, routingReady)
+        : productionSetupReadiness([], [], [], false),
+    [cloud, routingReady],
+  );
+
+  useEffect(() => {
+    if (cloud.status === "ready" && setupStep === null) {
+      setSetupStep(firstIncompleteProductionStep(setupReadiness));
+    }
+  }, [cloud.status, setupReadiness, setupStep]);
+
+  const activeStep = setupStep ?? "computer";
+  const activeStepIndex = productionSetupSteps.findIndex((step) => step.id === activeStep);
 
   const beginAction = (key: string): boolean => {
     if (inFlightRef.current.has(key)) return false;
@@ -238,6 +279,36 @@ export function ProductionPrintersPanel({
     setBusyAction(key);
     return true;
   };
+
+  async function createComputerPairing() {
+    const label = computerLabel.trim();
+    if (label.length < 2) {
+      setToast({ tone: "danger", message: "Informe um nome para identificar o computador." });
+      return;
+    }
+    const actionKey = "edge-hub-pairing";
+    if (!beginAction(actionKey)) return;
+    try {
+      setPairing(await api.createEdgeHubPairing(organizationId, unitId, label));
+    } catch (error) {
+      setToast({
+        tone: "danger",
+        message: errorMessage(error, "Não foi possível criar o código de conexão."),
+      });
+    } finally {
+      finishAction(actionKey);
+    }
+  }
+
+  async function copyPairingCode() {
+    if (!pairing) return;
+    try {
+      await navigator.clipboard.writeText(pairing.code);
+      setToast({ tone: "success", message: "Código copiado." });
+    } catch {
+      setToast({ tone: "info", message: "Selecione o código e copie manualmente." });
+    }
+  }
 
   const finishAction = (key: string) => {
     inFlightRef.current.delete(key);
@@ -265,8 +336,8 @@ export function ProductionPrintersPanel({
       setToast({
         tone: "success",
         message: printerDraft.id
-          ? "Alteração publicada; acompanhe o estado aplicado no Edge."
-          : "Impressora cadastrada; a publicação para o Edge está pendente.",
+          ? "Alteração salva e enviada ao computador da unidade."
+          : "Impressora cadastrada e enviada ao computador da unidade.",
       });
       setPrinterDraft(null);
       await loadCloud();
@@ -299,7 +370,7 @@ export function ProductionPrintersPanel({
         printer.revision,
         `production-printer/${printer.id}/archive/${printer.revision}`,
       );
-      setToast({ tone: "success", message: "Impressora arquivada e comando enviado ao Edge." });
+      setToast({ tone: "success", message: "Impressora arquivada." });
       await loadCloud();
     } catch (error) {
       setToast({
@@ -438,34 +509,15 @@ export function ProductionPrintersPanel({
     <section className="production-printers" aria-labelledby="production-printers-title">
       <header className="production-printers__header">
         <div>
-          <p className="eyebrow">Produção</p>
-          <h2 id="production-printers-title">Impressoras de produção</h2>
-          <p>
-            Cadastre o estado desejado na unidade e acompanhe a aplicação e a saída física no Edge.
-          </p>
+          <p className="eyebrow">Configuração guiada</p>
+          <h2 id="production-printers-title">Preparar pedidos na tela e na impressora</h2>
+          <p>Conecte os equipamentos e escolha para onde cada pedido deve ir.</p>
         </div>
         <div className="production-printers__header-actions">
           {cloud.status === "ready" && (
             <Badge tone={failedJobs > 0 ? "danger" : "success"}>
               {failedJobs > 0 ? `${failedJobs} falha(s) pendente(s)` : "Fila sem falhas"}
             </Badge>
-          )}
-          {canManage && (
-            <Button
-              onClick={() => {
-                setPrinterDraft(
-                  createProductionPrinterDraft(
-                    undefined,
-                    cloud.status === "ready" ? cloud.hubs : [],
-                    cloud.status === "ready" ? cloud.printers : [],
-                  ),
-                );
-                setPrinterMutationKey(crypto.randomUUID());
-              }}
-              size="sm"
-            >
-              Cadastrar impressora
-            </Button>
           )}
           {canManage && (
             <Button
@@ -484,8 +536,8 @@ export function ProductionPrintersPanel({
         <Callout tone="info">
           <strong>Consulta operacional</strong>
           <p>
-            Cadastro, política, fila cloud, teste e reimpressão exigem gestão da unidade. O
-            diagnóstico local abaixo continua limitado a este dispositivo.
+            Cadastro, áreas de preparo, testes e reimpressões exigem gestão da unidade. A
+            conferência abaixo continua limitada a este dispositivo.
           </p>
         </Callout>
       )}
@@ -493,7 +545,7 @@ export function ProductionPrintersPanel({
       {cloud.status === "loading" && <p role="status">Carregando impressoras e fila…</p>}
       {cloud.status === "error" && (
         <Callout tone="danger">
-          <strong>Configuração cloud indisponível</strong>
+          <strong>Configuração indisponível</strong>
           <p>{cloud.message}</p>
           <Button onClick={() => void loadCloud()} size="sm" variant="secondary">
             Tentar novamente
@@ -503,35 +555,169 @@ export function ProductionPrintersPanel({
 
       {cloud.status === "ready" && (
         <>
+          <nav className="production-setup-steps" aria-label="Etapas da configuração">
+            <ol>
+              {productionSetupSteps.map((step, index) => (
+                <li key={step.id}>
+                  <button
+                    aria-current={activeStep === step.id ? "step" : undefined}
+                    data-complete={setupReadiness[step.id]}
+                    onClick={() => setSetupStep(step.id)}
+                    type="button"
+                  >
+                    <span aria-hidden="true" className="production-setup-step__index">
+                      {setupReadiness[step.id] ? "✓" : index + 1}
+                    </span>
+                    {step.label}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+
           <section className="production-printers__summary" aria-label="Resumo da impressão">
+            <Card>
+              <span>Computadores conectados</span>
+              <strong>{cloud.hubs.filter((hub) => hub.online).length}</strong>
+            </Card>
             <Card>
               <span>Impressoras ativas</span>
               <strong>{cloud.printers.filter((printer) => printer.active !== false).length}</strong>
             </Card>
             <Card>
-              <span>Estações prontas</span>
+              <span>Áreas prontas</span>
               <strong>
                 {cloud.stations.filter((station) => station.readiness.ready).length}/
                 {cloud.stations.filter((station) => station.active).length}
               </strong>
             </Card>
             <Card>
-              <span>Fila cloud</span>
-              <strong>{cloud.jobs.length}</strong>
-            </Card>
-            <Card>
-              <span>Falhas / confirmação</span>
+              <span>Pedidos que precisam de atenção</span>
               <strong>{failedJobs}</strong>
             </Card>
           </section>
 
-          <div className="production-printers__layout">
+          {activeStep === "computer" && (
+            <section className="production-setup-panel" aria-labelledby="production-computer-title">
+              <div className="production-printers__section-heading">
+                <div>
+                  <h3 id="production-computer-title">Conecte o computador da unidade</h3>
+                  <p>
+                    Ele mantém a comunicação com as impressoras mesmo quando esta página está
+                    fechada.
+                  </p>
+                </div>
+                <Badge tone={setupReadiness.computer ? "success" : "warning"}>
+                  {setupReadiness.computer ? "Conectado" : "Aguardando conexão"}
+                </Badge>
+              </div>
+              {cloud.hubs.length === 0 ? (
+                <Card className="production-pairing">
+                  <div>
+                    <strong>Instale o Conector GiroMesa</strong>
+                    <p>
+                      Baixe no computador que ficará ligado na unidade. O instalador pedirá apenas o
+                      código mostrado aqui.
+                    </p>
+                  </div>
+                  <FormField htmlFor="production-computer-label" label="Nome do computador">
+                    <Input
+                      id="production-computer-label"
+                      maxLength={120}
+                      onChange={(event) => setComputerLabel(event.target.value)}
+                      value={computerLabel}
+                    />
+                  </FormField>
+                  <div className="production-pairing__actions">
+                    {pairing?.installerUrl ? (
+                      <Button
+                        onClick={() =>
+                          window.open(
+                            pairing.installerUrl as string,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        variant="secondary"
+                      >
+                        Baixar para Windows
+                      </Button>
+                    ) : null}
+                    <Button
+                      disabled={busyAction === "edge-hub-pairing"}
+                      onClick={() => void createComputerPairing()}
+                    >
+                      {busyAction === "edge-hub-pairing" ? "Criando…" : "Gerar código de conexão"}
+                    </Button>
+                  </div>
+                  {pairing ? (
+                    <div className="production-pairing__code" role="status">
+                      <span>Código válido até {dateTime(pairing.expiresAt)}</span>
+                      <strong>{pairing.code}</strong>
+                      <Button onClick={() => void copyPairingCode()} size="sm" variant="secondary">
+                        Copiar código
+                      </Button>
+                      {!pairing.installerUrl && (
+                        <small>
+                          O download ainda não está disponível. Entre em contato com o suporte.
+                        </small>
+                      )}
+                    </div>
+                  ) : (
+                    <small>O código vale por 5 minutos e funciona uma única vez.</small>
+                  )}
+                </Card>
+              ) : (
+                <div className="production-computers">
+                  {cloud.hubs.map((hub) => (
+                    <Card key={hub.id}>
+                      <span className="production-computer__info">
+                        <strong>{hub.label}</strong>
+                        <small>Último contato: {dateTime(hub.lastSeenAt)}</small>
+                      </span>
+                      <Badge tone={hub.online ? "success" : "warning"}>
+                        {hub.online ? "Conectado" : "Sem contato"}
+                      </Badge>
+                    </Card>
+                  ))}
+                </div>
+              )}
+              <Card className="production-connection-guide">
+                <strong>Como ligar uma impressora compatível?</strong>
+                <ul>
+                  <li>
+                    <b>Cabo de rede ou Wi-Fi:</b> impressora e computador ficam na mesma rede; não
+                    precisam de cabo direto entre eles.
+                  </li>
+                  <li>
+                    <b>USB:</b> ainda não está disponível nesta versão. Para evitar interrupções,
+                    use uma impressora com conexão de rede.
+                  </li>
+                </ul>
+              </Card>
+            </section>
+          )}
+
+          {activeStep === "printer" && (
             <section aria-labelledby="production-printer-list-title">
               <div className="production-printers__section-heading">
                 <div>
-                  <h3 id="production-printer-list-title">Cadastro e saúde</h3>
-                  <p>O estado pendente ainda não garante que o Edge aplicou a configuração.</p>
+                  <h3 id="production-printer-list-title">Adicione e teste as impressoras</h3>
+                  <p>Use um nome fácil, como “Cozinha quente” ou “Bar”.</p>
                 </div>
+                {canManage && (
+                  <Button
+                    onClick={() => {
+                      setPrinterDraft(
+                        createProductionPrinterDraft(undefined, cloud.hubs, cloud.printers),
+                      );
+                      setPrinterMutationKey(crypto.randomUUID());
+                    }}
+                    size="sm"
+                  >
+                    Adicionar impressora
+                  </Button>
+                )}
               </div>
               {cloud.printers.length === 0 ? (
                 <Card className="production-printers__empty">
@@ -560,25 +746,23 @@ export function ProductionPrintersPanel({
                       </header>
                       <dl>
                         <div>
-                          <dt>Edge</dt>
+                          <dt>Computador</dt>
                           <dd>
                             {cloud.hubs.find((hub) => hub.id === printer.hubId)?.label ??
                               printer.hubId}
                           </dd>
                         </div>
                         <div>
-                          <dt>Revisão</dt>
+                          <dt>Sincronização</dt>
                           <dd>
-                            desejada {printer.revision} · aplicada {printer.appliedRevision ?? "—"}
+                            {printer.appliedRevision === printer.revision
+                              ? "Atualizada"
+                              : "Aguardando atualização"}
                           </dd>
                         </div>
                         <div>
                           <dt>Setores</dt>
                           <dd>{printer.stationIds?.length || "Definidos nas políticas"}</dd>
-                        </div>
-                        <div>
-                          <dt>Tipos</dt>
-                          <dd>{printer.documentTypes.join(", ") || "Nenhum"}</dd>
                         </div>
                         <div>
                           <dt>Último teste</dt>
@@ -632,7 +816,9 @@ export function ProductionPrintersPanel({
                 </div>
               )}
             </section>
+          )}
 
+          {activeStep === "stations" && (
             <ProductionStationPolicies
               busyAction={busyAction}
               canManage={canManage}
@@ -644,161 +830,200 @@ export function ProductionPrintersPanel({
               printers={cloud.printers}
               stations={cloud.stations}
             />
-          </div>
+          )}
 
-          <section aria-labelledby="production-print-queue-title">
-            <div className="production-printers__section-heading">
-              <div>
-                <h3 id="production-print-queue-title">Fila e falhas</h3>
-                <p>Reimpressão é sempre uma ação separada e exige motivo.</p>
+          {activeStep === "routing" && (
+            <ProductionRoutingSetup
+              canManage={canManage}
+              onReadinessChange={setRoutingReady}
+              organizationId={organizationId}
+              stations={cloud.stations}
+              unitId={unitId}
+            />
+          )}
+
+          {activeStep === "check" && (
+            <section aria-labelledby="production-print-queue-title">
+              <div className="production-printers__section-heading">
+                <div>
+                  <h3 id="production-print-queue-title">Últimos pedidos enviados para impressão</h3>
+                  <p>Use esta lista para confirmar testes, falhas e reimpressões.</p>
+                </div>
               </div>
-            </div>
-            {cloud.jobs.length === 0 ? (
-              <Card className="production-printers__empty">
-                <strong>Fila vazia</strong>
-                <p>Nenhum ticket de produção foi solicitado neste recorte.</p>
-              </Card>
+              {cloud.jobs.length === 0 ? (
+                <Card className="production-printers__empty">
+                  <strong>Fila vazia</strong>
+                  <p>Nenhum ticket de produção foi solicitado neste recorte.</p>
+                </Card>
+              ) : (
+                <section className="production-print-queue" aria-label="Trabalhos de impressão">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Estação</th>
+                        <th>Impressora</th>
+                        <th>Status</th>
+                        <th>Horário</th>
+                        <th aria-label="Ações" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cloud.jobs.map((job) => {
+                        const action = productionPrintJobAction(job.status);
+                        return (
+                          <tr key={job.id}>
+                            <td>{job.stationName ?? job.stationId ?? "Roteamento automático"}</td>
+                            <td>{job.printerId ?? "Automática"}</td>
+                            <td>
+                              <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
+                              {job.lastError && <small>{job.lastError}</small>}
+                            </td>
+                            <td>{dateTime(job.updatedAt)}</td>
+                            <td>
+                              {(action === "reprint" || action === "retry_failed") && (
+                                <Button
+                                  disabled={!canManage || busyAction !== null}
+                                  onClick={() => {
+                                    setReprintJob(job);
+                                    setReprintReason("");
+                                    setReprintKey(crypto.randomUUID());
+                                  }}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  {action === "retry_failed" ? "Tentar novamente…" : "Reimprimir…"}
+                                </Button>
+                              )}
+                              {action === "resolve_unknown" && (
+                                <Button
+                                  disabled={!canManage || busyAction !== null}
+                                  onClick={() =>
+                                    setUnknownResolution({
+                                      job,
+                                      outcome: "",
+                                      reason: "",
+                                      idempotencyKey: crypto.randomUUID(),
+                                    })
+                                  }
+                                  size="sm"
+                                  variant="secondary"
+                                >
+                                  Confirmar resultado…
+                                </Button>
+                              )}
+                              {action === null && <small>Em processamento</small>}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </section>
+              )}
+            </section>
+          )}
+
+          <div className="production-setup-navigation">
+            <Button
+              disabled={activeStepIndex <= 0}
+              onClick={() =>
+                setSetupStep(productionSetupSteps[activeStepIndex - 1]?.id ?? "computer")
+              }
+              variant="secondary"
+            >
+              Voltar
+            </Button>
+            {activeStepIndex < productionSetupSteps.length - 1 ? (
+              <Button
+                onClick={() =>
+                  setSetupStep(productionSetupSteps[activeStepIndex + 1]?.id ?? "check")
+                }
+              >
+                Continuar
+              </Button>
             ) : (
-              <section className="production-print-queue" aria-label="Trabalhos de impressão">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Estação</th>
-                      <th>Impressora</th>
-                      <th>Status</th>
-                      <th>Horário</th>
-                      <th aria-label="Ações" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cloud.jobs.map((job) => {
-                      const action = productionPrintJobAction(job.status);
-                      return (
-                        <tr key={job.id}>
-                          <td>{job.stationName ?? job.stationId ?? "Roteamento automático"}</td>
-                          <td>{job.printerId ?? "Automática"}</td>
-                          <td>
-                            <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
-                            {job.lastError && <small>{job.lastError}</small>}
-                          </td>
-                          <td>{dateTime(job.updatedAt)}</td>
-                          <td>
-                            {(action === "reprint" || action === "retry_failed") && (
-                              <Button
-                                disabled={!canManage || busyAction !== null}
-                                onClick={() => {
-                                  setReprintJob(job);
-                                  setReprintReason("");
-                                  setReprintKey(crypto.randomUUID());
-                                }}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                {action === "retry_failed" ? "Tentar novamente…" : "Reimprimir…"}
-                              </Button>
-                            )}
-                            {action === "resolve_unknown" && (
-                              <Button
-                                disabled={!canManage || busyAction !== null}
-                                onClick={() =>
-                                  setUnknownResolution({
-                                    job,
-                                    outcome: "",
-                                    reason: "",
-                                    idempotencyKey: crypto.randomUUID(),
-                                  })
-                                }
-                                size="sm"
-                                variant="secondary"
-                              >
-                                Confirmar resultado…
-                              </Button>
-                            )}
-                            {action === null && <small>Em processamento</small>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </section>
+              <Badge tone={setupReadiness.check ? "success" : "warning"}>
+                {setupReadiness.check ? "Produção pronta" : "Revise as etapas pendentes"}
+              </Badge>
             )}
-          </section>
+          </div>
         </>
       )}
 
-      <section className="production-edge" aria-labelledby="production-edge-title">
-        <div className="production-printers__section-heading">
-          <div>
-            <h3 id="production-edge-title">Diagnóstico deste dispositivo</h3>
-            <p>Leitura local do Edge; não altera o cadastro da unidade.</p>
+      {activeStep === "check" && (
+        <section className="production-edge" aria-labelledby="production-edge-title">
+          <div className="production-printers__section-heading">
+            <div>
+              <h3 id="production-edge-title">Conferência deste computador</h3>
+              <p>Mostra o que está realmente disponível neste equipamento.</p>
+            </div>
+            {runtime.embedded && (
+              <Button
+                disabled={edge.status === "loading"}
+                onClick={() => void loadEdge()}
+                size="sm"
+                variant="secondary"
+              >
+                Atualizar conferência
+              </Button>
+            )}
           </div>
-          {runtime.embedded && (
-            <Button
-              disabled={edge.status === "loading"}
-              onClick={() => void loadEdge()}
-              size="sm"
-              variant="secondary"
-            >
-              Atualizar Edge
-            </Button>
+          {edge.status === "unavailable" && (
+            <Callout tone="info">
+              <strong>Conferência disponível somente no aplicativo GiroMesa</strong>
+              <p>
+                Abra o aplicativo no computador da unidade para conferir impressoras e pedidos
+                pendentes.
+              </p>
+            </Callout>
           )}
-        </div>
-        {edge.status === "unavailable" && (
-          <Callout tone="info">
-            <strong>Diagnóstico local disponível somente no aplicativo</strong>
-            <p>
-              No navegador, a configuração cloud continua disponível. Abra o aplicativo do terminal
-              para confirmar a saúde e a fila efetiva do Edge.
-            </p>
-          </Callout>
-        )}
-        {edge.status === "loading" && <p role="status">Consultando o Edge deste terminal…</p>}
-        {edge.status === "error" && (
-          <Callout tone="warning">
-            <strong>Edge não respondeu</strong>
-            <p>{edge.message}</p>
-          </Callout>
-        )}
-        {edge.status === "ready" && (
-          <div className="production-edge__grid">
-            <Card>
-              <strong>Impressoras efetivas</strong>
-              {edge.printers.length === 0 ? (
-                <p>Nenhuma configuração foi aplicada neste Edge.</p>
-              ) : (
-                <ul>
-                  {edge.printers.map((printer) => (
-                    <li key={printer.id}>
-                      <span>
-                        {printer.id} · {printer.paperWidthMm} mm
-                      </span>
-                      <Badge tone={printer.available ? "success" : "danger"}>
-                        {printer.available ? "Disponível" : (printer.errorCode ?? "Indisponível")}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-            <Card>
-              <strong>Fila local</strong>
-              {edge.jobs.length === 0 ? (
-                <p>Nenhum trabalho local neste recorte.</p>
-              ) : (
-                <ul>
-                  {edge.jobs.slice(0, 12).map((job) => (
-                    <li key={job.id}>
-                      <span>{job.stationName ?? job.printerId ?? job.documentType}</span>
-                      <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </div>
-        )}
-      </section>
+          {edge.status === "loading" && <p role="status">Conferindo este computador…</p>}
+          {edge.status === "error" && (
+            <Callout tone="warning">
+              <strong>O computador não respondeu</strong>
+              <p>{edge.message}</p>
+            </Callout>
+          )}
+          {edge.status === "ready" && (
+            <div className="production-edge__grid">
+              <Card>
+                <strong>Impressoras efetivas</strong>
+                {edge.printers.length === 0 ? (
+                  <p>Nenhuma impressora foi recebida por este computador.</p>
+                ) : (
+                  <ul>
+                    {edge.printers.map((printer) => (
+                      <li key={printer.id}>
+                        <span>
+                          {printer.id} · {printer.paperWidthMm} mm
+                        </span>
+                        <Badge tone={printer.available ? "success" : "danger"}>
+                          {printer.available ? "Disponível" : (printer.errorCode ?? "Indisponível")}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+              <Card>
+                <strong>Fila local</strong>
+                {edge.jobs.length === 0 ? (
+                  <p>Nenhum trabalho local neste recorte.</p>
+                ) : (
+                  <ul>
+                    {edge.jobs.slice(0, 12).map((job) => (
+                      <li key={job.id}>
+                        <span>{job.stationName ?? job.printerId ?? job.documentType}</span>
+                        <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
+          )}
+        </section>
+      )}
 
       <ProductionPrinterForm
         busy={busyAction?.startsWith("printer:") === true}
@@ -881,8 +1106,8 @@ export function ProductionPrintersPanel({
             <Callout tone="warning">
               <strong>Não reenvie este ticket agora</strong>
               <p>
-                Verifique a impressora fisicamente. O Edge iniciou a escrita, mas não conseguiu
-                confirmar se o papel saiu.
+                Confira a impressora. O envio começou, mas o sistema não conseguiu confirmar se o
+                papel saiu.
               </p>
             </Callout>
             <FormField htmlFor="production-unknown-outcome" label="Resultado físico" required>

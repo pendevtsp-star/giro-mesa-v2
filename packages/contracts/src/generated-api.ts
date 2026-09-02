@@ -2180,6 +2180,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pairings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_createEdgeHubPairing[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/edge-hub-pairings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["OrganizationsController_createEdgeHubPairing[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/membership-invitations": {
     parameters: {
       query?: never;
@@ -2238,6 +2270,38 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations["OrganizationsController_acceptInvite[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/device/edge-hub-pairings/redeem": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["EdgeHubEnrollmentController_redeem[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/device/edge-hub-pairings/redeem": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["EdgeHubEnrollmentController_redeem[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -22693,6 +22757,80 @@ export interface operations {
       };
     };
   };
+  "OrganizationsController_createEdgeHubPairing[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 300 */
+          expiresInSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            pairingId: string;
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+            installerUrl: string | null;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_createEdgeHubPairing[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          label: string;
+          /** @default 300 */
+          expiresInSeconds?: number;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            pairingId: string;
+            code: string;
+            /** Format: date-time */
+            expiresAt: string;
+            installerUrl: string | null;
+          };
+        };
+      };
+    };
+  };
   "OrganizationsController_invite[0]": {
     parameters: {
       query?: never;
@@ -22819,6 +22957,72 @@ export interface operations {
       };
     };
   };
+  "EdgeHubEnrollmentController_redeem[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            deviceId: string;
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            syncKey: string;
+          };
+        };
+      };
+    };
+  };
+  "EdgeHubEnrollmentController_redeem[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          code: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            deviceId: string;
+            /** Format: uuid */
+            organizationId: string;
+            /** Format: uuid */
+            unitId: string;
+            syncKey: string;
+          };
+        };
+      };
+    };
+  };
   "HealthController_health[0]": {
     parameters: {
       query?: never;
@@ -22851,6 +23055,7 @@ export interface operations {
               | "platform_commercial_site_v1"
               | "crm_evolution_go_v1"
               | "crm_operational_inbox_v1"
+              | "edge_hub_pairing_v1"
             )[];
             /** @enum {string} */
             database: "up";
@@ -22894,6 +23099,7 @@ export interface operations {
               | "platform_commercial_site_v1"
               | "crm_evolution_go_v1"
               | "crm_operational_inbox_v1"
+              | "edge_hub_pairing_v1"
             )[];
             /** @enum {string} */
             database: "up";

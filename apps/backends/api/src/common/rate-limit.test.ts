@@ -21,6 +21,13 @@ it("isolates the Evolution Go webhook from the generic write bucket", () => {
   });
 });
 
+it("limits Edge Hub pairing attempts independently", () => {
+  assert.deepEqual(requestRateLimit("POST", "/api/v1/device/edge-hub-pairings/redeem"), {
+    bucket: "edge-hub-pairing",
+    max: 10,
+  });
+});
+
 it("gives public mutations a separate bounded bucket", () => {
   assert.deepEqual(requestRateLimit("POST", "/public/v1/menus/unidade/reservations"), {
     bucket: "public-write",

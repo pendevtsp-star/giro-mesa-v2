@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Commands;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Integrations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Management;
@@ -30,6 +31,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder Devices
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Devices.DevicesRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The edgeHubPairings property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsRequestBuilder EdgeHubPairings
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.EdgeHubPairings.EdgeHubPairingsRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The fiscal property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Fiscal.FiscalRequestBuilder Fiscal

@@ -2,23 +2,25 @@
 
 Auto-generated documentation from the code knowledge graph community structure.
 
-**Total communities**: 14
+**Total communities**: 16
 
 ## Communities
 
 | Community | Size | Link |
 |-----------|------|------|
-| drizzle-management | 103 | [drizzle-management.md](drizzle-management.md) |
-| e2e-wcag | 13 | [e2e-wcag.md](e2e-wcag.md) |
-| events-request | 17 | [events-request.md](events-request.md) |
-| generated-giro-mesa-api-client | 2 | [generated-giro-mesa-api-client.md](generated-giro-mesa-api-client.md) |
-| item-request | 1213 | [item-request.md](item-request.md) |
-| item-request-body | 1099 | [item-request-body.md](item-request-body.md) |
-| orders-request | 183 | [orders-request.md](orders-request.md) |
-| src-billing | 18 | [src-billing.md](src-billing.md) |
-| src-database | 5 | [src-database.md](src-database.md) |
-| src-describe:componentes | 2 | [src-describe-componentes.md](src-describe-componentes.md) |
-| src-identity | 7 | [src-identity.md](src-identity.md) |
-| terraform-aws | 36 | [terraform-aws.md](terraform-aws.md) |
-| vps-key | 7 | [vps-key.md](vps-key.md) |
-| webhooks-request | 3 | [webhooks-request.md](webhooks-request.md) |
+| assets-async | 3416 | [assets-async.md](assets-async.md) |
+| drizzle-management | 318 | [drizzle-management.md](drizzle-management.md) |
+| e2e-json | 60 | [e2e-json.md](e2e-json.md) |
+| e2e-live-json | 4 | [e2e-live-json.md](e2e-live-json.md) |
+| e2e-real-mock | 112 | [e2e-real-mock.md](e2e-real-mock.md) |
+| item-request | 22197 | [item-request.md](item-request.md) |
+| lib-fixture | 27 | [lib-fixture.md](lib-fixture.md) |
+| load-scenario | 16 | [load-scenario.md](load-scenario.md) |
+| management-input | 3902 | [management-input.md](management-input.md) |
+| scripts-validate | 80 | [scripts-validate.md](scripts-validate.md) |
+| src-business | 79 | [src-business.md](src-business.md) |
+| src-input | 128 | [src-input.md](src-input.md) |
+| src-parse | 2934 | [src-parse.md](src-parse.md) |
+| table-table | 70 | [table-table.md](table-table.md) |
+| terraform-aws | 41 | [terraform-aws.md](terraform-aws.md) |
+| vps-key | 15 | [vps-key.md](vps-key.md) |

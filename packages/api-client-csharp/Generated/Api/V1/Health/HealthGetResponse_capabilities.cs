@@ -52,5 +52,9 @@ namespace GiroMesa.ApiClient.Api.V1.Health
         #pragma warning disable CS1591
         Crm_operational_inbox_v1,
         #pragma warning restore CS1591
+        [EnumMember(Value = "edge_hub_pairing_v1")]
+        #pragma warning disable CS1591
+        Edge_hub_pairing_v1,
+        #pragma warning restore CS1591
     }
 }

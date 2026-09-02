@@ -31,7 +31,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 73;
+export const OPS_REQUIRED_SCHEMA_VERSION = 76;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -42,6 +42,7 @@ export const OPS_REQUIRED_API_CAPABILITIES = [
   "public_menu_cover_image_v1",
   "platform_backoffice_v1",
   "platform_commercial_site_v1",
+  "edge_hub_pairing_v1",
 ] satisfies ApiCapability[];
 
 export function apiCompatibilityError(value: unknown): string | null {
@@ -103,6 +104,13 @@ export interface CommandResponse {
 
 export type PrintDocumentType = "partial_statement" | "payment_statement" | "final_receipt";
 export type PrintJobStatus = "queued" | "printing" | "confirmation_required" | "printed" | "failed";
+
+export interface EdgeHubPairing {
+  pairingId: string;
+  code: string;
+  expiresAt: string;
+  installerUrl: string | null;
+}
 
 export interface PosPrintJob {
   id: string;
@@ -854,6 +862,14 @@ export const api = {
   logout: () => request<void>("/v1/auth/logout", { method: "POST" }),
   me: () => request<unknown>("/v1/auth/me"),
   organizations: () => request<unknown[]>("/v1/organizations"),
+  createEdgeHubPairing: (organizationId: string, unitId: string, label: string) =>
+    request<EdgeHubPairing>(
+      `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/edge-hub-pairings`,
+      {
+        method: "POST",
+        body: JSON.stringify({ label, expiresInSeconds: 300 }),
+      },
+    ),
   createSelfServiceOrganization: (body: SelfServiceOrganizationInput) =>
     request<unknown>("/v1/organizations/self-service", {
       method: "POST",

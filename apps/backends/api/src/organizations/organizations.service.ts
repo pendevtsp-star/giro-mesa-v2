@@ -2,6 +2,8 @@ import { createHash, randomBytes } from "node:crypto";
 import type {
   AcceptMembershipInviteInput,
   CreateOrganizationInput,
+  EdgeHubPairingCreateInput,
+  EdgeHubPairingRedeemInput,
   EnrollDeviceInput,
   InviteMembershipInput,
   SelfServiceOrganizationInput,
@@ -11,6 +13,7 @@ import {
   commercialCatalogVersions,
   commercialPlans,
   deviceEnrollments,
+  edgeHubPairingCodes,
   identities,
   legalEntities,
   managementPeople,
@@ -42,6 +45,21 @@ import { shapeOrganizationScopes } from "./organization-scopes.js";
 import { ScopeService } from "./scope.service.js";
 
 const hashToken = (value: string) => createHash("sha256").update(value).digest("hex");
+const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function pairingCode() {
+  return [...randomBytes(8)].map((byte) => PAIRING_ALPHABET[byte & 31]).join("");
+}
+
+function installerUrl() {
+  const configured = process.env.EDGE_HUB_WINDOWS_INSTALLER_URL;
+  if (!configured) return null;
+  const url = new URL(configured);
+  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+    throw new Error("EDGE_HUB_WINDOWS_INSTALLER_URL must use HTTPS in production");
+  }
+  return url.toString();
+}
 
 @Injectable()
 export class OrganizationsService {
@@ -370,6 +388,102 @@ export class OrganizationsService {
       return created;
     });
     return { ...device, syncKey };
+  }
+
+  async createEdgeHubPairing(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    input: EdgeHubPairingCreateInput,
+  ) {
+    const roles = await this.scope.requireOrganizationRole(identityId, organizationId, [
+      "owner",
+      "manager",
+    ]);
+    if (!roles.some((row) => row.unitId === null || row.unitId === unitId)) {
+      throw new NotFoundException();
+    }
+    const code = pairingCode();
+    const expiresAt = new Date(Date.now() + input.expiresInSeconds * 1_000);
+    return this.database.db.transaction(async (tx) => {
+      const [pairing] = await tx
+        .insert(edgeHubPairingCodes)
+        .values({
+          organizationId,
+          unitId,
+          label: input.label,
+          codeHash: hashToken(code),
+          createdByIdentityId: identityId,
+          expiresAt,
+        })
+        .returning({ id: edgeHubPairingCodes.id });
+      if (!pairing) throw new Error("Edge Hub pairing insert did not return a row");
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "device.edge_hub_pairing_created",
+        entityType: "device_pairing",
+        entityId: pairing.id,
+        metadata: { label: input.label, expiresAt },
+      });
+      return { pairingId: pairing.id, code, expiresAt, installerUrl: installerUrl() };
+    });
+  }
+
+  async redeemEdgeHubPairing(input: EdgeHubPairingRedeemInput) {
+    const hash = hashToken(input.code.trim().toUpperCase());
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`edge-hub-pair:${hash}`}))`);
+      const [pairing] = await tx
+        .select()
+        .from(edgeHubPairingCodes)
+        .where(
+          and(
+            eq(edgeHubPairingCodes.codeHash, hash),
+            isNull(edgeHubPairingCodes.consumedAt),
+            gt(edgeHubPairingCodes.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+      if (!pairing) throw new ConflictException({ code: "EDGE_HUB_PAIRING_INVALID_OR_EXPIRED" });
+
+      const syncKey = randomBytes(32).toString("base64url");
+      const [device] = await tx
+        .insert(deviceEnrollments)
+        .values({
+          organizationId: pairing.organizationId,
+          unitId: pairing.unitId,
+          label: pairing.label,
+          syncKeyHash: hashToken(syncKey),
+        })
+        .returning({ id: deviceEnrollments.id });
+      if (!device) throw new Error("Edge Hub enrollment did not return a row");
+
+      const now = new Date();
+      const [consumed] = await tx
+        .update(edgeHubPairingCodes)
+        .set({ consumedAt: now, consumedByDeviceId: device.id })
+        .where(and(eq(edgeHubPairingCodes.id, pairing.id), isNull(edgeHubPairingCodes.consumedAt)))
+        .returning({ id: edgeHubPairingCodes.id });
+      if (!consumed) throw new ConflictException({ code: "EDGE_HUB_PAIRING_ALREADY_USED" });
+
+      await tx.insert(auditEvents).values({
+        organizationId: pairing.organizationId,
+        unitId: pairing.unitId,
+        actorIdentityId: pairing.createdByIdentityId,
+        action: "device.enrolled",
+        entityType: "device",
+        entityId: device.id,
+        metadata: { pairingId: pairing.id, enrollment: "edge_hub_installer" },
+      });
+      return {
+        deviceId: device.id,
+        organizationId: pairing.organizationId,
+        unitId: pairing.unitId,
+        syncKey,
+      };
+    });
   }
 
   async revokeDevice(identityId: string, organizationId: string, unitId: string, deviceId: string) {

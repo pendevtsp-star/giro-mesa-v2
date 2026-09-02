@@ -139,6 +139,7 @@ import {
   billingCheckouts,
   billingUpgradeQuotes,
   charges,
+  edgeHubPairingCodes,
   hubCommands,
   operationalCommands,
   organizations,
@@ -784,5 +785,20 @@ describe("database schema", () => {
     assert.match(migration, /CREATE TABLE "platform_staff_invitations"/);
     assert.match(migration, /platform_staff_invitations_pending_email_unique/);
     assert.match(migration, /CREATE TABLE "platform_staff_access"/);
+  });
+
+  it("persists one-time Edge Hub pairing codes without the raw code", async () => {
+    assert.ok(edgeHubPairingCodes.codeHash);
+    assert.ok(edgeHubPairingCodes.expiresAt);
+    assert.ok(edgeHubPairingCodes.consumedAt);
+    assert.ok(edgeHubPairingCodes.consumedByDeviceId);
+
+    const migration = await readFile(
+      new URL("../drizzle/0076_edge_hub_pairing.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(migration, /edge_hub_pairing_codes_hash_unique/);
+    assert.match(migration, /edge_hub_pairing_codes_consumed_device_fk/);
+    assert.doesNotMatch(migration, /"code" varchar/);
   });
 });

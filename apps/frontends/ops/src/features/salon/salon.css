@@ -5046,6 +5046,43 @@
   .approval-form {
     grid-template-columns: 1fr;
   }
+  .salon-service-modal .gm-modal__header {
+    align-items: start;
+    flex-wrap: wrap;
+  }
+  .salon-service-modal .gm-modal__header > strong {
+    flex: 1 1 auto;
+    order: 1;
+    white-space: nowrap;
+  }
+  .salon-service-modal .gm-modal__description {
+    flex: 1 0 100%;
+    order: 3;
+  }
+  .salon-service-modal .gm-modal__header > .gm-button {
+    order: 2;
+  }
+  .salon-service-modal .workspace-tools--account .cashier-payment-form,
+  .salon-service-modal .workspace-tools--account .cashier-payment-form__fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .salon-service-modal .cashier-payment-form__fields > label,
+  .salon-service-modal .cashier-payment-form .cashier-payment-form__reference {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .salon-service-modal .cashier-payment-form__fields small {
+    line-height: 1.35;
+  }
+  .salon-service-modal .cashier-payment-form .cash-change-field {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .salon-service-modal .cash-change-field > :is(span, strong, input),
+  .salon-service-modal .cashier-payment-form .cashier-payment-form__submit {
+    width: 100%;
+  }
   .approval-form__heading,
   .approval-form > p,
   .approval-form .dialog-actions {

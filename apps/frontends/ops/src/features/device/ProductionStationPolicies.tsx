@@ -13,18 +13,18 @@ const deliveryModes: Array<{
 }> = [
   {
     value: "kds_only",
-    label: "Somente KDS",
-    description: "A estação opera na tela, sem saída térmica automática.",
+    label: "Somente na tela",
+    description: "Os pedidos aparecem na tela da produção, sem impressão automática.",
   },
   {
     value: "printer_only",
-    label: "Somente impressora",
-    description: "A produção depende do ticket físico e não exige conclusão no KDS.",
+    label: "Somente no papel",
+    description: "Os pedidos são impressos e não precisam ser concluídos na tela.",
   },
   {
     value: "both",
-    label: "KDS + impressão",
-    description: "Mantém a fila visual e emite o ticket físico.",
+    label: "Na tela e no papel",
+    description: "Os pedidos aparecem na tela e também são impressos.",
   },
   {
     value: "disabled",
@@ -35,10 +35,10 @@ const deliveryModes: Array<{
 
 const readinessIssueLabels: Record<string, string> = {
   DELIVERY_DISABLED: "Entrega desativada para esta estação.",
-  KDS_NOT_CONFIGURED: "Nenhum terminal KDS está configurado para esta estação.",
+  KDS_NOT_CONFIGURED: "Nenhuma tela está preparada para esta área.",
   PRINT_PRINTER_NOT_CONFIGURED: "Escolha uma impressora para esta estação.",
   PRINT_POLICY_INVALID: "A impressora escolhida não atende esta estação.",
-  EDGE_HUB_OFFLINE: "O Edge vinculado à impressora está offline.",
+  EDGE_HUB_OFFLINE: "O computador ligado à impressora está sem conexão.",
 };
 
 export function productionStationPolicyCanBeSaved(
@@ -75,8 +75,8 @@ export function ProductionStationPolicies({
     <section aria-labelledby="production-station-policy-title">
       <div className="production-printers__section-heading">
         <div>
-          <h3 id="production-station-policy-title">Política por estação</h3>
-          <p>Uma estação pode usar KDS, ticket físico, ambos ou ficar desativada.</p>
+          <h3 id="production-station-policy-title">Como cada área recebe os pedidos?</h3>
+          <p>Escolha tela, papel ou os dois para cada área de preparo.</p>
         </div>
       </div>
       {stations.length === 0 ? (
@@ -120,7 +120,7 @@ export function ProductionStationPolicies({
                   </Badge>
                 </header>
                 <div className="gm-form-grid">
-                  <FormField htmlFor={`production-mode-${station.id}`} label="Entrega da produção">
+                  <FormField htmlFor={`production-mode-${station.id}`} label="Receber pedidos">
                     <NativeSelect
                       disabled={!canManage}
                       id={`production-mode-${station.id}`}
@@ -201,9 +201,9 @@ export function ProductionStationPolicies({
                   </FormField>
                 </div>
                 <ul className="production-readiness" aria-label={`Prontidão de ${station.name}`}>
-                  <li data-ready={station.readiness.kdsConfigured}>KDS configurado</li>
+                  <li data-ready={station.readiness.kdsConfigured}>Tela preparada</li>
                   <li data-ready={station.readiness.printerConfigured}>Impressão configurada</li>
-                  <li data-ready={station.readiness.hubOnline}>Edge online</li>
+                  <li data-ready={station.readiness.hubOnline}>Computador conectado</li>
                 </ul>
                 {station.readiness.issues.length > 0 && (
                   <ul className="production-readiness__issues">
@@ -218,7 +218,7 @@ export function ProductionStationPolicies({
                     onClick={() => onSave(station)}
                     size="sm"
                   >
-                    {busyAction === `policy:${station.id}` ? "Salvando…" : "Salvar política"}
+                    {busyAction === `policy:${station.id}` ? "Salvando…" : "Salvar esta área"}
                   </Button>
                 )}
               </Card>

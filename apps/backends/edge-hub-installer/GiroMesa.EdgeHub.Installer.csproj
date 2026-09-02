@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>GiroMesa.Conector.Setup</AssemblyName>
+    <RootNamespace>GiroMesa.EdgeHub.Installer</RootNamespace>
+    <EdgeHubApiBaseUrl Condition="'$(EdgeHubApiBaseUrl)' == ''">https://api.giromesa.com.br</EdgeHubApiBaseUrl>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\edge-hub\Enrollment\CloudEnrollment.cs" Link="Enrollment\CloudEnrollment.cs" />
+    <Compile Include="..\edge-hub\Security\MachineConfigurationStore.cs" Link="Security\MachineConfigurationStore.cs" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>EdgeHubApiBaseUrl</_Parameter1>
+      <_Parameter2>$(EdgeHubApiBaseUrl)</_Parameter2>
+    </AssemblyAttribute>
+    <EmbeddedResource Include="$(EdgeHubPayload)" LogicalName="GiroMesa.EdgeHub.exe" Condition="Exists('$(EdgeHubPayload)')" />
+  </ItemGroup>
+  <Target Name="RequireEdgeHubPayload" BeforeTargets="PrepareForBuild" Condition="'$(PublishInstaller)' == 'true' AND !Exists('$(EdgeHubPayload)')">
+    <Error Text="EdgeHubPayload must point to the signed GiroMesa.EdgeHub.exe." />
+  </Target>
+</Project>

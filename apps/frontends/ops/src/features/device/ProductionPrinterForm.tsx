@@ -123,16 +123,13 @@ export function ProductionPrinterForm({
         if (!busy) onClose();
       }}
       size="lg"
-      title={draft?.id ? "Editar impressora de produção" : "Cadastrar impressora de produção"}
+      title={draft?.id ? "Editar impressora" : "Adicionar impressora"}
     >
       {draft && (
         <form className="production-printer-form" onSubmit={onSubmit}>
-          <p>
-            O endereço é salvo pela API da unidade e publicado ao Edge por comando auditável. A tela
-            web não acessa a rede da impressora diretamente.
-          </p>
+          <p>Informe onde está a impressora. O computador conectado fará a comunicação com ela.</p>
           <div className="gm-form-grid production-printer-form__grid">
-            <FormField htmlFor="production-printer-hub" label="Servidor local (Edge)" required>
+            <FormField htmlFor="production-printer-hub" label="Computador conectado" required>
               <NativeSelect
                 id="production-printer-hub"
                 onChange={(event) => {
@@ -157,7 +154,7 @@ export function ProductionPrinterForm({
                 required
                 value={draft.hubId}
               >
-                <option value="">Selecione o Edge</option>
+                <option value="">Selecione o computador</option>
                 {hubs.map((hub) => (
                   <option key={hub.id} value={hub.id}>
                     {hub.label} · {hub.online ? "online" : "offline"}
@@ -166,8 +163,8 @@ export function ProductionPrinterForm({
               </NativeSelect>
               <small>
                 {hubs.length === 0
-                  ? "Nenhum dispositivo ativo está disponível para receber a configuração."
-                  : "O vínculo é explícito; o sistema nunca escolhe outro Edge em silêncio."}
+                  ? "Nenhum computador está conectado nesta unidade."
+                  : "Escolha o computador que está na mesma rede da impressora."}
               </small>
             </FormField>
             <FormField htmlFor="production-printer-label" label="Nome" required>
@@ -179,7 +176,11 @@ export function ProductionPrinterForm({
                 value={draft.label}
               />
             </FormField>
-            <FormField htmlFor="production-printer-host" label="IP privado" required>
+            <FormField
+              htmlFor="production-printer-host"
+              label="Endereço da impressora na rede"
+              required
+            >
               <Input
                 autoComplete="off"
                 id="production-printer-host"
@@ -189,18 +190,9 @@ export function ProductionPrinterForm({
                 required
                 value={draft.host}
               />
-              <small>Use apenas o IPv4 ou IPv6 privado fixo da rede local.</small>
-            </FormField>
-            <FormField htmlFor="production-printer-port" label="Porta" required>
-              <Input
-                id="production-printer-port"
-                max={65535}
-                min={1}
-                onChange={(event) => onChange({ ...draft, port: Number(event.target.value) })}
-                required
-                type="number"
-                value={draft.port}
-              />
+              <small>
+                Exemplo: 192.168.1.50. Você encontra esse número nas configurações da impressora.
+              </small>
             </FormField>
             <FormField htmlFor="production-printer-width" label="Bobina" required>
               <NativeSelect
@@ -214,112 +206,132 @@ export function ProductionPrinterForm({
                 <option value={80}>80 mm</option>
               </NativeSelect>
             </FormField>
-            <FormField htmlFor="production-printer-columns" label="Caracteres por linha" required>
-              <Input
-                id="production-printer-columns"
-                max={64}
-                min={24}
-                onChange={(event) =>
-                  onChange({ ...draft, charactersPerLine: Number(event.target.value) })
-                }
-                required
-                type="number"
-                value={draft.charactersPerLine}
-              />
-            </FormField>
-            <FormField
-              htmlFor="production-printer-code-table"
-              label="Tabela de caracteres"
-              required
-            >
-              <Input
-                id="production-printer-code-table"
-                max={255}
-                min={0}
-                onChange={(event) => onChange({ ...draft, codeTable: Number(event.target.value) })}
-                required
-                type="number"
-                value={draft.codeTable}
-              />
-            </FormField>
-            <FormField htmlFor="production-printer-fallback" label="Fallback">
-              <NativeSelect
-                id="production-printer-fallback"
-                onChange={(event) =>
-                  onChange({ ...draft, fallbackPrinterId: event.target.value || null })
-                }
-                value={draft.fallbackPrinterId ?? ""}
-              >
-                <option value="">Sem fallback</option>
-                {printers
-                  .filter(
-                    (printer) =>
-                      printer.id !== draft.id &&
-                      printer.active !== false &&
-                      printer.hubId === draft.hubId,
-                  )
-                  .map((printer) => (
-                    <option key={printer.id} value={printer.id}>
-                      {printer.label}
-                    </option>
-                  ))}
-              </NativeSelect>
-            </FormField>
           </div>
 
-          <fieldset className="production-printer-form__options">
-            <legend>Comportamento físico</legend>
-            <label>
-              <Checkbox
-                checked={draft.cut}
-                onChange={(event) => onChange({ ...draft, cut: event.target.checked })}
-              />
-              Guilhotina automática
-            </label>
-            <label>
-              <Checkbox
-                checked={draft.supportsRasterGraphics}
-                onChange={(event) =>
-                  onChange({ ...draft, supportsRasterGraphics: event.target.checked })
-                }
-              />
-              Suporta logomarca rasterizada
-            </label>
-            <label>
-              <Checkbox
-                checked={draft.isDefault}
-                disabled={defaultLocked}
-                onChange={(event) => onChange({ ...draft, isDefault: event.target.checked })}
-              />
-              Impressora padrão deste Edge
-            </label>
-            {defaultLocked && (
-              <small>
-                Este Edge precisa manter uma impressora padrão. Marque outra impressora deste Edge
-                como padrão antes de remover este vínculo.
-              </small>
-            )}
-          </fieldset>
-
-          <fieldset className="production-printer-form__checks">
-            <legend>Tipos de documento</legend>
-            {documentTypes.map((documentType) => (
-              <label key={documentType.value}>
-                <Checkbox
-                  checked={draft.documentTypes.includes(documentType.value)}
+          <details className="gm-disclosure production-printer-form__advanced">
+            <summary>Opções avançadas</summary>
+            <p>Use somente quando a equipe de suporte ou o manual da impressora solicitar.</p>
+            <div className="gm-form-grid production-printer-form__grid">
+              <FormField htmlFor="production-printer-port" label="Porta de comunicação" required>
+                <Input
+                  id="production-printer-port"
+                  max={65535}
+                  min={1}
+                  onChange={(event) => onChange({ ...draft, port: Number(event.target.value) })}
+                  required
+                  type="number"
+                  value={draft.port}
+                />
+              </FormField>
+              <FormField htmlFor="production-printer-columns" label="Caracteres por linha" required>
+                <Input
+                  id="production-printer-columns"
+                  max={64}
+                  min={24}
                   onChange={(event) =>
-                    onChange({
-                      ...draft,
-                      documentTypes: event.target.checked
-                        ? [...new Set([...draft.documentTypes, documentType.value])]
-                        : draft.documentTypes.filter((value) => value !== documentType.value),
-                    })
+                    onChange({ ...draft, charactersPerLine: Number(event.target.value) })
+                  }
+                  required
+                  type="number"
+                  value={draft.charactersPerLine}
+                />
+              </FormField>
+              <FormField
+                htmlFor="production-printer-code-table"
+                label="Tabela de caracteres"
+                required
+              >
+                <Input
+                  id="production-printer-code-table"
+                  max={255}
+                  min={0}
+                  onChange={(event) =>
+                    onChange({ ...draft, codeTable: Number(event.target.value) })
+                  }
+                  required
+                  type="number"
+                  value={draft.codeTable}
+                />
+              </FormField>
+              <FormField htmlFor="production-printer-fallback" label="Impressora reserva">
+                <NativeSelect
+                  id="production-printer-fallback"
+                  onChange={(event) =>
+                    onChange({ ...draft, fallbackPrinterId: event.target.value || null })
+                  }
+                  value={draft.fallbackPrinterId ?? ""}
+                >
+                  <option value="">Sem impressora reserva</option>
+                  {printers
+                    .filter(
+                      (printer) =>
+                        printer.id !== draft.id &&
+                        printer.active !== false &&
+                        printer.hubId === draft.hubId,
+                    )
+                    .map((printer) => (
+                      <option key={printer.id} value={printer.id}>
+                        {printer.label}
+                      </option>
+                    ))}
+                </NativeSelect>
+              </FormField>
+            </div>
+
+            <fieldset className="production-printer-form__options">
+              <legend>Recursos da impressora</legend>
+              <label>
+                <Checkbox
+                  checked={draft.cut}
+                  onChange={(event) => onChange({ ...draft, cut: event.target.checked })}
+                />
+                Guilhotina automática
+              </label>
+              <label>
+                <Checkbox
+                  checked={draft.supportsRasterGraphics}
+                  onChange={(event) =>
+                    onChange({ ...draft, supportsRasterGraphics: event.target.checked })
                   }
                 />
-                {documentType.label}
+                Suporta logomarca rasterizada
               </label>
-            ))}
-          </fieldset>
+              <label>
+                <Checkbox
+                  checked={draft.isDefault}
+                  disabled={defaultLocked}
+                  onChange={(event) => onChange({ ...draft, isDefault: event.target.checked })}
+                />
+                Impressora principal deste computador
+              </label>
+              {defaultLocked && (
+                <small>
+                  Este computador precisa manter uma impressora principal. Escolha outra antes de
+                  remover este vínculo.
+                </small>
+              )}
+            </fieldset>
+
+            <fieldset className="production-printer-form__checks">
+              <legend>O que pode ser impresso</legend>
+              {documentTypes.map((documentType) => (
+                <label key={documentType.value}>
+                  <Checkbox
+                    checked={draft.documentTypes.includes(documentType.value)}
+                    onChange={(event) =>
+                      onChange({
+                        ...draft,
+                        documentTypes: event.target.checked
+                          ? [...new Set([...draft.documentTypes, documentType.value])]
+                          : draft.documentTypes.filter((value) => value !== documentType.value),
+                      })
+                    }
+                  />
+                  {documentType.label}
+                </label>
+              ))}
+            </fieldset>
+          </details>
 
           <div className="production-printer-form__actions">
             <Button disabled={busy} onClick={onClose} type="button" variant="ghost">

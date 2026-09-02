@@ -1359,8 +1359,8 @@ export function OperationalApp({
                         <Icon name="settings" size={14} />
                       </span>
                       <span>
-                        <strong>SmartPOS e dispositivos</strong>
-                        <small>Pareamento, saúde e instalação</small>
+                        <strong>Equipamentos e produção</strong>
+                        <small>Impressoras, preparo e pagamentos</small>
                       </span>
                     </Button>
                     <Button

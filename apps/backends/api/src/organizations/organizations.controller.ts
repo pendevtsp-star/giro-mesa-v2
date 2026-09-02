@@ -5,7 +5,13 @@ import {
   type CreateOrganizationInput,
   copyUnitSettingsSchema,
   createOrganizationSchema,
+  type EdgeHubPairingCreateInput,
+  type EdgeHubPairingRedeemInput,
   type EnrollDeviceInput,
+  edgeHubPairingCreateResponseSchema,
+  edgeHubPairingCreateSchema,
+  edgeHubPairingRedeemResponseSchema,
+  edgeHubPairingRedeemSchema,
   enrollDeviceSchema,
   establishmentSettingsHistoryEntrySchema,
   establishmentSettingsSchema,
@@ -36,7 +42,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBody, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
+import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
 import { z } from "zod";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
@@ -228,6 +234,23 @@ export class OrganizationsController {
     );
   }
 
+  @ApiBody({ schema: toOpenApiSchema(edgeHubPairingCreateSchema) })
+  @ApiCreatedResponse({ schema: toOpenApiSchema(edgeHubPairingCreateResponseSchema) })
+  @Post(":organizationId/units/:unitId/edge-hub-pairings")
+  createEdgeHubPairing(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Body(new ZodPipe(edgeHubPairingCreateSchema)) body: EdgeHubPairingCreateInput,
+  ) {
+    return this.organizationsService.createEdgeHubPairing(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      body,
+    );
+  }
+
   @Post(":organizationId/membership-invitations")
   invite(
     @Req() request: AuthenticatedRequest,
@@ -243,5 +266,18 @@ export class OrganizationsController {
     @Body(new ZodPipe(acceptMembershipInviteSchema)) body: AcceptMembershipInviteInput,
   ) {
     return this.organizationsService.acceptInvite(request.auth.identityId, body);
+  }
+}
+
+@Controller(["api/v1/device", "v1/device"])
+export class EdgeHubEnrollmentController {
+  constructor(private readonly organizationsService: OrganizationsService) {}
+
+  @HttpCode(200)
+  @ApiBody({ schema: toOpenApiSchema(edgeHubPairingRedeemSchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(edgeHubPairingRedeemResponseSchema) })
+  @Post("edge-hub-pairings/redeem")
+  redeem(@Body(new ZodPipe(edgeHubPairingRedeemSchema)) body: EdgeHubPairingRedeemInput) {
+    return this.organizationsService.redeemEdgeHubPairing(body);
   }
 }

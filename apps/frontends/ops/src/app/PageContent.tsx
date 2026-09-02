@@ -181,8 +181,8 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
     description: "Organizações, unidades e saúde operacional.",
   },
   device: {
-    title: "SmartPOS e dispositivos",
-    description: "Pareamento, saúde, conciliação e diagnóstico dos terminais.",
+    title: "Equipamentos e produção",
+    description: "Conecte impressoras, organize o preparo e configure pagamentos.",
   },
   alerts: {
     title: "Central de alertas",

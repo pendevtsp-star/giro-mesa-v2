@@ -359,6 +359,49 @@ export const deviceEnrollments = pgTable(
   ],
 );
 
+export const edgeHubPairingCodes = pgTable(
+  "edge_hub_pairing_codes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    codeHash: varchar("code_hash", { length: 64 }).notNull(),
+    createdByIdentityId: uuid("created_by_identity_id").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    consumedByDeviceId: uuid("consumed_by_device_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("edge_hub_pairing_codes_hash_unique").on(table.codeHash),
+    index("edge_hub_pairing_codes_scope_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.expiresAt,
+    ),
+    foreignKey({
+      name: "edge_hub_pairing_codes_created_by_fk",
+      columns: [table.createdByIdentityId],
+      foreignColumns: [identities.id],
+    }),
+    foreignKey({
+      name: "edge_hub_pairing_codes_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "edge_hub_pairing_codes_consumed_device_fk",
+      columns: [table.organizationId, table.unitId, table.consumedByDeviceId],
+      foreignColumns: [
+        deviceEnrollments.organizationId,
+        deviceEnrollments.unitId,
+        deviceEnrollments.id,
+      ],
+    }).onDelete("restrict"),
+  ],
+);
+
 export const commercialCatalogVersions = pgTable(
   "commercial_catalog_versions",
   {

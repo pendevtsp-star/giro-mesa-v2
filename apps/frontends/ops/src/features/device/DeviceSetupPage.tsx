@@ -231,6 +231,13 @@ export function DeviceSetupPage({
         </p>
       </Callout>
 
+      <ProductionPrintersPanel
+        canManage={canManage}
+        organizationId={organizationId}
+        runtime={runtime}
+        unitId={unitId}
+      />
+
       {runtime.embedded && (
         <NativePairingCard onPaired={() => setPairingRevision((value) => value + 1)} />
       )}
@@ -240,13 +247,6 @@ export function DeviceSetupPage({
         canReconcile={canReconcile}
         key={pairingRevision}
         organizationId={organizationId}
-        unitId={unitId}
-      />
-
-      <ProductionPrintersPanel
-        canManage={canManage}
-        organizationId={organizationId}
-        runtime={runtime}
         unitId={unitId}
       />
 
