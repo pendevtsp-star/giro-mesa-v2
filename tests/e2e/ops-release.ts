@@ -4,7 +4,7 @@ export const compatibleApiHealth = {
   status: "ok",
   version: "2.0.0",
   buildSha: "e2e",
-  schemaVersion: 73,
+  schemaVersion: 76,
   capabilities: [
     "table_qr_lifecycle_v1",
     "table_qr_metrics_v1",
@@ -15,6 +15,7 @@ export const compatibleApiHealth = {
     "public_menu_cover_image_v1",
     "platform_backoffice_v1",
     "platform_commercial_site_v1",
+    "edge_hub_pairing_v1",
   ],
   database: "up",
   integrations: {},

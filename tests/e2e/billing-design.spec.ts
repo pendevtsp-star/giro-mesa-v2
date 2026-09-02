@@ -209,7 +209,11 @@ test("ativação informa as pendências reais e direciona para a próxima etapa"
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto("http://127.0.0.1:3112/#/billing");
 
-  await expect(page.getByText("3 etapas pendentes para liberar o período de teste.")).toBeVisible();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "3 etapas pendentes para liberar o período de teste." }),
+  ).toBeVisible();
   await expect(page.getByText("Cardápio pronto para operar", { exact: true })).toBeVisible();
   await expect(page.getByText("Caixa e formas de recebimento", { exact: true })).toBeVisible();
   await expect(page.getByText("Treinamento da equipe", { exact: true })).toBeVisible();

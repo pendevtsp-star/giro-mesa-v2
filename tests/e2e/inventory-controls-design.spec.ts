@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { mockCompatibleApi } from "./ops-release";
+import { compatibleApiHealth, mockCompatibleApi } from "./ops-release";
 
 const organizationId = "a1111111-1111-4111-8111-111111111111";
 const unitId = "b1111111-1111-4111-8111-111111111111";
@@ -24,23 +24,8 @@ async function mockInventory(page: Page) {
     route.fulfill({
       status: 200,
       json: {
-        status: "ok",
-        version: "2.0.0",
+        ...compatibleApiHealth,
         buildSha: "inventory-e2e",
-        schemaVersion: 73,
-        capabilities: [
-          "table_qr_lifecycle_v1",
-          "table_qr_metrics_v1",
-          "table_qr_presence_code_v1",
-          "ops_background_notifications_v1",
-          "table_qr_brand_upload_v1",
-          "ops_web_push_v1",
-          "public_menu_cover_image_v1",
-          "platform_backoffice_v1",
-          "platform_commercial_site_v1",
-        ],
-        database: "up",
-        integrations: {},
       },
     }),
   );
