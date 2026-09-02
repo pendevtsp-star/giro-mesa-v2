@@ -139,8 +139,7 @@ async function nonEmpty(path) {
   }
 }
 
-export function validateRecoveryCoverage(recovery, journal, manifest) {
-  if (manifest.status !== "homologated") return [];
+export function validateRecoveryCoverage(recovery, journal, _manifest) {
   const latestMigration = journal.entries?.at(-1)?.tag;
   return latestMigration && recovery.targetMigration === latestMigration
     ? []

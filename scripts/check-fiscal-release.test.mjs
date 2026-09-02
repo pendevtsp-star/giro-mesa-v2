@@ -92,12 +92,12 @@ test("rejects malformed fiscal encryption keys before release", () => {
   );
 });
 
-test("requires recovery evidence for the latest migration before production", () => {
+test("requires recovery evidence for the latest migration in every release mode", () => {
   assert.deepEqual(
     validateRecoveryCoverage(
       { targetMigration: "0053_petite_trauma" },
       { entries: [{ tag: "0061_accountant_portal_security" }] },
-      homologated,
+      { ...homologated, status: "blocked" },
     ),
     ["Recovery compatibility evidence must cover the latest database migration."],
   );

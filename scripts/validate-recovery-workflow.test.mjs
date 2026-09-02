@@ -74,8 +74,8 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
 test("privileged recovery authorization binds the versioned evidence file", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0075_platform_staff_invitations");
-  assert.equal(matrix.transitions.length, 6);
+  assert.equal(matrix.targetMigration, "0076_edge_hub_pairing");
+  assert.equal(matrix.transitions.length, 7);
   const [
     transition,
     previousProductionTransition,
@@ -83,6 +83,7 @@ test("privileged recovery authorization binds the versioned evidence file", () =
     latestProductionTransition,
     previousAppTransition,
     appOnlyTransition,
+    currentTargetTransition,
   ] = matrix.transitions;
   assert.equal(transition.appliedBefore, "0026_doseclub_integration");
   assert.equal(transition.appliedBeforeWhen, "1786493658116");
@@ -128,13 +129,20 @@ test("privileged recovery authorization binds the versioned evidence file", () =
   assert.equal(previousAppTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(previousAppTransition.testedUpgrade, true);
   assert.deepEqual(previousAppTransition.evidence, transition.evidence);
-  assert.equal(appOnlyTransition.appliedBefore, matrix.targetMigration);
+  assert.equal(appOnlyTransition.appliedBefore, "0075_platform_staff_invitations");
   assert.equal(appOnlyTransition.appliedBeforeWhen, "1787796000000");
   assert.equal(appOnlyTransition.appliedAfter, matrix.targetMigration);
   assert.equal(appOnlyTransition.recoveryMigration, "0045_strong_pride");
   assert.equal(appOnlyTransition.recoveryArtifact, transition.recoveryArtifact);
   assert.equal(appOnlyTransition.testedUpgrade, true);
   assert.deepEqual(appOnlyTransition.evidence, transition.evidence);
+  assert.equal(currentTargetTransition.appliedBefore, matrix.targetMigration);
+  assert.equal(currentTargetTransition.appliedBeforeWhen, "1788307200000");
+  assert.equal(currentTargetTransition.appliedAfter, matrix.targetMigration);
+  assert.equal(currentTargetTransition.recoveryMigration, "0045_strong_pride");
+  assert.equal(currentTargetTransition.recoveryArtifact, transition.recoveryArtifact);
+  assert.equal(currentTargetTransition.testedUpgrade, true);
+  assert.deepEqual(currentTargetTransition.evidence, transition.evidence);
   const evidence = JSON.parse(
     readFileSync(join(root, "docs", "evidence", "recovery", "5421ce-validation.json"), "utf8"),
   );

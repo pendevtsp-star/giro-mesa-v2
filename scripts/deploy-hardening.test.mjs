@@ -540,7 +540,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0075_platform_staff_invitations");
+  assert.equal(matrix.requiredAppliedMigration, "0076_edge_hub_pairing");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -574,7 +574,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.match(rollback, /actions\/runs/);
 });
 
-test("schema 75 full restore requires a functional smoke before Docker", () => {
+test("schema 75 and newer full restore requires a functional smoke before Docker", () => {
   const result = run(restoreScript, [
     "--backup-directory",
     "/tmp/does-not-exist",
@@ -591,11 +591,11 @@ test("schema 75 full restore requires a functional smoke before Docker", () => {
     "--expected-target-artifact",
     `git:${"b".repeat(40)}`,
     "--expected-target-migration-id",
-    "0075_platform_staff_invitations",
+    "0076_edge_hub_pairing",
   ]);
 
   assert.notEqual(result.status, 0);
-  assert.match(output(result), /RESTORE_SMOKE_SQL_REQUIRED:0075_platform_staff_invitations/);
+  assert.match(output(result), /RESTORE_SMOKE_SQL_REQUIRED:0076_edge_hub_pairing/);
   assert.doesNotMatch(output(result), /BACKUP_MANIFEST_MISSING|RESTORE_TOOL_REQUIRED/);
 });
 
@@ -653,7 +653,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0075_platform_staff_invitations");
+  assert.equal(recovery.targetMigration, "0076_edge_hub_pairing");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -666,6 +666,7 @@ test("pre-migration backup binds the migration actually applied in the source da
       { appliedBefore: "0053_petite_trauma", appliedBeforeWhen: "1787373316439" },
       { appliedBefore: "0074_crm_operational_inbox", appliedBeforeWhen: "1787709600000" },
       { appliedBefore: "0075_platform_staff_invitations", appliedBeforeWhen: "1787796000000" },
+      { appliedBefore: "0076_edge_hub_pairing", appliedBeforeWhen: "1788307200000" },
     ],
   );
   for (const transition of recovery.transitions) {

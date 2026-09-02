@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0075_platform_staff_invitations",
+  "requiredAppliedMigration": "0076_edge_hub_pairing",
   "transitions": [],
   "fullRestore": {
     "required": true,
