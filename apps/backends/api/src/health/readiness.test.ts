@@ -16,6 +16,7 @@ describe("database readiness", () => {
             whatsappMessages: null,
             crmAutomations: null,
             crmQuickReplies: null,
+            edgeHubPairingCodes: null,
           },
         ],
       },
@@ -35,6 +36,7 @@ describe("database readiness", () => {
             "growth_whatsapp_messages",
             "growth_crm_automation_rules",
             "growth_crm_quick_replies",
+            "edge_hub_pairing_codes",
           ],
         });
         return true;
