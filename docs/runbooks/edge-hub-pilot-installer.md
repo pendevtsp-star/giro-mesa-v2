@@ -21,6 +21,7 @@ O pacote e seu SHA-256 ficam em `apps/backends/edge-hub-installer/bin/local-test
 ## Disponibilizar na VPS
 
 1. Copie `GiroMesa-Conector-Setup-PILOTO.exe` para o caminho persistente `/srv/apps/giromesa-v2/shared/edge-hub-installer/GiroMesa-Conector-Setup.exe`.
+   O deploy valida o SHA-256 e aplica automaticamente as permissões de leitura exigidas pela API.
 2. No arquivo de ambiente protegido da VPS, configure:
 
    ```dotenv

@@ -64,7 +64,7 @@ if [[ $installer_host_path != "$expected_installer_host_path" ]]; then
   exit 1
 fi
 mkdir -p "$installer_host_path"
-chmod 750 "$installer_host_path"
+chmod 751 "$installer_host_path"
 installer_version=$(read_env_key EDGE_HUB_WINDOWS_INSTALLER_VERSION)
 installer_sha256=$(read_env_key EDGE_HUB_WINDOWS_INSTALLER_SHA256)
 installer_organizations=$(read_env_key EDGE_HUB_PILOT_ORGANIZATION_IDS)
@@ -73,6 +73,7 @@ if [[ -n $installer_version || -n $installer_sha256 || -n $installer_organizatio
   [[ -f $installer_file && ! -L $installer_file ]] || { echo "EDGE_HUB_INSTALLER_FILE_REQUIRED" >&2; exit 1; }
   actual_installer_sha256=$(sha256sum "$installer_file" | awk '{print $1}')
   [[ $actual_installer_sha256 == "${installer_sha256,,}" ]] || { echo "EDGE_HUB_INSTALLER_SHA256_MISMATCH" >&2; exit 1; }
+  chmod 644 "$installer_file"
 fi
 
 python3 - "$fiscal_release_manifest" "$release_package" "$env_file" <<'PY'

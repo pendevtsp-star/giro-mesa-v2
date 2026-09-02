@@ -5,8 +5,8 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -101,6 +101,12 @@ function signedManifest(directory, payload, key) {
     }),
   );
 }
+
+test("pilot installer remains readable by the non-root API container", () => {
+  const source = readFileSync(deployScript, "utf8");
+  assert.match(source, /chmod 751 "\$installer_host_path"/);
+  assert.match(source, /chmod 644 "\$installer_file"/);
+});
 
 test("Linux backup fails closed before Docker when the HMAC key is absent", () => {
   const directory = mkdtempSync(join(tmpdir(), "giromesa-linux-backup-negative-"));
