@@ -1133,7 +1133,7 @@ export function OperationalApp({
               size="sm"
               variant="ghost"
             >
-              ☰
+              <Icon name="menu" size={20} />
             </Button>
             <div className="topbar__scope">
               {establishmentContext.logoUrl && (
@@ -1271,7 +1271,7 @@ export function OperationalApp({
                   <strong>{session.profile.name}</strong>
                   <small>{session.profile.role}</small>
                 </span>
-                <span aria-hidden="true">⌄</span>
+                <Icon name="chevron-down" size={14} />
               </Button>
               {profileMenu && (
                 <section

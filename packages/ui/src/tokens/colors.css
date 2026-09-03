@@ -45,10 +45,10 @@
   --gm-surface-sunken: hsl(55, 14%, 96%);
   --gm-border: hsl(72, 8%, 85%);
   /* Feedback surfaces */
-  --gm-warning-soft: #fff0ce;
-  --gm-danger-soft: #fbe1e1;
+  --gm-warning-soft: hsl(42, 100%, 90%);
+  --gm-danger-soft: hsl(0, 75%, 93%);
   --gm-success-soft: var(--gm-brand-soft);
-  --gm-info-soft: #e3eef8;
+  --gm-info-soft: hsl(208, 62%, 93%);
   /* Interaction */
   --gm-focus: var(--gm-brand);
   --gm-overlay: rgb(14 25 20 / 64%);

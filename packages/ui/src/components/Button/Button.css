@@ -19,6 +19,10 @@
     transform var(--gm-duration-fast) var(--gm-ease-out);
   white-space: nowrap;
 }
+.gm-button:focus-visible {
+  outline: 2px solid var(--gm-focus);
+  outline-offset: 2px;
+}
 .gm-button:not(:disabled):active {
   transform: translateY(1px);
 }

@@ -36,9 +36,23 @@ export type IconName =
   | "arrow-down"
   | "download"
   | "upload"
-  | "copy";
+  | "copy"
+  | "menu"
+  | "chevron-down";
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
+  menu: (
+    <>
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+    </>
+  ),
+  "chevron-down": (
+    <>
+      <polyline points="6 9 12 15 18 9" />
+    </>
+  ),
   "arrow-up": (
     <>
       <line x1="12" y1="19" x2="12" y2="5" />
