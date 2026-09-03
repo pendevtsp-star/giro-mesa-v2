@@ -900,6 +900,7 @@ export function OperationalApp({
         aria-label={sidebarIsCollapsed ? item.label : undefined}
         aria-current={route === item.route ? "page" : undefined}
         className={route === item.route ? "active" : ""}
+        data-tooltip={item.label}
         href={navigationHref(item)}
         key={item.route}
         title={sidebarIsCollapsed ? item.label : undefined}
@@ -937,6 +938,7 @@ export function OperationalApp({
             aria-label={sidebarIsCollapsed ? item.label : undefined}
             aria-current={active && sidebarIsCollapsed ? "page" : undefined}
             className={active ? "active" : ""}
+            data-tooltip={item.label}
             href={kdsAreaHref(lastKdsOperationalArea)}
             title={sidebarIsCollapsed ? item.label : undefined}
           >

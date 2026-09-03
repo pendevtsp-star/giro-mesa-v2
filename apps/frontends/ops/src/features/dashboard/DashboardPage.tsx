@@ -1,5 +1,15 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
-import { Badge, Button, Card, EmptyState, Input, NativeSelect, VisuallyHidden } from "@giromesa/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Icon,
+  type IconName,
+  Input,
+  NativeSelect,
+  VisuallyHidden,
+} from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import type { Profile } from "../../domain";
@@ -13,6 +23,37 @@ import {
 } from "../../management.shared";
 import { routeHref } from "../../router";
 import { canAccess } from "../../rules";
+
+function metricIcon(metric: OverviewData["metrics"][number]): IconName {
+  if (metric.route === "reports" || metric.id.includes("sales") || metric.id.includes("revenue")) {
+    return "finance";
+  }
+  if (metric.route === "salon" || metric.id.includes("table")) {
+    return "salon";
+  }
+  if (metric.route === "kds" || metric.id.includes("kds") || metric.id.includes("kitchen")) {
+    return "kds";
+  }
+  if (metric.route === "finance" || metric.id.includes("cash")) {
+    return "cash";
+  }
+  if (metric.route === "inventory" || metric.id.includes("stock")) {
+    return "inventory";
+  }
+  if (metric.route === "delivery") {
+    return "delivery";
+  }
+  return "dashboard";
+}
+
+function parseGoalPercentage(label?: string | null): number | null {
+  if (!label) return null;
+  const match = label.match(/(\d+)%/);
+  const first = match?.[1];
+  if (!first) return null;
+  const val = Number.parseInt(first, 10);
+  return Number.isFinite(val) ? Math.min(100, Math.max(0, val)) : null;
+}
 
 export function RealDashboard({
   profile,
@@ -301,11 +342,11 @@ export function RealDashboard({
                         <strong>{item.title}</strong>
                         <small>{item.detail}</small>
                         {item.assignedTo && (
-                          <span className="dashboard-priority__owner">
+                          <Badge tone={item.assignedTo.isMe ? "success" : "info"}>
                             {item.assignedTo.isMe
                               ? "Assumida por você"
                               : `Com ${item.assignedTo.name}`}
-                          </span>
+                          </Badge>
                         )}
                       </a>
                       <div className="dashboard-priority__controls">
@@ -375,31 +416,53 @@ export function RealDashboard({
                       key={metric.id}
                     >
                       <Card
-                        className={`grid ${sourceUnavailable ? "dashboard-metric__unavailable" : ""}`}
+                        className={`dashboard-metric__card ${sourceUnavailable ? "dashboard-metric__unavailable" : ""}`}
                       >
-                        <span className="dashboard-metric__label">{metric.label}</span>
-                        <strong>{metric.value}</strong>
-                        <small>{metric.detail}</small>
-                        {sourceUnavailable && (
-                          <Badge tone="warning">
-                            Fonte {sourceLabel(metric.source)} indisponível
-                          </Badge>
-                        )}
-                        {(metric.comparison || metric.goal) && !sourceUnavailable && (
-                          <span className="dashboard-metric__context">
-                            {metric.comparison && (
-                              <Badge tone={metric.comparison.tone}>
-                                {metric.comparison.value} · {metric.comparison.label}
-                              </Badge>
-                            )}
-                            {metric.goal && (
-                              <Badge tone={metric.goal.tone}>{metric.goal.label}</Badge>
-                            )}
+                        <div className="dashboard-metric__head">
+                          <span className="dashboard-metric__label">{metric.label}</span>
+                          <span aria-hidden="true" className="dashboard-metric__icon">
+                            <Icon name={metricIcon(metric)} size={16} />
                           </span>
-                        )}
-                        <span aria-hidden="true" className="dashboard-metric__arrow">
-                          →
-                        </span>
+                        </div>
+                        <div className="dashboard-metric__body">
+                          <strong>{metric.value}</strong>
+                          <small>{metric.detail}</small>
+                        </div>
+                        {metric.goal &&
+                          !sourceUnavailable &&
+                          (() => {
+                            const percent = parseGoalPercentage(metric.goal.label);
+                            return percent !== null ? (
+                              <div className="dashboard-metric__progress-bar" aria-hidden="true">
+                                <div
+                                  className={`dashboard-metric__progress-fill dashboard-metric__progress-fill--${metric.goal.tone}`}
+                                  style={{ width: `${percent}%` }}
+                                />
+                              </div>
+                            ) : null;
+                          })()}
+                        <div className="dashboard-metric__footer">
+                          {sourceUnavailable && (
+                            <Badge tone="warning">
+                              Fonte {sourceLabel(metric.source)} indisponível
+                            </Badge>
+                          )}
+                          {(metric.comparison || metric.goal) && !sourceUnavailable && (
+                            <div className="dashboard-metric__badges">
+                              {metric.comparison && (
+                                <Badge tone={metric.comparison.tone}>
+                                  {metric.comparison.value} · {metric.comparison.label}
+                                </Badge>
+                              )}
+                              {metric.goal && (
+                                <Badge tone={metric.goal.tone}>{metric.goal.label}</Badge>
+                              )}
+                            </div>
+                          )}
+                          <span aria-hidden="true" className="dashboard-metric__arrow">
+                            →
+                          </span>
+                        </div>
                         <VisuallyHidden>Abrir {metric.label}</VisuallyHidden>
                       </Card>
                     </a>

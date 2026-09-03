@@ -329,22 +329,137 @@
 
 .dashboard-metric {
   color: inherit;
+  display: flex;
   min-width: 0;
   text-decoration: none;
 }
 
-.dashboard-metric .gm-card {
+.dashboard-metric .gm-card,
+.dashboard-metric__card {
   border-top: 3px solid var(--overview-tone, var(--gm-border));
-  display: grid;
-  gap: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   height: 100%;
-  min-height: 112px;
-  padding: 0.9rem;
+  justify-content: space-between;
+  min-height: 145px;
+  padding: 0.95rem;
   position: relative;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+  width: 100%;
 }
 
-.dashboard-metric:hover .gm-card {
+.dashboard-metric:hover .gm-card,
+.dashboard-metric:hover .dashboard-metric__card {
   border-color: var(--overview-tone, var(--gm-brand));
+  box-shadow: var(--gm-shadow-md);
+  transform: translateY(-1px);
+}
+
+.dashboard-metric__head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.dashboard-metric__label {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  font-weight: 600;
+}
+
+.dashboard-metric__icon {
+  align-items: center;
+  color: var(--overview-tone, var(--gm-brand));
+  display: flex;
+  opacity: 0.85;
+}
+
+.dashboard-metric__body {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.dashboard-metric strong,
+.dashboard-metric__value {
+  font-family: var(--gm-display);
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.dashboard-metric small,
+.dashboard-metric__detail {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+  line-height: 1.35;
+}
+
+.dashboard-metric__progress-bar {
+  background: var(--gm-surface-soft);
+  border-radius: 999px;
+  height: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.dashboard-metric__progress-fill {
+  border-radius: 999px;
+  height: 100%;
+  transition: width 300ms ease;
+}
+
+.dashboard-metric__progress-fill--success {
+  background: var(--gm-success);
+}
+.dashboard-metric__progress-fill--warning {
+  background: var(--gm-warning);
+}
+.dashboard-metric__progress-fill--danger {
+  background: var(--gm-danger);
+}
+.dashboard-metric__progress-fill--info {
+  background: var(--gm-info);
+}
+
+.dashboard-metric__footer {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 0.4rem;
+  width: 100%;
+}
+
+.dashboard-metric__badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.dashboard-metric__badges .gm-badge {
+  font-size: var(--gm-font-xs);
+}
+
+.dashboard-metric__arrow {
+  color: var(--gm-muted);
+  font-weight: 800;
+  margin-left: auto;
+  transition:
+    transform 150ms ease,
+    color 150ms ease;
+}
+
+.dashboard-metric:hover .dashboard-metric__arrow {
+  color: var(--overview-tone, var(--gm-brand));
+  transform: translateX(2px);
 }
 
 .dashboard-metric__unavailable {
@@ -370,38 +485,6 @@
 
 .dashboard-metric--info {
   --overview-tone: var(--gm-info);
-}
-
-.dashboard-metric__label {
-  color: var(--gm-muted);
-  font-size: var(--gm-font-sm);
-}
-
-.dashboard-metric strong {
-  font-family: var(--gm-display);
-  font-size: 1.55rem;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.035em;
-}
-
-.dashboard-metric__arrow {
-  color: var(--gm-brand);
-  font-weight: 800;
-  position: absolute;
-  right: 0.9rem;
-  top: 0.8rem;
-}
-
-.dashboard-metric__context {
-  align-items: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-  margin-top: 0.25rem;
-}
-
-.dashboard-metric__context .gm-badge {
-  font-size: var(--gm-font-xs);
 }
 
 .dashboard-secondary {
@@ -671,7 +754,25 @@
 }
 
 @media (max-width: 480px) {
-  .dashboard-metrics,
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  .dashboard-metric strong,
+  .dashboard-metric__value {
+    font-size: 1.25rem;
+  }
+  .dashboard-metric .gm-card,
+  .dashboard-metric__card {
+    min-height: 125px;
+    padding: 0.75rem;
+    gap: 0.35rem;
+  }
+  .dashboard-metric__badges .gm-badge {
+    line-height: 1.2;
+    max-width: 100%;
+    white-space: normal;
+  }
   .dashboard-pulse__grid {
     grid-template-columns: 1fr;
   }
