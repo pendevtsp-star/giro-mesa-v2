@@ -95,7 +95,7 @@ namespace GiroMesa.ApiClient.V1.Sync.Batches
             writer.WriteDoubleValue("protocolVersion", ProtocolVersion);
         }
         /// <summary>
-        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember2"/>, <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember3"/>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember2"/>, <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember3"/>, <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember4"/>
         /// </summary>
         [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
         public partial class BatchesPostRequestBody_commandResults : IComposedTypeWrapper, IParsable
@@ -123,6 +123,14 @@ namespace GiroMesa.ApiClient.V1.Sync.Batches
 #nullable restore
 #else
             public global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember3 BatchesPostRequestBodyCommandResultsMember3 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember4"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember4? BatchesPostRequestBodyCommandResultsMember4 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember4 BatchesPostRequestBodyCommandResultsMember4 { get; set; }
 #endif
             /// <summary>
             /// Creates a new instance of the appropriate class based on discriminator value
@@ -154,6 +162,10 @@ namespace GiroMesa.ApiClient.V1.Sync.Batches
                 {
                     return BatchesPostRequestBodyCommandResultsMember3.GetFieldDeserializers();
                 }
+                else if(BatchesPostRequestBodyCommandResultsMember4 != null)
+                {
+                    return BatchesPostRequestBodyCommandResultsMember4.GetFieldDeserializers();
+                }
                 return new Dictionary<string, Action<IParseNode>>();
             }
             /// <summary>
@@ -174,6 +186,10 @@ namespace GiroMesa.ApiClient.V1.Sync.Batches
                 else if(BatchesPostRequestBodyCommandResultsMember3 != null)
                 {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember3>(null, BatchesPostRequestBodyCommandResultsMember3);
+                }
+                else if(BatchesPostRequestBodyCommandResultsMember4 != null)
+                {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Sync.Batches.BatchesPostRequestBody_commandResultsMember4>(null, BatchesPostRequestBodyCommandResultsMember4);
                 }
             }
         }
