@@ -52,12 +52,23 @@ public static class MachineConfigurationStore
         var clear = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.LocalMachine);
         try
         {
-            return JsonSerializer.Deserialize<MachineConfiguration>(clear)
-                ?? throw new CryptographicException("Protected Edge Hub configuration is invalid.");
+            var configuration = JsonSerializer.Deserialize<MachineConfiguration>(clear);
+            return IsComplete(configuration) ? configuration : null;
         }
         finally
         {
             CryptographicOperations.ZeroMemory(clear);
         }
     }
+
+    private static bool IsComplete(MachineConfiguration? configuration) =>
+        configuration is not null &&
+        Guid.TryParse(configuration.DeviceId, out _) &&
+        Guid.TryParse(configuration.OrganizationId, out _) &&
+        Guid.TryParse(configuration.UnitId, out _) &&
+        Uri.TryCreate(configuration.CloudApiBaseUrl, UriKind.Absolute, out var api) &&
+        (api.Scheme == Uri.UriSchemeHttps || api.Scheme == Uri.UriSchemeHttp) &&
+        !string.IsNullOrWhiteSpace(configuration.CloudSyncKey) &&
+        !string.IsNullOrWhiteSpace(configuration.DatabaseKey) &&
+        !string.IsNullOrWhiteSpace(configuration.DataDirectory);
 }

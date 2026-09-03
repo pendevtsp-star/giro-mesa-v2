@@ -63,7 +63,7 @@ Directory-based community: apps/backends
 | verifyStepUp | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 529-591 |
 | revoke | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 593-605 |
 
-*... and 3909 more members.*
+*... and 3722 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (6143 edge(s))
-- `where` (2464 edge(s))
-- `and` (1992 edge(s))
-- `from` (1890 edge(s))
-- `select` (1587 edge(s))
-- `equal` (1417 edge(s))
-- `Param` (1195 edge(s))
-- `ParseUUIDPipe` (1172 edge(s))
-- `values` (1150 edge(s))
-- `insert` (1030 edge(s))
-- `limit` (1020 edge(s))
-- `map` (848 edge(s))
-- `returning` (679 edge(s))
-- `set` (628 edge(s))
-- `update` (548 edge(s))
+- `eq` (5974 edge(s))
+- `where` (2412 edge(s))
+- `and` (1945 edge(s))
+- `from` (1855 edge(s))
+- `select` (1577 edge(s))
+- `equal` (1378 edge(s))
+- `Param` (1171 edge(s))
+- `ParseUUIDPipe` (1148 edge(s))
+- `values` (1140 edge(s))
+- `insert` (1027 edge(s))
+- `limit` (996 edge(s))
+- `map` (838 edge(s))
+- `returning` (667 edge(s))
+- `set` (609 edge(s))
+- `update` (540 edge(s))
 
 ### Incoming
 
-- `equal` (1412 edge(s))
+- `equal` (1373 edge(s))
 - `eq` (456 edge(s))
 - `ok` (438 edge(s))
 - `values` (390 edge(s))
 - `insert` (390 edge(s))
 - `where` (324 edge(s))
 - `returning` (284 edge(s))
-- `from` (239 edge(s))
+- `from` (238 edge(s))
 - `deepEqual` (237 edge(s))
-- `randomUUID` (236 edge(s))
+- `randomUUID` (225 edge(s))
 - `select` (218 edge(s))
-- `safeParse` (208 edge(s))
+- `safeParse` (191 edge(s))
 - `rejects` (174 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-schemas.ts` (119 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/management/management.schemas.ts` (118 edge(s))

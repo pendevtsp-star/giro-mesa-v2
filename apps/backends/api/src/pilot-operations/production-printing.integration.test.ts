@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   deviceEnrollments,
   hubCommands,
+  hubHeartbeats,
   identities,
   memberships,
   organizations,
@@ -77,6 +78,63 @@ it("keeps one desired default per Edge Hub and ignores stale printer-test result
     assert.ok(hubA && hubB);
 
     const service = new ProductionPrintingService(database, new ScopeService(database));
+    await database.db.insert(hubHeartbeats).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      hubId: hubA.id,
+      version: "integration-test",
+      lastSeenAt: new Date(),
+    });
+    const probe = await service.probePrinterConnection(
+      owner.id,
+      organization.id,
+      unit.id,
+      `probe-a-${runId}`,
+      { hubId: hubA.id, host: "192.168.10.10", port: 9100 },
+    );
+    assert.equal(probe.state, "pending");
+    assert.equal(
+      (
+        await service.printerConnectionProbeStatus(
+          owner.id,
+          organization.id,
+          unit.id,
+          probe.commandId,
+        )
+      ).state,
+      "pending",
+    );
+    await database.db.transaction((tx) =>
+      service.applyCommandResult(
+        tx,
+        { id: hubA.id, organizationId: organization.id, unitId: unit.id },
+        {
+          commandId: probe.commandId,
+          type: "printer.connection.probe",
+          status: "reachable",
+          errorCode: null,
+        },
+      ),
+    );
+    assert.equal(
+      (
+        await service.printerConnectionProbeStatus(
+          owner.id,
+          organization.id,
+          unit.id,
+          probe.commandId,
+        )
+      ).state,
+      "reachable",
+    );
+    await assert.rejects(
+      service.probePrinterConnection(owner.id, organization.id, unit.id, `probe-b-${runId}`, {
+        hubId: hubB.id,
+        host: "192.168.20.10",
+        port: 9100,
+      }),
+      (error: unknown) => errorCode(error) === "EDGE_HUB_OFFLINE",
+    );
     const desired = (hubId: string, label: string, host: string) => ({
       hubId,
       label,

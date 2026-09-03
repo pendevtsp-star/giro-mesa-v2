@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using GiroMesa.EdgeHub.Adapters;
@@ -38,6 +40,7 @@ public sealed class CloudPrinterCommandProcessor(
                     "printer.configuration.upsert" => await ApplyConfigurationAsync(command),
                     "printer.configuration.archive" => await ArchiveConfigurationAsync(command),
                     "printer.test" => await TestPrinterAsync(command, cancellationToken),
+                    "printer.connection.probe" => await ProbePrinterConnectionAsync(command, cancellationToken),
                     _ => throw new CloudPrinterCommandException("CLOUD_COMMAND_UNSUPPORTED"),
                 };
             }
@@ -186,6 +189,47 @@ public sealed class CloudPrinterCommandProcessor(
         }, JsonOptions);
     }
 
+    private static async Task<JsonElement> ProbePrinterConnectionAsync(
+        CloudCommand command,
+        CancellationToken cancellationToken)
+    {
+        var input = command.Payload.Deserialize<CloudPrinterConnectionProbeInput>(JsonOptions)
+            ?? throw new CloudPrinterCommandException("PRINTER_CONNECTION_PROBE_INVALID");
+        if (!IPAddress.TryParse(input.Host, out _) || input.Port is < 1 or > 65535)
+            throw new CloudPrinterCommandException("PRINTER_CONNECTION_PROBE_INVALID");
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(input.Host, input.Port, timeout.Token);
+            return JsonSerializer.SerializeToElement(new
+            {
+                commandId = command.Id,
+                type = command.Type,
+                status = "reachable",
+                errorCode = (string?)null,
+            }, JsonOptions);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return UnreachableProbe(command.Id, command.Type);
+        }
+        catch (SocketException)
+        {
+            return UnreachableProbe(command.Id, command.Type);
+        }
+    }
+
+    private static JsonElement UnreachableProbe(string commandId, string type) =>
+        JsonSerializer.SerializeToElement(new
+        {
+            commandId,
+            type,
+            status = "unreachable",
+            errorCode = "PRINTER_UNREACHABLE",
+        }, JsonOptions);
+
     private static JsonElement Failure(CloudCommand command, string errorCode)
     {
         var printerId = TryString(command.Payload, "printerId");
@@ -207,6 +251,13 @@ public sealed class CloudPrinterCommandProcessor(
                 printerId,
                 revision = revision ?? 0,
                 status = "failed",
+                errorCode,
+            }, JsonOptions),
+            "printer.connection.probe" => JsonSerializer.SerializeToElement(new
+            {
+                commandId = command.Id,
+                type = command.Type,
+                status = "unreachable",
                 errorCode,
             }, JsonOptions),
             _ => JsonSerializer.SerializeToElement(new
@@ -270,6 +321,8 @@ public sealed class CloudPrinterCommandProcessor(
     private sealed record CloudPrinterConfigurationArchiveInput(string PrinterId, int Revision);
 
     private sealed record CloudPrinterTestInput(string PrinterId, string? IdempotencyKey);
+
+    private sealed record CloudPrinterConnectionProbeInput(string Host, int Port);
 
     private sealed record CloudPrinterConfigurationInput(
         string Host,

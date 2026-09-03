@@ -110,6 +110,14 @@ export const cloudCommandResultSchema = z.discriminatedUnion("type", [
         });
       }
     }),
+  z
+    .object({
+      commandId: z.uuid(),
+      type: z.literal("printer.connection.probe"),
+      status: z.enum(["reachable", "unreachable"]),
+      errorCode: commandResultErrorCodeSchema,
+    })
+    .strict(),
 ]);
 
 export const syncBatchSchema = z

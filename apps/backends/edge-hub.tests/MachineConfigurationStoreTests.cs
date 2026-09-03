@@ -27,6 +27,23 @@ public sealed class MachineConfigurationStoreTests : IDisposable
         Assert.DoesNotContain("sync-secret", File.ReadAllText(path));
     }
 
+    [Fact]
+    public void Rejects_incomplete_legacy_configuration()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var path = Path.Combine(_directory, "legacy.bin");
+        MachineConfigurationStore.Save(new MachineConfiguration(
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid().ToString(),
+            "https://api.giromesa.com.br",
+            "",
+            "database-secret-with-more-than-32-characters",
+            Path.Combine(_directory, "data")), path);
+
+        Assert.Null(MachineConfigurationStore.TryLoad(path));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory)) Directory.Delete(_directory, true);

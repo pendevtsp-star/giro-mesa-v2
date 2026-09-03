@@ -7,8 +7,10 @@ import type {
   ManualKdsTicketPrintInput,
   PrinterConfigurationArchiveCommandV1,
   PrinterConfigurationCommandV1,
+  PrinterConnectionProbeCommandV1,
   PrinterTestCommandV1,
   PrintJobExecuteCommandV1,
+  ProductionPrinterConnectionProbeInput,
   ProductionPrinterDocumentType,
   ProductionPrintPolicyInput,
   ResolveUnknownProductionPrintJobInput,
@@ -60,6 +62,7 @@ type TicketDispatchItem = {
 const HUB_ONLINE_WINDOW_MS = 2 * 60_000;
 const PRINT_COMMAND_TTL_MS = 10 * 60_000;
 const PRINTER_TEST_TTL_MS = 5 * 60_000;
+const PRINTER_CONNECTION_PROBE_TTL_MS = 30_000;
 const PRINTER_CONFIGURATION_TTL_MS = 7 * 24 * 60 * 60_000;
 
 function isAllowedPrinterIpv4(value: string) {
@@ -170,6 +173,102 @@ export class ProductionPrintingService {
         lastSeenAt: hub.lastSeenAt?.toISOString() ?? null,
         online: Boolean(hub.lastSeenAt && hub.lastSeenAt.getTime() > onlineThreshold),
       })),
+    };
+  }
+
+  async probePrinterConnection(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ProductionPrinterConnectionProbeInput,
+  ) {
+    await this.requireManage(identityId, organizationId, unitId);
+    if (!isPrivatePrinterAddress(input.host)) {
+      throw new BadRequestException({
+        code: "PRODUCTION_PRINTER_PRIVATE_ADDRESS_REQUIRED",
+        message: "Use um endereço IPv4 ou IPv6 privado literal.",
+      });
+    }
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "production-printer.connection-probe",
+      input,
+      async (tx) => {
+        await this.requireOnlineHub(tx, organizationId, unitId, input.hubId);
+        const commandId = randomUUID();
+        const expiresAt = new Date(Date.now() + PRINTER_CONNECTION_PROBE_TTL_MS);
+        const payload: PrinterConnectionProbeCommandV1 = { host: input.host, port: input.port };
+        await tx.insert(hubCommands).values({
+          id: commandId,
+          organizationId,
+          unitId,
+          hubId: input.hubId,
+          idempotencyKey: `printer-probe:${commandId}`,
+          type: "printer.connection.probe",
+          source: "operations",
+          payload: payload as unknown as Record<string, unknown>,
+          expiresAt,
+        });
+        await this.recordLifecycle(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "production_printer.connection_probe_requested",
+          "hub_command",
+          commandId,
+          { hubId: input.hubId, host: input.host, port: input.port },
+        );
+        return { commandId, state: "pending" as const, expiresAt: expiresAt.toISOString() };
+      },
+    );
+  }
+
+  async printerConnectionProbeStatus(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    commandId: string,
+  ) {
+    await this.requireManage(identityId, organizationId, unitId);
+    const [command] = await this.database.db
+      .select({
+        id: hubCommands.id,
+        payload: hubCommands.payload,
+        expiresAt: hubCommands.expiresAt,
+        acknowledgedAt: hubCommands.acknowledgedAt,
+      })
+      .from(hubCommands)
+      .where(
+        and(
+          eq(hubCommands.id, commandId),
+          eq(hubCommands.organizationId, organizationId),
+          eq(hubCommands.unitId, unitId),
+          eq(hubCommands.type, "printer.connection.probe"),
+        ),
+      )
+      .limit(1);
+    if (!command) throw new NotFoundException({ code: "PRINTER_CONNECTION_PROBE_NOT_FOUND" });
+    const result = command.payload.probeResult;
+    if (command.acknowledgedAt && result && typeof result === "object" && !Array.isArray(result)) {
+      const status = (result as Record<string, unknown>).status;
+      const errorCode = (result as Record<string, unknown>).errorCode;
+      if (status === "reachable" || status === "unreachable") {
+        return {
+          commandId,
+          state: status,
+          errorCode: typeof errorCode === "string" ? errorCode : null,
+        };
+      }
+    }
+    return {
+      commandId,
+      state: command.expiresAt <= new Date() ? ("timeout" as const) : ("pending" as const),
+      errorCode: null,
     };
   }
 
@@ -1040,6 +1139,16 @@ export class ProductionPrintingService {
       await this.applyPrinterConfigurationResult(tx, hub, command.id, result, now);
     } else if (result.type === "printer.test") {
       await this.applyPrinterTestResult(tx, hub, command.id, result, now);
+    } else if (result.type === "printer.connection.probe") {
+      await tx
+        .update(hubCommands)
+        .set({
+          payload: {
+            ...command.payload,
+            probeResult: result as unknown as Record<string, unknown>,
+          },
+        })
+        .where(eq(hubCommands.id, command.id));
     } else {
       throw new ConflictException({ code: "CLOUD_COMMAND_RESULT_TYPE_UNSUPPORTED" });
     }
@@ -1776,6 +1885,28 @@ export class ProductionPrintingService {
       .limit(1);
     if (!hub) throw new ConflictException({ code: "EDGE_HUB_NOT_ENROLLED", hubId });
     return hub;
+  }
+
+  private async requireOnlineHub(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    hubId: string,
+  ) {
+    await this.requireActiveHub(tx, organizationId, unitId, hubId);
+    const [heartbeat] = await tx
+      .select({ hubId: hubHeartbeats.hubId })
+      .from(hubHeartbeats)
+      .where(
+        and(
+          eq(hubHeartbeats.organizationId, organizationId),
+          eq(hubHeartbeats.unitId, unitId),
+          eq(hubHeartbeats.hubId, hubId),
+          gt(hubHeartbeats.lastSeenAt, new Date(Date.now() - HUB_ONLINE_WINDOW_MS)),
+        ),
+      )
+      .limit(1);
+    if (!heartbeat) throw new ConflictException({ code: "EDGE_HUB_OFFLINE", hubId });
   }
 
   private async queuePrinterConfiguration(

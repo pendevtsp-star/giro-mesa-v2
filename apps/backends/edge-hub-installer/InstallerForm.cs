@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Json;
 using GiroMesa.EdgeHub.Enrollment;
 using GiroMesa.EdgeHub.Security;
 
@@ -77,8 +78,12 @@ public sealed class InstallerForm : Form
             var executable = InstallPayload(payload);
             await ProtectConfigurationDirectoryAsync();
             await ConfigureAndStartServiceAsync(executable);
-            _status.ForeColor = Color.DarkGreen;
-            _status.Text = "Pronto. Este computador já está conectado ao GiroMesa.";
+            _status.Text = "Serviço instalado. Aguardando o primeiro contato com o GiroMesa…";
+            var connected = await WaitForCloudConnectionAsync();
+            _status.ForeColor = connected ? Color.DarkGreen : Color.DarkGoldenrod;
+            _status.Text = connected
+                ? "Pronto. Este computador está conectado ao GiroMesa. Você já pode fechar esta janela."
+                : "O serviço foi instalado e continuará tentando se conectar automaticamente. Você pode fechar esta janela e acompanhar o último contato no GiroMesa.";
             _install.Text = "Concluído";
         }
         catch (Exception exception)
@@ -107,6 +112,29 @@ public sealed class InstallerForm : Form
             enrollment.SyncKey,
             Convert.ToBase64String(RandomNumberGenerator.GetBytes(48)),
             dataDirectory);
+    }
+
+    private static async Task<bool> WaitForCloudConnectionAsync()
+    {
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                using var response = await client.GetAsync("http://127.0.0.1:5000/health");
+                using var document = JsonDocument.Parse(await response.Content.ReadAsStreamAsync());
+                if (document.RootElement.TryGetProperty("lastSuccessfulSyncAt", out var lastSync) &&
+                    lastSync.ValueKind == JsonValueKind.String)
+                    return true;
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException or JsonException)
+            {
+                // The Windows service keeps retrying; the installer only waits for the first confirmation.
+            }
+            await Task.Delay(1_000);
+        }
+        return false;
     }
 
     private static byte[] ReadPayload()

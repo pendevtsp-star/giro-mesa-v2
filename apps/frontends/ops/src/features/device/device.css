@@ -668,6 +668,45 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.production-printer-address-help {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  margin-top: var(--gm-space-2);
+}
+
+.production-printer-address-help summary {
+  color: var(--gm-ink);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.production-printer-address-help ol {
+  display: grid;
+  gap: var(--gm-space-1);
+  margin-block: var(--gm-space-2);
+  padding-left: var(--gm-space-5);
+}
+
+.production-printer-form__probe {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+}
+
+.production-printer-form__probe-status {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+}
+
+.production-printer-form__probe-status[data-state="reachable"] {
+  color: var(--gm-success);
+}
+
+.production-printer-form__probe-status[data-state="unreachable"] {
+  color: var(--gm-danger);
+}
+
 .production-printer-form__options,
 .production-printer-form__checks {
   border: 1px solid var(--gm-border);
@@ -757,6 +796,8 @@
   .production-printers__header-actions .gm-button,
   .production-printer-card__actions,
   .production-printer-card__actions .gm-button,
+  .production-printer-form__probe,
+  .production-printer-form__probe .gm-button,
   .production-printer-form__actions,
   .production-printer-form__actions .gm-button {
     width: 100%;

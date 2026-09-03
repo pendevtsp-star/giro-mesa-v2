@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using GiroMesa.EdgeHub.Adapters;
 using GiroMesa.EdgeHub.Storage;
@@ -104,6 +106,33 @@ public sealed class CloudPrinterCommandProcessorTests : IAsyncLifetime
         Assert.Equal(1, first.Result?.GetProperty("revision").GetInt32());
         Assert.Equal("printed", replay.Result?.GetProperty("status").GetString());
         Assert.True(replay.Result!.Value.GetProperty("duplicate").GetBoolean());
+    }
+
+    [Fact]
+    public async Task ProbesAndReportsAReachableNetworkPrinter()
+    {
+        var options = CreateOptions(withStaticPrinter: false);
+        var (store, _, processor) = await CreateProcessorAsync(options, new DisabledPrinterGateway());
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var commandId = Guid.NewGuid().ToString();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            await store.SaveCloudCommandsAsync([Command(
+                commandId,
+                "printer.connection.probe",
+                new { host = "127.0.0.1", port })]);
+
+            Assert.Equal(1, await processor.ProcessPendingAsync());
+            var result = Assert.Single(await store.GetPendingCloudCommandResultsAsync(10));
+            Assert.Equal(commandId, result.GetProperty("commandId").GetString());
+            Assert.Equal("reachable", result.GetProperty("status").GetString());
+        }
+        finally
+        {
+            listener.Stop();
+        }
     }
 
     public Task InitializeAsync() => Task.CompletedTask;

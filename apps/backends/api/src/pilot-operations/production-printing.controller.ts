@@ -4,8 +4,12 @@ import {
   idempotencyKeySchema,
   type ManualKdsTicketPrintInput,
   manualKdsTicketPrintSchema,
+  type ProductionPrinterConnectionProbeInput,
   type ProductionPrinterRevisionInput,
   type ProductionPrintPolicyInput,
+  productionPrinterConnectionProbeInputSchema,
+  productionPrinterConnectionProbeResponseSchema,
+  productionPrinterConnectionProbeStatusSchema,
   productionPrinterListResponseSchema,
   productionPrinterMutationResponseSchema,
   productionPrinterRevisionSchema,
@@ -58,6 +62,43 @@ export class ProductionPrintingController {
     @Param("unitId", ParseUUIDPipe) unitId: string,
   ) {
     return this.productionPrinting.listPrinters(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("production-printers/connection-probes")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  @ApiBody({ schema: toOpenApiSchema(productionPrinterConnectionProbeInputSchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(productionPrinterConnectionProbeResponseSchema) })
+  probePrinterConnection(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") rawIdempotencyKey: string | undefined,
+    @Body(new ZodPipe(productionPrinterConnectionProbeInputSchema))
+    body: ProductionPrinterConnectionProbeInput,
+  ) {
+    return this.productionPrinting.probePrinterConnection(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      this.idempotencyKey(rawIdempotencyKey),
+      body,
+    );
+  }
+
+  @Get("production-printers/connection-probes/:commandId")
+  @ApiOkResponse({ schema: toOpenApiSchema(productionPrinterConnectionProbeStatusSchema) })
+  printerConnectionProbeStatus(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("commandId", ParseUUIDPipe) commandId: string,
+  ) {
+    return this.productionPrinting.printerConnectionProbeStatus(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      commandId,
+    );
   }
 
   @Post("production-printers")

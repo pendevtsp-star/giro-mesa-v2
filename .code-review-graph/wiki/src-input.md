@@ -33,37 +33,6 @@ Directory-based community: packages/contracts
 | it:requires a provider reference and rejects card data on approval@L33 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/smartpos-contracts.test.ts | 33-84 |
 | it:rejects card data in provider reconciliation identifiers@L86 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/smartpos-contracts.test.ts | 86-128 |
 | it:requires an internal certification before integrated capabilities are enabled@L130 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/smartpos-contracts.test.ts | 130-147 |
-| ApiCapability | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 47-47 |
-| ApiHealthResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 48-48 |
-| OperationalPushSubscription | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 76-76 |
-| OperationalPushConfig | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 77-77 |
-| overlappingPeriodIndex | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 156-175 |
-| HoursRule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 264-264 |
-| hoursRuleIntervals | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 266-277 |
-| BusinessHoursPeriod | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 455-455 |
-| BusinessHoursDay | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 456-456 |
-| BusinessHoursException | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 457-457 |
-| BusinessHours | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 458-458 |
-| EstablishmentPresentation | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 459-459 |
-| EstablishmentSettings | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 460-460 |
-| UpdateOrganizationSettingsInput | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 461-461 |
-| UpdateUnitSettingsInput | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 462-462 |
-| CopyUnitSettingsInput | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 463-463 |
-| EstablishmentSettingsHistoryEntry | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 464-466 |
-| RestoreEstablishmentSettingsInput | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 467-467 |
-| EstablishmentSpecializedSettingsSummary | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 468-470 |
-| PrintDocumentPayloadV2 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 472-556 |
-| KdsTicketPrintPayloadV1 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 776-800 |
-| PrintJobExecuteCommandV1 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 802-811 |
-| PrinterConfigurationCommandV1 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 813-830 |
-| PrinterConfigurationArchiveCommandV1 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 832-835 |
-| PrinterTestCommandV1 | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 837-840 |
-| CloudCommandResult | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 842-870 |
-| ProductionDeliveryMode | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 872-872 |
-| ProductionPrintPolicyInput | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 873-873 |
-| ProductionPrinterDocumentType | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts | 874-874 |
-
-*... and 81 more members.*
 
 ## Execution Flows
 
@@ -78,26 +47,20 @@ No execution flows pass through this community.
 - `parse` (13 edge(s))
 - `randomUUID` (12 edge(s))
 - `toISOString` (6 edge(s))
-- `Number` (6 edge(s))
-- `slice` (5 edge(s))
 - `deepEqual` (4 edge(s))
 - `from` (3 edge(s))
 - `getTime` (2 edge(s))
-- `map` (2 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts::BusinessHours` (2 edge(s))
 - `repeat` (1 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts::BusinessHours.map` (1 edge(s))
-- `matchAll` (1 edge(s))
-- `replace` (1 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/index.ts` (115 edge(s))
 - `equal` (74 edge(s))
 - `safeParse` (61 edge(s))
 - `parse` (13 edge(s))
 - `randomUUID` (12 edge(s))
 - `toISOString` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/contracts/src/generated-api.ts` (5 edge(s))
 - `deepEqual` (4 edge(s))
 - `from` (3 edge(s))
 - `getTime` (2 edge(s))

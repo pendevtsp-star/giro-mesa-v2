@@ -46,7 +46,14 @@ builder.Services.AddSingleton<IPrinterGateway>(services =>
     services.GetRequiredService<EscPosPrinterGateway>());
 builder.Services.AddSingleton<PrintJobExecutor>();
 builder.Services.AddSingleton<CloudPrinterCommandProcessor>();
-builder.Services.AddHttpClient<CloudSyncWorker>();
+builder.Services.AddHttpClient(nameof(CloudSyncWorker));
+builder.Services.AddSingleton(services => new CloudSyncWorker(
+    services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(CloudSyncWorker)),
+    services.GetRequiredService<HubStore>(),
+    services.GetRequiredService<FocusCredentialStore>(),
+    services.GetRequiredService<CloudPrinterCommandProcessor>(),
+    services.GetRequiredService<Microsoft.Extensions.Options.IOptions<HubOptions>>(),
+    services.GetRequiredService<ILogger<CloudSyncWorker>>()));
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<CloudSyncWorker>());
 builder.Services.AddSingleton<FiscalRecoveryWorker>();
 builder.Services.AddHostedService(serviceProvider => serviceProvider.GetRequiredService<FiscalRecoveryWorker>());

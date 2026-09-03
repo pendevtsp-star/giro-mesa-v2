@@ -1433,7 +1433,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             SELECT result FROM inbound_cloud_commands
             WHERE processed_at IS NOT NULL AND result IS NOT NULL AND cloud_acknowledged_at IS NULL
               AND type IN ('print_job.execute', 'printer.configuration.upsert',
-                           'printer.configuration.archive', 'printer.test')
+                           'printer.configuration.archive', 'printer.test',
+                           'printer.connection.probe')
             ORDER BY received_at
             LIMIT $limit;
             """;
@@ -1454,7 +1455,8 @@ public sealed class HubStore(IOptions<HubOptions> options, ILogger<HubStore> log
             FROM inbound_cloud_commands
             WHERE processed_at IS NULL AND cloud_acknowledged_at IS NULL
               AND type IN ('print_job.execute', 'printer.configuration.upsert',
-                           'printer.configuration.archive', 'printer.test')
+                           'printer.configuration.archive', 'printer.test',
+                           'printer.connection.probe')
             ORDER BY received_at, id
             LIMIT $limit;
             """;

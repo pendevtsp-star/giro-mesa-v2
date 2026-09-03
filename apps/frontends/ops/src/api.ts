@@ -256,6 +256,18 @@ export interface ProductionPrinterHub {
   online: boolean;
 }
 
+export type ProductionPrinterConnectionProbeState =
+  | "pending"
+  | "reachable"
+  | "unreachable"
+  | "timeout";
+
+export interface ProductionPrinterConnectionProbeStatus {
+  commandId: string;
+  state: ProductionPrinterConnectionProbeState;
+  errorCode: string | null;
+}
+
 export type TerminalProfileMode =
   | "waiter_mobile"
   | "reception"
@@ -4172,6 +4184,30 @@ export const api = {
     productionPrinters: (organizationId: string, unitId: string) =>
       request<{ printers: ProductionPrinter[]; hubs: ProductionPrinterHub[] }>(
         pilotPath(organizationId, unitId, "production-printers"),
+      ),
+    probeProductionPrinterConnection: (
+      organizationId: string,
+      unitId: string,
+      body: { hubId: string; host: string; port: number },
+      idempotencyKey?: string,
+    ) =>
+      idempotentRequest<{ commandId: string; state: "pending"; expiresAt: string }>(
+        pilotPath(organizationId, unitId, "production-printers/connection-probes"),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    productionPrinterConnectionProbeStatus: (
+      organizationId: string,
+      unitId: string,
+      commandId: string,
+    ) =>
+      request<ProductionPrinterConnectionProbeStatus>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `production-printers/connection-probes/${encodeURIComponent(commandId)}`,
+        ),
       ),
     createProductionPrinter: (
       organizationId: string,

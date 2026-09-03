@@ -32,6 +32,7 @@ import {
   createProductionPrinterDraft,
   type ProductionPrinterDraft,
   ProductionPrinterForm,
+  type ProductionPrinterProbeState,
   productionPrinterInput,
 } from "./ProductionPrinterForm";
 import { ProductionRoutingSetup } from "./ProductionRoutingSetup";
@@ -136,6 +137,10 @@ export function ProductionPrintersPanel({
   const [policyDrafts, setPolicyDrafts] = useState<Record<string, ProductionPrintingPolicy>>({});
   const [printerDraft, setPrinterDraft] = useState<ProductionPrinterDraft | null>(null);
   const [printerMutationKey, setPrinterMutationKey] = useState("");
+  const [printerProbe, setPrinterProbe] = useState<{
+    state: ProductionPrinterProbeState;
+    message: string | null;
+  }>({ state: "idle", message: null });
   const [reprintJob, setReprintJob] = useState<ProductionPrintJob | null>(null);
   const [reprintReason, setReprintReason] = useState("");
   const [reprintKey, setReprintKey] = useState("");
@@ -159,48 +164,54 @@ export function ProductionPrintersPanel({
   const [pilotComment, setPilotComment] = useState("");
   const [pilotFeedbackSent, setPilotFeedbackSent] = useState(false);
   const inFlightRef = useRef(new Set<string>());
+  const printerProbeRequestRef = useRef(0);
 
-  const loadCloud = useCallback(async () => {
-    if (!canManage) {
-      setCloud({ status: "restricted" });
-      return;
-    }
-    setCloud({ status: "loading" });
-    try {
-      const [printerResponse, stationResponse, jobs] = await Promise.all([
-        api.pilot.productionPrinters(organizationId, unitId),
-        api.pilot.productionPrintingStations(organizationId, unitId),
-        api.pilot.productionPrintJobs(organizationId, unitId, { limit: 40 }),
-      ]);
-      setCloud({
-        status: "ready",
-        printers: printerResponse.printers,
-        stations: stationResponse.stations,
-        jobs,
-        hubs: printerResponse.hubs,
-      });
-      setPolicyDrafts(
-        Object.fromEntries(
-          stationResponse.stations.map((station) => [
-            station.id,
-            {
-              deliveryMode: station.deliveryMode,
-              copies: station.copies,
-              printerId: station.printerId,
-            },
-          ]),
-        ),
-      );
-    } catch (error) {
-      setCloud({
-        status: "error",
-        message: errorMessage(
-          error,
-          "Não foi possível carregar as impressoras de produção desta unidade.",
-        ),
-      });
-    }
-  }, [canManage, organizationId, unitId]);
+  const loadCloud = useCallback(
+    async (silent = false) => {
+      if (!canManage) {
+        setCloud({ status: "restricted" });
+        return;
+      }
+      if (!silent) setCloud({ status: "loading" });
+      try {
+        const [printerResponse, stationResponse, jobs] = await Promise.all([
+          api.pilot.productionPrinters(organizationId, unitId),
+          api.pilot.productionPrintingStations(organizationId, unitId),
+          api.pilot.productionPrintJobs(organizationId, unitId, { limit: 40 }),
+        ]);
+        setCloud({
+          status: "ready",
+          printers: printerResponse.printers,
+          stations: stationResponse.stations,
+          jobs,
+          hubs: printerResponse.hubs,
+        });
+        setPolicyDrafts(
+          Object.fromEntries(
+            stationResponse.stations.map((station) => [
+              station.id,
+              {
+                deliveryMode: station.deliveryMode,
+                copies: station.copies,
+                printerId: station.printerId,
+              },
+            ]),
+          ),
+        );
+      } catch (error) {
+        if (!silent) {
+          setCloud({
+            status: "error",
+            message: errorMessage(
+              error,
+              "Não foi possível carregar as impressoras de produção desta unidade.",
+            ),
+          });
+        }
+      }
+    },
+    [canManage, organizationId, unitId],
+  );
 
   const loadEdge = useCallback(async () => {
     if (!runtime.embedded) {
@@ -245,11 +256,10 @@ export function ProductionPrintersPanel({
     if (
       !pairing ||
       Date.parse(pairing.expiresAt) <= Date.now() ||
-      cloud.status !== "ready" ||
-      cloud.hubs.length > 0
+      (cloud.status === "ready" && cloud.hubs.some((hub) => hub.online))
     )
       return;
-    const refresh = window.setInterval(() => void loadCloud(), 5_000);
+    const refresh = window.setInterval(() => void loadCloud(true), 5_000);
     return () => window.clearInterval(refresh);
   }, [cloud, loadCloud, pairing]);
 
@@ -380,6 +390,100 @@ export function ProductionPrintersPanel({
     setBusyAction((current) => (current === key ? null : current));
   };
 
+  function openPrinterForm(printer?: ProductionPrinter) {
+    printerProbeRequestRef.current += 1;
+    setPrinterProbe({ state: "idle", message: null });
+    setPrinterDraft(
+      createProductionPrinterDraft(
+        printer,
+        cloud.status === "ready" ? cloud.hubs : [],
+        cloud.status === "ready" ? cloud.printers : [],
+      ),
+    );
+    setPrinterMutationKey(crypto.randomUUID());
+  }
+
+  function changePrinterDraft(nextDraft: ProductionPrinterDraft) {
+    if (
+      !printerDraft ||
+      nextDraft.hubId !== printerDraft.hubId ||
+      nextDraft.host !== printerDraft.host ||
+      nextDraft.port !== printerDraft.port
+    ) {
+      printerProbeRequestRef.current += 1;
+      setPrinterProbe({ state: "idle", message: null });
+    }
+    setPrinterDraft(nextDraft);
+  }
+
+  function closePrinterForm() {
+    printerProbeRequestRef.current += 1;
+    setPrinterProbe({ state: "idle", message: null });
+    setPrinterDraft(null);
+  }
+
+  async function probePrinterConnection() {
+    if (!printerDraft || !canManage) return;
+    const actionKey = "printer-connection-probe";
+    if (!beginAction(actionKey)) return;
+    const requestToken = ++printerProbeRequestRef.current;
+    setPrinterProbe({ state: "checking", message: "O computador está verificando a impressora…" });
+    try {
+      const probe = await api.pilot.probeProductionPrinterConnection(
+        organizationId,
+        unitId,
+        {
+          hubId: printerDraft.hubId,
+          host: printerDraft.host.trim(),
+          port: Math.trunc(printerDraft.port),
+        },
+        `production-printer/probe/${crypto.randomUUID()}`,
+      );
+      const deadline = Date.parse(probe.expiresAt);
+      while (Date.now() < deadline) {
+        if (requestToken !== printerProbeRequestRef.current) return;
+        const status = await api.pilot.productionPrinterConnectionProbeStatus(
+          organizationId,
+          unitId,
+          probe.commandId,
+        );
+        if (status.state === "reachable") {
+          setPrinterProbe({
+            state: "reachable",
+            message: "Conexão confirmada. A impressora está acessível por este computador.",
+          });
+          return;
+        }
+        if (status.state === "unreachable" || status.state === "timeout") {
+          setPrinterProbe({
+            state: "unreachable",
+            message:
+              status.state === "timeout"
+                ? "A verificação expirou. Confirme se o computador continua online e tente novamente."
+                : "A impressora não respondeu. Confira o IP, a porta e se ela está na mesma rede.",
+          });
+          return;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+      }
+      if (requestToken !== printerProbeRequestRef.current) return;
+      setPrinterProbe({
+        state: "unreachable",
+        message:
+          "A verificação expirou. Confirme se o computador continua online e tente novamente.",
+      });
+    } catch (error) {
+      if (requestToken === printerProbeRequestRef.current) {
+        setPrinterProbe({
+          state: "unreachable",
+          message: errorMessage(error, "Não foi possível verificar a conexão com a impressora."),
+        });
+      }
+    } finally {
+      finishAction(actionKey);
+    }
+  }
+
   async function savePrinter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!printerDraft || !canManage) return;
@@ -404,8 +508,8 @@ export function ProductionPrintersPanel({
           ? "Alteração salva e enviada ao computador da unidade."
           : "Impressora cadastrada e enviada ao computador da unidade.",
       });
-      setPrinterDraft(null);
-      await loadCloud();
+      closePrinterForm();
+      await loadCloud(true);
     } catch (error) {
       setToast({
         tone: "danger",
@@ -825,15 +929,7 @@ export function ProductionPrintersPanel({
                   <p>Use um nome fácil, como “Cozinha quente” ou “Bar”.</p>
                 </div>
                 {canManage && (
-                  <Button
-                    onClick={() => {
-                      setPrinterDraft(
-                        createProductionPrinterDraft(undefined, cloud.hubs, cloud.printers),
-                      );
-                      setPrinterMutationKey(crypto.randomUUID());
-                    }}
-                    size="sm"
-                  >
+                  <Button onClick={() => openPrinterForm()} size="sm">
                     Adicionar impressora
                   </Button>
                 )}
@@ -908,12 +1004,7 @@ export function ProductionPrintersPanel({
                           <>
                             <Button
                               disabled={busyAction !== null}
-                              onClick={() => {
-                                setPrinterDraft(
-                                  createProductionPrinterDraft(printer, cloud.hubs, cloud.printers),
-                                );
-                                setPrinterMutationKey(crypto.randomUUID());
-                              }}
+                              onClick={() => openPrinterForm(printer)}
                               size="sm"
                               variant="ghost"
                             >
@@ -1200,10 +1291,13 @@ export function ProductionPrintersPanel({
         busy={busyAction?.startsWith("printer:") === true}
         draft={printerDraft}
         hubs={cloud.status === "ready" ? cloud.hubs : []}
-        onChange={setPrinterDraft}
-        onClose={() => setPrinterDraft(null)}
+        onChange={changePrinterDraft}
+        onClose={closePrinterForm}
+        onProbe={() => void probePrinterConnection()}
         onSubmit={savePrinter}
         printers={cloud.status === "ready" ? cloud.printers : []}
+        probeMessage={printerProbe.message}
+        probeState={printerProbe.state}
       />
 
       <Modal

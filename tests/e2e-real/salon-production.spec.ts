@@ -1884,6 +1884,24 @@ test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", 
       },
     }),
   );
+  await page.route("**/pilot/production-printers/connection-probes**", (route) => {
+    if (route.request().method() === "POST") {
+      return route.fulfill({
+        json: {
+          commandId: "00000000-0000-4000-8000-000000000555",
+          state: "pending",
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        commandId: "00000000-0000-4000-8000-000000000555",
+        state: "reachable",
+        errorCode: null,
+      },
+    });
+  });
   await page.route("**/edge-hub-pairings", async (route) => {
     edgePairingBody = route.request().postDataJSON();
     edgeHubConnected = true;
@@ -1932,6 +1950,17 @@ test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", 
   await expect(
     page.getByRole("heading", { name: "Adicione e teste as impressoras" }),
   ).toBeVisible();
+  await page
+    .locator('section[aria-labelledby="production-printer-list-title"]')
+    .getByRole("button", { name: "Adicionar impressora", exact: true })
+    .click();
+  await page.getByLabel("Nome", { exact: true }).fill("Cozinha");
+  await page.getByLabel("Endereço da impressora na rede").fill("192.168.1.50");
+  await expect(page.getByRole("button", { name: "Salvar impressora" })).toBeDisabled();
+  await page.getByRole("button", { name: "Verificar conexão" }).click();
+  await expect(page.getByText("Conexão confirmada.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Salvar impressora" })).toBeEnabled();
+  await page.getByRole("button", { name: "Cancelar" }).click();
   await expect(page.getByText("Comanda 18 sem resultado")).toBeVisible();
   await expect(page.getByText("Bloqueio preventivo do suporte")).toBeVisible();
   await expect(page.getByRole("button", { name: /kill switch/i })).toHaveCount(0);

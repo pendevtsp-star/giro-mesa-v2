@@ -63,7 +63,7 @@ Directory-based community: apps/frontends
 | PublicActions | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/PublicActions.tsx | 11-162 |
 | TableConsumptionPanel | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/PublicActions.tsx | 164-234 |
 
-*... and 2944 more members.*
+*... and 2761 more members.*
 
 ## Execution Flows
 
@@ -76,25 +76,24 @@ Directory-based community: apps/frontends
 
 ### Outgoing
 
-- `useState` (1359 edge(s))
-- `map` (1234 edge(s))
-- `Button` (1032 edge(s))
+- `useState` (1274 edge(s))
+- `map` (1153 edge(s))
+- `Button` (934 edge(s))
 - `expect` (845 edge(s))
-- `trim` (593 edge(s))
-- `Input` (567 edge(s))
-- `filter` (531 edge(s))
-- `setBusy` (408 edge(s))
-- `Label` (396 edge(s))
+- `trim` (556 edge(s))
+- `Input` (548 edge(s))
+- `filter` (451 edge(s))
+- `Label` (362 edge(s))
+- `setBusy` (360 edge(s))
 - `setFeedback` (342 edge(s))
-- `find` (328 edge(s))
-- `includes` (325 edge(s))
 - `toBe` (309 edge(s))
-- `Card` (306 edge(s))
-- `Badge` (284 edge(s))
+- `Card` (286 edge(s))
+- `includes` (274 edge(s))
+- `Badge` (260 edge(s))
+- `find` (249 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/api.ts` (978 edge(s))
 - `expect` (845 edge(s))
 - `toBe` (309 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/management.shared.tsx` (221 edge(s))
@@ -104,8 +103,9 @@ Directory-based community: apps/frontends
 - `equal` (100 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/operations.shared.tsx` (99 edge(s))
 - `toMatchObject` (97 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/salon/SalonPage.tsx` (80 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/people/PeoplePage.tsx` (66 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/fiscal/FiscalPages.tsx` (64 edge(s))
 - `objectContaining` (63 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/kds/KdsPage.tsx` (62 edge(s))
+- `stringify` (61 edge(s))
+- `fn` (60 edge(s))

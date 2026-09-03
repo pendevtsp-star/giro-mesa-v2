@@ -7748,6 +7748,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/connection-probes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_probePrinterConnection[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/connection-probes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ProductionPrintingController_probePrinterConnection[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/connection-probes/{commandId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_printerConnectionProbeStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/connection-probes/{commandId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_printerConnectionProbeStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/{printerId}": {
     parameters: {
       query?: never;
@@ -41599,6 +41663,146 @@ export interface operations {
       };
     };
   };
+  "ProductionPrintingController_probePrinterConnection[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          host: string;
+          port: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** @enum {string} */
+            state: "pending";
+            /** Format: date-time */
+            expiresAt: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_probePrinterConnection[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          hubId: string;
+          host: string;
+          port: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** @enum {string} */
+            state: "pending";
+            /** Format: date-time */
+            expiresAt: string;
+            idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_printerConnectionProbeStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        commandId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** @enum {string} */
+            state: "pending" | "reachable" | "unreachable" | "timeout";
+            errorCode: string | null;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_printerConnectionProbeStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        commandId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** Format: uuid */
+            commandId: string;
+            /** @enum {string} */
+            state: "pending" | "reachable" | "unreachable" | "timeout";
+            errorCode: string | null;
+          };
+        };
+      };
+    };
+  };
   "ProductionPrintingController_updatePrinter[0]": {
     parameters: {
       query?: never;
@@ -61795,6 +61999,15 @@ export interface operations {
                 errorCode?: string | null;
                 duplicate?: boolean;
               }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.connection.probe";
+                /** @enum {string} */
+                status: "reachable" | "unreachable";
+                errorCode?: string | null;
+              }
           )[];
           /** @default [] */
           events?: {
@@ -61882,6 +62095,15 @@ export interface operations {
                 status: "printed" | "failed" | "confirmation_required";
                 errorCode?: string | null;
                 duplicate?: boolean;
+              }
+            | {
+                /** Format: uuid */
+                commandId: string;
+                /** @enum {string} */
+                type: "printer.connection.probe";
+                /** @enum {string} */
+                status: "reachable" | "unreachable";
+                errorCode?: string | null;
               }
           )[];
           /** @default [] */

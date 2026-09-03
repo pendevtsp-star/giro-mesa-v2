@@ -144,6 +144,15 @@ describe("edge sync boundaries", () => {
       }).success,
       true,
     );
+    assert.equal(
+      cloudCommandResultSchema.safeParse({
+        commandId,
+        type: "printer.connection.probe",
+        status: "reachable",
+        errorCode: null,
+      }).success,
+      true,
+    );
   });
 
   it("accepts only the dedicated authorization scheme", () => {

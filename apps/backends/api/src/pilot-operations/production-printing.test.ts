@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   createProductionPrinterSchema,
+  productionPrinterConnectionProbeInputSchema,
   productionPrintPolicyInputSchema,
 } from "@giromesa/contracts";
 import { isPrivatePrinterAddress } from "./production-printing.service.js";
@@ -49,6 +50,25 @@ describe("production printing contracts", () => {
     assert.equal(
       createProductionPrinterSchema.safeParse({ ...printer, stationIds: [crypto.randomUUID()] })
         .success,
+      false,
+    );
+  });
+
+  it("requires a bounded connection probe target", () => {
+    assert.equal(
+      productionPrinterConnectionProbeInputSchema.safeParse({
+        hubId: printer.hubId,
+        host: printer.host,
+        port: printer.port,
+      }).success,
+      true,
+    );
+    assert.equal(
+      productionPrinterConnectionProbeInputSchema.safeParse({
+        hubId: printer.hubId,
+        host: printer.host,
+        port: 0,
+      }).success,
       false,
     );
   });

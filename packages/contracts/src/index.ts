@@ -712,6 +712,28 @@ export const productionPrinterTestResponseSchema = z
     idempotentReplay: z.boolean().optional(),
   })
   .strict();
+export const productionPrinterConnectionProbeInputSchema = z
+  .object({
+    hubId: z.uuid(),
+    host: z.string().trim().min(2).max(45),
+    port: z.number().int().min(1).max(65_535),
+  })
+  .strict();
+export const productionPrinterConnectionProbeResponseSchema = z
+  .object({
+    commandId: z.uuid(),
+    state: z.literal("pending"),
+    expiresAt: z.iso.datetime({ offset: true }),
+    idempotentReplay: z.boolean().optional(),
+  })
+  .strict();
+export const productionPrinterConnectionProbeStatusSchema = z
+  .object({
+    commandId: z.uuid(),
+    state: z.enum(["pending", "reachable", "unreachable", "timeout"]),
+    errorCode: z.string().max(120).nullable(),
+  })
+  .strict();
 export const productionStationListResponseSchema = z
   .object({ stations: z.array(productionStationDeliverySchema) })
   .strict();
@@ -839,6 +861,11 @@ export interface PrinterTestCommandV1 {
   idempotencyKey?: string;
 }
 
+export interface PrinterConnectionProbeCommandV1 {
+  host: string;
+  port: number;
+}
+
 export type CloudCommandResult =
   | {
       commandId: string;
@@ -867,6 +894,12 @@ export type CloudCommandResult =
       status: "printed" | "failed" | "confirmation_required";
       errorCode?: string | null;
       duplicate?: boolean;
+    }
+  | {
+      commandId: string;
+      type: "printer.connection.probe";
+      status: "reachable" | "unreachable";
+      errorCode?: string | null;
     };
 
 export type ProductionDeliveryMode = z.infer<typeof productionDeliveryModeSchema>;
@@ -875,6 +908,9 @@ export type ProductionPrinterDocumentType = z.infer<typeof productionPrinterDocu
 export type CreateProductionPrinterInput = z.infer<typeof createProductionPrinterSchema>;
 export type UpdateProductionPrinterInput = z.infer<typeof updateProductionPrinterSchema>;
 export type ProductionPrinterRevisionInput = z.infer<typeof productionPrinterRevisionSchema>;
+export type ProductionPrinterConnectionProbeInput = z.infer<
+  typeof productionPrinterConnectionProbeInputSchema
+>;
 export type ProductionPrinter = z.infer<typeof productionPrinterSchema>;
 export type ProductionStationDelivery = z.infer<typeof productionStationDeliverySchema>;
 export type ManualKdsTicketPrintInput = z.infer<typeof manualKdsTicketPrintSchema>;

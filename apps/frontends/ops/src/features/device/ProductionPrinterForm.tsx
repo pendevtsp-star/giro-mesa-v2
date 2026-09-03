@@ -8,6 +8,8 @@ export type ProductionPrinterDraft = ProductionPrinterInput & {
   revision: number | null;
 };
 
+export type ProductionPrinterProbeState = "idle" | "checking" | "reachable" | "unreachable";
+
 const documentTypes = [
   { value: "kds_ticket", label: "Ticket de produção" },
   { value: "partial_statement", label: "Conta parcial" },
@@ -104,23 +106,30 @@ export function ProductionPrinterForm({
   hubs,
   onChange,
   onClose,
+  onProbe,
   onSubmit,
   printers,
+  probeMessage,
+  probeState,
 }: {
   busy: boolean;
   draft: ProductionPrinterDraft | null;
   hubs: ProductionPrinterHub[];
   onChange: (draft: ProductionPrinterDraft) => void;
   onClose: () => void;
+  onProbe: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   printers: ProductionPrinter[];
+  probeMessage: string | null;
+  probeState: ProductionPrinterProbeState;
 }) {
   const defaultLocked = draft ? productionPrinterDefaultIsLocked(draft, printers) : false;
+  const selectedHubOnline = Boolean(draft && hubs.find((hub) => hub.id === draft.hubId)?.online);
   return (
     <Modal
       isOpen={draft !== null}
       onClose={() => {
-        if (!busy) onClose();
+        if (!busy && probeState !== "checking") onClose();
       }}
       size="lg"
       title={draft?.id ? "Editar impressora" : "Adicionar impressora"}
@@ -193,6 +202,20 @@ export function ProductionPrinterForm({
               <small>
                 Exemplo: 192.168.1.50. Você encontra esse número nas configurações da impressora.
               </small>
+              <details className="production-printer-address-help">
+                <summary>Como encontrar este endereço?</summary>
+                <ol>
+                  <li>Imprima a página de rede ou autoteste indicada no manual da impressora.</li>
+                  <li>
+                    Procure “IP address” no visor, no roteador ou no utilitário do fabricante.
+                  </li>
+                  <li>Reserve esse IP no roteador para ele não mudar durante o atendimento.</li>
+                </ol>
+                <small>
+                  A impressora e o computador precisam estar na mesma rede. USB ainda não é
+                  compatível.
+                </small>
+              </details>
             </FormField>
             <FormField htmlFor="production-printer-width" label="Bobina" required>
               <NativeSelect
@@ -206,6 +229,35 @@ export function ProductionPrinterForm({
                 <option value={80}>80 mm</option>
               </NativeSelect>
             </FormField>
+          </div>
+
+          <div className="production-printer-form__probe">
+            <Button
+              disabled={
+                busy ||
+                probeState === "checking" ||
+                !selectedHubOnline ||
+                draft.host.trim().length < 3 ||
+                !Number.isInteger(draft.port) ||
+                draft.port < 1 ||
+                draft.port > 65_535
+              }
+              onClick={onProbe}
+              type="button"
+              variant="secondary"
+            >
+              {probeState === "checking" ? "Verificando…" : "Verificar conexão"}
+            </Button>
+            <span
+              className="production-printer-form__probe-status"
+              data-state={probeState}
+              role={probeState === "unreachable" ? "alert" : "status"}
+            >
+              {probeMessage ??
+                (!selectedHubOnline
+                  ? "O computador precisa estar online para verificar a impressora."
+                  : "Verifique o endereço antes de salvar.")}
+            </span>
           </div>
 
           <details className="gm-disclosure production-printer-form__advanced">
@@ -343,7 +395,8 @@ export function ProductionPrinterForm({
                 !draft.hubId ||
                 draft.label.trim().length < 2 ||
                 draft.host.trim().length < 3 ||
-                draft.documentTypes.length === 0
+                draft.documentTypes.length === 0 ||
+                probeState !== "reachable"
               }
               type="submit"
             >
