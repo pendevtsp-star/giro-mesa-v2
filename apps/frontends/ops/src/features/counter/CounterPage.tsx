@@ -282,7 +282,6 @@ export function RealCounterPage({
             >
               <section className="ops-board">
                 <Card>
-                  <p className="eyebrow">Balcão e retirada</p>
                   <h2>Nova comanda rápida</h2>
                   <form
                     className="inline-form counter-open-form"

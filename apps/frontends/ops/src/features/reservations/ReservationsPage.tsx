@@ -698,7 +698,6 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         <Card className="reservations-card">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Agenda</p>
               <h2>Reservas</h2>
             </div>
           </div>
@@ -881,7 +880,6 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         <Card className="reservations-card">
           <div className="section-title">
             <div>
-              <p className="eyebrow">Recepção</p>
               <h2>Lista de espera</h2>
             </div>
           </div>

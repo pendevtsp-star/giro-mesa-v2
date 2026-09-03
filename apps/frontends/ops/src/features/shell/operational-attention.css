@@ -52,14 +52,14 @@
   justify-content: space-between;
   gap: var(--gm-space-3);
   padding: var(--gm-space-3);
-  border: 1px solid var(--gm-border);
-  border-inline-start: 3px solid var(--gm-warning);
+  border: 1px solid color-mix(in srgb, var(--gm-warning) 30%, var(--gm-border));
   border-radius: var(--gm-radius-md, 8px);
   background: var(--gm-surface);
 }
 
 .operational-attention-list article[data-priority="critical"] {
-  border-inline-start-color: var(--gm-danger);
+  border-color: color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-danger-soft) 30%, var(--gm-surface));
 }
 
 .operational-attention-list article > div:first-child {

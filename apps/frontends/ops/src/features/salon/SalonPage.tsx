@@ -466,6 +466,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   }, [canReorganizeTurn]);
   const [priorityQueueOpen, setPriorityQueueOpen] = useState(true);
   const [guests, setGuests] = useState(2);
+  const [openingCustomerName, setOpeningCustomerName] = useState("");
   const [busy, setBusy] = useState(false);
   const [undoAction, setUndoAction] = useState<{
     message: string;
@@ -1450,7 +1451,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setBusy(true);
           setFeedback("");
           try {
-            const body = { tableId: targetTable.id, guestCount: usesQuickFlow ? 1 : guests };
+            const body = {
+              tableId: targetTable.id,
+              guestCount: usesQuickFlow ? 1 : guests,
+              ...(openingCustomerName.trim() ? { customerName: openingCustomerName.trim() } : {}),
+            };
             await scope.dispatch(
               "pos.tab.open_requested",
               pilotMutation("open-tab", { body }),
@@ -1463,6 +1468,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   ? "Comanda aberta em um toque. O pedido já está disponível."
                   : "Atendimento aberto. O cardápio já está disponível.",
             );
+            setOpeningCustomerName("");
             setSelectedTableId(targetTable.id);
             await floor.refresh();
           } catch (error) {
@@ -4552,11 +4558,46 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 )}
 
                 {filteredTables.length === 0 ? (
-                  <EmptyState
-                    icon={<Icon name="salon" size={28} />}
-                    title="Nenhuma mesa encontrada"
-                    description="Ajuste a busca ou os filtros para voltar ao painel."
-                  />
+                  data.tables.length === 0 ? (
+                    <EmptyState
+                      action={
+                        canEditSpace ? (
+                          <Button
+                            onClick={() => setWorkspaceMode("template")}
+                            size="sm"
+                            type="button"
+                            variant="primary"
+                          >
+                            Cadastrar mesas
+                          </Button>
+                        ) : undefined
+                      }
+                      description="Configure os ambientes e cadastre as mesas para iniciar a operação."
+                      icon={<Icon name="salon" size={28} />}
+                      title="Nenhuma mesa cadastrada nesta unidade"
+                    />
+                  ) : (
+                    <EmptyState
+                      action={
+                        <Button
+                          onClick={() => {
+                            setFilterStatus("all");
+                            setRoomFilter("all");
+                            setSectionFilter("all");
+                            setQuery("");
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="secondary"
+                        >
+                          Limpar filtros
+                        </Button>
+                      }
+                      description="Ajuste a busca ou os filtros para voltar ao painel."
+                      icon={<Icon name="salon" size={28} />}
+                      title="Nenhuma mesa encontrada"
+                    />
+                  )
                 ) : workspaceMode !== "operate" ? (
                   <FloorPlan
                     canEdit={
@@ -4912,9 +4953,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               {serviceCall &&
                                 callKindLabel[serviceCall.kind] !== presentation.label && (
                                   <span className="real-table__call-badge">
+                                    <Icon name="alerts" size={10} />
                                     {callKindLabel[serviceCall.kind]}
                                   </span>
                                 )}
+                              {servicePhase?.phase === "ready" && (
+                                <span className="real-table__ready-badge">
+                                  <Icon name="kds" size={10} />
+                                  Pronto
+                                </span>
+                              )}
                             </div>
                             <div className="real-table__value">
                               {groupTabs.length && canSeeTableFinancials(item) ? (
@@ -4984,138 +5032,146 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               <div className="table-drawer salon-workspace salon-workspace--modal">
                 {table && (
                   <>
-                    <section className="salon-next-action" aria-label="Próxima ação da mesa">
-                      <span>
-                        <small>Próxima ação</small>
-                        <strong>{selectedNextAction}</strong>
-                      </span>
-                      <small>
-                        {selectedPhase
-                          ? `${servicePhasePresentation[selectedPhase.phase]} · ${elapsedLabel(selectedPhase.since)}`
-                          : selectedCall
-                            ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
-                            : "O sistema destaca somente a etapa operacional atual."}
-                      </small>
-                      {selectedCanOperate &&
-                        ["owner", "manager", "waiter"].includes(scope.profileId) &&
-                        selectedReadyOrderIds.length > 0 && (
-                          <Button
-                            aria-busy={busy}
-                            disabled={busy}
-                            onClick={() => void serveReadyOrders(selectedReadyOrderIds)}
-                            size="sm"
-                          >
-                            {busy ? "Confirmando…" : "Marcar como servido"}
-                          </Button>
-                        )}
-                    </section>
-                    <div className="table-operation-strip">
-                      <div>
+                    {Boolean(
+                      tab &&
+                        (selectedCall || (selectedCanOperate && selectedReadyOrderIds.length > 0)),
+                    ) && (
+                      <section className="salon-next-action" aria-label="Próxima ação da mesa">
                         <span>
-                          <small>Ambiente físico</small>
-                          <strong>
-                            {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
-                              "Sem ambiente"}
-                          </strong>
+                          <small>Ação necessária</small>
+                          <strong>{selectedNextAction}</strong>
                         </span>
-                        <span>
-                          <small>Praça do turno</small>
-                          <strong>{selectedAssignment?.section.name ?? "Sem praça"}</strong>
-                        </span>
-                        <span>
-                          <small>Responsável</small>
-                          <strong>
-                            {selectedGroupResponsible?.displayName ??
-                              selectedAssignment?.primary?.displayName ??
-                              "Equipe"}
-                          </strong>
-                        </span>
-                        {selectedCall && (
-                          <span className="table-operation-strip__call">
-                            <small>{callKindLabel[selectedCall.kind]}</small>
+                        <small>
+                          {selectedPhase
+                            ? `${servicePhasePresentation[selectedPhase.phase]} · ${elapsedLabel(selectedPhase.since)}`
+                            : selectedCall
+                              ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
+                              : ""}
+                        </small>
+                        {selectedCanOperate &&
+                          ["owner", "manager", "waiter"].includes(scope.profileId) &&
+                          selectedReadyOrderIds.length > 0 && (
+                            <Button
+                              aria-busy={busy}
+                              disabled={busy}
+                              onClick={() => void serveReadyOrders(selectedReadyOrderIds)}
+                              size="sm"
+                            >
+                              {busy ? "Confirmando…" : "Marcar como servido"}
+                            </Button>
+                          )}
+                      </section>
+                    )}
+                    {Boolean(tab) && (
+                      <div className="table-operation-strip">
+                        <div>
+                          <span>
+                            <small>Ambiente físico</small>
                             <strong>
-                              {selectedCall.status === "acknowledged" && selectedCall.acknowledgedAt
-                                ? "Assumido por " +
-                                  callOwner(selectedCall.acknowledgedByIdentityId) +
-                                  " " +
-                                  elapsedLabel(selectedCall.acknowledgedAt)
-                                : `Aguardando ${elapsedLabel(selectedCall.createdAt)}`}
+                              {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
+                                "Sem ambiente"}
                             </strong>
                           </span>
-                        )}
-                      </div>
-                      {selectedCanOperate && (
-                        <nav aria-label="Ações rápidas da mesa">
+                          <span>
+                            <small>Praça do turno</small>
+                            <strong>{selectedAssignment?.section.name ?? "Sem praça"}</strong>
+                          </span>
+                          <span>
+                            <small>Responsável</small>
+                            <strong>
+                              {selectedGroupResponsible?.displayName ??
+                                selectedAssignment?.primary?.displayName ??
+                                "Equipe"}
+                            </strong>
+                          </span>
                           {selectedCall && (
-                            <Button
-                              disabled={busy}
-                              onClick={() =>
-                                void transitionCall(
-                                  selectedCall.id,
-                                  selectedCall.status === "open" ? "acknowledged" : "resolved",
-                                )
-                              }
-                              size="sm"
-                              variant={selectedCall.status === "open" ? "secondary" : "ghost"}
-                            >
-                              {selectedCall.status === "open"
-                                ? "Assumir chamado"
-                                : "Resolver chamado"}
-                            </Button>
+                            <span className="table-operation-strip__call">
+                              <small>{callKindLabel[selectedCall.kind]}</small>
+                              <strong>
+                                {selectedCall.status === "acknowledged" &&
+                                selectedCall.acknowledgedAt
+                                  ? "Assumido por " +
+                                    callOwner(selectedCall.acknowledgedByIdentityId) +
+                                    " " +
+                                    elapsedLabel(selectedCall.acknowledgedAt)
+                                  : `Aguardando ${elapsedLabel(selectedCall.createdAt)}`}
+                              </strong>
+                            </span>
                           )}
+                        </div>
+                        {selectedCanOperate && (
+                          <nav aria-label="Ações rápidas da mesa">
+                            {selectedCall && (
+                              <Button
+                                disabled={busy}
+                                onClick={() =>
+                                  void transitionCall(
+                                    selectedCall.id,
+                                    selectedCall.status === "open" ? "acknowledged" : "resolved",
+                                  )
+                                }
+                                size="sm"
+                                variant={selectedCall.status === "open" ? "secondary" : "ghost"}
+                              >
+                                {selectedCall.status === "open"
+                                  ? "Assumir chamado"
+                                  : "Resolver chamado"}
+                              </Button>
+                            )}
 
-                          {tab && (
-                            <Button
-                              onClick={() => setMoveTableOpen(true)}
-                              size="sm"
-                              variant="ghost"
-                            >
-                              <Icon name="salon" size={14} />
-                              <span>Mudar Mesa</span>
-                            </Button>
-                          )}
-                          {canReorganizeTurn && (
-                            <details className="table-more-actions" data-salon-floating-menu>
-                              <summary>Mais ações</summary>
-                              <div>
-                                {data.activeShift && (
+                            {tab && (
+                              <Button
+                                onClick={() => setMoveTableOpen(true)}
+                                size="sm"
+                                variant="ghost"
+                              >
+                                <Icon name="salon" size={14} />
+                                <span>Mudar Mesa</span>
+                              </Button>
+                            )}
+                            {canReorganizeTurn && (
+                              <details className="table-more-actions" data-salon-floating-menu>
+                                <summary>Mais ações</summary>
+                                <div>
+                                  {data.activeShift && (
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedTableId(null);
+                                        setWorkspaceMode("shift");
+                                        setFloorFocusId(table.id);
+                                        setFloorEditRequestKey((current) => current + 1);
+                                      }}
+                                      size="sm"
+                                      variant="ghost"
+                                    >
+                                      Mover neste turno
+                                    </Button>
+                                  )}
+                                  {data.activeShift && selectedBaseSection && !selectedTransfer && (
+                                    <Button onClick={openTransferDialog} size="sm" variant="ghost">
+                                      Ajustar praça
+                                    </Button>
+                                  )}
                                   <Button
                                     onClick={() => {
                                       setSelectedTableId(null);
-                                      setWorkspaceMode("shift");
-                                      setFloorFocusId(table.id);
-                                      setFloorEditRequestKey((current) => current + 1);
+                                      setView("map");
+                                      setWorkspaceMode("operate");
+                                      setJoinMode(true);
+                                      setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
                                     }}
                                     size="sm"
                                     variant="ghost"
                                   >
-                                    Mover neste turno
+                                    Organizar com outra mesa
                                   </Button>
-                                )}
-                                {data.activeShift && selectedBaseSection && !selectedTransfer && (
-                                  <Button onClick={openTransferDialog} size="sm" variant="ghost">
-                                    Ajustar praça
-                                  </Button>
-                                )}
-                                <Button
-                                  onClick={() => {
-                                    setSelectedTableId(null);
-                                    setView("map");
-                                    setWorkspaceMode("operate");
-                                    setJoinMode(true);
-                                    setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
-                                  }}
-                                  size="sm"
-                                  variant="ghost"
-                                >
-                                  Organizar com outra mesa
-                                </Button>
-                              </div>
-                            </details>
-                          )}
-                        </nav>
-                      )}
-                    </div>
+                                </div>
+                              </details>
+                            )}
+                          </nav>
+                        )}
+                      </div>
+                    )}
                     {selectedCanOperate &&
                       scope.profileId === "waiter" &&
                       selectedAssignment &&
@@ -5289,7 +5345,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     {!selectedCanOperate ? (
                       <Card className="table-start table-start--protected">
                         <div>
-                          <p className="eyebrow">Panorama protegido</p>
                           <h2>Atendimento de outra praça</h2>
                           <span>
                             {table.responsibleDisplayName
@@ -5314,7 +5369,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     ) : table.status === "needs_cleaning" || table.status === "cleaning" ? (
                       <Card className="table-start">
                         <div>
-                          <p className="eyebrow">Giro da mesa</p>
                           <h2>
                             {table.status === "needs_cleaning"
                               ? "Mesa aguardando limpeza"
@@ -5341,10 +5395,21 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       </Card>
                     ) : (
                       <section className="gm-card table-start table-start--opening">
-                        <div className="table-start__copy">
-                          <p className="eyebrow">
-                            {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
-                          </p>
+                        <div className="table-start__header">
+                          <div className="table-start__tags">
+                            <Badge tone={table.status === "reserved" ? "warning" : "success"}>
+                              {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
+                            </Badge>
+                            <span className="table-start__capacity">{table.seats} lugares</span>
+                            <span className="table-start__separator" aria-hidden="true">
+                              ·
+                            </span>
+                            <span className="table-start__location">
+                              {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
+                                "Salão"}{" "}
+                              · {selectedAssignment?.section.name ?? "Sem praça"}
+                            </span>
+                          </div>
                           <h2>
                             {table.status === "reserved"
                               ? "Confirmar chegada"
@@ -5352,13 +5417,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 ? "Abrir comanda rápida"
                                 : "Iniciar atendimento"}
                           </h2>
-                          <span>
+                          <p>
                             {table.status === "reserved"
                               ? "A confirmação abre uma nova comanda vazia; nenhum item é herdado da reserva."
-                              : selectedUsesQuickFlow
-                                ? "Sem etapas obrigatórias de recepção: abre e vai direto ao pedido."
-                                : "A comanda abre vazia e o cardápio aparece imediatamente."}
-                          </span>
+                              : "Defina o número de pessoas para abrir a comanda e iniciar os pedidos imediatamente."}
+                          </p>
                         </div>
                         <div className="table-start__controls">
                           {!selectedUsesQuickFlow && (
@@ -5367,7 +5430,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               <div className="table-start__guest-stepper">
                                 <Button
                                   aria-label="Diminuir quantidade de pessoas"
-                                  className="h-10 min-h-10 w-9 rounded-none px-0 text-base"
+                                  className="table-start__stepper-btn"
                                   disabled={busy || guests <= 1}
                                   onClick={() =>
                                     setGuests((current) =>
@@ -5382,7 +5445,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 </Button>
                                 <Input
                                   aria-label="Pessoas"
-                                  className="h-10 w-12 rounded-none border-0 border-x px-1 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  className="table-start__stepper-input [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                   min={1}
                                   max={500}
                                   onBlur={() => guests < 1 && setGuests(1)}
@@ -5392,12 +5455,15 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                       Number.isFinite(next) ? Math.min(500, Math.max(0, next)) : 0,
                                     );
                                   }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") void openTab();
+                                  }}
                                   type="number"
                                   value={guests}
                                 />
                                 <Button
                                   aria-label="Aumentar quantidade de pessoas"
-                                  className="h-10 min-h-10 w-9 rounded-none px-0 text-base"
+                                  className="table-start__stepper-btn"
                                   disabled={busy || guests >= 500}
                                   onClick={() =>
                                     setGuests((current) =>
@@ -5413,9 +5479,30 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               </div>
                             </fieldset>
                           )}
+                          <div className="table-start__customer-field">
+                            <label
+                              className="table-start__field-label"
+                              htmlFor="table-start-customer-input"
+                            >
+                              Cliente (opcional)
+                            </label>
+                            <Input
+                              aria-label="Identificação do cliente ou reserva (opcional)"
+                              disabled={busy}
+                              id="table-start-customer-input"
+                              onChange={(e) => setOpeningCustomerName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") void openTab();
+                              }}
+                              placeholder="Nome ou identificação da mesa"
+                              value={openingCustomerName}
+                            />
+                          </div>
                           <Button
+                            className="table-start__submit-btn"
                             disabled={busy || (!selectedUsesQuickFlow && guests < 1)}
                             onClick={() => void openTab()}
+                            variant="primary"
                           >
                             {busy
                               ? "Abrindo…"

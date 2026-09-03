@@ -7,8 +7,8 @@
   --gm-font-base: 0.88rem;
   --gm-font-md: 1.05rem;
   --gm-font-lg: 1.35rem;
-  --gm-font-xl: clamp(1.6rem, 2.5vw, 2rem);
-  --gm-font-2xl: clamp(1.75rem, 3vw, 2.5rem);
+  --gm-font-xl: 1.65rem;
+  --gm-font-2xl: 2.15rem;
   --gm-leading-tight: 1.1;
   --gm-leading-snug: 1.3;
   --gm-leading-normal: 1.55;

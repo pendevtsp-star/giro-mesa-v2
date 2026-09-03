@@ -171,10 +171,12 @@
   }
 
   .reservation-note {
-    border-left: 3px solid var(--gm-warning);
+    background: var(--gm-warning-soft);
+    border: 1px solid color-mix(in srgb, var(--gm-warning) 35%, transparent);
+    border-radius: var(--gm-radius-xs);
     color: var(--gm-ink);
     margin-top: var(--gm-space-1);
-    padding-left: var(--gm-space-2);
+    padding: var(--gm-space-1) var(--gm-space-2);
   }
 
   .capacity-hint {

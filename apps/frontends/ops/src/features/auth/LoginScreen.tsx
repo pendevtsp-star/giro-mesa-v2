@@ -75,7 +75,6 @@ export function LoginScreen({
         <Brand />
         <Badge tone="info">Ambiente operacional</Badge>
         <div>
-          <p className="eyebrow">O turno inteiro em um só lugar</p>
           <h1>O ritmo da casa, sem perder o controle.</h1>
           <p>
             Atendimento, produção, caixa e gestão conectados — mesmo quando a internet não
@@ -92,7 +91,6 @@ export function LoginScreen({
 
       <section className="auth-panel">
         <div className="auth-panel__inner">
-          <p className="eyebrow">Acesso seguro</p>
           <h2>{challengeToken ? "Confirmar segundo fator" : "Entrar na operação"}</h2>
           <p className="muted">Use o e-mail vinculado à sua organização.</p>
           <form onSubmit={handleSubmit} className="form-stack">

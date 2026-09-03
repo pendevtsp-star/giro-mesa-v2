@@ -107,52 +107,72 @@ export function CatalogProductsPanel(props: CatalogProductsPanelProps) {
     );
   }
 
+  const visibleCategories = catalog.categories.filter(
+    (category) => selectedTabCategoryId === "all" || category.id === selectedTabCategoryId,
+  );
+  const hasActiveFilters =
+    searchTerm !== "" || selectedAllergenFilter !== "all" || filterStatus !== "all";
+  const totalMatchingProducts = visibleCategories.reduce((total, category) => {
+    return (
+      total +
+      catalog.products.filter((product) =>
+        matchesProduct(product, category.id, filterStatus, searchTerm, selectedAllergenFilter),
+      ).length
+    );
+  }, 0);
+
+  if (hasActiveFilters && totalMatchingProducts === 0) {
+    return (
+      <EmptyState
+        description="Ajuste a busca, o filtro de dieta ou a situação para ver os itens do cardápio."
+        icon={<Icon name="catalog" size={28} />}
+        title="Nenhum produto encontrado"
+      />
+    );
+  }
+
   return (
     <div className="ops-grid ops-grid--catalog">
-      {catalog.categories
-        .filter(
-          (category) => selectedTabCategoryId === "all" || category.id === selectedTabCategoryId,
-        )
-        .map((category) => {
-          const items = catalog.products.filter((product) =>
-            matchesProduct(product, category.id, filterStatus, searchTerm, selectedAllergenFilter),
-          );
+      {visibleCategories.map((category) => {
+        const items = catalog.products.filter((product) =>
+          matchesProduct(product, category.id, filterStatus, searchTerm, selectedAllergenFilter),
+        );
 
-          if (items.length === 0 && (searchTerm !== "" || selectedAllergenFilter !== "all")) {
-            return null;
-          }
+        if (items.length === 0 && (searchTerm !== "" || selectedAllergenFilter !== "all")) {
+          return null;
+        }
 
-          return (
-            <section className="catalog-products-category" key={category.id}>
-              <CatalogCategoryHeader
-                busy={busy === "archive-category"}
-                category={category}
-                collapsed={Boolean(collapsedCategories[category.id])}
-                items={items}
-                onArchive={() => void archiveCategory(category.id)}
-                onCreateProduct={() => openNewProductForCategory(category.id)}
-                onEdit={() => openEditCategory(category)}
-                onMove={(direction) => moveCategory(category.id, direction)}
-                onToggleAvailability={() => void toggleCategoryAvailability(category.id)}
-                onToggleCollapsed={() => toggleCategoryCollapse(category.id)}
-                showReorder
+        return (
+          <section className="catalog-products-category" key={category.id}>
+            <CatalogCategoryHeader
+              busy={busy === "archive-category"}
+              category={category}
+              collapsed={Boolean(collapsedCategories[category.id])}
+              items={items}
+              onArchive={() => void archiveCategory(category.id)}
+              onCreateProduct={() => openNewProductForCategory(category.id)}
+              onEdit={() => openEditCategory(category)}
+              onMove={(direction) => moveCategory(category.id, direction)}
+              onToggleAvailability={() => void toggleCategoryAvailability(category.id)}
+              onToggleCollapsed={() => toggleCategoryCollapse(category.id)}
+              showReorder
+            />
+
+            {collapsedCategories[category.id] ? (
+              <CollapsedCategorySummary
+                itemCount={items.length}
+                onExpand={() => toggleCategoryCollapse(category.id)}
               />
-
-              {collapsedCategories[category.id] ? (
-                <CollapsedCategorySummary
-                  itemCount={items.length}
-                  onExpand={() => toggleCategoryCollapse(category.id)}
-                />
-              ) : items.length === 0 ? (
-                <div className="catalog-products-empty">
-                  Nenhum produto cadastrado nesta categoria.
-                </div>
-              ) : (
-                <ProductView items={items} props={props} />
-              )}
-            </section>
-          );
-        })}
+            ) : items.length === 0 ? (
+              <div className="catalog-products-empty">
+                Nenhum produto cadastrado nesta categoria.
+              </div>
+            ) : (
+              <ProductView items={items} props={props} />
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

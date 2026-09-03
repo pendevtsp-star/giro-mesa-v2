@@ -55,11 +55,13 @@
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: 12px;
-  padding: 1.1rem 1.25rem;
+  padding: 1rem 1.15rem;
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
-  transition: all 0.2s ease-out;
+  transition:
+    border-color 0.2s ease-out,
+    box-shadow 0.2s ease-out;
   position: relative;
   overflow: hidden;
 }
@@ -463,7 +465,10 @@
   cursor: pointer;
   white-space: nowrap;
   box-sizing: border-box;
-  transition: all 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
   border: 1px solid var(--gm-border);
   background: var(--gm-surface-soft);
   color: var(--gm-ink);
@@ -515,7 +520,11 @@
   color: var(--gm-muted);
   cursor: pointer;
   padding: 0;
-  transition: all 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s ease;
 }
 
 .catalog-card-icon-btn:hover:not(:disabled) {
@@ -679,7 +688,9 @@
   background: var(--gm-surface-sunken);
   overflow: hidden;
   margin: 4px 0;
-  transition: all 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
 .catalog-sub-accordion[open] {
@@ -904,6 +915,8 @@
   padding-block: 2px;
   overflow-x: auto;
   scrollbar-width: thin;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
 }
 
 .catalog-category-tabs__tab {

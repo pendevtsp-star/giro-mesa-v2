@@ -107,7 +107,7 @@
 .finance-feedback {
   padding: var(--gm-space-3);
   background: var(--gm-surface-soft);
-  border-left: 3px solid var(--gm-action);
+  border: 1px solid color-mix(in srgb, var(--gm-action) 35%, var(--gm-border));
   border-radius: var(--gm-radius-md);
 }
 

@@ -1,7 +1,9 @@
-﻿html {
+html {
   min-width: 320px;
   scrollbar-color: color-mix(in srgb, var(--gm-muted) 55%, transparent) transparent;
   scrollbar-width: thin;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 :where(.gm-modal__body, .salon-workspace, .real-product-picker, .segmented, .floor-setup__tables) {
@@ -497,7 +499,8 @@
   padding-left: 1.5rem;
 }
 .honest-limit {
-  border-left: 4px solid var(--gm-brand);
+  border-color: color-mix(in srgb, var(--gm-brand) 30%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-brand-soft) 25%, var(--gm-surface));
   display: grid;
   gap: 0.65rem;
 }
@@ -674,9 +677,14 @@ h3,
 p {
   margin-top: 0;
 }
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
 h1 {
   font-family: var(--gm-display);
-  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-size: var(--gm-font-2xl);
   letter-spacing: -0.035em;
   margin-bottom: 0.35rem;
 }

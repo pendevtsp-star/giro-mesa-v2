@@ -389,9 +389,12 @@
 }
 
 .platform-boundary {
-  border-left: 3px solid var(--gm-info);
+  background: var(--gm-info-soft);
+  border: 1px solid color-mix(in srgb, var(--gm-info) 30%, transparent);
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-muted);
   font-size: var(--gm-font-sm);
-  padding-left: var(--gm-space-2);
+  padding: var(--gm-space-2) var(--gm-space-3);
 }
 
 .platform-checklist,

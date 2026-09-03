@@ -109,7 +109,8 @@
 }
 
 .delivery-order-real--late {
-  border-inline-start: 3px solid var(--gm-danger);
+  border-color: color-mix(in srgb, var(--gm-danger) 45%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-danger-soft) 25%, var(--gm-surface));
 }
 .delivery-order-real__meta {
   justify-content: flex-start;

@@ -507,7 +507,6 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   >
                     <div className="purchases-section-heading">
                       <div>
-                        <p className="eyebrow">Próxima ação</p>
                         <h2 id="purchase-suggestions-title">Sugestões de reposição</h2>
                       </div>
                       <Badge tone="warning">{suggestions.length}</Badge>
@@ -549,7 +548,6 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                 <section aria-labelledby="purchase-orders-title" className="purchases-panel">
                   <div className="purchases-section-heading">
                     <div>
-                      <p className="eyebrow">Acompanhamento</p>
                       <h2 id="purchase-orders-title">Pedidos de compra</h2>
                     </div>
                     <Badge>{data.page?.total ?? data.orders.length} pedido(s)</Badge>

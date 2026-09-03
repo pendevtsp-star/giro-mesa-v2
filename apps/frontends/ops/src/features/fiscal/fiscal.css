@@ -51,26 +51,26 @@
 
   .fiscal-provider-card {
     min-height: 100%;
-    border-left: 3px solid var(--gm-border);
+    border: 1px solid var(--gm-border);
   }
 
   .fiscal-provider-card[data-status="unknown"] {
-    border-left-color: var(--gm-info);
+    border-color: color-mix(in srgb, var(--gm-info) 40%, var(--gm-border));
   }
 
   .fiscal-provider-card[data-status="not_configured"] {
-    border-left-color: var(--gm-warning);
+    border-color: color-mix(in srgb, var(--gm-warning) 40%, var(--gm-border));
   }
 
   .fiscal-provider-card[data-status="ready"] {
-    border-left-color: var(--gm-success);
+    border-color: color-mix(in srgb, var(--gm-success) 40%, var(--gm-border));
   }
 
   .fiscal-provider-card[data-status="platform_not_configured"],
   .fiscal-provider-card[data-status="profile_required"],
   .fiscal-provider-card[data-status="company_required"],
   .fiscal-provider-card[data-status="credentials_missing"] {
-    border-left-color: var(--gm-warning);
+    border-color: color-mix(in srgb, var(--gm-warning) 40%, var(--gm-border));
   }
 
   .fiscal-provider-card[data-status="error"] {
@@ -120,20 +120,25 @@
     display: grid;
     gap: var(--gm-space-1);
     padding: var(--gm-space-3);
-    border-left: 3px solid var(--gm-border);
+    border: 1px solid var(--gm-border);
+    border-radius: var(--gm-radius-sm);
   }
 
   .fiscal-metric--success {
-    border-left-color: var(--gm-success);
+    border-color: color-mix(in srgb, var(--gm-success) 40%, var(--gm-border));
+    background: color-mix(in srgb, var(--gm-success-soft) 20%, var(--gm-surface));
   }
   .fiscal-metric--warning {
-    border-left-color: var(--gm-warning);
+    border-color: color-mix(in srgb, var(--gm-warning) 40%, var(--gm-border));
+    background: color-mix(in srgb, var(--gm-warning-soft) 20%, var(--gm-surface));
   }
   .fiscal-metric--danger {
-    border-left-color: var(--gm-danger);
+    border-color: color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
+    background: color-mix(in srgb, var(--gm-danger-soft) 20%, var(--gm-surface));
   }
   .fiscal-metric--info {
-    border-left-color: var(--gm-info);
+    border-color: color-mix(in srgb, var(--gm-info) 40%, var(--gm-border));
+    background: color-mix(in srgb, var(--gm-info-soft) 20%, var(--gm-surface));
   }
 
   .fiscal-metric span {
@@ -917,7 +922,7 @@
     gap: var(--gm-space-1);
     margin-top: var(--gm-space-2);
     padding: var(--gm-space-3);
-    border-left: 3px solid var(--gm-success);
+    border: 1px solid color-mix(in srgb, var(--gm-success) 35%, transparent);
     border-radius: var(--gm-radius-sm);
     background: var(--gm-success-soft);
   }

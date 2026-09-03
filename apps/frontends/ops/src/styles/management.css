@@ -94,7 +94,8 @@
 
 .people-policy-note {
   background: var(--gm-info-soft);
-  border-left: 3px solid var(--gm-info);
+  border: 1px solid color-mix(in srgb, var(--gm-info) 30%, transparent);
+  border-radius: var(--gm-radius-sm);
   color: var(--gm-muted);
   font-size: var(--gm-font-sm);
   margin: var(--gm-space-3) var(--gm-space-4) 0;
@@ -268,15 +269,18 @@
 }
 
 .people-attention-card {
-  border-left: 4px solid var(--gm-warning);
+  border-color: color-mix(in srgb, var(--gm-warning) 35%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-warning-soft) 25%, var(--gm-surface));
 }
 
 .people-attention-card--danger {
-  border-left-color: var(--gm-danger);
+  border-color: color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-danger-soft) 30%, var(--gm-surface));
 }
 
 .people-permission-card {
-  border-left: 4px solid var(--gm-info);
+  border-color: color-mix(in srgb, var(--gm-info) 35%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-info-soft) 25%, var(--gm-surface));
 }
 
 .people-team-tools {
@@ -1218,7 +1222,8 @@
 .kds-inline-alert,
 .kds-action-error {
   background: var(--gm-danger-soft);
-  border-left: 4px solid var(--gm-danger);
+  border: 1px solid color-mix(in srgb, var(--gm-danger) 35%, transparent);
+  border-radius: var(--gm-radius-xs);
   color: var(--gm-danger);
   font-size: var(--gm-font-sm);
   margin: 0;
@@ -1369,7 +1374,8 @@
 }
 .kds-item-blocked {
   background: var(--gm-danger-soft);
-  border-left: 4px solid var(--gm-danger);
+  border: 1px solid color-mix(in srgb, var(--gm-danger) 35%, transparent);
+  border-radius: var(--gm-radius-xs);
   color: var(--gm-danger);
 }
 .kds-attention-list {
@@ -2514,7 +2520,8 @@
 }
 .inventory-context-note {
   background: var(--gm-surface-soft);
-  border-left: 3px solid var(--gm-primary);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
   color: var(--gm-muted);
   font-size: 0.75rem;
   line-height: 1.5;

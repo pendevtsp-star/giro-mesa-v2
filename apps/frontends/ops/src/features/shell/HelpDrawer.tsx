@@ -1,4 +1,4 @@
-import { Button } from "@giromesa/ui";
+import { Button, Icon } from "@giromesa/ui";
 import { useEffect } from "react";
 import type { RouteId } from "../../domain";
 
@@ -180,7 +180,6 @@ export function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => 
       <aside aria-labelledby="help-title" aria-modal="true" className="help-drawer" role="dialog">
         <div className="dialog-header">
           <div>
-            <p className="eyebrow">Ajuda local</p>
             <h2 id="help-title">{topic.title}</h2>
           </div>
           <Button
@@ -190,7 +189,7 @@ export function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => 
             size="sm"
             variant="ghost"
           >
-            ×
+            <Icon name="x" size={16} />
           </Button>
         </div>
         <p className="muted">

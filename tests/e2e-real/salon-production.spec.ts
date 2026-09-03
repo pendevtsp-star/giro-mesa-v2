@@ -471,23 +471,25 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
 });
 
 test("Notificações do sistema desaparecem automaticamente", async ({ page }) => {
+  let openRequest: unknown;
   await mockProductionApi(page);
-  await page.route("**/pilot/tabs/open", (route) =>
-    route.fulfill({ status: 201, json: { id: "tab-opened" } }),
-  );
+  await page.route("**/pilot/tabs/open", async (route) => {
+    openRequest = route.request().postDataJSON();
+    await route.fulfill({ status: 201, json: { id: "tab-opened" } });
+  });
   await page.goto("/");
   await page.evaluate(() => {
     window.location.hash = "#/salon";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
   await page.locator(".real-table").filter({ hasText: "Mesa 01" }).click();
-  await page
-    .getByRole("dialog", { name: "Mesa 01" })
-    .getByRole("button", { name: "Abrir atendimento e pedir" })
-    .click();
+  const dialog = page.getByRole("dialog", { name: "Mesa 01" });
+  await dialog.getByLabel("Identificação do cliente ou reserva (opcional)").fill("Cliente Teste");
+  await dialog.getByRole("button", { name: "Abrir atendimento e pedir" }).click();
 
   const toast = page.locator(".gm-toast").filter({ hasText: "Atendimento aberto" });
   await expect(toast).toBeVisible();
+  expect(openRequest).toEqual(expect.objectContaining({ customerName: "Cliente Teste" }));
   await expect(toast).toBeHidden({ timeout: 3_000 });
 });
 
@@ -844,7 +846,7 @@ test("Salão respeita a operação permitida para cada papel", async ({ browser 
     await occupiedTable.click();
     const dialog = page.getByRole("dialog", { name: "Mesa 03" });
     if (actor.expectation === "protected") {
-      await expect(dialog.getByText("Panorama protegido")).toBeVisible();
+      await expect(dialog.getByRole("heading", { name: "Atendimento de outra praça" })).toBeVisible();
       await expect(dialog).toContainText("não estão no seu escopo");
     } else {
       await expect(dialog.getByRole("button", { name: /^Pedido/ })).toBeVisible();
@@ -1068,12 +1070,8 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await availableTable.click();
   const openingDialog = page.getByRole("dialog", { name: "Mesa 01" });
   await expect(openingDialog).toHaveClass(/salon-service-modal--compact/);
-  await expect(
-    openingDialog
-      .getByRole("region", { name: "Próxima ação da mesa" })
-      .getByText("Iniciar atendimento", { exact: true }),
-  ).toBeVisible();
-  await expect(openingDialog.locator(".table-start--opening")).toHaveCSS("display", "grid");
+  await expect(openingDialog.getByRole("heading", { name: "Iniciar atendimento" })).toBeVisible();
+  await expect(openingDialog.locator(".table-start--opening")).toHaveCSS("display", "flex");
   const guestCount = openingDialog.getByRole("spinbutton", { name: "Pessoas" });
   await expect(guestCount).toHaveValue("2");
   await openingDialog.getByRole("button", { name: "Aumentar quantidade de pessoas" }).click();

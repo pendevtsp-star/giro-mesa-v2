@@ -257,7 +257,8 @@
   .purchases-divergence {
     margin: 0;
     padding: var(--gm-space-2);
-    border-inline-start: 3px solid var(--gm-warning);
+    border: 1px solid color-mix(in srgb, var(--gm-warning) 35%, transparent);
+    border-radius: var(--gm-radius-xs);
     background: var(--gm-warning-soft);
   }
 

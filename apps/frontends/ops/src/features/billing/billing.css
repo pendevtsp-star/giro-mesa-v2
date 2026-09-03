@@ -16,25 +16,30 @@
 
 .billing-alert {
   align-items: center;
-  border-left: 4px solid var(--gm-border);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
   grid-template-columns: minmax(0, 1fr) auto;
   padding: var(--gm-space-3) var(--gm-space-4);
 }
 
 .billing-alert--success {
-  border-left-color: var(--gm-success);
+  border-color: color-mix(in srgb, var(--gm-success) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-success-soft) 25%, var(--gm-surface));
 }
 
 .billing-alert--info {
-  border-left-color: var(--gm-info);
+  border-color: color-mix(in srgb, var(--gm-info) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-info-soft) 25%, var(--gm-surface));
 }
 
 .billing-alert--warning {
-  border-left-color: var(--gm-warning);
+  border-color: color-mix(in srgb, var(--gm-warning) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-warning-soft) 25%, var(--gm-surface));
 }
 
 .billing-alert--danger {
-  border-left-color: var(--gm-danger);
+  border-color: color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
+  background: color-mix(in srgb, var(--gm-danger-soft) 25%, var(--gm-surface));
 }
 
 .billing-alert strong,

@@ -232,11 +232,14 @@
 
   .reports-results > .remote-state[role="alert"] {
     background: color-mix(in srgb, var(--gm-danger-soft) 42%, var(--gm-surface));
-    border-left: 3px solid var(--gm-danger);
+    border: 1px solid color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
+    border-radius: var(--gm-radius-sm);
   }
 
   .reports-results > .remote-state[role="status"] {
-    border-left: 3px solid var(--gm-info);
+    border: 1px solid color-mix(in srgb, var(--gm-info) 40%, var(--gm-border));
+    background: color-mix(in srgb, var(--gm-info-soft) 30%, var(--gm-surface));
+    border-radius: var(--gm-radius-sm);
   }
 
   .reports-rate-limit .gm-button {
