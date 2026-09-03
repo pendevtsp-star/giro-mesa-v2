@@ -32,8 +32,6 @@ import {
   FloorPlan,
   type FloorPlanElement,
   type FloorPlanPosition,
-  type FloorPlanTableDetails,
-  type FloorPlanZonePosition,
 } from "./FloorPlan";
 import { MoveTableDialog } from "./MoveTableDialog";
 import { SalonSearch } from "./SalonSearch";
@@ -332,9 +330,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
-  const [workspaceMode, setWorkspaceMode] = useState<"operate" | "space" | "shift" | "template">(
-    "operate",
-  );
+  const [workspaceMode, setWorkspaceMode] = useState<"operate" | "shift" | "template">("operate");
   const [shiftEditorTool, setShiftEditorTool] = useState<"assign" | "move">("assign");
   const [showMetricsCockpit, setShowMetricsCockpit] = useState(false);
   const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
@@ -489,6 +485,10 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [tableStart, setTableStart] = useState(1);
   const [tableQuantity, setTableQuantity] = useState(4);
   const [tableSeats, setTableSeats] = useState(4);
+  const [managedTableId, setManagedTableId] = useState("");
+  const [managedTableLabel, setManagedTableLabel] = useState("");
+  const [managedTableSeats, setManagedTableSeats] = useState(4);
+  const [managedTableRoomId, setManagedTableRoomId] = useState("");
   const [setupOpen, setSetupOpen] = useState(false);
   const [joinMode, setJoinMode] = useState(false);
   const [joinSelection, setJoinSelection] = useState<string[]>([]);
@@ -986,8 +986,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           const shiftTransfer = transferForTable(item.id);
           const serviceCall = serviceCallForTable(item.id);
           const servicePhase = servicePhaseForTable(item.id);
-          const activeLayout =
-            workspaceMode === "space" || workspaceMode === "template" ? undefined : shiftLayout;
+          const activeLayout = workspaceMode === "template" ? undefined : shiftLayout;
           const effectiveRoomId = activeLayout?.roomId ?? item.roomId;
           const previewSection = data.shiftSections.find(
             (section) => section.id === assignmentSectionId,
@@ -1297,6 +1296,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
+        function openSpaceSetup() {
+          setWorkspaceMode("operate");
+          setJoinMode(false);
+          setJoinSelection([]);
+          setSetupSection("space");
+          setSetupOpen(true);
+        }
+
         function openShiftReview() {
           openShiftSetup();
           if (!preflightBlocked) setShiftSetupStep("open");
@@ -1376,8 +1383,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           setFloorEditRequestKey((current) => current + 1);
         }
 
-        function switchWorkspaceMode(mode: "operate" | "space" | "shift") {
-          if (mode === "space" && !canEditSpace) return;
+        function switchWorkspaceMode(mode: "operate" | "shift") {
           if (mode === "shift" && (!canReorganizeTurn || !data.activeShift)) return;
           setWorkspaceMode(mode);
           setJoinMode(false);
@@ -1640,68 +1646,27 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
-        async function saveFloorLayout(
-          positions: FloorPlanPosition[],
-          zones: FloorPlanZonePosition[],
-          elements: FloorPlanElement[],
-          tableDetails: FloorPlanTableDetails[],
-        ) {
+        async function saveManagedTable(event: FormEvent<HTMLFormElement>) {
+          event.preventDefault();
+          const selected = allActiveTables.find((item) => item.id === managedTableId);
+          if (!selected || !managedTableRoomId) return;
           setBusy(true);
           setFeedback("");
           try {
-            if (
-              tableDetails.some(
-                (details) =>
-                  details.label.trim().length === 0 ||
-                  !Number.isInteger(details.seats) ||
-                  details.seats < 1 ||
-                  details.seats > 100,
-              )
-            ) {
-              throw new Error("Informe nome e quantidade de lugares vÃ¡lidos para cada mesa.");
-            }
-            const detailsByTableId = new Map(
-              tableDetails.map((details) => [details.tableId, details] as const),
-            );
-            await api.pilot.updateFloorLayout(scope.organizationId, scope.unitId, {
+            await api.pilot.updateTable(scope.organizationId, scope.unitId, selected.id, {
               expectedRevision: requiredOperationalRevision(data.floorRevision, "planta"),
-              tables: positions.map(({ tableId, x, y, width, height, rotation, shape }) => {
-                const details = detailsByTableId.get(tableId);
-                if (!details) throw new Error("Preencha os dados de cada mesa antes de salvar.");
-                return {
-                  tableId,
-                  roomId: details.roomId,
-                  label: details.label.trim(),
-                  seats: details.seats,
-                  x,
-                  y,
-                  width,
-                  height,
-                  rotation,
-                  shape,
-                };
-              }),
-              rooms: zones.filter((zone) =>
-                data.rooms.some((room) => room.id === zone.roomId && room.active),
-              ),
-              layoutElements: elements.map((element) => ({
-                id: element.id,
-                roomId: element.roomId,
-                kind: element.kind,
-                ...(element.label?.trim() ? { label: element.label.trim() } : {}),
-                x: element.x,
-                y: element.y,
-                width: element.width,
-                height: element.height,
-                rotation: element.rotation,
-              })),
+              roomId: managedTableRoomId,
+              label: managedTableLabel.trim(),
+              seats: managedTableSeats,
+              width: selected.width ?? 122,
+              height: selected.height ?? 76,
+              rotation: selected.rotation ?? 0,
+              shape: selected.shape ?? "rectangle",
             });
-            setFeedback("Planta publicada para toda a equipe desta unidade.");
-            floor.retry();
-            return true;
+            setFeedback(`${managedTableLabel.trim()} atualizada para toda a equipe.`);
+            await floor.refresh();
           } catch (error) {
-            setErrorFeedback(error, "Não foi possível salvar a planta.");
-            return false;
+            setErrorFeedback(error, "Não foi possível atualizar a mesa.");
           } finally {
             setBusy(false);
           }
@@ -1736,25 +1701,35 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
           }
         }
 
-        async function archiveTable(tableId: string) {
+        async function archiveManagedTable() {
+          const selected = allActiveTables.find((item) => item.id === managedTableId);
+          if (
+            !selected ||
+            busy ||
+            !window.confirm(`Arquivar ${selected.label}? O histórico operacional será preservado.`)
+          ) {
+            return;
+          }
           setBusy(true);
           setFeedback("");
           try {
             await api.pilot.archiveTable(
               scope.organizationId,
               scope.unitId,
-              tableId,
+              selected.id,
               requiredOperationalRevision(data.floorRevision, "planta"),
             );
+            setManagedTableId("");
+            setManagedTableLabel("");
+            setManagedTableSeats(4);
+            setManagedTableRoomId("");
             setFeedback("Mesa arquivada. O histórico operacional foi preservado.");
-            floor.retry();
-            return true;
+            await floor.refresh();
           } catch (error) {
             setErrorFeedback(
               error,
               "Não foi possível arquivar. Mesas ocupadas, reservadas, agrupadas ou atribuídas ao turno precisam ser liberadas antes.",
             );
-            return false;
           } finally {
             setBusy(false);
           }
@@ -3229,6 +3204,98 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             : "Criar mesa"}
                         </Button>
                       </form>
+                      <form
+                        className="action-form"
+                        onSubmit={(event) => void saveManagedTable(event)}
+                      >
+                        <h3>Gerenciar mesa</h3>
+                        <Label className="action-form__wide">
+                          Mesa
+                          <NativeSelect
+                            onChange={(event) => {
+                              const nextId = event.target.value;
+                              const nextTable = allActiveTables.find((item) => item.id === nextId);
+                              setManagedTableId(nextId);
+                              setManagedTableLabel(nextTable?.label ?? "");
+                              setManagedTableSeats(nextTable?.seats ?? 4);
+                              setManagedTableRoomId(nextTable?.roomId ?? "");
+                            }}
+                            value={managedTableId}
+                          >
+                            <option value="">Selecione uma mesa</option>
+                            {allActiveTables.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.label}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </Label>
+                        <Label className="action-form__wide">
+                          Identificação
+                          <Input
+                            disabled={!managedTableId}
+                            maxLength={60}
+                            minLength={1}
+                            onChange={(event) => setManagedTableLabel(event.target.value)}
+                            required
+                            value={managedTableLabel}
+                          />
+                        </Label>
+                        <Label>
+                          Lugares
+                          <Input
+                            disabled={!managedTableId}
+                            max={100}
+                            min={1}
+                            onChange={(event) => setManagedTableSeats(Number(event.target.value))}
+                            required
+                            type="number"
+                            value={managedTableSeats}
+                          />
+                        </Label>
+                        <Label>
+                          Ambiente
+                          <NativeSelect
+                            disabled={!managedTableId}
+                            onChange={(event) => setManagedTableRoomId(event.target.value)}
+                            required
+                            value={managedTableRoomId}
+                          >
+                            <option disabled value="">
+                              Selecione
+                            </option>
+                            {data.rooms
+                              .filter((item) => item.active)
+                              .map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name}
+                                </option>
+                              ))}
+                          </NativeSelect>
+                        </Label>
+                        <Button
+                          disabled={
+                            busy ||
+                            !managedTableId ||
+                            !managedTableRoomId ||
+                            !managedTableLabel.trim() ||
+                            !Number.isInteger(managedTableSeats) ||
+                            managedTableSeats < 1 ||
+                            managedTableSeats > 100
+                          }
+                          type="submit"
+                        >
+                          {busy ? "Salvando…" : "Salvar mesa"}
+                        </Button>
+                        <Button
+                          disabled={busy || !managedTableId}
+                          onClick={() => void archiveManagedTable()}
+                          type="button"
+                          variant="danger"
+                        >
+                          Arquivar mesa
+                        </Button>
+                      </form>
                     </div>
                   ) : (
                     <div className="shift-setup-flow">
@@ -4372,7 +4439,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     ))}
                   </fieldset>
                   <fieldset className="segmented salon-workspace-modes">
-                    <legend className="gm-sr-only">Modo de trabalho</legend>
+                    <legend className="gm-sr-only">Organização do salão</legend>
                     <Button
                       aria-pressed={workspaceMode === "operate"}
                       onClick={() => switchWorkspaceMode("operate")}
@@ -4381,11 +4448,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       Operar
                     </Button>
                     {canEditSpace && (
-                      <Button
-                        aria-pressed={workspaceMode === "space"}
-                        onClick={() => switchWorkspaceMode("space")}
-                        type="button"
-                      >
+                      <Button onClick={openSpaceSetup} type="button">
                         Editar espaço
                       </Button>
                     )}
@@ -4497,27 +4560,19 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 ) : workspaceMode !== "operate" ? (
                   <FloorPlan
                     canEdit={
-                      workspaceMode === "space"
+                      workspaceMode === "template"
                         ? canEditSpace
-                        : workspaceMode === "template"
-                          ? canEditSpace
-                          : workspaceMode === "shift" && canReorganizeTurn
+                        : workspaceMode === "shift" && canReorganizeTurn
                     }
-                    canEditElements={workspaceMode === "space"}
+                    canEditElements={false}
                     editRequestKey={floorEditRequestKey}
                     editActionLabel={
-                      workspaceMode === "shift"
-                        ? "Organizar turno"
-                        : workspaceMode === "template"
-                          ? "Selecionar mesas"
-                          : "Editar espaço"
+                      workspaceMode === "shift" ? "Organizar turno" : "Selecionar mesas"
                     }
                     editableItemIds={
                       workspaceMode === "shift"
                         ? data.tables.filter(canOperateTable).map((item) => item.id)
-                        : workspaceMode === "template"
-                          ? selectableServiceSectionTables.map((item) => item.id)
-                          : undefined
+                        : selectableServiceSectionTables.map((item) => item.id)
                     }
                     editorTool={
                       workspaceMode === "template"
@@ -4526,26 +4581,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           ? shiftEditorTool
                           : "move"
                     }
-                    editableZoneIds={
-                      workspaceMode === "space"
-                        ? data.rooms.filter((room) => room.active).map((room) => room.id)
-                        : []
-                    }
+                    editableZoneIds={[]}
                     editingDescription={
                       workspaceMode === "shift"
                         ? "Arraste mesas entre ambientes; a mudança vale apenas neste turno."
-                        : workspaceMode === "template"
-                          ? "Clique nas mesas para definir esta praça reutilizável."
-                          : "Arraste mesas e limites para editar a planta física permanente."
+                        : "Clique nas mesas para definir esta praça reutilizável."
                     }
                     elements={floorPlanElements}
                     focusId={floorFocusId}
                     items={floorPlanItems}
                     joinMode={joinMode}
                     layoutScope={
-                      workspaceMode === "space" || workspaceMode === "template" || !data.activeShift
-                        ? "permanent"
-                        : "shift"
+                      workspaceMode === "template" || !data.activeShift ? "permanent" : "shift"
                     }
                     onEditingChange={(editing) => {
                       if (!editing && workspaceMode === "template") {
@@ -4586,20 +4633,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           : [...current, tableId],
                       );
                     }}
-                    {...(workspaceMode === "space" ? { onArchiveTable: archiveTable } : {})}
                     onSavePositions={
-                      workspaceMode === "template"
-                        ? () => saveServiceSection()
-                        : workspaceMode === "shift"
-                          ? saveShiftLayout
-                          : saveFloorLayout
+                      workspaceMode === "template" ? () => saveServiceSection() : saveShiftLayout
                     }
                     saveActionLabel={
-                      workspaceMode === "shift"
-                        ? "Aplicar no turno"
-                        : workspaceMode === "template"
-                          ? "Salvar praça"
-                          : "Salvar espaço"
+                      workspaceMode === "shift" ? "Aplicar no turno" : "Salvar praça"
                     }
                     onSelect={(operationId) => {
                       const selected = data.tables.find(

@@ -27,6 +27,7 @@ const tab = {
 };
 
 const floor = {
+  floorRevision: 1,
   rooms: [
     {
       id: "room-1",
@@ -248,6 +249,10 @@ async function mockProductionApi(
     }
     if (route.request().method() === "PUT" && /\/shifts\/[^/]+\/sections$/.test(url.pathname)) {
       await route.fulfill({ json: { revision: 3 } });
+      return;
+    }
+    if (route.request().method() === "PUT" && /\/pilot\/tables\/[^/]+$/.test(url.pathname)) {
+      await route.fulfill({ json: { floorRevision: 2 } });
       return;
     }
     if (
@@ -998,7 +1003,51 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(page.getByRole("button", { name: "Abrir planta em tela cheia" })).toHaveCount(0);
   await expect(page.getByText("Modo operação", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "Editar espaço", exact: true }).click();
-  await expect(page.getByText("Organização do espaço", { exact: true })).toBeVisible();
+  const spaceDialog = page.getByRole("dialog", { name: "Configurar atendimento" });
+  await expect(spaceDialog).toBeVisible();
+  await expect(spaceDialog.getByRole("heading", { name: "Novo ambiente físico" })).toBeVisible();
+  await expect(spaceDialog.getByRole("heading", { name: "Gerenciar mesa" })).toBeVisible();
+  await expect(page.getByText("Organização do espaço", { exact: true })).toHaveCount(0);
+  const spaceForms = spaceDialog.locator(".floor-management__forms--real");
+  await expect
+    .poll(() =>
+      spaceForms.evaluate(
+        (element) =>
+          getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
+      ),
+    )
+    .toBe(3);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectNoHorizontalOverflow(page);
+  await expect
+    .poll(() =>
+      spaceForms.evaluate(
+        (element) =>
+          getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
+      ),
+    )
+    .toBe(1);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const managedTableForm = spaceDialog.locator("form").filter({ hasText: "Gerenciar mesa" });
+  await managedTableForm.locator("select").first().selectOption({ label: "Mesa 01" });
+  await managedTableForm.getByLabel("Identificação").fill("Mesa 01 atualizada");
+  await managedTableForm.getByLabel("Lugares").fill("6");
+  const updateTableRequest = page.waitForRequest(
+    (request) => request.method() === "PUT" && request.url().endsWith("/pilot/tables/m01"),
+  );
+  await managedTableForm.getByRole("button", { name: "Salvar mesa" }).click();
+  const updateTablePayload = (await updateTableRequest).postDataJSON() as {
+    label: string;
+    seats: number;
+    roomId: string;
+  };
+  expect(updateTablePayload).toMatchObject({
+    label: "Mesa 01 atualizada",
+    seats: 6,
+    roomId: "room-1",
+  });
+  await page.keyboard.press("Escape");
+  await expect(spaceDialog).toBeHidden();
   await page.getByRole("button", { name: "Operar", exact: true }).click();
   await expect(page.locator(".real-table").first()).toBeVisible();
   await page.getByRole("button", { name: "Juntar mesas", exact: true }).click();
