@@ -13,14 +13,6 @@ Directory-based community: tests/e2e-real
 | Name | Kind | File | Lines |
 |------|------|------|-------|
 | test:visor do cliente acompanha a conta sem expor a operação@L8 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/customer-display.spec.ts | 8-146 |
-| mockDashboardApi | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 18-192 |
-| test:back office cadastra e pesquisa tenant, trata incidentes e explicita dados parciais@L194 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 194-511 |
-| test:prioridades e preferências usam mutações auditáveis@L513 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 513-540 |
-| test:topbar mantém o relógio alinhado à virada do minuto e à retomada da aba@L542 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 542-558 |
-| test:visão geral real orienta o perfil ${profile.profileId}@L561 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 561-596 |
-| test:visão geral diferencia dados parciais de operação sem pendências@L599 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 599-713 |
-| signalAutomaticRefresh | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 602-602 |
-| releaseAutomaticRefresh | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/dashboard-production.spec.ts | 603-603 |
 | DeliveryRole | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/delivery-production.spec.ts | 85-85 |
 | DeliveryCalls | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/delivery-production.spec.ts | 86-96 |
 | DeliveryMockOptions | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/delivery-production.spec.ts | 98-101 |
@@ -62,8 +54,16 @@ Directory-based community: tests/e2e-real
 | test:KDS deixa explícito quando a leitura está atrasada@L902 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/kds-production.spec.ts | 902-909 |
 | test:KDS mantém cancelamento visível até a cozinha confirmar ciência@L911 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/kds-production.spec.ts | 911-923 |
 | test:KDS exige confirmação e PIN gerencial para cancelar um ticket@L925 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/kds-production.spec.ts | 925-949 |
+| Calls | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 48-58 |
+| emptyCalls | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 60-72 |
+| mockPurchasesApi | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 74-387 |
+| openPurchases | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 389-413 |
+| expectNoHorizontalOverflow | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 415-421 |
+| test:gerente cria pedido multilinha, aprova, recebe parcialmente e concilia fatura@L423 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 423-522 |
+| test:perfil de estoque vê conciliação e estorno sem ações financeiras@L524 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 524-547 |
+| test:conflito de versão mantém pedido pendente e orienta recarregar@L549 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/purchases-production.spec.ts | 549-565 |
 
-*... and 31 more members.*
+*... and 10 more members.*
 
 ## Execution Flows
 
@@ -73,36 +73,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `expect` (329 edge(s))
-- `getByRole` (326 edge(s))
-- `click` (190 edge(s))
-- `toBeVisible` (141 edge(s))
-- `fulfill` (108 edge(s))
-- `getByLabel` (103 edge(s))
-- `getByText` (79 edge(s))
-- `fill` (73 edge(s))
-- `endsWith` (68 edge(s))
-- `locator` (56 edge(s))
-- `postDataJSON` (52 edge(s))
-- `toBe` (51 edge(s))
-- `poll` (45 edge(s))
-- `push` (42 edge(s))
-- `first` (33 edge(s))
+- `expect` (210 edge(s))
+- `getByRole` (190 edge(s))
+- `click` (110 edge(s))
+- `toBeVisible` (95 edge(s))
+- `fulfill` (66 edge(s))
+- `getByLabel` (63 edge(s))
+- `getByText` (52 edge(s))
+- `fill` (41 edge(s))
+- `endsWith` (37 edge(s))
+- `toBe` (33 edge(s))
+- `poll` (33 edge(s))
+- `first` (29 edge(s))
+- `postDataJSON` (27 edge(s))
+- `push` (24 edge(s))
+- `selectOption` (24 edge(s))
 
 ### Incoming
 
-- `expect` (321 edge(s))
-- `getByRole` (316 edge(s))
-- `click` (185 edge(s))
-- `toBeVisible` (137 edge(s))
-- `getByLabel` (103 edge(s))
-- `getByText` (79 edge(s))
-- `fill` (73 edge(s))
-- `locator` (55 edge(s))
-- `toBe` (47 edge(s))
-- `poll` (45 edge(s))
-- `first` (33 edge(s))
-- `selectOption` (33 edge(s))
-- `toEqual` (27 edge(s))
-- `toContainText` (26 edge(s))
-- `toHaveCount` (24 edge(s))
+- `expect` (203 edge(s))
+- `getByRole` (184 edge(s))
+- `click` (107 edge(s))
+- `toBeVisible` (92 edge(s))
+- `getByLabel` (63 edge(s))
+- `getByText` (52 edge(s))
+- `fill` (41 edge(s))
+- `poll` (33 edge(s))
+- `toBe` (29 edge(s))
+- `first` (29 edge(s))
+- `selectOption` (24 edge(s))
+- `locator` (23 edge(s))
+- `toContainText` (19 edge(s))
+- `toEqual` (16 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-real/delivery-production.spec.ts` (16 edge(s))

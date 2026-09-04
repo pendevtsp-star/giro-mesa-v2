@@ -1,6 +1,10 @@
 .cash-page {
-  max-width: 1120px;
+  max-width: 1160px;
 }
+
+/* ==========================================================================
+   GAVETAS FÍSICAS (Hardware & Ponto de Venda)
+   ========================================================================== */
 
 .cash-registers {
   display: grid;
@@ -16,7 +20,7 @@
 
 .cash-register-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--gm-space-3);
 }
 
@@ -29,14 +33,25 @@
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-lg);
+  box-shadow: var(--gm-shadow-xs);
   transition:
     border-color var(--gm-duration-fast) var(--gm-ease-out),
-    background var(--gm-duration-fast) var(--gm-ease-out);
+    background var(--gm-duration-fast) var(--gm-ease-out),
+    box-shadow var(--gm-duration-fast) var(--gm-ease-out),
+    transform var(--gm-duration-fast) var(--gm-ease-out);
+}
+
+.cash-register-card:hover {
+  border-color: var(--gm-action-hover);
+  box-shadow: var(--gm-shadow-sm);
 }
 
 .cash-register-card[data-selected="true"] {
   background: var(--gm-surface-soft);
   border-color: var(--gm-action);
+  box-shadow:
+    0 0 0 2px var(--gm-action-soft),
+    var(--gm-shadow-sm);
 }
 
 .cash-register-card__select {
@@ -45,8 +60,8 @@
   flex-direction: column;
   width: 100%;
   height: auto;
-  min-height: 104px;
-  padding: var(--gm-space-3);
+  min-height: 112px;
+  padding: var(--gm-space-3) var(--gm-space-4);
   gap: var(--gm-space-2);
   text-align: left;
   white-space: normal;
@@ -61,9 +76,45 @@
   gap: var(--gm-space-2);
 }
 
-.cash-register-card__title strong {
+.cash-register-card__status-line {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  min-width: 0;
+}
+
+.cash-register-card__status-line strong {
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: var(--gm-font-md);
+  font-weight: 700;
+  color: var(--gm-ink);
+}
+
+.cash-register-card__operator {
+  color: var(--gm-ink);
+  font-size: var(--gm-font-xs);
+  font-weight: 500;
+}
+
+.cash-register-card__time {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-2xs);
+}
+
+.cash-register-card__selected-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: 2px var(--gm-space-2);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gm-action);
+  background: var(--gm-action-soft);
+  border-radius: var(--gm-radius-sm);
+  margin-top: 2px;
 }
 
 .cash-register-card__select small,
@@ -87,6 +138,9 @@
   cursor: pointer;
   border-radius: var(--gm-radius-md);
   list-style: none;
+  transition:
+    background var(--gm-duration-fast),
+    color var(--gm-duration-fast);
 }
 
 .cash-register-menu > summary::-webkit-details-marker {
@@ -105,17 +159,17 @@
 
 .cash-register-menu__content {
   position: absolute;
-  z-index: 5;
+  z-index: 10;
   top: calc(100% - var(--gm-space-1));
   right: var(--gm-space-1);
   display: grid;
-  min-width: 168px;
+  min-width: 172px;
   padding: var(--gm-space-2);
   gap: var(--gm-space-1);
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
-  box-shadow: var(--gm-shadow-sm);
+  box-shadow: var(--gm-shadow-md);
 }
 
 .cash-register-menu__content button {
@@ -126,9 +180,9 @@
 .cash-register-create,
 .cash-register-rename {
   display: grid;
-  grid-template-columns: minmax(220px, 420px) auto;
+  grid-template-columns: minmax(240px, 440px) auto;
   align-items: end;
-  padding: var(--gm-space-3);
+  padding: var(--gm-space-4);
   gap: var(--gm-space-3);
   background: var(--gm-surface-soft);
   border: 1px solid var(--gm-border);
@@ -153,6 +207,585 @@
   border-radius: 0 0 var(--gm-radius-lg) var(--gm-radius-lg);
 }
 
+.cash-consolidated-card {
+  border-left: 4px solid var(--gm-action);
+}
+
+/* ==========================================================================
+   BARRA DE OPERAÇÃO DO TURNO ABERTO (Com Destaque no Fechamento)
+   ========================================================================== */
+
+.cash-operation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gm-space-4);
+  padding: var(--gm-space-4) var(--gm-space-5);
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-xl);
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.cash-operation-header__info {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.cash-operation-header__title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.cash-operation-header__tag {
+  font-size: var(--gm-font-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-success);
+}
+
+.cash-operation-header__drawer-name {
+  margin: 0;
+  font-size: var(--gm-font-xl);
+  font-weight: 800;
+  color: var(--gm-ink);
+}
+
+.cash-operation-header__meta {
+  margin: 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-operation-header__meta strong {
+  color: var(--gm-ink);
+}
+
+.cash-operation-header__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+/* Botão de Fechamento com Destaque Máximo */
+.cash-btn-close-highlight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  font-weight: 800;
+  box-shadow: var(--gm-shadow-sm);
+  transition:
+    transform var(--gm-duration-fast) var(--gm-ease-out),
+    box-shadow var(--gm-duration-fast);
+}
+
+.cash-btn-close-highlight:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--gm-shadow-md);
+}
+
+.cash-btn-close-highlight--active {
+  box-shadow:
+    0 0 0 3px var(--gm-danger-soft),
+    var(--gm-shadow-md);
+}
+
+.cash-btn-quick--active {
+  background: var(--gm-surface-soft);
+  border-color: var(--gm-action);
+  color: var(--gm-action);
+}
+
+/* ==========================================================================
+   ALERTA DE COMANDAS PENDENTES
+   ========================================================================== */
+
+.cash-pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gm-space-4);
+  width: 100%;
+}
+
+.cash-pending-banner__text {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.cash-pending-banner__header {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  color: var(--gm-warning);
+}
+
+.cash-pending-banner__header strong {
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-pending-banner__text p {
+  margin: 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-pending-action {
+  flex-shrink: 0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   PAINÉIS DE AÇÃO (Fechamento, Movimento, Transferência)
+   ========================================================================== */
+
+.cash-action-card {
+  display: grid;
+  gap: var(--gm-space-4);
+  border-radius: var(--gm-radius-xl);
+  box-shadow: var(--gm-shadow-md);
+  animation: cash-slide-down var(--gm-duration-fast) var(--gm-ease-out);
+}
+
+@keyframes cash-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cash-closure-card {
+  border: 2px solid var(--gm-danger);
+  background: var(--gm-surface);
+}
+
+.cash-card-desc {
+  margin: var(--gm-space-1) 0 0 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+  max-width: 640px;
+}
+
+.cash-closure-form {
+  display: grid;
+  gap: var(--gm-space-5);
+  margin-top: var(--gm-space-2);
+}
+
+.cash-closure-step {
+  display: grid;
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-4);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-lg);
+}
+
+.cash-closure-step__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gm-space-3);
+}
+
+.cash-step-number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gm-ink);
+  color: var(--gm-surface);
+  font-size: var(--gm-font-xs);
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cash-closure-step__header strong {
+  display: block;
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-closure-step__header small {
+  display: block;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-counted-field label {
+  display: grid;
+  gap: var(--gm-space-2);
+  font-weight: 600;
+  color: var(--gm-ink);
+}
+
+.cash-input-lg {
+  font-size: var(--gm-font-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  height: 48px;
+  max-width: 320px;
+}
+
+.cash-tender-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--gm-space-3);
+}
+
+.cash-tender-grid label {
+  display: grid;
+  gap: var(--gm-space-1);
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+  color: var(--gm-ink);
+}
+
+.cash-closure-reason-label {
+  display: grid;
+  gap: var(--gm-space-1);
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+  color: var(--gm-ink);
+}
+
+/* Confirmação Guiada do Fechamento */
+.cash-confirm-box {
+  display: grid;
+  gap: var(--gm-space-4);
+  padding: var(--gm-space-4);
+  background: var(--gm-warning-soft);
+  border: 2px solid var(--gm-warning);
+  border-radius: var(--gm-radius-lg);
+}
+
+.cash-confirm-box__header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gm-space-3);
+  color: var(--gm-warning);
+}
+
+.cash-confirm-box__header strong {
+  display: block;
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-confirm-box__header p {
+  margin: 2px 0 0 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-confirm-box__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.cash-confirm-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  padding: var(--gm-space-2) var(--gm-space-3);
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  font-size: var(--gm-font-xs);
+}
+
+.cash-confirm-item__label {
+  color: var(--gm-muted);
+}
+
+.cash-confirm-item__val {
+  font-weight: 800;
+  color: var(--gm-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-confirm-box__actions,
+.cash-closure-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+}
+
+/* Painel de Movimentação (Sangria/Suprimento) */
+.cash-movement-card,
+.cash-transfer-card {
+  border: 1px solid var(--gm-border);
+  background: var(--gm-surface);
+}
+
+.cash-movement-type-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.cash-action-form-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: var(--gm-space-3);
+  align-items: end;
+}
+
+.cash-form-buttons {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  margin-top: var(--gm-space-2);
+}
+
+/* ==========================================================================
+   HERO CARD DE ABERTURA DE CAIXA (Gaveta Fechada)
+   ========================================================================== */
+
+.cash-hero-card--opening {
+  display: grid;
+  gap: var(--gm-space-5);
+  padding: var(--gm-space-6) var(--gm-space-6);
+  background: var(--gm-surface);
+  border: 2px solid var(--gm-border);
+  border-radius: var(--gm-radius-xl);
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.cash-hero-card__header {
+  display: grid;
+  gap: var(--gm-space-2);
+}
+
+.cash-hero-card__badge-row {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.cash-hero-card__status {
+  font-size: var(--gm-font-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gm-muted);
+}
+
+.cash-hero-card__title {
+  margin: 0;
+  font-size: var(--gm-font-2xl);
+  font-weight: 800;
+  color: var(--gm-ink);
+}
+
+.cash-hero-card__desc {
+  margin: 0;
+  font-size: var(--gm-font-sm);
+  color: var(--gm-muted);
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.cash-hero-card__body {
+  display: grid;
+  gap: var(--gm-space-5);
+  max-width: 640px;
+}
+
+/* Chips de Valores Sugeridos */
+.cash-quick-chips-section {
+  display: grid;
+  gap: var(--gm-space-2);
+}
+
+.cash-quick-chips-title {
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+  color: var(--gm-ink);
+}
+
+.cash-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.cash-quick-chip {
+  padding: var(--gm-space-2) var(--gm-space-3);
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+  color: var(--gm-ink);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-full);
+  cursor: pointer;
+  transition: all var(--gm-duration-fast) var(--gm-ease-out);
+}
+
+.cash-quick-chip:hover {
+  background: var(--gm-action-soft);
+  border-color: var(--gm-action);
+  color: var(--gm-action);
+}
+
+.cash-quick-chip--active {
+  background: var(--gm-action);
+  border-color: var(--gm-action);
+  color: var(--gm-surface);
+}
+
+.cash-quick-chip--clear {
+  color: var(--gm-muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+.cash-opening-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+}
+
+.cash-opening-form__field {
+  flex: 1;
+  min-width: 220px;
+}
+
+.cash-opening-form__field label {
+  display: grid;
+  gap: var(--gm-space-2);
+  font-size: var(--gm-font-sm);
+  font-weight: 600;
+  color: var(--gm-ink);
+}
+
+.cash-opening-input {
+  font-size: var(--gm-font-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  height: 48px;
+}
+
+.cash-btn-open-shift {
+  height: 48px;
+  padding-inline: var(--gm-space-5);
+  font-weight: 800;
+  font-size: var(--gm-font-md);
+}
+
+.cash-opening-note small {
+  display: block;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+  line-height: 1.4;
+}
+
+.cash-hero-card__permission-msg {
+  margin: 0;
+  padding: var(--gm-space-3) var(--gm-space-4);
+  background: var(--gm-surface-soft);
+  border-radius: var(--gm-radius-md);
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+}
+
+/* ==========================================================================
+   EXTRATO DO CAIXA COM FILTROS
+   ========================================================================== */
+
+.cash-ledger__header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+}
+
+.cash-ledger__filter-tabs {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-lg);
+  gap: 2px;
+}
+
+.cash-tab-btn {
+  padding: var(--gm-space-1) var(--gm-space-3);
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+  color: var(--gm-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--gm-radius-md);
+  cursor: pointer;
+  transition: all var(--gm-duration-fast) var(--gm-ease-out);
+}
+
+.cash-tab-btn:hover {
+  color: var(--gm-ink);
+}
+
+.cash-tab-btn--active {
+  color: var(--gm-ink);
+  background: var(--gm-surface);
+  box-shadow: var(--gm-shadow-xs);
+  font-weight: 700;
+}
+
+.cash-entry-badge {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: var(--gm-font-sm);
+  flex-shrink: 0;
+}
+
+.cash-entry-badge.positive {
+  background: var(--gm-success-soft);
+  color: var(--gm-success);
+}
+
+.cash-entry-badge.negative {
+  background: var(--gm-danger-soft);
+  color: var(--gm-danger);
+}
+
+.cash-entry-val {
+  font-size: var(--gm-font-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cash-entry-val.positive {
+  color: var(--gm-success);
+}
+
+.cash-entry-val.negative {
+  color: var(--gm-danger);
+}
+
+/* ==========================================================================
+   RESULTADOS E MÉTODOS
+   ========================================================================== */
+
 .cash-notice {
   margin: 0;
   padding: var(--gm-space-3) var(--gm-space-4);
@@ -160,60 +793,17 @@
   border-radius: var(--gm-radius-md);
 }
 
-.cash-notice--warning,
-.cash-confirm {
+.cash-notice--warning {
   color: var(--gm-warning);
   background: var(--gm-warning-soft);
   border-color: var(--gm-warning);
-}
-
-.cash-pending {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gm-space-4);
-}
-
-.cash-pending > div,
-.cash-confirm,
-.cash-result__values > span,
-.cash-methods > span {
-  display: grid;
-  gap: var(--gm-space-1);
-}
-
-.cash-pending small,
-.cash-entry small,
-.cash-result small,
-.cash-methods small,
-.cash-approval small,
-.cash-responsibility small,
-.cash-tender-result small {
-  color: var(--gm-muted);
-}
-
-.cash-link {
-  color: var(--gm-link);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.cash-link:focus-visible {
-  outline: 3px solid var(--gm-focus);
-  outline-offset: 3px;
-}
-
-.cash-confirm {
-  padding: var(--gm-space-3);
-  border: 1px solid;
-  border-radius: var(--gm-radius-md);
 }
 
 .cash-methods,
 .cash-result__values,
 .cash-tender-result {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: var(--gm-space-3);
   margin-block: var(--gm-space-3);
 }
@@ -223,12 +813,52 @@
 .cash-tender-result > span {
   display: grid;
   gap: var(--gm-space-1);
-  padding: var(--gm-space-3);
+  padding: var(--gm-space-3) var(--gm-space-4);
   background: var(--gm-surface-soft);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
 }
 
+.cash-methods small,
+.cash-result small,
+.cash-tender-result small,
+.cash-approval small,
+.cash-responsibility small {
+  color: var(--gm-muted);
+}
+
+.cash-methods strong,
+.cash-result__values strong {
+  font-size: var(--gm-font-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-entry-list {
+  display: grid;
+}
+
+.cash-entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--gm-space-3);
+  padding-block: var(--gm-space-3);
+  border-top: 1px solid var(--gm-border);
+}
+
+.cash-entry > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cash-entry small {
+  color: var(--gm-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Administração e Histórico */
 .cash-alert-list,
 .cash-approval-list,
 .cash-terminal-list,
@@ -297,34 +927,419 @@
   border-top: 1px solid var(--gm-border);
 }
 
-.cash-entry-list {
-  display: grid;
-}
+/* ==========================================================================
+   ALERTAS OPERACIONAIS NO TOPO (Anomalias, Limite de Horário, etc.)
+   ========================================================================== */
 
-.cash-entry {
+.cash-top-alerts {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
   gap: var(--gm-space-3);
-  padding-block: var(--gm-space-3);
-  border-top: 1px solid var(--gm-border);
 }
 
-.cash-entry > span:nth-child(2) {
+.cash-top-alert-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--gm-space-3);
+}
+
+.cash-top-alert-content strong {
+  display: block;
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-top-alert-content p {
+  margin: 2px 0 0 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+/* ==========================================================================
+   BANNER E LISTA DE COMANDAS PENDENTES DE LIQUIDAÇÃO
+   ========================================================================== */
+
+.cash-pending-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+}
+
+.cash-pending-banner__text {
   display: grid;
-  min-width: 0;
+  gap: 2px;
+}
+
+.cash-pending-banner__header {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  color: var(--gm-warning);
+}
+
+.cash-pending-banner__header strong {
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-pending-banner__text p {
+  margin: 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-pending-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.cash-pending-tabs-list {
+  display: grid;
+  gap: var(--gm-space-2);
+  margin-top: var(--gm-space-3);
+  padding-top: var(--gm-space-3);
+  border-top: 1px dashed var(--gm-border);
+}
+
+.cash-pending-tab-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+  padding: var(--gm-space-2) var(--gm-space-3);
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+}
+
+.cash-pending-tab-item__info {
+  display: grid;
+  gap: 2px;
+}
+
+.cash-pending-tab-item__info strong {
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-pending-tab-item__info small {
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-pending-tab-item__action {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+/* ==========================================================================
+   CALCULADORA DE CÉDULAS E MOEDAS (DENOMINATION COUNTER)
+   ========================================================================== */
+
+.cash-btn-toggle-calculator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+  margin-left: auto;
+}
+
+.cash-denomination-calculator {
+  display: grid;
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-4);
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-lg);
+  box-shadow: var(--gm-shadow-xs);
+}
+
+.cash-denomination-calculator__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-denomination-calculator__header strong {
+  color: var(--gm-ink);
+}
+
+.cash-denomination-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--gm-space-3);
+}
+
+.cash-denomination-item {
+  display: grid;
+  gap: var(--gm-space-1);
+  padding: var(--gm-space-2) var(--gm-space-3);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  transition: border-color var(--gm-duration-fast);
+}
+
+.cash-denomination-item:focus-within {
+  border-color: var(--gm-action);
+}
+
+.cash-denomination-item__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--gm-space-1);
 }
 
-.cash-entry small {
-  overflow-wrap: anywhere;
+.cash-denomination-item__label strong {
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+  font-variant-numeric: tabular-nums;
 }
 
-.cash-open-card .inline-action-form {
-  max-width: 480px;
+.cash-denom-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: var(--gm-radius-sm);
 }
 
-@media (max-width: 520px) {
+.cash-denom-type.bill {
+  color: var(--gm-success);
+  background: var(--gm-success-soft);
+}
+
+.cash-denom-type.coin {
+  color: var(--gm-action);
+  background: var(--gm-action-soft);
+}
+
+.cash-denomination-item input {
+  font-size: var(--gm-font-md);
+  font-weight: 700;
+  text-align: right;
+  height: 36px;
+}
+
+.cash-denomination-subtotal {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gm-muted);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-denomination-total-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gm-space-3) var(--gm-space-4);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  font-size: var(--gm-font-sm);
+  color: var(--gm-ink);
+}
+
+.cash-denomination-total-bar strong {
+  font-size: var(--gm-font-lg);
+  font-weight: 800;
+  color: var(--gm-success);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   COMPROVANTE OFICIAL DE FECHAMENTO (SLIP TÉRMICO E IMPRESSÃO)
+   ========================================================================== */
+
+.cash-result__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--gm-space-2);
+}
+
+.cash-slip-receipt {
+  max-width: 380px;
+  margin: 0 auto;
+  padding: var(--gm-space-4);
+  background: var(--gm-surface);
+  border: 1px dashed var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  font-family: monospace, var(--gm-font-family, system-ui);
+  color: var(--gm-ink);
+  box-shadow: var(--gm-shadow-xs);
+}
+
+.cash-slip-receipt__header {
+  text-align: center;
+  margin-bottom: var(--gm-space-3);
+}
+
+.cash-slip-receipt__header h3 {
+  margin: 0;
+  font-size: var(--gm-font-md);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cash-slip-receipt__header p {
+  margin: 2px 0;
+  font-size: var(--gm-font-xs);
+  color: var(--gm-muted);
+}
+
+.cash-slip-receipt__header small {
+  font-size: 11px;
+  color: var(--gm-muted);
+}
+
+.cash-slip-receipt__section {
+  display: grid;
+  gap: 3px;
+  font-size: var(--gm-font-xs);
+  margin-block: var(--gm-space-2);
+}
+
+.cash-slip-receipt__section p {
+  margin: 0;
+}
+
+.cash-slip-receipt__divider {
+  border-top: 1px dashed var(--gm-border);
+  margin-block: var(--gm-space-3);
+}
+
+.cash-slip-receipt__values {
+  display: grid;
+  gap: var(--gm-space-1);
+  font-size: var(--gm-font-xs);
+}
+
+.cash-slip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.cash-slip-row--highlight {
+  padding-block: 4px;
+  border-top: 1px solid var(--gm-border);
+  border-bottom: 1px solid var(--gm-border);
+  font-weight: 700;
+}
+
+.cash-slip-receipt__signatures {
+  display: grid;
+  gap: var(--gm-space-5);
+  margin-top: var(--gm-space-5);
+  padding-top: var(--gm-space-3);
+}
+
+.cash-slip-sign-line {
+  border-top: 1px solid var(--gm-ink);
+  text-align: center;
+  padding-top: 4px;
+}
+
+.cash-slip-sign-line span {
+  font-size: 10px;
+  color: var(--gm-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cash-slip-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gm-space-2);
+  margin-top: var(--gm-space-4);
+  padding-top: var(--gm-space-3);
+  border-top: 1px solid var(--gm-border);
+}
+
+/* Formatação Térmica na Impressão */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #cash-closure-slip,
+  #cash-closure-slip * {
+    visibility: visible;
+  }
+
+  #cash-closure-slip {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: 80mm;
+    padding: 2mm;
+    margin: 0;
+    border: none;
+    box-shadow: none;
+    font-size: 11px;
+    color: #000;
+    background: #fff;
+  }
+
+  .cash-slip-sign-line {
+    border-top-color: #000;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVIDADE MOBILE (375px a 520px)
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  .cash-operation-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: var(--gm-space-4);
+  }
+
+  .cash-operation-header__actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .cash-action-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-opening-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cash-btn-open-shift {
+    width: 100%;
+  }
+
+  .cash-ledger__header-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cash-ledger__filter-tabs {
+    display: flex;
+    overflow-x: auto;
+  }
+
   .cash-registers .card-header {
     align-items: flex-start;
   }
@@ -343,9 +1358,31 @@
     width: 100%;
   }
 
-  .cash-pending {
-    align-items: flex-start;
+  .cash-pending-banner {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cash-pending-tab-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .cash-pending-tab-item__action {
+    justify-content: space-between;
+  }
+
+  .cash-denomination-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .cash-btn-toggle-calculator {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .cash-closure-step__header {
+    flex-wrap: wrap;
   }
 
   .cash-alert-list > p,
@@ -355,6 +1392,15 @@
   }
 
   .cash-history__exports {
+    flex-wrap: wrap;
+  }
+
+  .cash-result .card-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cash-result__header-actions {
     flex-wrap: wrap;
   }
 

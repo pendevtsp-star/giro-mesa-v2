@@ -63,7 +63,7 @@ Directory-based community: tests/e2e
 | test:ativação informa as pendências reais e direciona para a próxima etapa@L196 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/billing-design.spec.ts | 196-225 |
 | test:A jornada cobre a apresentação responsiva.@L199 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/billing-design.spec.ts | 199-199 |
 
-*... and 10 more members.*
+*... and 9 more members.*
 
 ## Execution Flows
 
@@ -79,13 +79,13 @@ No execution flows pass through this community.
 - `endsWith` (69 edge(s))
 - `getByText` (56 edge(s))
 - `click` (53 edge(s))
-- `fulfill` (38 edge(s))
+- `fulfill` (37 edge(s))
 - `goto` (35 edge(s))
 - `evaluate` (31 edge(s))
 - `toBe` (29 edge(s))
 - `getByLabel` (28 edge(s))
 - `locator` (26 edge(s))
-- `route` (23 edge(s))
+- `route` (22 edge(s))
 - `toHaveAttribute` (21 edge(s))
 - `setViewportSize` (17 edge(s))
 

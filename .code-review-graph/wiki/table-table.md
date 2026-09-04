@@ -41,8 +41,6 @@ Directory-based community: packages/ui
 | Drawer | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Drawer/Drawer.tsx | 5-48 |
 | EmptyState | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/EmptyState/EmptyState.tsx | 3-24 |
 | FormField | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/FormField/FormField.tsx | 3-30 |
-| IconName | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx | 3-39 |
-| Icon | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx | 267-290 |
 | Label | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Label/Label.tsx | 4-13 |
 | Modal | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx | 8-85 |
 | requestClose | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx | 30-34 |
@@ -62,8 +60,10 @@ Directory-based community: packages/ui
 | SwitchProps | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx | 4-7 |
 | Switch | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx | 9-44 |
 | Table | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 4-12 |
+| TableHeader | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 13-21 |
+| TableBody | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 22-30 |
 
-*... and 22 more members.*
+*... and 20 more members.*
 
 ## Execution Flows
 
@@ -78,6 +78,7 @@ No execution flows pass through this community.
 - `expect` (25 edge(s))
 - `ReactNode` (18 edge(s))
 - `HTMLAttributes` (9 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx::Icon` (6 edge(s))
 - `useEffect` (4 edge(s))
 - `onClose` (2 edge(s))
 - `stopPropagation` (2 edge(s))
@@ -87,7 +88,6 @@ No execution flows pass through this community.
 - `close` (2 edge(s))
 - `VariantProps` (1 edge(s))
 - `alertVariants` (1 edge(s))
-- `badgeVariants` (1 edge(s))
 
 ### Incoming
 
@@ -99,10 +99,10 @@ No execution flows pass through this community.
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Accordion/Accordion.tsx` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Pagination/Pagination.tsx` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Alert/Alert.tsx` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Button/Button.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Separator/Separator.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Toast/Toast.tsx` (2 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/layouts/KanbanBoard/KanbanBoard.tsx` (2 edge(s))

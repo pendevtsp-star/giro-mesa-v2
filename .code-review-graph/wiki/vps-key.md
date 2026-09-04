@@ -22,9 +22,6 @@ Directory-based community: deploy/vps
 | views | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 6-13 |
 | valid | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 16-57 |
 | cleanup_attestation_stage | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/verify-image-provenance.sh | 30-30 |
-| read_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 20-38 |
-| require_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 40-49 |
-| write_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh | 51-58 |
 
 ## Execution Flows
 
@@ -36,23 +33,22 @@ No execution flows pass through this community.
 
 - `isinstance` (18 edge(s))
 - `get` (13 edge(s))
-- `return` (8 edge(s))
 - `docker` (8 edge(s))
 - `bool` (7 edge(s))
-- `true` (6 edge(s))
-- `printf` (6 edge(s))
-- `echo` (6 edge(s))
+- `return` (6 edge(s))
+- `echo` (5 edge(s))
+- `true` (4 edge(s))
 - `"${current_compose[@]}"` (4 edge(s))
-- `grep` (3 edge(s))
+- `printf` (3 edge(s))
 - `sleep` (3 edge(s))
-- `shift` (2 edge(s))
-- `exit` (2 edge(s))
+- `grep` (2 edge(s))
 - `ln` (2 edge(s))
 - `python3` (2 edge(s))
+- `rm` (2 edge(s))
+- `seq` (2 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/bootstrap-env.sh` (92 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/rollback-app.sh` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/preserve-legacy-providers.sh` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/ensure-cloudflare-dns.sh` (3 edge(s))

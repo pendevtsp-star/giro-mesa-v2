@@ -63,7 +63,7 @@ Directory-based community: apps/frontends
 | PublicActions | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/PublicActions.tsx | 11-162 |
 | TableConsumptionPanel | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/PublicActions.tsx | 164-234 |
 
-*... and 2761 more members.*
+*... and 2269 more members.*
 
 ## Execution Flows
 
@@ -76,36 +76,36 @@ Directory-based community: apps/frontends
 
 ### Outgoing
 
-- `useState` (1274 edge(s))
-- `map` (1153 edge(s))
-- `Button` (934 edge(s))
-- `expect` (845 edge(s))
-- `trim` (556 edge(s))
-- `Input` (548 edge(s))
-- `filter` (451 edge(s))
-- `Label` (362 edge(s))
-- `setBusy` (360 edge(s))
-- `setFeedback` (342 edge(s))
-- `toBe` (309 edge(s))
-- `Card` (286 edge(s))
-- `includes` (274 edge(s))
-- `Badge` (260 edge(s))
-- `find` (249 edge(s))
+- `useState` (986 edge(s))
+- `map` (876 edge(s))
+- `expect` (806 edge(s))
+- `Button` (734 edge(s))
+- `Input` (452 edge(s))
+- `trim` (445 edge(s))
+- `Label` (345 edge(s))
+- `setBusy` (344 edge(s))
+- `filter` (341 edge(s))
+- `setFeedback` (302 edge(s))
+- `toBe` (297 edge(s))
+- `Card` (236 edge(s))
+- `includes` (219 edge(s))
+- `NativeSelect` (206 edge(s))
+- `Badge` (197 edge(s))
 
 ### Incoming
 
-- `expect` (845 edge(s))
-- `toBe` (309 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/management.shared.tsx` (221 edge(s))
-- `toEqual` (137 edge(s))
-- `toContain` (133 edge(s))
+- `expect` (806 edge(s))
+- `toBe` (297 edge(s))
+- `toContain` (132 edge(s))
+- `toEqual` (129 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/platform.tsx` (104 edge(s))
 - `equal` (100 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/operations.shared.tsx` (99 edge(s))
-- `toMatchObject` (97 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/people/PeoplePage.tsx` (66 edge(s))
+- `toMatchObject` (87 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/shell/OperationalApp.tsx::OperationalApp` (67 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/fiscal/FiscalPages.tsx` (64 edge(s))
 - `objectContaining` (63 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/kds/KdsPage.tsx` (62 edge(s))
 - `stringify` (61 edge(s))
 - `fn` (60 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/counter/CounterWorkspace.tsx` (58 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/reports/ReportsPage.tsx` (56 edge(s))
