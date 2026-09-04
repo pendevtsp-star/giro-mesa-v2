@@ -52858,6 +52858,18 @@ export interface operations {
               mfaCode?: string;
             };
           };
+          expressAccess?: {
+            roles: (
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+            )[];
+            pin: string;
+          };
         };
       };
     };
@@ -52944,6 +52956,18 @@ export interface operations {
               currentPassword?: string;
               mfaCode?: string;
             };
+          };
+          expressAccess?: {
+            roles: (
+              | "waiter"
+              | "cashier"
+              | "receptionist"
+              | "busser"
+              | "kds"
+              | "delivery"
+              | "inventory"
+            )[];
+            pin: string;
           };
         };
       };

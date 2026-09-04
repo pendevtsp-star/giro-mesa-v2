@@ -100157,6 +100157,36 @@
                     "required": [
                       "email"
                     ]
+                  },
+                  "expressAccess": {
+                    "type": "object",
+                    "properties": {
+                      "roles": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "waiter",
+                            "cashier",
+                            "receptionist",
+                            "busser",
+                            "kds",
+                            "delivery",
+                            "inventory"
+                          ]
+                        }
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "roles",
+                      "pin"
+                    ]
                   }
                 },
                 "required": [
@@ -100332,6 +100362,36 @@
                     },
                     "required": [
                       "email"
+                    ]
+                  },
+                  "expressAccess": {
+                    "type": "object",
+                    "properties": {
+                      "roles": {
+                        "minItems": 1,
+                        "maxItems": 7,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "waiter",
+                            "cashier",
+                            "receptionist",
+                            "busser",
+                            "kds",
+                            "delivery",
+                            "inventory"
+                          ]
+                        }
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{6}$"
+                      }
+                    },
+                    "required": [
+                      "roles",
+                      "pin"
                     ]
                   }
                 },
