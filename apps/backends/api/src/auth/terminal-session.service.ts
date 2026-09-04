@@ -3,8 +3,6 @@ import {
   auditEvents,
   authSessions,
   identities,
-  managementPeople,
-  managementPersonAccess,
   memberships,
   organizations,
   passwordCredentials,
@@ -325,24 +323,6 @@ export class TerminalSessionService {
         .from(memberships)
         .innerJoin(identities, eq(identities.id, memberships.identityId))
         .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-        .innerJoin(
-          managementPersonAccess,
-          and(
-            eq(managementPersonAccess.membershipId, memberships.id),
-            eq(managementPersonAccess.organizationId, terminal.organizationId),
-            eq(managementPersonAccess.unitId, terminal.unitId),
-            eq(managementPersonAccess.status, "active"),
-          ),
-        )
-        .innerJoin(
-          managementPeople,
-          and(
-            eq(managementPeople.id, managementPersonAccess.personId),
-            eq(managementPeople.organizationId, terminal.organizationId),
-            eq(managementPeople.identityId, identities.id),
-            eq(managementPeople.active, true),
-          ),
-        )
         .innerJoin(terminalOperatorPins, eq(terminalOperatorPins.membershipId, memberships.id))
         .where(
           and(
@@ -673,24 +653,6 @@ export class TerminalSessionService {
       .innerJoin(memberships, eq(memberships.id, terminalSessions.activeActorMembershipId))
       .innerJoin(identities, eq(identities.id, memberships.identityId))
       .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-      .innerJoin(
-        managementPersonAccess,
-        and(
-          eq(managementPersonAccess.membershipId, memberships.id),
-          eq(managementPersonAccess.organizationId, terminalSessions.organizationId),
-          eq(managementPersonAccess.unitId, terminalSessions.unitId),
-          eq(managementPersonAccess.status, "active"),
-        ),
-      )
-      .innerJoin(
-        managementPeople,
-        and(
-          eq(managementPeople.id, managementPersonAccess.personId),
-          eq(managementPeople.organizationId, terminalSessions.organizationId),
-          eq(managementPeople.identityId, identities.id),
-          eq(managementPeople.active, true),
-        ),
-      )
       .innerJoin(terminalOperatorPins, eq(terminalOperatorPins.membershipId, memberships.id))
       .where(
         and(
@@ -761,24 +723,6 @@ export class TerminalSessionService {
       .from(memberships)
       .innerJoin(identities, eq(identities.id, memberships.identityId))
       .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
-      .innerJoin(
-        managementPersonAccess,
-        and(
-          eq(managementPersonAccess.membershipId, memberships.id),
-          eq(managementPersonAccess.organizationId, organizationId),
-          eq(managementPersonAccess.unitId, unitId),
-          eq(managementPersonAccess.status, "active"),
-        ),
-      )
-      .innerJoin(
-        managementPeople,
-        and(
-          eq(managementPeople.id, managementPersonAccess.personId),
-          eq(managementPeople.organizationId, organizationId),
-          eq(managementPeople.identityId, identities.id),
-          eq(managementPeople.active, true),
-        ),
-      )
       .innerJoin(terminalOperatorPins, eq(terminalOperatorPins.membershipId, memberships.id))
       .where(
         and(
