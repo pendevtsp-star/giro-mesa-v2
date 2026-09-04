@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyState,
+  Icon,
   Input,
   Modal,
   NativeSelect,
@@ -71,6 +72,7 @@ import {
 } from "./kds.model";
 import {
   type KdsArea,
+  kdsAreaHref,
   kdsStoragePrefix,
   saveKdsLastOperationalArea,
   saveKdsStationLabel,
@@ -361,6 +363,15 @@ function TicketCard({
     : (ticket.eta?.remainingMinutes ?? ticket.eta?.p50Minutes ?? null);
   const ticketAdvanceBlocked =
     blockedItems.length > 0 || (next === "ready" && attentionPending.length > 0);
+  const targetMinutes = Math.max(1, sla.targetMinutes);
+  const slaPercent = Math.min(100, Math.round((sla.elapsedMinutes / targetMinutes) * 100));
+  const slaTone = sla.isOverdue
+    ? "danger"
+    : slaPercent >= 80
+      ? "warning"
+      : slaPercent >= 50
+        ? "info"
+        : "success";
   return (
     <article
       aria-label={`Ticket ${reference}`}
@@ -386,12 +397,28 @@ function TicketCard({
           </div>
         </header>
 
+        <div
+          aria-label={`Tempo decorrido: ${sla.elapsedMinutes} de ${sla.targetMinutes} min (${slaPercent}%)`}
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={slaPercent}
+          className={`real-kds-card__sla-track real-kds-card__sla-track--${slaTone}`}
+          role="progressbar"
+        >
+          <div
+            className={`real-kds-card__sla-fill real-kds-card__sla-fill--${slaTone}`}
+            style={{ width: `${slaPercent}%` }}
+          />
+        </div>
+
         <div className="real-kds-card__meta">
-          <strong className={sla.isOverdue ? "kds-timer kds-timer--overdue" : "kds-timer"}>
-            {sla.elapsedMinutes} min
-          </strong>
-          <span>Meta {sla.targetMinutes} min</span>
-          {sla.isOverdue && <span>{sla.overdueMinutes} min atrasado</span>}
+          <div className="real-kds-card__timer-wrap">
+            <strong className={sla.isOverdue ? "kds-timer kds-timer--overdue" : "kds-timer"}>
+              {sla.elapsedMinutes} min
+            </strong>
+            <span className="kds-timer-target">/ {sla.targetMinutes} min</span>
+            {sla.isOverdue && <Badge tone="danger">+{sla.overdueMinutes} min atrasado</Badge>}
+          </div>
           {kdsChannelLabel(ticket.channel) && <span>{kdsChannelLabel(ticket.channel)}</span>}
           {ticket.customerName && <span>{ticket.customerName}</span>}
           {formatTime(ticket.promisedAt) && <span>Prometido {formatTime(ticket.promisedAt)}</span>}
@@ -695,11 +722,13 @@ function TicketCard({
             aria-busy={cardBusy}
             aria-describedby={ticketAdvanceBlocked ? `kds-blocker-${ticket.id}` : undefined}
             aria-keyshortcuts="Enter Space"
+            className="real-kds-card__bump-btn"
             data-kds-bump
             disabled={cardBusy || items.length === 0 || ticketAdvanceBlocked}
             onClick={() => onTicketState(ticket, next as "preparing" | "ready")}
           >
-            {cardBusy ? "Confirmando…" : kdsActionLabel[ticket.status]}
+            <span>{cardBusy ? "Confirmando…" : kdsActionLabel[ticket.status]}</span>
+            <kbd className="real-kds-card__bump-kbd">↵ Bump</kbd>
           </Button>
         )}
 
@@ -2201,6 +2230,43 @@ export function RealKdsPage({
               {liveMessage}
             </p>
 
+            <nav aria-label="Navegação da produção KDS" className="kds-tabs">
+              <a
+                aria-current={
+                  operationalViewMode === "station" && area !== "settings" ? "page" : undefined
+                }
+                className={`kds-tab ${operationalViewMode === "station" && area !== "settings" ? "kds-tab--active" : ""}`}
+                href={kdsAreaHref("station")}
+              >
+                <Icon name="kds" size={16} />
+                <span className="kds-tab__label">Estação de preparo</span>
+                <Badge tone={activeTickets.length > 0 ? "neutral" : "info"}>
+                  {activeTickets.length}
+                </Badge>
+              </a>
+              <a
+                aria-current={
+                  operationalViewMode === "pass" && area !== "settings" ? "page" : undefined
+                }
+                className={`kds-tab ${operationalViewMode === "pass" && area !== "settings" ? "kds-tab--active" : ""}`}
+                href={kdsAreaHref("pass")}
+              >
+                <Icon name="check" size={16} />
+                <span className="kds-tab__label">Passe / expedição</span>
+                <Badge tone={orders.size > 0 ? "warning" : "neutral"}>{orders.size}</Badge>
+              </a>
+              {canManageUnitSettings && (
+                <a
+                  aria-current={area === "settings" ? "page" : undefined}
+                  className={`kds-tab ${area === "settings" ? "kds-tab--active" : ""}`}
+                  href={kdsAreaHref("settings")}
+                >
+                  <Icon name="settings" size={16} />
+                  <span className="kds-tab__label">Configurações</span>
+                </a>
+              )}
+            </nav>
+
             {area === "settings" && !canManageUnitSettings ? (
               <EmptyState
                 description="As configurações da produção exigem permissão de gestão do Cardápio."
@@ -2287,7 +2353,7 @@ export function RealKdsPage({
               <>
                 <div className="kds-command-bar">
                   <div className="kds-operational-context">
-                    <span className="gm-pill">Área operacional</span>
+                    <Badge tone="neutral">Produção KDS</Badge>
                     {operationalViewMode === "station" && (
                       <div className="kds-station-context">
                         <strong>{stationName}</strong>
@@ -2591,14 +2657,29 @@ export function RealKdsPage({
                                   </span>
                                 </header>
                                 <div className="kds-pass-stations">
-                                  {tickets.map((ticket) => (
-                                    <span key={ticket.id}>
-                                      <strong>{kdsStationLabel(ticket)}</strong>
-                                      <Badge tone={statusTone(ticket.status)}>
-                                        {inPass ? "No passe" : KDS_STATUS_LABEL[ticket.status]}
-                                      </Badge>
-                                    </span>
-                                  ))}
+                                  {tickets.map((ticket) => {
+                                    const isStationReady =
+                                      inPass ||
+                                      ticket.status === "ready" ||
+                                      ticket.status === "done";
+                                    return (
+                                      <div
+                                        className={`kds-pass-station-chip ${isStationReady ? "kds-pass-station-chip--ready" : ""}`}
+                                        key={ticket.id}
+                                      >
+                                        <span
+                                          aria-hidden="true"
+                                          className="kds-pass-station-chip__icon"
+                                        >
+                                          {isStationReady ? "✓" : "⏳"}
+                                        </span>
+                                        <strong>{kdsStationLabel(ticket)}</strong>
+                                        <Badge tone={statusTone(ticket.status)}>
+                                          {inPass ? "No passe" : KDS_STATUS_LABEL[ticket.status]}
+                                        </Badge>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                                 <ul className="kds-pass-items">
                                   {tickets.flatMap((ticket) =>

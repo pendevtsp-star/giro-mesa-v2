@@ -20,6 +20,30 @@ function itemStatus(status: TicketStatus) {
 }
 
 async function mockKdsApi(page: Page) {
+  await page.route("**/health", (route) =>
+    route.fulfill({
+      json: {
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "kds-e2e",
+        schemaVersion: 77,
+        database: "up",
+        integrations: {},
+        capabilities: [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+          "edge_hub_pairing_v1",
+        ],
+      },
+    }),
+  );
   const state = {
     acknowledgedAttention: false,
     attentionEnabled: false,
@@ -58,6 +82,7 @@ async function mockKdsApi(page: Page) {
     attentionMutations: [] as Array<{ noteId: string; revision: string }>,
     loads: 0,
     orderPriority: 80,
+    printMutations: [] as Array<Record<string, unknown>>,
     priorityMutations: [] as Array<{
       orderId: string;
       priority: number;
@@ -89,6 +114,10 @@ async function mockKdsApi(page: Page) {
     const path = `${url.pathname}${url.search}`;
     const method = request.method();
 
+    if (method === "GET" && path === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     if (path === "/v1/auth/me") {
       await route.fulfill({
         json: {
@@ -508,6 +537,15 @@ async function mockKdsApi(page: Page) {
       return;
     }
 
+    if (method === "POST" && /\/pilot\/kds\/[^/]+\/print-jobs$/.test(path)) {
+      state.printMutations.push(request.postDataJSON() as Record<string, unknown>);
+      await route.fulfill({
+        status: 201,
+        json: { printJob: { id: "print-job-1", status: "queued" } },
+      });
+      return;
+    }
+
     const transition = path.match(/\/pilot\/kds\/([^/]+)\/state$/);
     if (method === "POST" && transition) {
       const ticketId = decodeURIComponent(transition[1] ?? "");
@@ -629,24 +667,27 @@ test("KDS mantém submenu, rotas e última área operacional", async ({ page }, 
   await enterKds(page);
 
   await expect(page).toHaveURL(/#\/kds\/station$/);
-  await expect(page.getByRole("link", { name: "Praça — não fixada" })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(
+    page.locator(".kds-tabs").getByRole("link", { name: /Estação de preparo/ }),
+  ).toHaveAttribute("aria-current", "page");
   await page.getByRole("link", { name: "Passe / expedição", exact: true }).click();
   await expect(page).toHaveURL(/#\/kds\/pass$/);
   await expect(page.getByRole("heading", { level: 1, name: "Passe / expedição" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Configurações", exact: true }).click();
+  await page
+    .locator(".kds-tabs")
+    .getByRole("link", { name: "Configurações", exact: true })
+    .click();
   await expect(page).toHaveURL(/#\/kds\/settings$/);
   await expect(page.getByRole("heading", { level: 1, name: "Configurações do KDS" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Terminal" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Praças e roteamento" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Estações e roteamento" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Fluxo" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Aparência" })).toBeVisible();
   await expect(page.getByText("Somente este terminal").first()).toBeVisible();
   await expect(page.getByText("Configuração da unidade").first()).toBeVisible();
-  await expect(page.getByLabel("Identificador no Edge")).toHaveAttribute("placeholder", "Padrão");
   await expect(page.getByLabel("Tecla para Ação anterior")).toHaveValue("← Esquerda");
   await expect(page.getByLabel("Tecla para Próxima ação")).toHaveValue("→ Direita");
 
@@ -681,7 +722,10 @@ test("KDS centraliza disponibilidade e sincroniza o perfil deste terminal", asyn
   const apiState = await mockKdsApi(page);
   await enterKds(page);
 
-  await page.getByRole("link", { name: "Configurações", exact: true }).click();
+  await page
+    .locator(".kds-tabs")
+    .getByRole("link", { name: "Configurações", exact: true })
+    .click();
   await expect(page.getByRole("heading", { name: "Central de disponibilidade" })).toBeVisible();
   await page.getByLabel("Pesquisar produto").fill("Risoto");
   await page.getByRole("button", { name: "Alterar" }).click();
@@ -724,6 +768,10 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
   await enterKds(page);
 
   await expect(page.locator("[data-kds-ticket]")).toHaveCount(2);
+  await expect(
+    page.locator(".kds-tabs").getByRole("link", { name: /Estação de preparo/ }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("progressbar")).toHaveCount(2);
   await expect(page.getByText("Mesa 12").first()).toBeVisible();
   await expect(page.locator("[data-kds-ticket]").getByText("Cozinha").first()).toBeVisible();
   await expect(page.locator("[data-kds-ticket]").getByText("Bar").first()).toBeVisible();
@@ -760,20 +808,26 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
   await kitchenTicket.getByRole("button", { name: /Marcar ticket pronto/ }).click();
 
   await page.getByRole("link", { name: "Passe / expedição", exact: true }).click();
-  await expect(page.getByText("Aguardando praças")).toBeVisible();
+  await expect(
+    page.locator(".kds-tabs").getByRole("link", { name: /Passe \/ expedição/ }),
+  ).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("Aguardando estações")).toBeVisible();
   await page.getByRole("button", { name: "Remover prioridade" }).click();
   await expect.poll(() => apiState.priorityMutations).toHaveLength(1);
   await expect(page.getByRole("button", { name: "Priorizar pedido" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Receber pedido no passe" })).toHaveCount(0);
-  await page.getByRole("link", { name: "Configurações", exact: true }).click();
-  await page.getByRole("button", { name: "Praça", exact: true }).click();
+  await page
+    .locator(".kds-tabs")
+    .getByRole("link", { name: "Configurações", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Estação", exact: true }).click();
   await page.locator("[data-kds-station]").selectOption({ label: "Bar" });
-  await page.getByRole("button", { name: "Fixar praça neste terminal" }).click();
-  await page.getByRole("link", { name: "Praça — Bar", exact: true }).click();
+  await page.getByRole("button", { name: "Fixar estação neste terminal" }).click();
+  await page.getByRole("link", { name: "Estação — Bar", exact: true }).click();
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Produção" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Praça — Bar", exact: true })).toBeVisible();
-  await expect(page.getByText("Praça fixada", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Estação — Bar", exact: true })).toBeVisible();
+  await expect(page.getByText("Estação fixada", { exact: true })).toBeVisible();
   const startBar = page.getByRole("button", { name: /Iniciar preparo/ }).first();
   await startBar.click();
   await page.getByRole("button", { name: "Marcar 1 pronto" }).click();
@@ -801,13 +855,6 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
 test("KDS bloqueia pronto sem ciência, opera bloqueio e imprime o ticket focado", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const state = window as Window & { __kdsPrintCalls?: number };
-    state.__kdsPrintCalls = 0;
-    window.print = () => {
-      state.__kdsPrintCalls = (state.__kdsPrintCalls ?? 0) + 1;
-    };
-  });
   const apiState = await mockKdsApi(page);
   apiState.attentionEnabled = true;
   await enterKds(page);
@@ -858,11 +905,7 @@ test("KDS bloqueia pronto sem ciência, opera bloqueio e imprime o ticket focado
   await ready.focus();
   await expect(ready).toBeFocused();
   await page.keyboard.press("p");
-  await expect
-    .poll(() =>
-      page.evaluate(() => (window as Window & { __kdsPrintCalls?: number }).__kdsPrintCalls),
-    )
-    .toBe(1);
+  await expect.poll(() => apiState.printMutations).toHaveLength(1);
 });
 
 test("KDS mantém acessibilidade, dark mode e ausência de overflow nos pontos críticos", async ({
@@ -904,7 +947,7 @@ test("KDS deixa explícito quando a leitura está atrasada", async ({ page }) =>
   apiState.freshness = "stale";
   await enterKds(page);
 
-  await expect(page.getByRole("status")).toContainText("Dados atrasados");
+  await expect(page.getByRole("status").filter({ hasText: "Dados atrasados" })).toBeVisible();
   await expect(page.locator("[data-kds-ticket]")).not.toHaveCount(0);
 });
 

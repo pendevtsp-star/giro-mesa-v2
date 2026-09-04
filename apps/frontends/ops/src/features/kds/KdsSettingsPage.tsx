@@ -143,9 +143,7 @@ export function KdsSettingsPage({
         <Card className="kds-settings-card">
           <header className="kds-settings-card__header">
             <div>
-              <span className="gm-pill" data-tone="info">
-                Somente este terminal
-              </span>
+              <Badge tone="info">Somente este terminal</Badge>
               <h2>Terminal</h2>
               <p>Defina a estação, confira conexão e prepare este equipamento para o turno.</p>
             </div>
@@ -268,7 +266,7 @@ export function KdsSettingsPage({
         <Card className="kds-settings-card">
           <header className="kds-settings-card__header">
             <div>
-              <span className="gm-pill">Configuração da unidade</span>
+              <Badge tone="neutral">Configuração da unidade</Badge>
               <h2>Estações e roteamento</h2>
               <p>Leitura das estações publicadas para esta unidade e da capacidade informada.</p>
             </div>
@@ -361,7 +359,7 @@ export function KdsSettingsPage({
         <Card className="kds-settings-card">
           <header className="kds-settings-card__header">
             <div>
-              <span className="gm-pill">Configuração da unidade</span>
+              <Badge tone="neutral">Configuração da unidade</Badge>
               <h2>Fluxo</h2>
               <p>Comportamentos habilitados pelo contrato operacional atual.</p>
             </div>
@@ -397,9 +395,7 @@ export function KdsSettingsPage({
         <Card className="kds-settings-card">
           <header className="kds-settings-card__header">
             <div>
-              <span className="gm-pill" data-tone="info">
-                Somente este terminal
-              </span>
+              <Badge tone="info">Somente este terminal</Badge>
               <h2>Aparência</h2>
               <p>Preferências visuais e de atenção deste navegador.</p>
             </div>
