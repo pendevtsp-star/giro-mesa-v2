@@ -164,6 +164,31 @@ async function mockPeopleApi(
     assignments: [] as CapturedRequest[],
   };
 
+  await page.route("**/health", (route) =>
+    route.fulfill({
+      json: {
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "people-e2e",
+        schemaVersion: 77,
+        database: "up",
+        integrations: {},
+        capabilities: [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+          "edge_hub_pairing_v1",
+        ],
+      },
+    }),
+  );
+
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -705,7 +730,7 @@ test("Pessoas navega, filtra e executa fluxos reais sem diálogos nativos", asyn
   const personDialog = page.getByRole("dialog", { name: "Bruno Lima" });
   await expect(personDialog.getByRole("heading", { name: "Escalas recentes" })).toBeVisible();
   await expect(personDialog.getByText(/30 min de intervalo/)).toBeVisible();
-  await personDialog.getByRole("button", { name: "Fechar" }).click();
+  await personDialog.getByRole("button", { name: "Fechar", exact: true }).click();
 
   await page.getByLabel("Filtrar situação da pessoa").selectOption("all");
   const commissionCard = page.locator(".people-commission-card");
@@ -827,18 +852,33 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
   const createDialog = page.getByRole("dialog", { name: "Novo funcionário" });
   await createDialog.getByLabel("Nome").fill("Felipe Nunes");
   await createDialog.getByLabel("Função").fill("Garçom");
-  await createDialog.getByLabel(/Também terá acesso/).check();
-  await createDialog.getByLabel("E-mail de acesso").fill("FELIPE@GIROMESA.TEST");
-  await createDialog.getByLabel("Perfil de acesso").selectOption("waiter");
+  await createDialog.getByRole("radio", { name: /Trabalhar agora com PIN/ }).check();
+  await createDialog.getByLabel("PIN de 6 dígitos").fill("123456");
+  await createDialog.getByLabel("Confirmar PIN").fill("123456");
+  await createDialog.getByRole("checkbox", { name: /Garçom/ }).check();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await createDialog.getByRole("button", { name: "Cadastrar e convidar" }).click();
+  await createDialog.getByRole("button", { name: "Cadastrar e habilitar" }).click();
   await expect.poll(() => captured.peopleCreates.length).toBe(1);
   expect(captured.peopleCreates[0]).toMatchObject({
     name: "Felipe Nunes",
     roleLabel: "Garçom",
-    access: { email: "felipe@giromesa.test", role: "waiter" },
+    expressAccess: { roles: ["waiter"], pin: "123456" },
+  });
+
+  await page.getByRole("button", { name: "Novo funcionário", exact: true }).click();
+  await createDialog.getByLabel("Nome").fill("Fernanda Alves");
+  await createDialog.getByLabel("Função").fill("Garçom");
+  await createDialog.getByRole("radio", { name: /Convidar por e-mail/ }).check();
+  await createDialog.getByLabel("E-mail de acesso").fill("FERNANDA@GIROMESA.TEST");
+  await createDialog.getByRole("checkbox", { name: /Garçom/ }).check();
+  await createDialog.getByRole("button", { name: "Cadastrar e convidar" }).click();
+  await expect.poll(() => captured.peopleCreates.length).toBe(2);
+  expect(captured.peopleCreates[1]).toMatchObject({
+    name: "Fernanda Alves",
+    roleLabel: "Garçom",
+    access: { email: "fernanda@giromesa.test", roles: ["waiter"] },
   });
 
   const teamCard = page
@@ -854,10 +894,10 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
   await bruno.getByRole("button", { name: "Conceder acesso" }).click();
   const invite = page.getByRole("dialog", { name: "Conceder acesso" });
   await invite.getByLabel("E-mail de acesso").fill("bruno@giromesa.test");
-  await invite.getByLabel("Perfil de acesso").selectOption("waiter");
+  await invite.getByRole("checkbox", { name: /Garçom/ }).check();
   await invite.getByRole("button", { name: "Confirmar" }).click();
   await expect(invite).toBeHidden();
-  await bruno.getByRole("button", { name: "Fechar" }).click();
+  await bruno.getByRole("button", { name: "Fechar", exact: true }).click();
 
   const carla = await openDetails("Carla Souza");
   await expect(carla.getByText("Último erro: Servidor de e-mail indisponível")).toBeVisible();
@@ -867,14 +907,14 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
   await cancel.getByLabel("Motivo").fill("E-mail informado incorretamente");
   await cancel.getByRole("button", { name: "Confirmar" }).click();
   await expect(cancel).toBeHidden();
-  await carla.getByRole("button", { name: "Fechar" }).click();
+  await carla.getByRole("button", { name: "Fechar", exact: true }).click();
 
   const ana = await openDetails("Ana Martins");
   await expect(ana.getByRole("heading", { name: "Unidades liberadas" })).toBeVisible();
   await expect(ana.getByRole("heading", { name: "Histórico de acesso" })).toBeVisible();
   await ana.getByRole("button", { name: "Liberar outra unidade" }).click();
   const unitAccess = page.getByRole("dialog", { name: "Liberar outra unidade" });
-  await unitAccess.getByLabel("Perfil nesta unidade").selectOption("manager");
+  await unitAccess.getByRole("checkbox", { name: /Gerente/ }).check();
   await unitAccess.getByLabel("Motivo").fill("Cobertura temporária da unidade");
   await unitAccess.getByLabel("Confirmar com").selectOption("mfa");
   await unitAccess.getByLabel("Código de 6 dígitos").fill("123456");
@@ -886,15 +926,16 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
         method: "POST",
         body: {
           unitId: "unit-north",
-          role: "manager",
+          roles: ["manager"],
           reason: "Cobertura temporária da unidade",
           reauth: { mfaCode: "123456" },
         },
       },
     ]);
-  await ana.getByRole("button", { name: "Alterar perfil" }).click();
-  const profile = page.getByRole("dialog", { name: "Alterar perfil" });
-  await profile.getByLabel("Perfil de acesso").selectOption("cashier");
+  await ana.getByRole("button", { name: "Alterar funções" }).click();
+  const profile = page.getByRole("dialog", { name: "Alterar funções" });
+  await profile.getByRole("checkbox", { name: /Gerente/ }).uncheck();
+  await profile.getByRole("checkbox", { name: /Caixa/ }).check();
   await profile.getByLabel("Motivo").fill("Transferência para o caixa");
   await profile.getByLabel("Senha atual", { exact: true }).fill("senha-do-proprietário");
   await profile.getByRole("button", { name: "Confirmar" }).click();
@@ -904,7 +945,7 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
   await suspend.getByLabel("Motivo").fill("Afastamento temporário");
   await suspend.getByRole("button", { name: "Confirmar" }).click();
   await expect(suspend).toBeHidden();
-  await ana.getByRole("button", { name: "Fechar" }).click();
+  await ana.getByRole("button", { name: "Fechar", exact: true }).click();
 
   const eva = await openDetails("Eva Rocha");
   await eva.getByRole("button", { name: "Reativar acesso" }).click();
@@ -912,19 +953,23 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
   await reactivate.getByLabel("Motivo").fill("Retorno ao trabalho");
   await reactivate.getByRole("button", { name: "Confirmar" }).click();
   await expect(reactivate).toBeHidden();
-  await eva.getByRole("button", { name: "Fechar" }).click();
+  await eva.getByRole("button", { name: "Fechar", exact: true }).click();
 
   await expect(teamCard.getByText("Convite expirado", { exact: true })).toBeVisible();
   expect(captured.accessActions).toEqual(
     expect.arrayContaining([
-      { action: "invite", method: "POST", body: { email: "bruno@giromesa.test", role: "waiter" } },
+      {
+        action: "invite",
+        method: "POST",
+        body: { email: "bruno@giromesa.test", roles: ["waiter"] },
+      },
       { action: "resend", method: "POST", body: {} },
       { action: "cancel", method: "POST", body: { reason: "E-mail informado incorretamente" } },
       {
         action: "update",
         method: "PATCH",
         body: {
-          role: "cashier",
+          roles: ["cashier"],
           reason: "Transferência para o caixa",
           reauth: { currentPassword: "senha-do-proprietário" },
         },
@@ -933,7 +978,7 @@ test("Pessoas cadastra e administra convite, perfil e suspensão de acesso", asy
       {
         action: "reactivate",
         method: "POST",
-        body: { role: "inventory", reason: "Retorno ao trabalho" },
+        body: { roles: ["inventory"], reason: "Retorno ao trabalho" },
       },
     ]),
   );

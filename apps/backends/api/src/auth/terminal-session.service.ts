@@ -99,6 +99,10 @@ function protectedPin(membershipId: string, pin: string) {
   return createHmac("sha256", pinPepper()).update(`${membershipId}:${pin}`).digest("base64url");
 }
 
+export function hashTerminalPin(membershipId: string, pin: string) {
+  return argon2.hash(protectedPin(membershipId, pin), { type: argon2.argon2id });
+}
+
 function terminalLocked(lockedUntil?: Date | null) {
   return new HttpException(
     {
@@ -150,9 +154,7 @@ export class TerminalSessionService {
       });
     }
 
-    const pinHash = await argon2.hash(protectedPin(membership.id, input.pin), {
-      type: argon2.argon2id,
-    });
+    const pinHash = await hashTerminalPin(membership.id, input.pin);
     await this.database.db.transaction(async (tx) => {
       await tx
         .insert(terminalOperatorPins)

@@ -1,8 +1,13 @@
 import { Badge, Button, Card, Input, Label, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { ApiClientError } from "../../api";
+import { profiles } from "../../profiles";
 import { Brand } from "./Brand";
 import type { TerminalSessionView } from "./terminal-api";
+
+const terminalRoleLabels = new Map<string, string>(
+  profiles.map((profile) => [profile.id, profile.role]),
+);
 
 export function TerminalLockScreen({
   view,
@@ -13,7 +18,7 @@ export function TerminalLockScreen({
   onUnlock: (membershipId: string, pin: string) => Promise<void>;
   onClose: () => Promise<void>;
 }) {
-  const [membershipId, setMembershipId] = useState(view.operators[0]?.membershipId ?? "");
+  const [membershipId, setMembershipId] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -81,8 +86,8 @@ export function TerminalLockScreen({
         </Badge>
         <h1>Quem vai operar agora?</h1>
         <p className="muted">
-          {view.organization.name} · {view.unit.name}. O terminal bloqueia após 5 minutos sem
-          atividade.
+          {view.organization.name} · {view.unit.name}. Selecione seu nome e digite seu PIN; a
+          identificação usa os dois dados. O terminal bloqueia após 5 minutos sem atividade.
         </p>
 
         {view.operators.length > 0 ? (
@@ -95,9 +100,17 @@ export function TerminalLockScreen({
                 onChange={(event) => setMembershipId(event.target.value)}
                 value={membershipId}
               >
+                <option disabled value="">
+                  Selecione seu nome
+                </option>
                 {view.operators.map((operator) => (
                   <option key={operator.membershipId} value={operator.membershipId}>
                     {operator.displayName}
+                    {operator.roles.length > 0
+                      ? ` · ${operator.roles
+                          .map((role) => terminalRoleLabels.get(role) ?? role)
+                          .join(" + ")}`
+                      : ""}
                   </option>
                 ))}
               </NativeSelect>

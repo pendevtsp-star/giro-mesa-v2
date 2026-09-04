@@ -72,6 +72,7 @@ describe("dados gerenciais reais", () => {
     ).toEqual({
       status: "none",
       email: null,
+      managed: false,
       role: null,
       roles: [],
       revision: null,

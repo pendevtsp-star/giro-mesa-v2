@@ -105,6 +105,7 @@ import {
   posTabs,
   posTerminalProfiles,
   roleBindings,
+  terminalOperatorPins,
   terminalSessions,
   units,
 } from "@giromesa/db";
@@ -136,7 +137,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { AuthService } from "../auth/auth.service.js";
-import { TerminalSessionService } from "../auth/terminal-session.service.js";
+import { hashTerminalPin, TerminalSessionService } from "../auth/terminal-session.service.js";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
@@ -350,8 +351,22 @@ const SENSITIVE_PERSON_ACCESS_ROLES = new Set<PersonAccessRole>([
   "finance",
   "accountant",
 ]);
+const EXPRESS_PERSON_ACCESS_ROLES = new Set<PersonAccessRole>([
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+  "inventory",
+]);
 const TIME_TRACKING_READ_ROLES = ["owner", "manager", "finance"] as const;
 const PERSON_ACCESS_INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
+const MANAGED_OPERATOR_EMAIL_DOMAIN = "terminal.giromesa.invalid";
+const managedOperatorEmail = (identityId: string) =>
+  `operator+${identityId}@${MANAGED_OPERATOR_EMAIL_DOMAIN}`;
+const isManagedOperatorEmail = (email: string) =>
+  email.endsWith(`@${MANAGED_OPERATOR_EMAIL_DOMAIN}`);
 const personAccessInvitationHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 const personAccessKey = (personId: string, unitId: string) => `${personId}:${unitId}`;
@@ -379,9 +394,11 @@ function personAccessView(access: PersonAccessRead | undefined) {
   if (!access) return { status: "none" as const };
   const status = personAccessPublicStatus(access.status, access.invitationExpiresAt);
   if (status === "none") return { status };
+  const managed = isManagedOperatorEmail(access.email);
   return {
     status,
-    email: access.email,
+    email: managed ? undefined : access.email,
+    managed,
     role: access.role,
     roles: access.roles,
     revision: access.revision,
@@ -1219,6 +1236,18 @@ export class ManagementService {
 
   private assertPersonAccessRoles(actorRole: ManagementRole, roles: readonly PersonAccessRole[]) {
     for (const role of roles) this.assertPersonAccessGrant(actorRole, role);
+  }
+
+  private assertManagedOperatorRoles(email: string, roles: readonly PersonAccessRole[]) {
+    if (
+      isManagedOperatorEmail(email) &&
+      roles.some((role) => !EXPRESS_PERSON_ACCESS_ROLES.has(role))
+    ) {
+      throw new ForbiddenException({
+        code: "MANAGED_OPERATOR_ROLE_DENIED",
+        message: "O acesso expresso por PIN aceita somente funções operacionais.",
+      });
+    }
   }
 
   private async requireSensitiveRolesStepUp(
@@ -21142,6 +21171,7 @@ export class ManagementService {
       if (!sourceAccess?.membershipId) {
         throw new ConflictException({ code: "PERSON_ACCESS_MUST_BE_ACTIVE" });
       }
+      this.assertManagedOperatorRoles(sourceAccess.email, input.roles);
       await this.personRoleSets(tx, [sourceAccess]);
       if (existing && existing.status !== "terminated" && existing.status !== "canceled") {
         throw new ConflictException({ code: "PERSON_UNIT_ACCESS_ALREADY_EXISTS" });
@@ -21348,12 +21378,19 @@ export class ManagementService {
       this.assertPersonAccessRoles(actorRole, input.access.roles);
       await this.requireSensitiveRolesStepUp(identityId, input.access.roles, input.access.reauth);
     }
-    if (input.identityId && input.access) {
+    if (input.expressAccess) this.assertPersonAccessRoles(actorRole, input.expressAccess.roles);
+    if ([input.identityId, input.access, input.expressAccess].filter(Boolean).length > 1) {
       throw new BadRequestException({
         code: "PERSON_ACCESS_AMBIGUOUS",
-        message: "Use identityId para vínculo existente ou access para convite, não ambos.",
+        message: "Escolha apenas uma forma de acesso.",
       });
     }
+    const managedIdentityId = input.expressAccess ? randomUUID() : undefined;
+    const managedMembershipId = input.expressAccess ? randomUUID() : undefined;
+    const managedPinHash =
+      input.expressAccess && managedMembershipId
+        ? await hashTerminalPin(managedMembershipId, input.expressAccess.pin)
+        : undefined;
     return this.database.db.transaction(async (tx) => {
       if (input.identityId) {
         const [membership] = await tx
@@ -21388,11 +21425,33 @@ export class ManagementService {
           .limit(1);
         if (linked) throw new ConflictException({ code: "PERSON_IDENTITY_ALREADY_LINKED" });
       }
-      const { access: accessInput, ...personInput } = input;
+      const { access: accessInput, expressAccess, ...personInput } = input;
       const id = randomUUID();
+      if (expressAccess && managedIdentityId && managedMembershipId && managedPinHash) {
+        const email = managedOperatorEmail(managedIdentityId);
+        await tx.insert(identities).values({
+          id: managedIdentityId,
+          email,
+          displayName: input.name,
+          kind: "human",
+        });
+        await tx.insert(memberships).values({
+          id: managedMembershipId,
+          identityId: managedIdentityId,
+          organizationId,
+          status: "active",
+          invitedByIdentityId: identityId,
+        });
+      }
       const [person] = await tx
         .insert(managementPeople)
-        .values({ id, organizationId, unitId, ...personInput })
+        .values({
+          id,
+          organizationId,
+          unitId,
+          ...personInput,
+          identityId: managedIdentityId ?? personInput.identityId,
+        })
         .returning();
       if (!person) throw new Error("Person was not created");
       await this.record(
@@ -21403,19 +21462,79 @@ export class ManagementService {
         "management.person.created",
         "person",
         id,
-        { identityId: input.identityId ?? null, accessInvited: Boolean(accessInput) },
+        {
+          identityId: input.identityId ?? managedIdentityId ?? null,
+          accessInvited: Boolean(accessInput),
+          expressAccess: Boolean(expressAccess),
+        },
       );
-      const access = accessInput
-        ? await this.createPersonAccessInvitation(
-            tx,
-            identityId,
+      let access: ReturnType<typeof personAccessView> = { status: "none" as const };
+      if (accessInput) {
+        access = await this.createPersonAccessInvitation(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          id,
+          accessInput,
+          false,
+        );
+      } else if (expressAccess && managedIdentityId && managedMembershipId && managedPinHash) {
+        const email = managedOperatorEmail(managedIdentityId);
+        const roleBindingIds = new Map<PersonAccessRole, string>();
+        for (const role of expressAccess.roles) {
+          roleBindingIds.set(
+            role,
+            await this.ensurePersonRoleBinding(tx, managedMembershipId, unitId, role),
+          );
+        }
+        const changedAt = new Date();
+        const [createdAccess] = await tx
+          .insert(managementPersonAccess)
+          .values({
+            personId: id,
             organizationId,
             unitId,
-            id,
-            accessInput,
-            false,
-          )
-        : { status: "none" as const };
+            email,
+            role: firstPersonAccessRole(expressAccess.roles),
+            status: "active",
+            membershipId: managedMembershipId,
+            roleBindingId: roleBindingIds.get(firstPersonAccessRole(expressAccess.roles)),
+            statusChangedAt: changedAt,
+            statusChangedByIdentityId: identityId,
+            statusChangeReason: "Cadastro expresso por PIN.",
+          })
+          .returning();
+        if (!createdAccess) throw new Error("Express person access was not created");
+        await this.replacePersonRoleAssignments(
+          tx,
+          organizationId,
+          unitId,
+          id,
+          expressAccess.roles,
+          "people_admin",
+          roleBindingIds,
+        );
+        await tx.insert(terminalOperatorPins).values({
+          membershipId: managedMembershipId,
+          pinHash: managedPinHash,
+        });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.person.access.express-created",
+          "person_access",
+          id,
+          { membershipId: managedMembershipId, roles: expressAccess.roles },
+        );
+        access = personAccessView({
+          ...createdAccess,
+          invitationExpiresAt: null,
+          roles: expressAccess.roles,
+        });
+      }
       return { ...person, access };
     });
   }
@@ -21551,6 +21670,7 @@ export class ManagementService {
         throw new ConflictException({ code: "PERSON_ACCESS_CHANGED" });
       }
       this.assertPersonAccessRoles(actorRole, [...new Set([...access.roles, ...input.roles])]);
+      this.assertManagedOperatorRoles(access.email, input.roles);
       await this.requireSensitiveRolesStepUp(
         identityId,
         [...new Set([...access.roles, ...input.roles])],
@@ -21745,6 +21865,7 @@ export class ManagementService {
         throw new ConflictException({ code: "PERSON_ACCESS_CHANGED" });
       }
       const targetRoles = input.roles ?? access.roles;
+      this.assertManagedOperatorRoles(access.email, targetRoles);
       this.assertPersonAccessRoles(actorRole, [...new Set([...access.roles, ...targetRoles])]);
       await this.requireSensitiveRolesStepUp(
         identityId,

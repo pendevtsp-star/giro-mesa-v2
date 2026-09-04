@@ -31,7 +31,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 76;
+export const OPS_REQUIRED_SCHEMA_VERSION = 77;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -654,13 +654,17 @@ export function operationalApiErrorMessage(
         "A estação deste pedido está impedida de receber produção. Ajuste a política da estação e tente novamente.",
       PERSON_ACCESS_CHANGED:
         "Outro responsável alterou este acesso. Suas escolhas foram preservadas; revise os dados atualizados e tente novamente.",
+      TERMINAL_PIN_NOT_CONFIGURED:
+        "A troca rápida por PIN ainda não foi configurada neste ambiente.",
+      TERMINAL_PIN_REAUTH_REQUIRED: "A senha atual não confere.",
     } as Record<string, string>
   )[code];
   const technical = /^(?:Cannot\s+(?:GET|POST|PUT|PATCH|DELETE)\s+\/|[A-Z_]{3,}:)/i.test(
     backendMessage,
   );
   const message =
-    status === 401
+    codedMessage ??
+    (status === 401
       ? "Sua sessão expirou. Entre novamente."
       : status === 403
         ? "Seu perfil não possui permissão para esta operação."
@@ -670,10 +674,9 @@ export function operationalApiErrorMessage(
             ? `Muitas solicitações em sequência. Aguarde${Number.isFinite(retryAfterSeconds) ? ` ${retryAfterSeconds} segundos` : " alguns segundos"} e tente novamente.`
             : status >= 500
               ? "O servidor não conseguiu concluir a consulta. Tente novamente em instantes."
-              : (codedMessage ??
-                (backendMessage && !technical
-                  ? backendMessage
-                  : `Não foi possível concluir a operação (${status}).`));
+              : backendMessage && !technical
+                ? backendMessage
+                : `Não foi possível concluir a operação (${status}).`);
   return `${message}${referenceSuffix(requestId)}`;
 }
 
@@ -3194,6 +3197,10 @@ export const api = {
           email: string;
           roles: string[];
           reauth?: { currentPassword?: string; mfaCode?: string };
+        };
+        expressAccess?: {
+          roles: string[];
+          pin: string;
         };
       },
     ) =>

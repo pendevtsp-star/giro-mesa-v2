@@ -22,7 +22,7 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
         status: "ok",
         version: "2.0.0",
         buildSha: "dashboard-e2e",
-        schemaVersion: 76,
+        schemaVersion: 77,
         database: "up",
         integrations: {},
         capabilities: [
@@ -205,7 +205,7 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
         status: "ok",
         version: "2.0.0",
         buildSha: "platform-e2e",
-        schemaVersion: 76,
+        schemaVersion: 77,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",

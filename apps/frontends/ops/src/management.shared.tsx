@@ -1472,6 +1472,7 @@ export type PersonAccessStatus = "none" | "pending" | "expired" | "active" | "su
 export interface PersonAccess {
   status: PersonAccessStatus;
   email: string | null;
+  managed: boolean;
   roles: string[];
   role: string | null;
   revision: number | null;
@@ -4001,6 +4002,7 @@ function parsePerson(person: Row): Person {
     access: {
       status: accessStatus as PersonAccessStatus,
       email: rawAccess ? optionalString(rawAccess.email) : null,
+      managed: rawAccess?.managed === undefined ? false : boolean(rawAccess.managed),
       roles: rawAccess ? parsePersonAccessRoles(rawAccess) : [],
       role: rawAccess ? optionalString(rawAccess.role) : null,
       revision: rawAccess && rawAccess.revision !== undefined ? integer(rawAccess.revision) : null,
@@ -4029,6 +4031,7 @@ function parsePersonAccessValue(value: unknown): PersonAccess {
   return {
     status: status as PersonAccessStatus,
     email: optionalString(access.email),
+    managed: access.managed === undefined ? false : boolean(access.managed),
     roles: parsePersonAccessRoles(access),
     role: optionalString(access.role),
     revision: access.revision === undefined ? null : integer(access.revision),

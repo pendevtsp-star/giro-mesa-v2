@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   identities,
@@ -8,9 +8,12 @@ import {
   managementPersonRoleAssignments,
   memberships,
   organizations,
+  passwordCredentials,
   roleBindings,
+  terminalOperatorPins,
   units,
 } from "@giromesa/db";
+import * as argon2 from "argon2";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -372,6 +375,122 @@ it("keeps multiple People roles atomic across suspend and reactivate", async (co
       .where(eq(managementPersonRoleAssignments.personId, person.id));
     assert.equal(remainingAssignments.length, 0);
   } finally {
+    await database.onModuleDestroy();
+  }
+});
+
+it("creates an express employee ready for PIN operations and management records", async (context) => {
+  const databaseUrl = process.env.MANAGEMENT_DATABASE_URL;
+  if (!databaseUrl) {
+    context.skip("MANAGEMENT_DATABASE_URL not configured");
+    return;
+  }
+  process.env.DATABASE_URL = databaseUrl;
+  const previousPepper = process.env.TERMINAL_PIN_PEPPER;
+  process.env.TERMINAL_PIN_PEPPER = "people-express-integration-test-pepper";
+  const database = new DatabaseService();
+  try {
+    const management = new ManagementService(database, new ScopeService(database));
+    const suffix = randomUUID();
+    const [organization] = await database.db
+      .insert(organizations)
+      .values({
+        legalName: "People express test",
+        tradeName: "People express test",
+        document: suffix.replaceAll("-", "").slice(0, 14),
+      })
+      .returning();
+    assert.ok(organization);
+    const [unit] = await database.db
+      .insert(units)
+      .values({ organizationId: organization.id, name: "Express unit" })
+      .returning();
+    assert.ok(unit);
+    const [owner] = await database.db
+      .insert(identities)
+      .values({ email: `express-owner-${suffix}@example.test`, displayName: "Owner" })
+      .returning();
+    assert.ok(owner);
+    const [ownerMembership] = await database.db
+      .insert(memberships)
+      .values({ identityId: owner.id, organizationId: organization.id, status: "active" })
+      .returning();
+    assert.ok(ownerMembership);
+    await database.db
+      .insert(roleBindings)
+      .values({ membershipId: ownerMembership.id, role: "owner" });
+
+    const person = await management.createPerson(owner.id, organization.id, unit.id, {
+      name: "Funcionário expresso",
+      roleLabel: "Atendimento",
+      expressAccess: { roles: ["waiter", "cashier"], pin: "123456" },
+    });
+    assert.ok(person.identityId);
+    assert.equal(person.access.status, "active");
+    assert.equal(person.access.managed, true);
+    assert.equal(person.access.email, undefined);
+
+    const [managedIdentity] = await database.db
+      .select()
+      .from(identities)
+      .where(eq(identities.id, person.identityId))
+      .limit(1);
+    assert.ok(managedIdentity);
+    assert.ok(managedIdentity.email.endsWith("@terminal.giromesa.invalid"));
+    assert.equal(managedIdentity.emailVerifiedAt, null);
+    const credentials = await database.db
+      .select()
+      .from(passwordCredentials)
+      .where(eq(passwordCredentials.identityId, person.identityId));
+    assert.equal(credentials.length, 0);
+
+    const [membership] = await database.db
+      .select()
+      .from(memberships)
+      .where(eq(memberships.identityId, person.identityId))
+      .limit(1);
+    assert.equal(membership?.status, "active");
+    assert.ok(membership);
+    const bindings = await database.db
+      .select({ role: roleBindings.role, unitId: roleBindings.unitId })
+      .from(roleBindings)
+      .where(eq(roleBindings.membershipId, membership.id));
+    assert.deepEqual(bindings.map((binding) => binding.role).sort(), ["cashier", "waiter"]);
+    assert.equal(
+      bindings.every((binding) => binding.unitId === unit.id),
+      true,
+    );
+
+    const assignments = await database.db
+      .select({ role: managementPersonRoleAssignments.role })
+      .from(managementPersonRoleAssignments)
+      .where(eq(managementPersonRoleAssignments.personId, person.id));
+    assert.deepEqual(assignments.map((assignment) => assignment.role).sort(), [
+      "cashier",
+      "waiter",
+    ]);
+    const [pin] = await database.db
+      .select()
+      .from(terminalOperatorPins)
+      .where(eq(terminalOperatorPins.membershipId, membership.id))
+      .limit(1);
+    assert.ok(pin?.active);
+    const protectedPin = createHmac("sha256", process.env.TERMINAL_PIN_PEPPER)
+      .update(`${membership.id}:123456`)
+      .digest("base64url");
+    assert.equal(await argon2.verify(pin.pinHash, protectedPin), true);
+
+    const schedule = await management.createSchedule(owner.id, organization.id, unit.id, {
+      personId: person.id,
+      startsAt: "2032-01-10T12:00:00.000Z",
+      endsAt: "2032-01-10T20:00:00.000Z",
+      breakMinutes: 30,
+    });
+    assert.ok(schedule);
+    assert.equal(schedule.personId, person.id);
+  } finally {
+    if (previousPepper === undefined) delete process.env.TERMINAL_PIN_PEPPER;
+    else process.env.TERMINAL_PIN_PEPPER = previousPepper;
     await database.onModuleDestroy();
   }
 });

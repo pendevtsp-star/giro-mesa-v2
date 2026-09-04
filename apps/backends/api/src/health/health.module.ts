@@ -17,7 +17,7 @@ import { InternalKeyGuard } from "../billing/internal-key.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
 
-export const RELEASE_SCHEMA_VERSION = 76;
+export const RELEASE_SCHEMA_VERSION = 77;
 export const RELEASE_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",

@@ -1,11 +1,12 @@
-import { Badge, Button, Card, Input, Label, NativeSelect } from "@giromesa/ui";
-import { type FormEvent, useEffect, useState } from "react";
+import { Badge, Button, Card, Label, NativeSelect } from "@giromesa/ui";
+import { useEffect, useState } from "react";
 import { ApiClientError } from "../../api";
 import { sessionForScope } from "../../app/access";
 import type { ScopeSource, Session } from "../../app/types";
 import { profileIdForScope } from "../../auth";
 import { ProfileAvatar as Avatar } from "../shell/ProfileAvatar";
 import { Brand } from "./Brand";
+import { type ConfigureTerminalPin, TerminalPinSetupForm } from "./TerminalPinSetupForm";
 export function ScopeScreen({
   source,
   onBack,
@@ -15,11 +16,7 @@ export function ScopeScreen({
   source: ScopeSource;
   onBack: () => void;
   onComplete: (session: Session) => Promise<void> | void;
-  onConfigurePin: (input: {
-    membershipId: string;
-    currentPassword: string;
-    pin: string;
-  }) => Promise<void>;
+  onConfigurePin: ConfigureTerminalPin;
 }) {
   const [organizationId, setOrganizationId] = useState(
     source.organizations[0]?.organization.id ?? "",
@@ -34,10 +31,6 @@ export function ScopeScreen({
   const [terminalMode, setTerminalMode] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [pin, setPin] = useState("");
-  const [pinBusy, setPinBusy] = useState(false);
-  const [pinMessage, setPinMessage] = useState("");
   const selectedSession = sessionForScope(source, organizationId, unitId, terminalMode);
   const profile = selectedSession?.profile;
 
@@ -57,29 +50,6 @@ export function ScopeScreen({
       );
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function configurePin(event: FormEvent) {
-    event.preventDefault();
-    if (!selectedSession || !currentPassword || !/^\d{6}$/.test(pin)) return;
-    setPinBusy(true);
-    setPinMessage("");
-    try {
-      await onConfigurePin({
-        membershipId: selectedSession.membershipId,
-        currentPassword,
-        pin,
-      });
-      setCurrentPassword("");
-      setPin("");
-      setPinMessage("PIN configurado. Você já pode operar terminais compartilhados.");
-    } catch (cause) {
-      setPinMessage(
-        cause instanceof ApiClientError ? cause.message : "Não foi possível configurar o PIN.",
-      );
-    } finally {
-      setPinBusy(false);
     }
   }
 
@@ -146,51 +116,17 @@ export function ScopeScreen({
             <span>
               <strong>Este é um terminal compartilhado</strong>
               <small>
-                Troca online por PIN, bloqueio após 5 minutos e acesso apenas à operação desta
-                unidade.
+                Escolha do colaborador + PIN, bloqueio após 5 minutos e acesso apenas à operação
+                desta unidade.
               </small>
             </span>
           </label>
           <details className="terminal-pin-setup">
             <summary>Configurar meu PIN de terminal</summary>
-            <form className="terminal-pin-setup__form" onSubmit={configurePin}>
-              <p className="muted">
-                O PIN pertence ao seu acesso nesta empresa e não substitui sua senha.
-              </p>
-              <Label>
-                Senha atual
-                <Input
-                  autoComplete="current-password"
-                  disabled={pinBusy}
-                  onChange={(event) => setCurrentPassword(event.target.value)}
-                  required
-                  type="password"
-                  value={currentPassword}
-                />
-              </Label>
-              <Label>
-                Novo PIN de 6 dígitos
-                <Input
-                  autoComplete="new-password"
-                  disabled={pinBusy}
-                  inputMode="numeric"
-                  maxLength={6}
-                  onChange={(event) => setPin(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  pattern="[0-9]{6}"
-                  required
-                  type="password"
-                  value={pin}
-                />
-              </Label>
-              {pinMessage && (
-                <p className="auth-message" role="status">
-                  {pinMessage}
-                </p>
-              )}
-              <Button disabled={pinBusy || !currentPassword || !/^\d{6}$/.test(pin)} type="submit">
-                {pinBusy ? "Salvando..." : "Salvar meu PIN"}
-              </Button>
-            </form>
+            <TerminalPinSetupForm
+              membershipId={selectedSession?.membershipId ?? ""}
+              onConfigure={onConfigurePin}
+            />
           </details>
           {error && (
             <p className="auth-message auth-message--error" role="alert">

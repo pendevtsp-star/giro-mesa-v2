@@ -79,6 +79,43 @@ describe("people lifecycle schemas", () => {
     );
   });
 
+  it("valida cadastro expresso somente com PIN e funções operacionais", () => {
+    const person = personSchema.parse({
+      name: "Bruno Lima",
+      roleLabel: "Garçom",
+      expressAccess: { roles: ["waiter", "cashier"], pin: "123456" },
+    });
+    assert.deepEqual(person.expressAccess, {
+      roles: ["waiter", "cashier"],
+      pin: "123456",
+    });
+    assert.equal(
+      personSchema.safeParse({
+        name: "Bruno Lima",
+        roleLabel: "Gerente",
+        expressAccess: { roles: ["manager"], pin: "123456" },
+      }).success,
+      false,
+    );
+    assert.equal(
+      personSchema.safeParse({
+        name: "Bruno Lima",
+        roleLabel: "Garçom",
+        expressAccess: { roles: ["waiter"], pin: "12345" },
+      }).success,
+      false,
+    );
+    assert.equal(
+      personSchema.safeParse({
+        name: "Bruno Lima",
+        roleLabel: "Garçom",
+        access: { email: "bruno@example.com", roles: ["waiter"] },
+        expressAccess: { roles: ["waiter"], pin: "123456" },
+      }).success,
+      false,
+    );
+  });
+
   it("exige uma única prova de identidade e motivo no acesso multiunidade", () => {
     assert.equal(personAccessStepUpSchema.safeParse({ currentPassword: "segredo" }).success, true);
     assert.equal(personAccessStepUpSchema.safeParse({ mfaCode: "123456" }).success, true);

@@ -124,6 +124,7 @@ fi
 postgres_password=$(openssl rand -hex 24)
 session_secret=$(openssl rand -hex 48)
 qr_table_token_secret=$(openssl rand -hex 48)
+terminal_pin_pepper=$(openssl rand -hex 32)
 mfa_key=$(openssl rand -base64 32)
 outbox_key=$(openssl rand -base64 32)
 fiscal_credentials_key=$(openssl rand -base64 32)
@@ -169,6 +170,7 @@ write_key TRUST_PROXY 1
 write_key CORS_ORIGINS https://giromesa.com.br,https://www.giromesa.com.br,https://menu.giromesa.com.br,https://app.giromesa.com.br
 write_key SESSION_SECRET "$session_secret"
 write_key QR_TABLE_TOKEN_SECRET "$qr_table_token_secret"
+write_key TERMINAL_PIN_PEPPER "$terminal_pin_pepper"
 write_key MEDIA_ROOT /app/data/media
 write_key EDGE_HUB_INSTALLER_HOST_PATH /srv/apps/giromesa-v2/shared/edge-hub-installer
 write_key EDGE_HUB_WINDOWS_INSTALLER_PATH /app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe

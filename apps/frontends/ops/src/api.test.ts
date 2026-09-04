@@ -34,6 +34,29 @@ describe("compatibilidade e erros da API", () => {
     );
   });
 
+  it("preserva os erros operacionais seguros do cadastro de PIN", () => {
+    expect(
+      operationalApiErrorMessage(
+        503,
+        undefined,
+        "request-pin-config",
+        undefined,
+        "TERMINAL_PIN_NOT_CONFIGURED",
+      ),
+    ).toBe(
+      "A troca rápida por PIN ainda não foi configurada neste ambiente. Referência: request-pin-config.",
+    );
+    expect(
+      operationalApiErrorMessage(
+        401,
+        undefined,
+        "request-pin-password",
+        undefined,
+        "TERMINAL_PIN_REAUTH_REQUIRED",
+      ),
+    ).toBe("A senha atual não confere. Referência: request-pin-password.");
+  });
+
   it("aceita a identidade de release compatível", () => {
     expect(
       apiCompatibilityError({

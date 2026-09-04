@@ -117,6 +117,7 @@ function timelineExceptions(timeline: PersonTimelineData) {
 
 type PeopleSection = "today" | "team" | "access" | "schedules" | "time" | "settings";
 type PeopleFilter = "all" | "active" | "inactive" | "unlinked" | "on_shift";
+type PersonAccessMode = "none" | "express" | "email";
 type AccessRole =
   | "owner"
   | "manager"
@@ -158,6 +159,15 @@ const managerGrantableAccessRoles = new Set<AccessRole>([
   "busser",
   "kds",
   "delivery",
+]);
+const expressAccessRoles = new Set<AccessRole>([
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+  "inventory",
 ]);
 const sensitiveAccessRoles = new Set<AccessRole>(["manager", "finance", "accountant"]);
 const accessRoleHighlights: Record<AccessRole, string[]> = {
@@ -225,6 +235,7 @@ function auditActionLabel(action: string) {
       "management.person.inactivated": "Pessoa inativada",
       "management.person.reactivated": "Pessoa reativada",
       "management.person.access.invited": "Convite enviado",
+      "management.person.access.express-created": "Acesso expresso por PIN criado",
       "management.person.access.resent": "Convite reenviado",
       "management.person.access.canceled": "Convite cancelado",
       "management.person.access.role-changed": "Funções alteradas",
@@ -358,6 +369,9 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     scope.profileId === "owner"
       ? accessRoles
       : accessRoles.filter((role) => managerGrantableAccessRoles.has(role.value));
+  const grantableExpressAccessRoles = grantableAccessRoles.filter((role) =>
+    expressAccessRoles.has(role.value),
+  );
   const canConfigureTracking =
     capabilities.state.status === "ready"
       ? capabilities.state.data.canConfigure
@@ -408,9 +422,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const [personName, setPersonName] = useState("");
   const [roleLabel, setRoleLabel] = useState("");
   const [employmentCode, setEmploymentCode] = useState("");
-  const [personAccessEnabled, setPersonAccessEnabled] = useState(false);
+  const [personAccessMode, setPersonAccessMode] = useState<PersonAccessMode>("express");
   const [personEmail, setPersonEmail] = useState("");
   const [personAccessRoles, setPersonAccessRoles] = useState<AccessRole[]>([]);
+  const [personPin, setPersonPin] = useState("");
+  const [personPinConfirmation, setPersonPinConfirmation] = useState("");
   const [schedulePersonId, setSchedulePersonId] = useState("");
   const [scheduleStart, setScheduleStart] = useState("");
   const [scheduleEnd, setScheduleEnd] = useState("");
@@ -556,10 +572,13 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   }, [directory.state]);
   const selectedPerson = selectedPersonId ? personById.get(selectedPersonId) : undefined;
   const selectedPersonAccessRoles = selectedPerson?.access.roles ?? [];
+  const selectedPersonGrantableAccessRoles = selectedPerson?.access.managed
+    ? grantableExpressAccessRoles
+    : grantableAccessRoles;
   const canManageSelectedAccess =
     !selectedPersonAccessRoles.length ||
     selectedPersonAccessRoles.every((role) =>
-      grantableAccessRoles.some((grantable) => grantable.value === role),
+      selectedPersonGrantableAccessRoles.some((grantable) => grantable.value === role),
     );
   const currentUnitLabel =
     accessOverview.status === "ready"
@@ -670,8 +689,12 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       failAction(null, "Conecte-se para cadastrar ou convidar um funcionário.");
       return;
     }
-    if (personAccessEnabled && !personAccessRoles.length) {
+    if (personAccessMode !== "none" && !personAccessRoles.length) {
       failAction(null, "Selecione ao menos uma função autorizada para habilitar o acesso.");
+      return;
+    }
+    if (personAccessMode === "express" && personPin !== personPinConfirmation) {
+      failAction(null, "A confirmação do PIN não confere.");
       return;
     }
     setActionId("new-person");
@@ -681,26 +704,34 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
         name: personName.trim(),
         roleLabel: roleLabel.trim(),
         employmentCode: employmentCode.trim() || undefined,
-        access: personAccessEnabled
-          ? {
-              email: personEmail.trim().toLowerCase(),
-              roles: personAccessRoles,
-              reauth: stepUpFor(personAccessRoles),
-            }
-          : undefined,
+        access:
+          personAccessMode === "email"
+            ? {
+                email: personEmail.trim().toLowerCase(),
+                roles: personAccessRoles,
+                reauth: stepUpFor(personAccessRoles),
+              }
+            : undefined,
+        expressAccess:
+          personAccessMode === "express" ? { roles: personAccessRoles, pin: personPin } : undefined,
       });
       setPersonName("");
       setRoleLabel("");
       setEmploymentCode("");
-      setPersonAccessEnabled(false);
+      setPersonAccessMode("express");
       setPersonEmail("");
       setPersonAccessRoles([]);
+      setPersonPin("");
+      setPersonPinConfirmation("");
       setReauthValue("");
       setIsCreatePersonOpen(false);
       setFeedback({
-        message: personAccessEnabled
-          ? `Funcionário cadastrado e convite enviado com ${accessRolesLabel(personAccessRoles)}.`
-          : "Funcionário cadastrado sem acesso ao sistema.",
+        message:
+          personAccessMode === "express"
+            ? `Funcionário cadastrado e habilitado por PIN com ${accessRolesLabel(personAccessRoles)}.`
+            : personAccessMode === "email"
+              ? `Funcionário cadastrado e convite enviado com ${accessRolesLabel(personAccessRoles)}.`
+              : "Funcionário cadastrado sem acesso ao sistema.",
         tone: "success",
       });
       remote.retry();
@@ -771,7 +802,9 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
       kind === "invite"
         ? []
         : person.access.roles.filter((role): role is AccessRole =>
-            grantableAccessRoles.some((item) => item.value === role),
+            (person.access.managed ? grantableExpressAccessRoles : grantableAccessRoles).some(
+              (item) => item.value === role,
+            ),
           ),
     );
     setAccessReason("");
@@ -2144,15 +2177,18 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
             <Card className="people-create-card">
               <div>
                 <strong>Novo funcionário</strong>
-                <small>Cadastre o vínculo e, se necessário, envie o acesso em uma etapa.</small>
+                <small>Cadastre e habilite por PIN ou convide por e-mail em uma etapa.</small>
               </div>
               <Button
                 disabled={!online}
                 onClick={() => {
                   setReauthValue("");
                   setReauthMethod("password");
-                  setPersonAccessEnabled(false);
+                  setPersonAccessMode("express");
+                  setPersonEmail("");
                   setPersonAccessRoles([]);
+                  setPersonPin("");
+                  setPersonPinConfirmation("");
                   setActionError("");
                   setIsCreatePersonOpen(true);
                 }}
@@ -2787,7 +2823,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         <strong>{person.name}</strong>
                         <small>
                           {person.roleLabel}
-                          {person.access.email ? ` · ${person.access.email}` : ""}
+                          {person.access.managed
+                            ? " · Operacional por PIN"
+                            : person.access.email
+                              ? ` · ${person.access.email}`
+                              : ""}
                         </small>
                       </span>
                       <span className="people-row__statuses">
@@ -3372,47 +3412,118 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </fieldset>
               <fieldset>
                 <legend>Acesso ao GiroMesa</legend>
-                <label className="people-access-toggle">
-                  <input
-                    checked={personAccessEnabled}
-                    onChange={(event) => {
-                      setPersonAccessEnabled(event.target.checked);
-                      if (!event.target.checked) setPersonAccessRoles([]);
-                      setReauthValue("");
-                    }}
-                    type="checkbox"
-                  />
-                  <span>
-                    <strong>Também terá acesso ao sistema</strong>
-                    <small>O convite será enviado somente após o cadastro confirmado.</small>
-                  </span>
-                </label>
-                {personAccessEnabled && (
+                {(
+                  [
+                    {
+                      value: "express",
+                      label: "Trabalhar agora com PIN",
+                      description: "Cria o vínculo operacional sem exigir e-mail ou senha.",
+                    },
+                    {
+                      value: "email",
+                      label: "Convidar por e-mail",
+                      description: "O funcionário cria a própria conta e depois configura o PIN.",
+                    },
+                    {
+                      value: "none",
+                      label: "Somente cadastro gerencial",
+                      description: "Aparece na equipe, escalas e ponto, mas não opera o terminal.",
+                    },
+                  ] as const
+                ).map((option) => (
+                  <label className="people-access-toggle" key={option.value}>
+                    <input
+                      checked={personAccessMode === option.value}
+                      name="person-access-mode"
+                      onChange={() => {
+                        setPersonAccessMode(option.value);
+                        setPersonAccessRoles([]);
+                        setPersonEmail("");
+                        setPersonPin("");
+                        setPersonPinConfirmation("");
+                        setReauthValue("");
+                      }}
+                      type="radio"
+                      value={option.value}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+                  </label>
+                ))}
+                {personAccessMode !== "none" && (
                   <div className="gm-form-grid people-access-form__fields">
-                    <label className="gm-field">
-                      E-mail de acesso
-                      <Input
-                        autoComplete="email"
-                        inputMode="email"
-                        onChange={(event) => setPersonEmail(event.target.value)}
-                        required
-                        type="email"
-                        value={personEmail}
-                      />
-                    </label>
+                    {personAccessMode === "email" && (
+                      <label className="gm-field">
+                        E-mail de acesso
+                        <Input
+                          autoComplete="email"
+                          inputMode="email"
+                          onChange={(event) => setPersonEmail(event.target.value)}
+                          required
+                          type="email"
+                          value={personEmail}
+                        />
+                      </label>
+                    )}
+                    {personAccessMode === "express" && (
+                      <>
+                        <p className="form-hint action-form__wide">
+                          O funcionário já ficará disponível para praças, escalas, ponto e produção,
+                          conforme as funções autorizadas abaixo. O PIN não libera áreas gerenciais.
+                        </p>
+                        <label className="gm-field">
+                          PIN de 6 dígitos
+                          <Input
+                            autoComplete="new-password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            onChange={(event) =>
+                              setPersonPin(event.target.value.replace(/\D/g, "").slice(0, 6))
+                            }
+                            pattern="[0-9]{6}"
+                            required
+                            type="password"
+                            value={personPin}
+                          />
+                        </label>
+                        <label className="gm-field">
+                          Confirmar PIN
+                          <Input
+                            autoComplete="new-password"
+                            inputMode="numeric"
+                            maxLength={6}
+                            onChange={(event) =>
+                              setPersonPinConfirmation(
+                                event.target.value.replace(/\D/g, "").slice(0, 6),
+                              )
+                            }
+                            pattern="[0-9]{6}"
+                            required
+                            type="password"
+                            value={personPinConfirmation}
+                          />
+                        </label>
+                      </>
+                    )}
                     <AccessRolesPicker
                       id="new-person-access-roles"
                       onChange={(roles) => {
                         setPersonAccessRoles(roles);
                         setReauthValue("");
                       }}
-                      options={grantableAccessRoles}
+                      options={
+                        personAccessMode === "express"
+                          ? grantableExpressAccessRoles
+                          : grantableAccessRoles
+                      }
                       selected={personAccessRoles}
                       unitLabel={scope.unitId}
                     />
                   </div>
                 )}
-                {personAccessEnabled && stepUpFields(personAccessRoles)}
+                {personAccessMode === "email" && stepUpFields(personAccessRoles)}
               </fieldset>
               {actionError && (
                 <p className="people-page__error" role="alert">
@@ -3439,9 +3550,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     actionId === "new-person" ||
                     personName.trim().length < 2 ||
                     roleLabel.trim().length < 1 ||
-                    (personAccessEnabled && !personEmail.trim()) ||
-                    (personAccessEnabled && !personAccessRoles.length) ||
-                    (personAccessEnabled &&
+                    (personAccessMode === "email" && !personEmail.trim()) ||
+                    (personAccessMode === "express" && !/^\d{6}$/.test(personPin)) ||
+                    (personAccessMode === "express" && personPin !== personPinConfirmation) ||
+                    (personAccessMode !== "none" && !personAccessRoles.length) ||
+                    (personAccessMode === "email" &&
                       accessRolesRequireStepUp([], personAccessRoles, sensitiveAccessRoles) &&
                       !reauthValue.trim())
                   }
@@ -3449,9 +3562,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 >
                   {actionId === "new-person"
                     ? "Salvando…"
-                    : personAccessEnabled
-                      ? "Cadastrar e convidar"
-                      : "Cadastrar funcionário"}
+                    : personAccessMode === "express"
+                      ? "Cadastrar e habilitar"
+                      : personAccessMode === "email"
+                        ? "Cadastrar e convidar"
+                        : "Cadastrar funcionário"}
                 </Button>
               </div>
             </form>
@@ -3494,7 +3609,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     setSelectedAccessRoles(roles);
                     setReauthValue("");
                   }}
-                  options={grantableAccessRoles}
+                  options={selectedPersonGrantableAccessRoles}
                   selected={selectedAccessRoles}
                   unitLabel={currentUnitLabel}
                 />
@@ -3610,7 +3725,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       setUnitAccessRoles(roles);
                       setReauthValue("");
                     }}
-                    options={grantableAccessRoles}
+                    options={selectedPersonGrantableAccessRoles}
                     selected={unitAccessRoles}
                     unitLabel={
                       accessOverview.data.units.find((unit) => unit.id === unitAccessUnitId)
@@ -3840,8 +3955,10 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     <div>
                       <h3 id="person-access-title">Acesso ao GiroMesa</h3>
                       <p>
-                        {selectedPerson?.access.email ??
-                          "Este funcionário ainda não possui acesso."}
+                        {selectedPerson?.access.managed
+                          ? "Identidade operacional gerenciada por PIN"
+                          : (selectedPerson?.access.email ??
+                            "Este funcionário ainda não possui acesso.")}
                       </p>
                     </div>
                     <Badge tone={accessStatusMeta[selectedPerson?.access.status ?? "none"].tone}>
@@ -3859,7 +3976,14 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                   )}
                   {selectedPerson?.access.status === "pending" && (
                     <p className="people-access-card__meta">
-                      O mesmo PIN será configurado após o aceite e valerá para todas as funções.
+                      Após aceitar o convite, o funcionário entra com a própria conta e configura um
+                      único PIN para todas as funções.
+                    </p>
+                  )}
+                  {selectedPerson?.access.managed && (
+                    <p className="people-access-card__meta">
+                      Disponível nos cadastros gerenciais e nos fluxos operacionais autorizados, sem
+                      login próprio por e-mail.
                     </p>
                   )}
                   {data.canManage && selectedPerson && canManageSelectedAccess && (

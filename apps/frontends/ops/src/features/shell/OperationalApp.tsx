@@ -21,6 +21,7 @@ import { type RealtimeStatus, subscribeScopeRealtime } from "../../realtime";
 import { parseRoute, routeHref } from "../../router";
 import { canAccess } from "../../rules";
 import { Brand } from "../auth/AuthScreens";
+import { type ConfigureTerminalPin, TerminalPinSetupForm } from "../auth/TerminalPinSetupForm";
 import { CustomerDisplayPage, customerDisplayTabIdFromHash } from "../counter/CustomerDisplayPage";
 import {
   KDS_NAVIGATION_EVENT,
@@ -187,10 +188,12 @@ export function OperationalApp({
   session,
   onLogout,
   onSwitchUser,
+  onConfigurePin,
 }: {
   session: Session;
   onLogout: () => void | Promise<void>;
   onSwitchUser?: () => void | Promise<void>;
+  onConfigurePin?: ConfigureTerminalPin;
 }) {
   const lastRouteStorageKey = lastOperationalRouteStorageKey(session);
   const canManageKdsUnitSettings =
@@ -223,6 +226,7 @@ export function OperationalApp({
   const [accountantPendingCount, setAccountantPendingCount] = useState<number | null>(null);
   const [scopeRevision, setScopeRevision] = useState(0);
   const [profileMenu, setProfileMenu] = useState(false);
+  const [terminalPinSetupOpen, setTerminalPinSetupOpen] = useState(false);
   const [sessionActionBusy, setSessionActionBusy] = useState(false);
   const [sessionActionIssue, setSessionActionIssue] = useState<{
     cashBlocked: boolean;
@@ -1315,6 +1319,24 @@ export function OperationalApp({
                   )}
 
                   <div className="profile-popover__tools">
+                    {onConfigurePin && (
+                      <Button
+                        className="theme-toggle"
+                        onClick={() => {
+                          closeAllPopovers();
+                          setTerminalPinSetupOpen(true);
+                        }}
+                        variant="ghost"
+                      >
+                        <span aria-hidden="true">
+                          <Icon name="user" size={14} />
+                        </span>
+                        <span>
+                          <strong>Meu PIN de terminal</strong>
+                          <small>Cadastrar ou alterar acesso rápido</small>
+                        </span>
+                      </Button>
+                    )}
                     {!session.terminalMode &&
                       session.profile.permissions.includes("billing.manage") && (
                         <Button
@@ -1429,6 +1451,20 @@ export function OperationalApp({
             </div>
           </div>
         </header>
+
+        {onConfigurePin && (
+          <Modal
+            isOpen={terminalPinSetupOpen}
+            onClose={() => setTerminalPinSetupOpen(false)}
+            size="sm"
+            title="Meu PIN de terminal"
+          >
+            <TerminalPinSetupForm
+              membershipId={session.membershipId}
+              onConfigure={onConfigurePin}
+            />
+          </Modal>
+        )}
 
         <Modal
           isOpen={sessionActionIssue !== null}

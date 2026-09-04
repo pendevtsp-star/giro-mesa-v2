@@ -163,12 +163,13 @@ for name, exact in (
         print(f"{name}_INVALID", file=sys.stderr)
         raise SystemExit(1)
 
-qr_table_token_secret = values.get("QR_TABLE_TOKEN_SECRET")
-if qr_table_token_secret is None:
-    additions["QR_TABLE_TOKEN_SECRET"] = secrets.token_hex(32)
-elif len(qr_table_token_secret.strip()) < 32:
-    print("QR_TABLE_TOKEN_SECRET_INVALID", file=sys.stderr)
-    raise SystemExit(1)
+for name in ("QR_TABLE_TOKEN_SECRET", "TERMINAL_PIN_PEPPER"):
+    value = values.get(name)
+    if value is None:
+        additions[name] = secrets.token_hex(32)
+    elif len(value.strip()) < 32:
+        print(f"{name}_INVALID", file=sys.stderr)
+        raise SystemExit(1)
 
 runtime_defaults = {
     "MEDIA_ROOT": "/app/data/media",

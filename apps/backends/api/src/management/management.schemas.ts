@@ -1033,6 +1033,26 @@ const personAccessRolesSchema = z
   });
 const personAccessExpectedRevisionSchema = z.number().int().positive().optional();
 
+const personExpressAccessRoleSchema = z.enum([
+  "waiter",
+  "cashier",
+  "receptionist",
+  "busser",
+  "kds",
+  "delivery",
+  "inventory",
+]);
+const personExpressAccessSchema = z.object({
+  roles: z
+    .array(personExpressAccessRoleSchema)
+    .min(1)
+    .max(personExpressAccessRoleSchema.options.length)
+    .refine((roles) => new Set(roles).size === roles.length, {
+      message: "Não repita uma função de acesso.",
+    }),
+  pin: z.string().regex(/^\d{6}$/, "O PIN deve ter exatamente 6 dígitos."),
+});
+
 export const personAccessStepUpSchema = z
   .object({
     currentPassword: z.string().min(1).max(200).optional(),
@@ -1177,9 +1197,18 @@ const personFieldsSchema = z.object({
   hiredAt: date.optional(),
 });
 
-export const personSchema = personFieldsSchema.extend({
-  access: personAccessInviteSchema.optional(),
-});
+export const personSchema = personFieldsSchema
+  .extend({
+    access: personAccessInviteSchema.optional(),
+    expressAccess: personExpressAccessSchema.optional(),
+  })
+  .refine(
+    (value) => [value.identityId, value.access, value.expressAccess].filter(Boolean).length <= 1,
+    {
+      message: "Escolha apenas uma forma de acesso.",
+      path: ["access"],
+    },
+  );
 
 export const personUpdateSchema = personFieldsSchema
   .partial()

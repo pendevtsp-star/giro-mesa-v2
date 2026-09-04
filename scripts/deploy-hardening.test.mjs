@@ -271,6 +271,7 @@ test("runtime env hardening preserves existing secrets and is byte-idempotent", 
     assert.match(afterFirst, /^PLATFORM_ADMIN_GRANTS=/m);
     assert.match(afterFirst, /^PLATFORM_ADMIN_ROLES=/m);
     assert.match(afterFirst, /^QR_TABLE_TOKEN_SECRET=[a-f\d]{64}$/m);
+    assert.match(afterFirst, /^TERMINAL_PIN_PEPPER=[a-f\d]{64}$/m);
     assert.match(afterFirst, /^MEDIA_ROOT=\/app\/data\/media$/m);
     assert.match(afterFirst, /^SMARTPOS_SIGNATURE_MAX_SKEW_SECONDS=300$/m);
     assert.match(afterFirst, /^NEXT_PUBLIC_REDE_STORE_URL=$/m);
@@ -310,6 +311,13 @@ test("runtime env rejects invalid platform roles and short QR secrets atomically
     assert.notEqual(shortSecret.status, 0);
     assert.match(output(shortSecret), /QR_TABLE_TOKEN_SECRET_INVALID/);
     assert.equal(readFileSync(envFile, "utf8"), existing);
+
+    const shortPinPepper = `QR_TABLE_TOKEN_SECRET=${"a".repeat(64)}\nTERMINAL_PIN_PEPPER=short\n`;
+    writeFileSync(envFile, shortPinPepper);
+    const invalidPinPepper = run(ensureScript, [envFile]);
+    assert.notEqual(invalidPinPepper.status, 0);
+    assert.match(output(invalidPinPepper), /TERMINAL_PIN_PEPPER_INVALID/);
+    assert.equal(readFileSync(envFile, "utf8"), shortPinPepper);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

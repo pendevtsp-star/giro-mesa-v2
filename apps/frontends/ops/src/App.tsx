@@ -266,6 +266,13 @@ export function App() {
       session={session}
       onLogout={logout}
       onSwitchUser={session.terminalMode ? () => lockTerminal("switch") : undefined}
+      onConfigurePin={
+        !session.terminalMode && !session.platformAdmin
+          ? async (input) => {
+              await terminalApi.configurePin(input);
+            }
+          : undefined
+      }
     />
   );
 }
