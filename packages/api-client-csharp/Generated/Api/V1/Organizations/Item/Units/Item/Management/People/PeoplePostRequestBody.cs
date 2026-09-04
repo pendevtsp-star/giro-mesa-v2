@@ -30,6 +30,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
 #else
         public string EmploymentCode { get; set; }
 #endif
+        /// <summary>The expressAccess property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_expressAccess? ExpressAccess { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_expressAccess ExpressAccess { get; set; }
+#endif
         /// <summary>The hiredAt property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -85,6 +93,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
             {
                 { "access", n => { Access = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access.CreateFromDiscriminatorValue); } },
                 { "employmentCode", n => { EmploymentCode = n.GetStringValue(); } },
+                { "expressAccess", n => { ExpressAccess = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_expressAccess>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_expressAccess.CreateFromDiscriminatorValue); } },
                 { "hiredAt", n => { HiredAt = n.GetStringValue(); } },
                 { "hourlyRateCents", n => { HourlyRateCents = n.GetIntValue(); } },
                 { "identityId", n => { IdentityId = n.GetGuidValue(); } },
@@ -101,6 +110,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Peo
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_access>("access", Access);
             writer.WriteStringValue("employmentCode", EmploymentCode);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.People.PeoplePostRequestBody_expressAccess>("expressAccess", ExpressAccess);
             writer.WriteStringValue("hiredAt", HiredAt);
             writer.WriteIntValue("hourlyRateCents", HourlyRateCents);
             writer.WriteGuidValue("identityId", IdentityId);
