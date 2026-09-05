@@ -489,6 +489,7 @@ test("deploy invokes the complete backup before migration and never snapshots cl
   assert.ok(migrationCall > backupCall, "backup must finish before migrations start");
   assert.ok(pullCall > backupCall, "backup must finish before pulling images");
   assert.ok(stopCall > pullCall, "target images must be pulled before stopping mutators");
+  assert.match(deploy, /export COMPOSE_PARALLEL_LIMIT=\$\{COMPOSE_PARALLEL_LIMIT:-1\}/);
   assert.ok(postgresUpCall > backupCall, "backup must finish before updating PostgreSQL");
   assert.doesNotMatch(deploy, /(?:cp|tar|gzip)[^\n]*(?:env_file|\.env)/i);
   assert.match(deploy, /GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64/);

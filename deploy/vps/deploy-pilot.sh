@@ -280,6 +280,7 @@ export GIROMESA_API_IMAGE=${recovery_image_values[0]} GIROMESA_WORKER_IMAGE=${re
 export GIROMESA_SITE_IMAGE=${recovery_image_values[2]} GIROMESA_CUSTOMER_IMAGE=${recovery_image_values[3]}
 export GIROMESA_OPS_IMAGE=${recovery_image_values[4]}
 recovery_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$recovery_release/deploy/vps/compose.pilot.yaml" -f "$recovery_release/deploy/vps/compose.images.yaml" -f "$recovery_release/deploy/vps/compose.observability.yaml")
+export COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT:-1}
 "${recovery_compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
 "${recovery_compose[@]}" pull
