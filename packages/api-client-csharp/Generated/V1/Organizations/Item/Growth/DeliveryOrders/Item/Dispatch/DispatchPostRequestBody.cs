@@ -22,6 +22,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Di
 #else
         public string CourierReference { get; set; }
 #endif
+        /// <summary>The coverageOverrideReason property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? CoverageOverrideReason { get; set; }
+#nullable restore
+#else
+        public string CoverageOverrideReason { get; set; }
+#endif
         /// <summary>The idempotencyKey property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -56,6 +64,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Di
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "courierReference", n => { CourierReference = n.GetStringValue(); } },
+                { "coverageOverrideReason", n => { CoverageOverrideReason = n.GetStringValue(); } },
                 { "idempotencyKey", n => { IdempotencyKey = n.GetStringValue(); } },
             };
         }
@@ -67,6 +76,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Di
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteStringValue("courierReference", CourierReference);
+            writer.WriteStringValue("coverageOverrideReason", CoverageOverrideReason);
             writer.WriteStringValue("idempotencyKey", IdempotencyKey);
             writer.WriteAdditionalData(AdditionalData);
         }

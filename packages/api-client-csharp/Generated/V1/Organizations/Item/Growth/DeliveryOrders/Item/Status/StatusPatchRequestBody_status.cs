@@ -24,10 +24,6 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.St
         #pragma warning disable CS1591
         Ready,
         #pragma warning restore CS1591
-        [EnumMember(Value = "dispatched")]
-        #pragma warning disable CS1591
-        Dispatched,
-        #pragma warning restore CS1591
         [EnumMember(Value = "completed")]
         #pragma warning disable CS1591
         Completed,
