@@ -9,6 +9,7 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, banco próprio e releases imutá
 - O deploy exige backup completo do banco, diretório de objetos e `.env` atual cifrado. Backup somente do banco é recusado.
 - O backup é criado antes de `pull`, atualização do PostgreSQL ou migrations.
 - Imagens de aplicação, PostgreSQL, Cosign, BuildKit, frontend Dockerfile e bases são fixadas por digest.
+- Materialize o commit exato com `git -c tar.umask=0022 archive`; o release deve ser `root:root`, sem escrita para grupo/outros e com os hashes idênticos ao manifesto assinado antes de chamar o entrypoint.
 - O overlay `compose.observability.yaml` é debug-only e não substitui observabilidade durável.
 
 ## Primeiro deploy
