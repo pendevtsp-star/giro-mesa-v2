@@ -15,5 +15,6 @@ regexes = [
   '''^giromesa_operational_scope_v1$''',
   '''^delivery-assign-1$''',
   '''^delivery-notification-1$''',
+  '''^delivery-fulfillment-mismatch-0001$''',
   '''^commission-idempotency-1$''',
 ]
