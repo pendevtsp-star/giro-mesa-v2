@@ -188,8 +188,13 @@ export function orderSubmissionErrorMessage(createdCount: number, error: unknown
   return `${createdCount === 1 ? "Pedido salvo em espera, mas não enviado à produção." : `${createdCount} etapas salvas em espera, mas não enviadas à produção.`} ${message}`;
 }
 
-export function requiresDeliveryRegistration(error: unknown): error is ApiClientError {
-  return error instanceof ApiClientError && error.code === "DELIVERY_ORDER_REGISTRATION_REQUIRED";
+export function requiresDeliveryRegistration(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "DELIVERY_ORDER_REGISTRATION_REQUIRED"
+  );
 }
 
 export function stableDeliveryIdempotencyKey(

@@ -118,6 +118,9 @@ describe("atalhos e rascunho operacional", () => {
         ),
       ),
     ).toBe(true);
+    expect(requiresDeliveryRegistration({ code: "DELIVERY_ORDER_REGISTRATION_REQUIRED" })).toBe(
+      true,
+    );
     expect(requiresDeliveryRegistration(new Error("Falha de rede"))).toBe(false);
   });
 

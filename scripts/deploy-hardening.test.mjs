@@ -640,6 +640,10 @@ test("deploy health gate includes the asynchronous worker", () => {
 
 test("public ingress keeps the internal Evolution webhook off the Internet", () => {
   const ingress = readFileSync(ingressConfig, "utf8");
+  assert.match(ingress, /set_real_ip_from 172\.64\.0\.0\/13;/);
+  assert.match(ingress, /set_real_ip_from 2606:4700::\/32;/);
+  assert.match(ingress, /real_ip_header CF-Connecting-IP;/);
+  assert.match(ingress, /real_ip_recursive on;/);
   for (const header of [
     "Strict-Transport-Security",
     "X-Content-Type-Options",
