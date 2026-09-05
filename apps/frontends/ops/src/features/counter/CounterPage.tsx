@@ -487,7 +487,7 @@ export function RealCounterPage({
                             </small>
                           )}
                         </div>
-                        <Label className="items-start rounded-md border border-border bg-muted p-3 leading-snug">
+                        <Label className="counter-notification-consent items-start rounded-md border border-border bg-muted p-3 leading-snug">
                           <input
                             className="accent-primary"
                             checked={readyNotificationConsent}
