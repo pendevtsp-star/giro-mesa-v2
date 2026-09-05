@@ -814,6 +814,9 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(workflow, /critical=\[[^\n]*"package\.json"/);
   assert.match(provenance, /"package\.json"/);
   assert.match(readFileSync(trustedEntrypoint, "utf8"), /"package\.json"/);
+  assert.equal(workflow.split("deploy/vps/ensure-runtime-env.sh").length - 1, 2);
+  assert.match(provenance, /"deploy\/vps\/ensure-runtime-env\.sh"/);
+  assert.match(readFileSync(trustedEntrypoint, "utf8"), /"deploy\/vps\/ensure-runtime-env\.sh"/);
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");
   for (const name of [
     "FISCAL_RELEASE_ENV",

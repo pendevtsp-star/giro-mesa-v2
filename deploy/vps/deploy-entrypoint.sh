@@ -165,7 +165,7 @@ done
 
 python3 -I - "$stage/target.json" "$release" "$stage/recovery.json" "$recovery_release" "$stage/recovery-validation.json" "$recovery_evidence_hash" <<'PY'
 import hashlib, json, pathlib, re, sys
-fixed = {"deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"}
+fixed = {"deploy/vps/deploy-entrypoint.sh","deploy/vps/compose.pilot.yaml","deploy/vps/compose.images.yaml","deploy/vps/compose.observability.yaml","deploy/vps/deploy-pilot.sh","deploy/vps/ensure-runtime-env.sh","deploy/vps/rollback-app.sh","deploy/vps/verify-image-provenance.sh","deploy/vps/validate-buildkit-attestations.py","deploy/vps/image-lock.json","deploy/vps/rollback-compatibility.json","deploy/vps/recovery-compatibility.json","scripts/backup-production.sh","scripts/restore-drill.sh","packages/db/drizzle/meta/_journal.json"}
 target_only = {"package.json","config/fiscal-release.json","scripts/check-fiscal-storage.sh","scripts/fiscal-production-smoke.sql"}
 def validate_files(manifest_path, root_raw, role):
     value = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
