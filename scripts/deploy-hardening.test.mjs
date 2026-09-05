@@ -483,10 +483,12 @@ test("deploy invokes the complete backup before migration and never snapshots cl
   const migrationCall = deploy.indexOf("--profile tools run --rm migrate");
   const composeInvocation = '"$' + '{compose[@]}"';
   const pullCall = deploy.indexOf(`${composeInvocation} pull`);
+  const stopCall = deploy.indexOf("docker stop --timeout");
   const postgresUpCall = deploy.indexOf(`${composeInvocation} up -d postgres`);
   assert.ok(backupCall >= 0, "deploy must invoke the complete Linux backup");
   assert.ok(migrationCall > backupCall, "backup must finish before migrations start");
   assert.ok(pullCall > backupCall, "backup must finish before pulling images");
+  assert.ok(stopCall > pullCall, "target images must be pulled before stopping mutators");
   assert.ok(postgresUpCall > backupCall, "backup must finish before updating PostgreSQL");
   assert.doesNotMatch(deploy, /(?:cp|tar|gzip)[^\n]*(?:env_file|\.env)/i);
   assert.match(deploy, /GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64/);

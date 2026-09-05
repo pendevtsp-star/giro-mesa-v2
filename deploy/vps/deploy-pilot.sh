@@ -407,11 +407,12 @@ unset GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64
 unset GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64
 [[ -f $backup/manifest.json ]] || { echo "BACKUP_MANIFEST_MISSING" >&2; exit 1; }
 
+"${compose[@]}" pull
+"$provenance_script"
+
 docker stop --timeout "${GIROMESA_DRAIN_SECONDS:-30}" "${mutators[@]}" >/dev/null
 mutators_stopped=1
 
-"${compose[@]}" pull
-"$provenance_script"
 "${compose[@]}" up -d postgres
 postgres_id=$("${compose[@]}" ps -q postgres)
 postgres_status=
