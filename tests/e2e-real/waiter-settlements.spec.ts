@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const unitId = "00000000-0000-4000-8000-000000000002";
@@ -67,9 +68,14 @@ function settlement(status = "preview") {
 }
 
 async function mockApi(page: Page) {
+  await mockCompatibleApiHealth(page, "waiter-settlements-e2e");
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
+    if (route.request().method() === "GET" && path === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     if (path === "/v1/auth/me") {
       await route.fulfill({
         json: {

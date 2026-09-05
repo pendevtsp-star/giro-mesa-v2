@@ -5,6 +5,7 @@ import {
   buildTableTransferCommand,
   canOpenTableWorkspace,
   findPriorityServiceCall,
+  nextTransferRefreshBoundary,
   parseSalonViewContext,
   requiredOperationalRevision,
   runFloorRevisionMutation,
@@ -12,6 +13,7 @@ import {
   structuralMergePolicy,
   summarizeSalonAttention,
   tableStatusPresentation,
+  transferUrgency,
 } from "./SalonPage";
 import {
   buildSalonPreflight,
@@ -74,6 +76,32 @@ describe("buildTableTransferCommand", () => {
         },
       },
     });
+  });
+});
+
+describe("nextTransferRefreshBoundary", () => {
+  it("ignores expired transfers instead of refreshing the floor in a tight loop", () => {
+    const now = new Date("2026-09-05T20:00:00.000Z").getTime();
+    const transfer = (expiresAt: string) => ({ expiresAt }) as never;
+
+    expect(nextTransferRefreshBoundary([transfer("2026-09-05T19:59:00.000Z")], now)).toBe(
+      Number.POSITIVE_INFINITY,
+    );
+    expect(nextTransferRefreshBoundary([transfer("2026-09-05T20:30:00.000Z")], now)).toBe(
+      new Date("2026-09-05T20:15:00.000Z").getTime(),
+    );
+  });
+});
+
+describe("transferUrgency", () => {
+  it("keeps an expired transfer visible until its operational confirmation", () => {
+    const now = new Date("2026-09-05T20:00:00.000Z").getTime();
+
+    expect(transferUrgency("2026-09-05T19:59:00.000Z", now)).toEqual({
+      expired: true,
+      minutes: 1,
+    });
+    expect(transferUrgency("2026-09-05T20:16:00.000Z", now)).toBeNull();
   });
 });
 

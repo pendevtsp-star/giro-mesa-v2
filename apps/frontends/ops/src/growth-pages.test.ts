@@ -224,9 +224,11 @@ describe("contratos de crescimento reais", () => {
     ]);
     expect(order).toBeDefined();
     if (!order) return;
-    expect(parseDeliveryOrderMutation({ duplicate: false, order })).toMatchObject({
+    const mutationOrder = { ...order } as Partial<typeof order>;
+    delete mutationOrder.notifications;
+    expect(parseDeliveryOrderMutation({ duplicate: false, order: mutationOrder })).toMatchObject({
       duplicate: false,
-      order: { id: "delivery-1" },
+      order: { id: "delivery-1", notifications: [] },
     });
     expect(() => parseDeliveryOrderMutation(order)).toThrow(InvalidGrowthPayloadError);
   });

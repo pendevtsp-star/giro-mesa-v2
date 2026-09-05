@@ -310,7 +310,7 @@ export function parseDeliveryOrderMutation(value: unknown): {
   order: DeliveryOrder;
 } {
   const mutation = deliveryMutation(value, "order");
-  const order = parseDeliveryOrders([mutation.payload])[0];
+  const order = parseDeliveryOrders([{ notifications: [], ...mutation.payload }])[0];
   if (!order) throw new InvalidGrowthPayloadError();
   return { duplicate: mutation.duplicate, order };
 }

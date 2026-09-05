@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "org-1";
 const unitId = "unit-1";
@@ -80,6 +81,7 @@ async function mockPurchasesApi(
   seedReady = false,
   profileRole = "manager",
 ) {
+  await mockCompatibleApiHealth(page, "purchases-e2e");
   let shouldFailCreate = failNextCreate;
   let orders: Record<string, unknown>[] = [];
   let items: Record<string, unknown>[] = [];
@@ -148,6 +150,10 @@ async function mockPurchasesApi(
     const method = request.method();
     const purchasesPath = `/v1/organizations/${organizationId}/units/${unitId}/management/purchases`;
 
+    if (method === "GET" && path === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     if (method === "GET" && path === purchasesPath) {
       await route.fulfill({
         json: {

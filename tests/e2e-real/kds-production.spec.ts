@@ -26,7 +26,7 @@ async function mockKdsApi(page: Page) {
         status: "ok",
         version: "2.0.0",
         buildSha: "kds-e2e",
-        schemaVersion: 77,
+        schemaVersion: 78,
         database: "up",
         integrations: {},
         capabilities: [
@@ -674,10 +674,7 @@ test("KDS mantém submenu, rotas e última área operacional", async ({ page }, 
   await expect(page).toHaveURL(/#\/kds\/pass$/);
   await expect(page.getByRole("heading", { level: 1, name: "Passe / expedição" })).toBeVisible();
 
-  await page
-    .locator(".kds-tabs")
-    .getByRole("link", { name: "Configurações", exact: true })
-    .click();
+  await page.locator(".kds-tabs").getByRole("link", { name: "Configurações", exact: true }).click();
   await expect(page).toHaveURL(/#\/kds\/settings$/);
   await expect(page.getByRole("heading", { level: 1, name: "Configurações do KDS" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Terminal" })).toBeVisible();
@@ -722,10 +719,7 @@ test("KDS centraliza disponibilidade e sincroniza o perfil deste terminal", asyn
   const apiState = await mockKdsApi(page);
   await enterKds(page);
 
-  await page
-    .locator(".kds-tabs")
-    .getByRole("link", { name: "Configurações", exact: true })
-    .click();
+  await page.locator(".kds-tabs").getByRole("link", { name: "Configurações", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Central de disponibilidade" })).toBeVisible();
   await page.getByLabel("Pesquisar produto").fill("Risoto");
   await page.getByRole("button", { name: "Alterar" }).click();
@@ -816,10 +810,7 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
   await expect.poll(() => apiState.priorityMutations).toHaveLength(1);
   await expect(page.getByRole("button", { name: "Priorizar pedido" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Receber pedido no passe" })).toHaveCount(0);
-  await page
-    .locator(".kds-tabs")
-    .getByRole("link", { name: "Configurações", exact: true })
-    .click();
+  await page.locator(".kds-tabs").getByRole("link", { name: "Configurações", exact: true }).click();
   await page.getByRole("button", { name: "Estação", exact: true }).click();
   await page.locator("[data-kds-station]").selectOption({ label: "Bar" });
   await page.getByRole("button", { name: "Fixar estação neste terminal" }).click();

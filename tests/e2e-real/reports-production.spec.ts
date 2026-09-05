@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
+import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "org-1";
 const unitId = "unit-1";
@@ -203,6 +204,7 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
 }
 
 async function mockReportsApi(page: Page, requestedPeriods: string[]) {
+  await mockCompatibleApiHealth(page, "reports-e2e");
   const savedViews: Array<Record<string, unknown>> = [];
   const alerts: Array<Record<string, unknown>> = [];
   const csvContent = "\uFEFFseção;rótulo;timezone\r\nvendas;Prato executivo;America/Sao_Paulo\r\n";
@@ -486,12 +488,16 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
     "#/finance",
   );
   await page.getByRole("button", { name: "Salvar filtro atual" }).click();
+  const appliedFromLabel = (await page.getByLabel("Data inicial").inputValue())
+    .split("-")
+    .reverse()
+    .join("/");
   const appliedToLabel = (await page.getByLabel("Data final").inputValue())
     .split("-")
     .reverse()
     .join("/");
   await expect(page.getByRole("region", { name: "Filtros salvos" })).toContainText(
-    `01/08/2026 a ${appliedToLabel}`,
+    `${appliedFromLabel} a ${appliedToLabel}`,
   );
   await expect(page.getByRole("button", { name: "Salvar filtro atual" })).toBeDisabled();
   await expect(

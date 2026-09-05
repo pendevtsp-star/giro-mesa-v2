@@ -22,7 +22,7 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
         status: "ok",
         version: "2.0.0",
         buildSha: "dashboard-e2e",
-        schemaVersion: 77,
+        schemaVersion: 78,
         database: "up",
         integrations: {},
         capabilities: [
@@ -205,7 +205,7 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
         status: "ok",
         version: "2.0.0",
         buildSha: "platform-e2e",
-        schemaVersion: 77,
+        schemaVersion: 78,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -573,7 +573,9 @@ for (const profile of profiles) {
     await expect(page.locator(".dashboard-priority strong").first()).toHaveText(
       "Prioridade urgente",
     );
-    await expect(page.locator(`a.dashboard-metric[href="#/${profile.route}"]`).first()).toBeVisible();
+    await expect(
+      page.locator(`a.dashboard-metric[href="#/${profile.route}"]`).first(),
+    ).toBeVisible();
 
     if (profile.profileId === "owner") {
       const accessibility = await new AxeBuilder({ page })

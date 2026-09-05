@@ -1,14 +1,20 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const unitId = "22222222-2222-4222-8222-222222222222";
 const tabId = "33333333-3333-4333-8333-333333333333";
 
 test("visor do cliente acompanha a conta sem expor a operação", async ({ page }) => {
+  await mockCompatibleApiHealth(page, "customer-display-e2e");
   await page.route("**/v1/**", async (route) => {
     const request = route.request();
     const pathname = new URL(request.url()).pathname;
+    if (request.method() === "GET" && pathname === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     const payload =
       pathname === "/v1/auth/me"
         ? {

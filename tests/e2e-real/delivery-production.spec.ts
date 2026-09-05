@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "org-1";
 const unitId = "unit-1";
@@ -31,6 +32,7 @@ const initialOrder = {
   totalCents: 5_200,
   paymentMethod: "pay_on_fulfillment",
   paymentStatus: "awaiting_payment",
+  addressValidationStatus: "covered",
   address: {
     street: "Rua das Flores",
     number: "42",
@@ -130,6 +132,10 @@ async function mockDeliveryApi(
     const path = url.pathname;
     const method = request.method();
 
+    if (method === "GET" && path === "/v1/auth/terminal-session") {
+      await route.fulfill({ status: 401, json: { code: "TERMINAL_SESSION_REQUIRED" } });
+      return;
+    }
     if (method === "GET" && path.endsWith(`/growth/units/${unitId}/delivery-orders`)) {
       calls.searchQueries.push(url.search);
       await route.fulfill({ json: orders });
@@ -199,7 +205,18 @@ async function mockDeliveryApi(
         courierReference: courier?.reference ?? null,
         courierStatus: courier?.status ?? null,
       }));
-      await route.fulfill({ json: { duplicate: false, order: orders[0] } });
+      const rawOrder = { ...orders[0] };
+      for (const field of [
+        "zoneName",
+        "history",
+        "courierReference",
+        "courierStatus",
+        "lastPosition",
+        "notifications",
+      ] as const) {
+        delete (rawOrder as Partial<typeof initialOrder>)[field];
+      }
+      await route.fulfill({ json: { duplicate: false, order: rawOrder } });
       return;
     }
     if (method === "POST" && /\/growth\/delivery-orders\/[^/]+\/dispatch$/.test(path)) {
@@ -291,6 +308,7 @@ async function openDelivery(
   calls: DeliveryCalls,
   options: DeliveryMockOptions = {},
 ) {
+  await mockCompatibleApiHealth(page, "delivery-e2e");
   await mockDeliveryApi(page, role, calls, options);
   await page.goto("/");
   await page.evaluate(() => {
@@ -404,11 +422,12 @@ test("operador visualiza pedidos, abre detalhes e avança uma transição", asyn
   const calls = emptyCalls();
   await openDelivery(page, "delivery", calls);
 
-  const orderButton = page.getByRole("button", { name: "Abrir pedido D-100" }).first();
+  const orderButton = page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first();
+  const orderCard = page.locator("article.delivery-order-card").filter({ has: orderButton });
   await expect(orderButton).toBeVisible();
   await expect(page.getByText("Maria Oliveira").first()).toBeVisible();
   await expect(page.getByText("Sincronizado", { exact: false })).toBeVisible();
-  await expect(page.getByText("Atrasado", { exact: true }).first()).toBeVisible();
+  await expect(orderCard.getByText("⚠️ Atrasado", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("button", { name: /nova zona|configurar zonas|editar zona|desativar/i }),
   ).toHaveCount(0);
@@ -423,7 +442,7 @@ test("operador visualiza pedidos, abre detalhes e avança uma transição", asyn
   await expect(details).toContainText("Histórico");
   await expect(details).toContainText("placed");
   await expect(details).toContainText("Última posição");
-  await details.getByRole("button", { name: "Solicitar atualização operacional" }).click();
+  await details.getByRole("button", { name: "Solicitar notificação" }).click();
   await expect.poll(() => calls.notifications.length).toBe(1);
   expect(calls.notifications[0]).toMatchObject({
     audience: "operations",
@@ -474,7 +493,8 @@ test("gerente cria, edita e desativa zona de entrega", async ({ page }) => {
     phone: "11988887777",
     idempotencyKey: expect.any(String),
   });
-  await expect(page.getByText("Carlos Lima · Moto 42")).toBeVisible();
+  await expect(page.getByText("Carlos Lima", { exact: true })).toBeVisible();
+  await expect(page.getByText("Moto 42", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Zonas" }).click();
   await page
@@ -482,7 +502,7 @@ test("gerente cria, edita e desativa zona de entrega", async ({ page }) => {
     .first()
     .click();
   await page.getByLabel(/região declarada|nome da zona/i).fill("Centro expandido");
-  await page.getByLabel(/taxa/i).fill("9,90");
+  await page.getByRole("textbox", { name: "Taxa (R$)" }).fill("9,90");
   await page.getByLabel(/pedido mínimo/i).fill("30,00");
   await page.getByLabel(/previsão de entrega/i).fill("55");
   await page.getByRole("button", { name: /criar zona|salvar zona/i }).click();
@@ -495,7 +515,7 @@ test("gerente cria, edita e desativa zona de entrega", async ({ page }) => {
     active: true,
   });
   expect(calls.createZone[0]).not.toHaveProperty("radiusKm");
-  await expect(page.getByText("Centro expandido")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Centro expandido" })).toBeVisible();
 
   await page
     .getByRole("button", { name: /editar zona|editar/i })
@@ -509,7 +529,7 @@ test("gerente cria, edita e desativa zona de entrega", async ({ page }) => {
     name: "Centro revisado",
     estimatedDeliveryMinutes: 60,
   });
-  await expect(page.getByText("Centro revisado")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Centro revisado" })).toBeVisible();
   await expect(page.getByText("60 min", { exact: true })).toBeVisible();
 
   await page
@@ -547,7 +567,7 @@ test("operador atribui entregador e exibe notificação confirmada", async ({ pa
     couriers: [initialCourier],
   });
 
-  await page.getByRole("button", { name: "Abrir pedido D-100" }).first().click();
+  await page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first().click();
   const details = page.getByRole("dialog");
   await details.getByLabel("Entregador disponível").selectOption(initialCourier.id);
   await details.getByRole("button", { name: "Atribuir e despachar" }).click();
@@ -557,9 +577,12 @@ test("operador atribui entregador e exibe notificação confirmada", async ({ pa
     courierId: initialCourier.id,
     idempotencyKey: expect.any(String),
   });
-  await expect.poll(() => calls.transition.length).toBe(1);
-  expect(calls.transition[0]).toEqual({ status: "dispatched" });
-  expect(calls.dispatch).toHaveLength(0);
+  await expect.poll(() => calls.dispatch.length).toBe(1);
+  expect(calls.dispatch[0]).toMatchObject({
+    courierReference: initialCourier.reference,
+    idempotencyKey: expect.any(String),
+  });
+  expect(calls.transition).toHaveLength(0);
   await expect(
     page.getByRole("status").filter({ hasText: "Pedido D-100 despachado." }),
   ).toBeVisible();
@@ -577,7 +600,7 @@ test("Delivery renderiza evento realtime e rejeita endereço fora da zona", asyn
   await forceRealtimeEvent(page);
   await openDelivery(page, "delivery", calls);
 
-  const orderButton = page.getByRole("button", { name: "Abrir pedido D-100" }).first();
+  const orderButton = page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first();
   await expect(page.getByText("Atualizações recentes")).toBeVisible();
   await expect(page.getByText("Nova posição do entregador")).toBeVisible();
   await orderButton.click();

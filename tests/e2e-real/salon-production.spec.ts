@@ -162,7 +162,7 @@ async function mockProductionApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "e2e-real",
-        schemaVersion: 77,
+        schemaVersion: 78,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -846,7 +846,9 @@ test("Salão respeita a operação permitida para cada papel", async ({ browser 
     await occupiedTable.click();
     const dialog = page.getByRole("dialog", { name: "Mesa 03" });
     if (actor.expectation === "protected") {
-      await expect(dialog.getByRole("heading", { name: "Atendimento de outra praça" })).toBeVisible();
+      await expect(
+        dialog.getByRole("heading", { name: "Atendimento de outra praça" }),
+      ).toBeVisible();
       await expect(dialog).toContainText("não estão no seu escopo");
     } else {
       await expect(dialog.getByRole("button", { name: /^Pedido/ })).toBeVisible();

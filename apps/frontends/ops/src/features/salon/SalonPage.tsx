@@ -15,6 +15,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { ApiClientError, api } from "../../api";
 import { pilotMutation, QueuedOperationalMutationError } from "../../operational-dispatch";
 import {
+  type PilotFloor,
   type PilotScope,
   parsePilotFloor,
   RemoteGate,
@@ -271,6 +272,31 @@ export function buildTableTransferCommand(tabId: string, targetTableId: string) 
   return { body, payload: pilotMutation("transfer-tab", { tabId, body }) };
 }
 
+export function nextTransferRefreshBoundary(
+  transfers: PilotFloor["shiftTableTransfers"],
+  now = Date.now(),
+) {
+  return Math.min(
+    ...transfers.flatMap(({ expiresAt }) => {
+      const expiry = new Date(expiresAt).getTime();
+      const warning = expiry - 15 * 60_000;
+      return [
+        expiry > now ? expiry : Number.POSITIVE_INFINITY,
+        warning > now ? warning : Number.POSITIVE_INFINITY,
+      ];
+    }),
+  );
+}
+
+export function transferUrgency(expiresAt: string, now = Date.now()) {
+  const remaining = new Date(expiresAt).getTime() - now;
+  if (!Number.isFinite(remaining) || remaining > 15 * 60_000) return null;
+  return {
+    expired: remaining <= 0,
+    minutes: Math.max(1, Math.ceil(remaining / 60_000)),
+  };
+}
+
 function closeFloatingMenus(root: ParentNode | null, target?: Node) {
   root
     ?.querySelectorAll<HTMLDetailsElement>("details[data-salon-floating-menu][open]")
@@ -302,13 +328,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   );
   const nextTransferBoundary =
     floor.state.status === "ready"
-      ? Math.min(
-          ...floor.state.data.shiftTableTransfers.flatMap((transfer) => {
-            const expiry = new Date(transfer.expiresAt).getTime();
-            const warning = expiry - 15 * 60_000;
-            return [expiry, warning > Date.now() ? warning : Number.POSITIVE_INFINITY];
-          }),
-        )
+      ? nextTransferRefreshBoundary(floor.state.data.shiftTableTransfers)
       : Number.POSITIVE_INFINITY;
   useEffect(() => {
     if (!Number.isFinite(nextTransferBoundary)) return;
@@ -1123,22 +1143,17 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             .map((phase) => groupForTable(phase.tableId)?.anchorTableId ?? phase.tableId),
         );
         const readyTables = activeTables.filter((item) => readyTableIds.has(item.id));
-        const expiringTransferKeys = new Set<string>();
-        const expiringTransfers = data.shiftTableTransfers.filter((transfer) => {
-          const remaining = new Date(transfer.expiresAt).getTime() - Date.now();
+        const transferAlertKeys = new Set<string>();
+        const transferAlerts = data.shiftTableTransfers.filter((transfer) => {
+          const urgency = transferUrgency(transfer.expiresAt);
           const groupId = groupForTable(transfer.tableId)?.id;
           const key = groupId ?? transfer.id;
-          if (remaining <= 0 || remaining > 15 * 60_000 || expiringTransferKeys.has(key)) {
-            return false;
-          }
-          expiringTransferKeys.add(key);
+          if (!urgency || transferAlertKeys.has(key)) return false;
+          transferAlertKeys.add(key);
           return true;
         });
         const priorityCount =
-          activeCalls.length +
-          expiringTransfers.length +
-          turnoverTables.length +
-          readyTables.length;
+          activeCalls.length + transferAlerts.length + turnoverTables.length + readyTables.length;
         const preflight = buildSalonPreflight(data);
         const preflightReady = preflight.filter((item) => item.ready).length;
         const preflightBlocked = preflight.some((item) => item.blocking && !item.ready);
@@ -2567,16 +2582,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </Button>
                       </article>
                     ))}
-                    {expiringTransfers.map((transfer) => {
+                    {transferAlerts.map((transfer) => {
                       const group = groupForTable(transfer.tableId);
                       const targetTableId = group?.anchorTableId ?? transfer.tableId;
                       const targetTable = data.tables.find(
                         (candidate) => candidate.id === targetTableId,
                       );
-                      const minutes = Math.max(
-                        1,
-                        Math.ceil((new Date(transfer.expiresAt).getTime() - Date.now()) / 60_000),
-                      );
+                      const urgency = transferUrgency(transfer.expiresAt);
+                      if (!urgency) return null;
                       return (
                         <Button
                           className="priority-task priority-task--warning"
@@ -2593,10 +2606,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               {group
                                 ? `Grupo com ${groupMembers(group.id).length} mesas`
                                 : (targetTable?.label ?? "Mesa")}{" "}
-                              · remanejamento vence
+                              · remanejamento {urgency.expired ? "vencido" : "vence"}
                             </strong>
                             <small>
-                              Em {minutes} min · abrir para devolver ou renovar a cobertura
+                              {urgency.expired
+                                ? "Abra para devolver ou renovar a cobertura"
+                                : `Em ${urgency.minutes} min · abrir para devolver ou renovar a cobertura`}
                             </small>
                           </span>
                           <strong>Localizar no painel</strong>
