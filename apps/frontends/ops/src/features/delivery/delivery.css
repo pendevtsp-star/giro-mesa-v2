@@ -11,9 +11,7 @@
 .delivery-operations__filters,
 .delivery-zone-real__heading,
 .delivery-zone-real__actions,
-.delivery-detail__summary,
-.delivery-order-real__meta,
-.delivery-order-real__footer {
+.delivery-detail__summary {
   align-items: center;
   display: flex;
   gap: var(--gm-space-2);
@@ -42,162 +40,6 @@
   border-color: var(--gm-warning);
 }
 
-.delivery-summary,
-.delivery-board-real,
-.delivery-zones__grid {
-  display: grid;
-  gap: var(--gm-space-3);
-}
-
-.delivery-summary {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.delivery-summary span {
-  background: var(--gm-surface-soft);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-sm);
-  color: var(--gm-muted);
-  display: grid;
-  font-size: var(--gm-font-xs);
-  gap: var(--gm-space-1);
-  padding: var(--gm-space-2) var(--gm-space-3);
-}
-
-.delivery-summary strong {
-  color: var(--gm-ink);
-  font-size: var(--gm-font-lg);
-}
-.delivery-operations__filters .gm-search-field {
-  flex: 1 1 260px;
-}
-.delivery-board-real {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.delivery-board-real__column {
-  background: var(--gm-surface-soft);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius);
-  display: grid;
-  gap: var(--gm-space-2);
-  min-height: 260px;
-  padding: var(--gm-space-3);
-}
-
-.delivery-board-real__column > header {
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-}
-.delivery-board-real__column h2,
-.delivery-zone-real h2 {
-  font-size: var(--gm-font-base);
-  margin: 0;
-}
-.delivery-list-real {
-  display: none;
-  gap: var(--gm-space-2);
-}
-
-.delivery-order-real {
-  display: grid;
-  gap: var(--gm-space-2);
-  margin-bottom: var(--gm-space-2);
-  min-width: 0;
-  padding: var(--gm-space-3);
-}
-
-.delivery-order-real--late {
-  border-color: color-mix(in srgb, var(--gm-danger) 45%, var(--gm-border));
-  background: color-mix(in srgb, var(--gm-danger-soft) 25%, var(--gm-surface));
-}
-.delivery-order-real__meta {
-  justify-content: flex-start;
-}
-.delivery-order-real__meta > span {
-  color: var(--gm-warning);
-  font-size: var(--gm-font-xs);
-  font-weight: 700;
-}
-
-.delivery-order-real__open {
-  background: none;
-  border: 0;
-  color: var(--gm-ink);
-  cursor: pointer;
-  display: grid;
-  gap: var(--gm-space-1);
-  padding: 0;
-  text-align: start;
-}
-
-.delivery-order-real__open span,
-.delivery-order-real__footer small,
-.delivery-zone-real small {
-  color: var(--gm-muted);
-  font-size: var(--gm-font-xs);
-}
-.delivery-order-real__open:focus-visible {
-  border-radius: var(--gm-radius-sm);
-  outline: 2px solid var(--gm-focus);
-  outline-offset: 2px;
-}
-.delivery-order-real__footer {
-  align-items: end;
-}
-
-.delivery-zones__notice,
-.delivery-zone-real {
-  display: grid;
-  gap: var(--gm-space-3);
-  padding: var(--gm-space-3);
-}
-.delivery-zones__notice p {
-  color: var(--gm-muted);
-  font-size: var(--gm-font-sm);
-  line-height: var(--gm-leading-normal);
-  margin: 0;
-}
-.delivery-zones__grid {
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-}
-.delivery-zone-real__heading > div,
-.delivery-zone-real dl,
-.delivery-detail dl,
-.delivery-detail__totals {
-  display: grid;
-  gap: var(--gm-space-1);
-}
-.delivery-zone-real dl,
-.delivery-detail dl {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 0;
-}
-.delivery-zone-real dt,
-.delivery-detail dt {
-  color: var(--gm-muted);
-  font-size: var(--gm-font-xs);
-}
-.delivery-zone-real dd,
-.delivery-detail dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.delivery-detail__totals {
-  border-block: 1px solid var(--gm-border);
-  padding-block: var(--gm-space-2);
-}
-.delivery-detail__totals span {
-  display: flex;
-  justify-content: space-between;
-}
-.delivery-zone-real__toggle {
-  align-items: center;
-  display: flex;
-  gap: var(--gm-space-2);
-}
-
 .delivery-sync {
   color: var(--gm-muted);
   display: flex;
@@ -206,26 +48,13 @@
   gap: var(--gm-space-2);
 }
 
-.delivery-sync span + span {
-  color: var(--gm-warning);
-}
-
 .delivery-realtime-notices {
   display: grid;
   gap: var(--gm-space-2);
   padding: var(--gm-space-3);
 }
 
-.delivery-couriers {
-  display: grid;
-  gap: var(--gm-space-2);
-  padding: var(--gm-space-3);
-}
-
-.delivery-realtime-notices > div,
-.delivery-realtime-notices li,
-.delivery-couriers > div,
-.delivery-couriers li {
+.delivery-realtime-notices > div {
   align-items: baseline;
   display: flex;
   flex-wrap: wrap;
@@ -233,11 +62,8 @@
   justify-content: space-between;
 }
 
-.delivery-realtime-notices > div span,
 .delivery-realtime-notices p,
 .delivery-realtime-notices time,
-.delivery-couriers > div span,
-.delivery-couriers p,
 .delivery-history p,
 .delivery-history time,
 .delivery-notifications p,
@@ -245,24 +71,636 @@
 .delivery-notifications time {
   color: var(--gm-muted);
   font-size: var(--gm-font-xs);
-}
-
-.delivery-realtime-notices p,
-.delivery-history p,
-.delivery-couriers p,
-.delivery-notifications p {
   margin: 0;
 }
 
 .delivery-realtime-notices ol,
 .delivery-history ol,
-.delivery-couriers ul,
 .delivery-notifications ol {
   display: grid;
   gap: var(--gm-space-1);
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* ==========================================================================
+   Central de Entregadores (Fleet Cockpit)
+   ========================================================================== */
+.delivery-couriers {
+  background: var(--gm-paper);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md, 8px);
+  display: grid;
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-3);
+}
+
+.delivery-couriers__header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.delivery-couriers__header strong {
+  color: var(--gm-ink);
+  font-size: 0.95rem;
+}
+
+.delivery-couriers__stats {
+  color: var(--gm-muted);
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.delivery-couriers__empty {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+  margin: 0;
+}
+
+.delivery-couriers__grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+}
+
+.delivery-courier-card {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 10px;
+  transition: border-color 0.15s ease;
+}
+
+.delivery-courier-card:hover {
+  border-color: color-mix(in srgb, var(--gm-action) 35%, var(--gm-border));
+}
+
+.delivery-courier-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.delivery-courier-card__name-line {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.delivery-courier-card__name-line strong {
+  color: var(--gm-ink);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.delivery-courier-card__ref {
+  color: var(--gm-muted);
+  font-size: 0.72rem;
+}
+
+.delivery-courier-card__phone {
+  color: var(--gm-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.delivery-courier-card__actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.delivery-courier-wa-btn {
+  align-items: center;
+  background: color-mix(in srgb, #10b981 8%, transparent);
+  border: 1px solid color-mix(in srgb, #059669 35%, transparent);
+  border-radius: 6px;
+  color: #059669;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 700;
+  gap: 4px;
+  min-height: 28px;
+  padding: 3px 8px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.delivery-courier-wa-btn:hover {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  border-color: #059669;
+}
+
+/* ==========================================================================
+   Cockpit de Resumo Operacional
+   ========================================================================== */
+.delivery-summary {
+  display: grid;
+  gap: var(--gm-space-2);
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+.delivery-summary-pill {
+  background: var(--gm-paper);
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: space-between;
+  padding: 8px 12px;
+  transition:
+    border-color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.delivery-summary-pill:hover {
+  border-color: color-mix(in srgb, var(--gm-action) 35%, var(--gm-border));
+}
+
+.delivery-summary-pill__top {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.delivery-summary-pill__top strong {
+  color: var(--gm-ink);
+  font-family: var(--gm-display);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.delivery-summary-pill__amount {
+  color: var(--gm-ink);
+  font-family: var(--gm-display), ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.delivery-summary-pill__label-line {
+  align-items: center;
+  color: var(--gm-muted);
+  display: flex;
+  font-size: 0.68rem;
+  font-weight: 700;
+  justify-content: space-between;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.delivery-summary-pill--total {
+  border-left: 3px solid var(--gm-action);
+}
+
+.delivery-operations__filters .gm-search-field {
+  flex: 1 1 260px;
+}
+
+/* ==========================================================================
+   Kanban Board Desktop
+   ========================================================================== */
+.delivery-board-real {
+  display: grid;
+  gap: var(--gm-space-3);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.delivery-board-real__column {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 480px;
+  padding: var(--gm-space-3);
+}
+
+.delivery-board-real__col-header {
+  border-bottom: 1px solid var(--gm-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+.delivery-board-real__col-title-line {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.delivery-board-real__col-title-line h2 {
+  color: var(--gm-ink);
+  font-size: 0.95rem;
+  font-weight: 750;
+  margin: 0;
+}
+
+.delivery-board-real__col-meta-line {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.delivery-board-real__col-total {
+  color: var(--gm-muted);
+  font-family: var(--gm-display), ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.delivery-board-real__col-late-pill {
+  color: var(--gm-danger);
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+/* ==========================================================================
+   Cartão de Pedido Operacional
+   ========================================================================== */
+.delivery-order-card {
+  background: var(--gm-paper);
+  border: 1px solid var(--gm-border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 10px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.delivery-order-card:hover {
+  border-color: color-mix(in srgb, var(--gm-action) 45%, var(--gm-border));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.delivery-order-card--late {
+  background: color-mix(in srgb, var(--gm-danger) 4%, var(--gm-paper));
+  border-color: color-mix(in srgb, var(--gm-danger) 60%, var(--gm-border));
+}
+
+.delivery-order-card__header {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.delivery-order-card__id-group {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.delivery-order-card__protocol {
+  background: color-mix(in srgb, var(--gm-ink) 8%, transparent);
+  border-radius: 4px;
+  color: var(--gm-ink);
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 2px 6px;
+}
+
+.delivery-order-card__badges {
+  align-items: center;
+  display: flex;
+  gap: 4px;
+}
+
+.delivery-sla-chip {
+  color: var(--gm-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.delivery-order-card__body-btn {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-block: 2px;
+  text-align: left;
+  width: 100%;
+}
+
+.delivery-order-card__body-btn:focus-visible {
+  outline: 2px solid var(--gm-action);
+  outline-offset: 2px;
+}
+
+.delivery-order-card__customer {
+  align-items: baseline;
+  display: flex;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.delivery-order-card__customer strong {
+  color: var(--gm-ink);
+  font-size: 0.88rem;
+  font-weight: 750;
+}
+
+.delivery-order-card__phone {
+  color: var(--gm-muted);
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.delivery-order-card__location {
+  align-items: center;
+  color: var(--gm-ink);
+  display: flex;
+  font-size: 0.74rem;
+  gap: 4px;
+}
+
+.delivery-order-card__courier-tag {
+  align-items: center;
+  color: var(--gm-action);
+  display: flex;
+  font-size: 0.72rem;
+  font-weight: 600;
+  gap: 4px;
+}
+
+.delivery-order-card__courier-tag small {
+  color: var(--gm-muted);
+}
+
+.delivery-order-card__footer {
+  align-items: center;
+  border-top: 1px solid var(--gm-border);
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding-top: 8px;
+}
+
+.delivery-order-card__total {
+  color: var(--gm-ink);
+  font-family: var(--gm-display), ui-monospace, monospace;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.delivery-order-card__actions {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.delivery-whatsapp-btn {
+  align-items: center;
+  background: color-mix(in srgb, #10b981 8%, transparent);
+  border: 1px solid color-mix(in srgb, #059669 35%, transparent);
+  border-radius: 6px;
+  color: #059669;
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 700;
+  gap: 4px;
+  min-height: 26px;
+  padding: 3px 7px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.delivery-whatsapp-btn:hover {
+  background: color-mix(in srgb, #10b981 18%, transparent);
+  border-color: #059669;
+}
+
+/* ==========================================================================
+   Mobile Kanban Tabs & List (<900px)
+   ========================================================================== */
+.delivery-list-real {
+  display: none;
+  gap: var(--gm-space-2);
+}
+
+.delivery-mobile-column-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+}
+
+.delivery-col-tab {
+  all: unset;
+  background: var(--gm-paper);
+  border: 1px solid var(--gm-border);
+  border-radius: 999px;
+  box-sizing: border-box;
+  color: var(--gm-ink);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.delivery-col-tab:hover {
+  border-color: var(--gm-action);
+}
+
+.delivery-col-tab--active {
+  background: var(--gm-action);
+  border-color: var(--gm-action);
+  color: var(--gm-on-action);
+}
+
+/* ==========================================================================
+   Simulador de Cobertura e Zonas
+   ========================================================================== */
+.delivery-coverage-simulator {
+  background: var(--gm-paper);
+  border: 1px solid var(--gm-border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 16px;
+}
+
+.delivery-coverage-simulator__header h3 {
+  color: var(--gm-ink);
+  font-size: 1rem;
+  font-weight: 750;
+  margin: 0 0 2px;
+}
+
+.delivery-coverage-simulator__header p {
+  color: var(--gm-muted);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.delivery-coverage-simulator__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.delivery-coverage-simulator__fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.delivery-coverage-simulator__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.delivery-coverage-result {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.delivery-coverage-result--success {
+  background: color-mix(in srgb, #10b981 8%, var(--gm-paper));
+  border-color: #10b981;
+}
+
+.delivery-coverage-result--failure {
+  background: color-mix(in srgb, var(--gm-danger) 8%, var(--gm-paper));
+  border-color: var(--gm-danger);
+}
+
+.delivery-coverage-result__content strong {
+  color: var(--gm-ink);
+  display: block;
+  font-size: 0.88rem;
+  margin-bottom: 4px;
+}
+
+.delivery-coverage-result__content p {
+  color: var(--gm-ink);
+  font-size: 0.78rem;
+  margin: 0;
+}
+
+.delivery-coverage-result__metrics {
+  color: var(--gm-ink);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 0.78rem;
+  margin-top: 6px;
+}
+
+.delivery-zones__notice,
+.delivery-zone-real {
+  display: grid;
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-3);
+}
+
+.delivery-zones__notice p {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  line-height: var(--gm-leading-normal);
+  margin: 0;
+}
+
+.delivery-zones__grid {
+  display: grid;
+  gap: var(--gm-space-3);
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+
+.delivery-zone-real__heading > div,
+.delivery-zone-real dl,
+.delivery-detail dl,
+.delivery-detail__totals {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.delivery-zone-real dl,
+.delivery-detail dl {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.delivery-zone-real dt,
+.delivery-detail dt {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+
+.delivery-zone-real dd,
+.delivery-detail dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-detail__totals {
+  border-block: 1px solid var(--gm-border);
+  padding-block: var(--gm-space-2);
+}
+
+.delivery-detail__totals > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.delivery-sync span + span {
+  color: var(--gm-warning);
+}
+
+.delivery-zone-real__toggle {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-2);
+}
+
+/* ==========================================================================
+   Detalhes do Pedido e Disparo de Notificações
+   ========================================================================== */
+.delivery-notification-trigger {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-block: 6px;
+  padding: 10px;
+}
+
+.delivery-notification-trigger__fields {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
 }
 
 .delivery-history,
@@ -285,6 +723,9 @@
   gap: var(--gm-space-1);
 }
 
+/* ==========================================================================
+   Responsividade
+   ========================================================================== */
 @media (max-width: 900px) {
   .delivery-board-real {
     display: none;
@@ -304,5 +745,8 @@
   .delivery-page__toolbar > .gm-button,
   .delivery-zone-real__actions .gm-button {
     width: 100%;
+  }
+  .delivery-notification-trigger__fields {
+    grid-template-columns: 1fr;
   }
 }

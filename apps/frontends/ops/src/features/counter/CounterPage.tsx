@@ -1,4 +1,3 @@
-// biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import {
   Badge,
   Button,
@@ -60,6 +59,46 @@ const counterStageOrder: CounterQueueStage[] = [
   "new",
   "delivered",
 ];
+
+export const COUNTER_PRESETS = [
+  { id: "pickup", label: "🛍️ Retirada", fulfillment: "pickup" as const, defaultMinutes: 20 },
+  {
+    id: "dine_in",
+    label: "☕ Balcão Local",
+    fulfillment: "dine_in" as const,
+    defaultMinutes: null,
+  },
+  { id: "delivery", label: "🛵 Delivery", fulfillment: "delivery" as const, defaultMinutes: 45 },
+] as const;
+
+export const PROMISED_MINUTES_PRESETS = [15, 30, 45, 60] as const;
+
+export function calculatePromisedPreset(minutes: number) {
+  const target = new Date(Date.now() + minutes * 60 * 1000);
+  const year = target.getFullYear();
+  const month = String(target.getMonth() + 1).padStart(2, "0");
+  const day = String(target.getDate()).padStart(2, "0");
+  const hours = String(target.getHours()).padStart(2, "0");
+  const mins = String(target.getMinutes()).padStart(2, "0");
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hours}:${mins}`,
+  };
+}
+
+export function buildWhatsAppReadyLink(
+  phone: string,
+  customerName?: string | null,
+  label?: string | null,
+) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  const fullPhone = digits.length <= 11 ? `55${digits}` : digits;
+  const namePart = customerName ? `Olá, ${customerName}!` : "Olá!";
+  const orderPart = label ? ` (pedido ${label})` : "";
+  const text = `${namePart} Seu pedido${orderPart} no GiroMesa está pronto para retirada. Aguardamos você!`;
+  return `https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`;
+}
 
 export interface CounterQueueResponse {
   items: Array<ReturnType<typeof parseTab> & { queueStage: Exclude<CounterQueueStage, "all"> }>;
@@ -275,14 +314,58 @@ export function RealCounterPage({
             setBusy(false);
           }
         }
+        function applyPreset(preset: (typeof COUNTER_PRESETS)[number]) {
+          setFulfillmentType(preset.fulfillment);
+          setGuests(1);
+          if (preset.defaultMinutes) {
+            const { date, time } = calculatePromisedPreset(preset.defaultMinutes);
+            setPromisedDate(date);
+            setPromisedTime(time);
+            setPromisedAtError("");
+          } else {
+            setPromisedDate("");
+            setPromisedTime("");
+          }
+        }
+
+        function applyMinutes(minutes: number) {
+          const { date, time } = calculatePromisedPreset(minutes);
+          setPromisedDate(date);
+          setPromisedTime(time);
+          setPromisedAtError("");
+        }
+
         return (
           <div className="counter-operation-container">
             <div
               className={`ops-layout counter-operation ${selected ? "counter-operation--selected" : "counter-operation--idle"} ${embedded ? "counter-page--embedded" : ""}`}
             >
               <section className="ops-board">
-                <Card>
-                  <h2>Nova comanda rápida</h2>
+                <Card className="counter-quick-open-card">
+                  <div className="counter-quick-open-header">
+                    <div>
+                      <p className="eyebrow">Ponto de Atendimento</p>
+                      <h2>Nova comanda rápida</h2>
+                    </div>
+                    <div className="counter-quick-presets">
+                      {COUNTER_PRESETS.map((preset) => (
+                        <Button
+                          className={
+                            fulfillmentType === preset.fulfillment
+                              ? "counter-preset-btn--active"
+                              : ""
+                          }
+                          key={preset.id}
+                          onClick={() => applyPreset(preset)}
+                          size="sm"
+                          type="button"
+                          variant={fulfillmentType === preset.fulfillment ? "primary" : "secondary"}
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
                   <form
                     className="inline-form counter-open-form"
                     onSubmit={(event) => void open(event)}
@@ -421,7 +504,23 @@ export function RealCounterPage({
                             }
                             className="promised-at-field"
                           >
-                            <legend>Prometido para</legend>
+                            <div className="promised-at-field__legend-row">
+                              <legend>Prometido para</legend>
+                              <div className="counter-minute-chips">
+                                <span>Atalhos:</span>
+                                {PROMISED_MINUTES_PRESETS.map((mins) => (
+                                  <Button
+                                    key={mins}
+                                    onClick={() => applyMinutes(mins)}
+                                    size="sm"
+                                    type="button"
+                                    variant="secondary"
+                                  >
+                                    +{mins} min
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
                             <Label className="grid gap-1.5">
                               <span>Data</span>
                               <Input
@@ -493,6 +592,36 @@ export function RealCounterPage({
                     )}
                   </form>
                 </Card>
+                {/* COCKPIT DE MÉTRICAS DA FILA */}
+                <div className="counter-metrics-bar">
+                  <div className="counter-metric-pill">
+                    <span>Em fila</span>
+                    <strong>{counterQueue.counts.all}</strong>
+                  </div>
+                  <div className="counter-metric-pill counter-metric-pill--prod">
+                    <span>Em preparo</span>
+                    <strong>{counterQueue.counts.production}</strong>
+                  </div>
+                  <div className="counter-metric-pill counter-metric-pill--ready">
+                    <span>Prontos p/ entrega</span>
+                    <strong>{counterQueue.counts.ready}</strong>
+                  </div>
+                  {counterQueue.counts.late > 0 && (
+                    <div className="counter-metric-pill counter-metric-pill--late">
+                      <span>Atrasados</span>
+                      <strong>{counterQueue.counts.late}</strong>
+                    </div>
+                  )}
+                  <div className="counter-metric-pill counter-metric-pill--total">
+                    <span>Total estimado</span>
+                    <strong>
+                      {formatMoney(
+                        counterQueue.items.reduce((sum, item) => sum + item.totalCents, 0),
+                      )}
+                    </strong>
+                  </div>
+                </div>
+
                 <Card className="counter-queue-tools">
                   <div
                     aria-live={queue.refreshError ? "assertive" : "off"}
@@ -576,60 +705,109 @@ export function RealCounterPage({
                     ))}
                   </fieldset>
                 </Card>
-                <div aria-busy={queueUpdating} className="data-list ops-tab-list">
+
+                <div aria-busy={queueUpdating} className="counter-queue-list">
                   {counterQueue.items.map((tab) => {
                     const stage = tab.queueStage;
+                    const whatsAppLink =
+                      tab.customerPhone && stage === "ready"
+                        ? buildWhatsAppReadyLink(
+                            tab.customerPhone,
+                            tab.customerName,
+                            tab.label ??
+                              (tab.displayNumber ? `Balcão ${tab.displayNumber}` : undefined),
+                          )
+                        : null;
                     return (
-                      <Button
-                        className={selected === tab.id ? "data-row data-row--selected" : "data-row"}
+                      <article
+                        className={`counter-queue-card ${selected === tab.id ? "counter-queue-card--selected" : ""}`}
                         key={tab.id}
-                        onClick={() => setSelected(tab.id)}
-                        type="button"
-                        variant="ghost"
                       >
-                        <div>
-                          <strong>
-                            {tab.label ??
-                              (tab.displayNumber
-                                ? `Balcão ${tab.displayNumber}`
-                                : "Atendimento do balcão")}
-                          </strong>
-                          <small>{tab.customerName ?? `${tab.guestCount} pessoa(s)`}</small>
-                          {tab.promisedAt && (
-                            <small>
-                              {new Date(tab.promisedAt).toLocaleString("pt-BR", {
-                                day: "2-digit",
-                                month: "2-digit",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </small>
-                          )}
-                          <span className="counter-row__badges">
-                            <Badge
-                              tone={
-                                stage === "late"
-                                  ? "danger"
-                                  : stage === "ready" || stage === "delivered"
-                                    ? "success"
-                                    : stage === "production"
-                                      ? "info"
-                                      : "neutral"
-                              }
+                        <button
+                          className="counter-queue-card__select-btn"
+                          onClick={() => setSelected(tab.id)}
+                          type="button"
+                        >
+                          <div className="counter-queue-card__top">
+                            <div className="counter-queue-card__title-line">
+                              <strong>
+                                {tab.label ??
+                                  (tab.displayNumber
+                                    ? `Balcão ${tab.displayNumber}`
+                                    : "Atendimento do balcão")}
+                              </strong>
+                              <Badge
+                                tone={
+                                  stage === "late"
+                                    ? "danger"
+                                    : stage === "ready" || stage === "delivered"
+                                      ? "success"
+                                      : stage === "production"
+                                        ? "info"
+                                        : "neutral"
+                                }
+                              >
+                                {counterQueueLabels[stage]}
+                              </Badge>
+                            </div>
+                            <strong className="counter-queue-card__amount">
+                              {formatMoney(tab.totalCents)}
+                            </strong>
+                          </div>
+
+                          <div className="counter-queue-card__details">
+                            <span className="counter-queue-card__customer">
+                              {tab.customerName ?? `${tab.guestCount} pessoa(s)`}
+                              {tab.customerPhone && (
+                                <small className="counter-queue-card__phone">
+                                  {tab.customerPhone}
+                                </small>
+                              )}
+                            </span>
+                            <div className="counter-queue-card__tags">
+                              <span className="counter-channel-tag">
+                                {tab.fulfillmentType === "pickup"
+                                  ? "Retirada"
+                                  : tab.fulfillmentType === "delivery"
+                                    ? "Delivery"
+                                    : "Local"}
+                              </span>
+                              {tab.promisedAt && (
+                                <span
+                                  className={`counter-sla-tag ${stage === "late" ? "counter-sla-tag--late" : ""}`}
+                                >
+                                  {stage === "late" ? "⚠️ Atrasado · " : "Prazo: "}
+                                  {new Date(tab.promisedAt).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+
+                        <div className="counter-queue-card__actions">
+                          {whatsAppLink && (
+                            <a
+                              className="button button--sm button--secondary counter-btn-whatsapp"
+                              href={whatsAppLink}
+                              rel="noopener noreferrer"
+                              target="_blank"
                             >
-                              {counterQueueLabels[stage]}
-                            </Badge>
-                            <small>
-                              {tab.fulfillmentType === "pickup"
-                                ? "Retirada"
-                                : tab.fulfillmentType === "delivery"
-                                  ? "Delivery"
-                                  : "Local"}
-                            </small>
-                          </span>
+                              💬 Avisar no WhatsApp
+                            </a>
+                          )}
+                          <Button
+                            onClick={() => setSelected(tab.id)}
+                            size="sm"
+                            type="button"
+                            variant={selected === tab.id ? "primary" : "secondary"}
+                          >
+                            {selected === tab.id ? "Em atendimento" : "Ver pedido"}
+                          </Button>
                         </div>
-                        <strong>{formatMoney(tab.totalCents)}</strong>
-                      </Button>
+                      </article>
                     );
                   })}
                 </div>

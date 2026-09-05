@@ -65,6 +65,29 @@ function orderId(order: DeliveryOrder) {
   return order.publicProtocol ?? order.orderRef.slice(0, 8).toUpperCase();
 }
 
+export function buildDeliveryWhatsAppLink(
+  phone: string,
+  customerName?: string | null,
+  orderRef?: string | null,
+) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  const fullPhone = digits.length <= 11 ? `55${digits}` : digits;
+  const greeting = customerName ? `Olá, ${customerName}!` : "Olá!";
+  const refText = orderRef ? ` do pedido #${orderRef}` : "";
+  const message = `${greeting} GiroMesa Delivery informando sobre o andamento${refText}. Em caso de dúvidas, estamos à disposição!`;
+  return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+}
+
+export function buildCourierWhatsAppLink(phone: string, courierName?: string | null) {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 8) return null;
+  const fullPhone = digits.length <= 11 ? `55${digits}` : digits;
+  const greeting = courierName ? `Olá, ${courierName}!` : "Olá!";
+  const message = `${greeting} GiroMesa Central de Entregas chamando.`;
+  return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
+}
+
 function withDeliveryNotification(order: DeliveryOrder, notification: DeliveryNotification) {
   return {
     ...order,
@@ -317,16 +340,28 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     });
   }, [displayedOrders.state, filter]);
 
+  const [mobileColumn, setMobileColumn] = useState<Column | "all">("all");
+
   const summary = useMemo(
     () =>
-      columns.map((column) => ({
-        ...column,
-        count:
+      columns.map((column) => {
+        const columnOrders =
           orders.state.status === "ready"
-            ? orders.state.data.filter((order) => columnFor(order.status) === column.id).length
-            : 0,
-      })),
+            ? orders.state.data.filter((order) => columnFor(order.status) === column.id)
+            : [];
+        return {
+          ...column,
+          count: columnOrders.length,
+          totalCents: columnOrders.reduce((sum, order) => sum + order.totalCents, 0),
+          lateCount: columnOrders.filter(isLate).length,
+        };
+      }),
     [orders.state],
+  );
+
+  const totalVolumeCents = useMemo(
+    () => summary.reduce((sum, col) => sum + col.totalCents, 0),
+    [summary],
   );
 
   async function transition(order: DeliveryOrder) {
@@ -459,14 +494,18 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     }
   }
 
-  async function requestNotification(order: DeliveryOrder) {
+  async function requestNotification(
+    order: DeliveryOrder,
+    audience: "operations" | "customer" = "operations",
+    type: "status_update" | "courier_assigned" | "courier_arriving" = "status_update",
+  ) {
     setBusy(order.id);
     setNotice(null);
     try {
       const { notification } = parseDeliveryNotificationMutation(
         await api.growth.requestDeliveryNotification(scope.organizationId, order.id, {
-          audience: "operations",
-          type: "status_update",
+          audience,
+          type,
           idempotencyKey: mutationKey("delivery-notification"),
         }),
       );
@@ -483,7 +522,9 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
       setSelected((current) =>
         current?.id === order.id ? withDeliveryNotification(current, notification) : current,
       );
-      setNotice({ text: "Notificação registrada como pendente do provedor; ela não foi enviada." });
+      setNotice({
+        text: `Notificação (${audience === "customer" ? "Cliente" : "Operação"}) registrada como pendente do provedor.`,
+      });
     } catch (error) {
       setNotice({
         error: true,
@@ -624,50 +665,123 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
               </Card>
               {canManage && couriers.state.status === "ready" && (
                 <Card className="delivery-couriers" aria-label="Disponibilidade dos entregadores">
-                  <div>
-                    <strong>Entregadores</strong>
-                    <span>Disponibilidade operacional</span>
+                  <div className="delivery-couriers__header">
+                    <div>
+                      <strong>🛵 Central de Entregadores</strong>
+                      <span className="delivery-couriers__stats">
+                        {couriers.state.data.filter((c) => c.status === "available").length}{" "}
+                        disponíveis ·{" "}
+                        {couriers.state.data.filter((c) => c.status === "delivering").length} em
+                        entrega · {couriers.state.data.length} total
+                      </span>
+                    </div>
                     <Button onClick={() => setCreatingCourier(true)} size="sm" variant="secondary">
-                      Cadastrar entregador
+                      + Cadastrar entregador
                     </Button>
                   </div>
                   {couriers.state.data.length === 0 ? (
-                    <p>Nenhum entregador cadastrado nesta unidade.</p>
+                    <p className="delivery-couriers__empty">
+                      Nenhum entregador cadastrado nesta unidade.
+                    </p>
                   ) : (
-                    <ul>
-                      {couriers.state.data.map((courier) => (
-                        <li key={courier.id}>
-                          <span>{`${courier.name} · ${courier.reference}`}</span>
-                          <Button
-                            disabled={
-                              busy === courier.id ||
-                              (courier.status !== "available" && courier.status !== "offline")
-                            }
-                            onClick={() => void setCourierStatus(courier)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            {courier.status === "available"
-                              ? "Ficar offline"
-                              : courier.status === "offline"
-                                ? "Ficar disponível"
-                                : courier.status === "assigned"
-                                  ? "Atribuído"
-                                  : "Em entrega"}
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="delivery-couriers__grid">
+                      {couriers.state.data.map((courier) => {
+                        const whatsAppLink = courier.phone
+                          ? buildCourierWhatsAppLink(courier.phone, courier.name)
+                          : null;
+                        return (
+                          <div className="delivery-courier-card" key={courier.id}>
+                            <div className="delivery-courier-card__info">
+                              <div className="delivery-courier-card__name-line">
+                                <strong>{courier.name}</strong>
+                                <Badge
+                                  tone={
+                                    courier.status === "available"
+                                      ? "success"
+                                      : courier.status === "delivering"
+                                        ? "warning"
+                                        : "neutral"
+                                  }
+                                >
+                                  {courier.status === "available"
+                                    ? "Disponível"
+                                    : courier.status === "delivering"
+                                      ? "Em entrega"
+                                      : "Offline"}
+                                </Badge>
+                              </div>
+                              <small className="delivery-courier-card__ref">
+                                {courier.reference}
+                              </small>
+                              {courier.phone && (
+                                <span className="delivery-courier-card__phone">
+                                  {courier.phone}
+                                </span>
+                              )}
+                            </div>
+                            <div className="delivery-courier-card__actions">
+                              {whatsAppLink && (
+                                <a
+                                  className="delivery-courier-wa-btn"
+                                  href={whatsAppLink}
+                                  rel="noopener noreferrer"
+                                  target="_blank"
+                                  title="Chamar entregador no WhatsApp"
+                                >
+                                  💬 WhatsApp
+                                </a>
+                              )}
+                              <Button
+                                disabled={
+                                  busy === courier.id ||
+                                  (courier.status !== "available" && courier.status !== "offline")
+                                }
+                                onClick={() => void setCourierStatus(courier)}
+                                size="sm"
+                                variant="secondary"
+                              >
+                                {courier.status === "available"
+                                  ? "Ficar offline"
+                                  : courier.status === "offline"
+                                    ? "Ficar disponível"
+                                    : courier.status === "assigned"
+                                      ? "Atribuído"
+                                      : "Em entrega"}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </Card>
               )}
               <section className="delivery-summary" aria-label="Resumo dos pedidos em operação">
                 {summary.map((item) => (
-                  <span key={item.id}>
-                    <strong>{item.count}</strong>
-                    {item.label}
+                  <span className="delivery-summary-pill" key={item.id}>
+                    <div className="delivery-summary-pill__top">
+                      <strong>{item.count}</strong>
+                      <span className="delivery-summary-pill__amount">
+                        {formatMoney(item.totalCents)}
+                      </span>
+                    </div>
+                    <div className="delivery-summary-pill__label-line">
+                      <small>{item.label}</small>
+                      {item.lateCount > 0 && <Badge tone="danger">⚠️ {item.lateCount}</Badge>}
+                    </div>
                   </span>
                 ))}
+                <span className="delivery-summary-pill delivery-summary-pill--total">
+                  <div className="delivery-summary-pill__top">
+                    <strong>{visibleOrders.length}</strong>
+                    <span className="delivery-summary-pill__amount">
+                      {formatMoney(totalVolumeCents)}
+                    </span>
+                  </div>
+                  <div className="delivery-summary-pill__label-line">
+                    <small>Total em operação</small>
+                  </div>
+                </span>
               </section>
               <div className="delivery-operations__filters">
                 <SegmentedTabs
@@ -695,44 +809,88 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
               ) : (
                 <>
                   <div className="delivery-board-real">
-                    {columns.map((column) => (
-                      <section className="delivery-board-real__column" key={column.id}>
-                        <header>
-                          <h2>{column.label}</h2>
-                          <Badge tone={column.id === "dispatched" ? "success" : "info"}>
-                            {summary.find((item) => item.id === column.id)?.count ?? 0}
-                          </Badge>
-                        </header>
-                        {visibleOrders
-                          .filter((order) => columnFor(order.status) === column.id)
-                          .map((order) => (
-                            <OrderCard
-                              busy={busy === order.id}
-                              key={order.id}
-                              onAdvance={() =>
-                                nextAction(order)?.dispatch
-                                  ? setSelected(order)
-                                  : void transition(order)
-                              }
-                              onOpen={() => setSelected(order)}
-                              order={order}
-                            />
-                          ))}
-                      </section>
-                    ))}
+                    {columns.map((column) => {
+                      const colSummary = summary.find((item) => item.id === column.id);
+                      return (
+                        <section className="delivery-board-real__column" key={column.id}>
+                          <header className="delivery-board-real__col-header">
+                            <div className="delivery-board-real__col-title-line">
+                              <h2>{column.label}</h2>
+                              <Badge tone={column.id === "dispatched" ? "success" : "info"}>
+                                {colSummary?.count ?? 0}
+                              </Badge>
+                            </div>
+                            <div className="delivery-board-real__col-meta-line">
+                              <span className="delivery-board-real__col-total">
+                                {formatMoney(colSummary?.totalCents ?? 0)}
+                              </span>
+                              {(colSummary?.lateCount ?? 0) > 0 && (
+                                <span className="delivery-board-real__col-late-pill">
+                                  ⚠️ {colSummary?.lateCount} atrasado(s)
+                                </span>
+                              )}
+                            </div>
+                          </header>
+                          {visibleOrders
+                            .filter((order) => columnFor(order.status) === column.id)
+                            .map((order) => (
+                              <OrderCard
+                                busy={busy === order.id}
+                                key={order.id}
+                                onAdvance={() =>
+                                  nextAction(order)?.dispatch
+                                    ? setSelected(order)
+                                    : void transition(order)
+                                }
+                                onOpen={() => setSelected(order)}
+                                order={order}
+                              />
+                            ))}
+                        </section>
+                      );
+                    })}
                   </div>
                   <div className="delivery-list-real">
-                    {visibleOrders.map((order) => (
-                      <OrderCard
-                        busy={busy === order.id}
-                        key={order.id}
-                        onAdvance={() =>
-                          nextAction(order)?.dispatch ? setSelected(order) : void transition(order)
-                        }
-                        onOpen={() => setSelected(order)}
-                        order={order}
-                      />
-                    ))}
+                    <div className="delivery-mobile-column-tabs">
+                      <button
+                        className={`delivery-col-tab ${mobileColumn === "all" ? "delivery-col-tab--active" : ""}`}
+                        onClick={() => setMobileColumn("all")}
+                        type="button"
+                      >
+                        Todos ({visibleOrders.length})
+                      </button>
+                      {columns.map((col) => {
+                        const colCount = summary.find((item) => item.id === col.id)?.count ?? 0;
+                        return (
+                          <button
+                            className={`delivery-col-tab ${mobileColumn === col.id ? "delivery-col-tab--active" : ""}`}
+                            key={col.id}
+                            onClick={() => setMobileColumn(col.id)}
+                            type="button"
+                          >
+                            {col.label} ({colCount})
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {visibleOrders
+                      .filter(
+                        (order) =>
+                          mobileColumn === "all" || columnFor(order.status) === mobileColumn,
+                      )
+                      .map((order) => (
+                        <OrderCard
+                          busy={busy === order.id}
+                          key={order.id}
+                          onAdvance={() =>
+                            nextAction(order)?.dispatch
+                              ? setSelected(order)
+                              : void transition(order)
+                          }
+                          onOpen={() => setSelected(order)}
+                          order={order}
+                        />
+                      ))}
                   </div>
                 </>
               )}
@@ -746,6 +904,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
           onEdit={setEditingZone}
           onToggle={(zone) => void setZoneActive(zone)}
           remote={zones}
+          scope={scope}
         />
       )}
       <OrderModal
@@ -756,7 +915,9 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         onClose={() => setSelected(null)}
         onCourierChange={setCourierId}
         onDispatch={dispatch}
-        onRequestNotification={() => selected && void requestNotification(selected)}
+        onRequestNotification={(audience, type) =>
+          selected && void requestNotification(selected, audience, type)
+        }
         onTransition={() => selected && void transition(selected)}
         order={selected}
       />
@@ -819,33 +980,339 @@ function OrderCard({
   onAdvance: () => void;
 }) {
   const action = nextAction(order);
+  const late = isLate(order);
+  const scheduled = isScheduled(order);
+  const whatsApp = order.customerPhone
+    ? buildDeliveryWhatsAppLink(order.customerPhone, order.customerName, orderId(order))
+    : null;
+  const neighborhood =
+    order.address?.neighborhood ?? (order.fulfillment === "pickup" ? "Retirada Balcão" : null);
+
   return (
-    <Card className={`delivery-order-real${isLate(order) ? " delivery-order-real--late" : ""}`}>
-      <div className="delivery-order-real__meta">
-        <Badge tone={order.fulfillment === "delivery" ? "info" : "neutral"}>
-          {order.fulfillment === "delivery" ? "Entrega" : "Retirada"}
-        </Badge>
-        {isLate(order) && <span>Atrasado</span>}
-        {isScheduled(order) && <span>Agendado</span>}
+    <article className={`delivery-order-card${late ? " delivery-order-card--late" : ""}`}>
+      <div className="delivery-order-card__header">
+        <div className="delivery-order-card__id-group">
+          <span className="delivery-order-card__protocol">#{orderId(order)}</span>
+          <Badge tone={order.fulfillment === "delivery" ? "info" : "neutral"}>
+            {order.fulfillment === "delivery" ? "🛵 Entrega" : "🛍️ Retirada"}
+          </Badge>
+        </div>
+        <div className="delivery-order-card__badges">
+          {late && <Badge tone="danger">⚠️ Atrasado</Badge>}
+          {scheduled && <Badge tone="neutral">📅 Agendado</Badge>}
+          {order.promisedAt && !late && (
+            <span className="delivery-sla-chip">
+              ⏱️{" "}
+              {new Date(order.promisedAt).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </div>
       </div>
-      <Button
-        aria-label={`Abrir pedido ${orderId(order)}`}
-        className="delivery-order-real__open"
+
+      <button
+        aria-label={`Abrir detalhes do pedido ${orderId(order)}`}
+        className="delivery-order-card__body-btn"
         onClick={onOpen}
         type="button"
-        variant="ghost"
       >
-        <strong>#{orderId(order)}</strong>
-        <span>{order.customerName ?? "Cliente não informado"}</span>
-      </Button>
-      <div className="delivery-order-real__footer">
-        <strong>{formatMoney(order.totalCents)}</strong>
-        <small>{dateTime(order.scheduledFor ?? order.createdAt)}</small>
+        <div className="delivery-order-card__customer">
+          <strong>{order.customerName ?? "Cliente não informado"}</strong>
+          {order.customerPhone && (
+            <span className="delivery-order-card__phone">{order.customerPhone}</span>
+          )}
+        </div>
+
+        {neighborhood && (
+          <div className="delivery-order-card__location">
+            <span>📍 {neighborhood}</span>
+          </div>
+        )}
+
+        {order.courierReference && (
+          <div className="delivery-order-card__courier-tag">
+            <span>🛵 {order.courierReference}</span>
+            {order.courierStatus && <small>({order.courierStatus})</small>}
+          </div>
+        )}
+      </button>
+
+      <div className="delivery-order-card__footer">
+        <strong className="delivery-order-card__total">{formatMoney(order.totalCents)}</strong>
+        <div className="delivery-order-card__actions">
+          {whatsApp && (
+            <a
+              className="delivery-whatsapp-btn"
+              href={whatsApp}
+              rel="noopener noreferrer"
+              target="_blank"
+              title="Abrir WhatsApp com o cliente"
+            >
+              💬 WhatsApp
+            </a>
+          )}
+          {action && (
+            <Button
+              disabled={busy}
+              onClick={onAdvance}
+              size="sm"
+              variant={
+                order.status === "dispatched" || order.status === "ready" ? "primary" : "secondary"
+              }
+            >
+              {busy ? "Atualizando…" : action.label}
+            </Button>
+          )}
+          <Button onClick={onOpen} size="sm" variant="ghost">
+            Ver
+          </Button>
+        </div>
       </div>
-      {action && (
-        <Button disabled={busy} onClick={onAdvance} size="sm" variant="secondary">
-          {busy ? "Atualizando…" : action.label}
-        </Button>
+    </article>
+  );
+}
+
+function DeliveryCoverageSimulator({
+  zones,
+  scope,
+}: {
+  zones: DeliveryZone[];
+  scope: GrowthScope;
+}) {
+  const [selectedZoneId, setSelectedZoneId] = useState<string>("auto");
+  const [street, setStreet] = useState("Av. Paulista");
+  const [number, setNumber] = useState("1000");
+  const [neighborhood, setNeighborhood] = useState("Bela Vista");
+  const [city, setCity] = useState("São Paulo");
+  const [state, setState] = useState("SP");
+  const [postalCode, setPostalCode] = useState("01310-100");
+  const [latitude, setLatitude] = useState("-23.561414");
+  const [longitude, setLongitude] = useState("-46.655881");
+  const [simulating, setSimulating] = useState(false);
+  const [simResult, setSimResult] = useState<{
+    covered: boolean;
+    zoneName?: string;
+    feeCents?: number;
+    estimatedMinutes?: number;
+    minimumOrderCents?: number;
+    message?: string;
+  } | null>(null);
+
+  async function handleSimulate(event: FormEvent) {
+    event.preventDefault();
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      setSimResult({ covered: false, message: "Coordenadas (latitude e longitude) inválidas." });
+      return;
+    }
+    const activeZones = zones.filter((z) => z.active);
+    if (activeZones.length === 0) {
+      setSimResult({ covered: false, message: "Não há zonas de entrega ativas para simulação." });
+      return;
+    }
+    const targetZones =
+      selectedZoneId === "auto" ? activeZones : activeZones.filter((z) => z.id === selectedZoneId);
+
+    if (targetZones.length === 0) {
+      setSimResult({ covered: false, message: "Zona selecionada não encontrada ou inativa." });
+      return;
+    }
+
+    setSimulating(true);
+    setSimResult(null);
+
+    const addressPayload = {
+      street: street.trim(),
+      number: number.trim(),
+      neighborhood: neighborhood.trim(),
+      city: city.trim(),
+      state: state.trim().toUpperCase(),
+      postalCode: postalCode.trim(),
+      latitude: lat,
+      longitude: lng,
+    };
+
+    try {
+      let foundCoveredZone: DeliveryZone | null = null;
+      for (const zone of targetZones) {
+        const response = (await api.growth.validateDeliveryZoneAddress(
+          scope.organizationId,
+          zone.id,
+          addressPayload,
+        )) as { covered: boolean; validationStatus: string };
+        if (response?.covered) {
+          foundCoveredZone = zone;
+          break;
+        }
+      }
+
+      if (foundCoveredZone) {
+        setSimResult({
+          covered: true,
+          zoneName: foundCoveredZone.name,
+          feeCents: foundCoveredZone.feeCents,
+          estimatedMinutes: foundCoveredZone.estimatedDeliveryMinutes,
+          minimumOrderCents: foundCoveredZone.minimumOrderCents,
+        });
+      } else {
+        setSimResult({
+          covered: false,
+          message: "Endereço fora do raio de cobertura das zonas testadas.",
+        });
+      }
+    } catch (err) {
+      setSimResult({
+        covered: false,
+        message: err instanceof Error ? err.message : "Erro ao validar endereço com a API.",
+      });
+    } finally {
+      setSimulating(false);
+    }
+  }
+
+  return (
+    <Card
+      className="delivery-coverage-simulator"
+      aria-label="Simulador de cobertura e taxa de entrega"
+    >
+      <div className="delivery-coverage-simulator__header">
+        <div>
+          <h3>📍 Simulador de Cobertura e Taxa</h3>
+          <p>Validação em tempo real com o backend através da API de zonas operacionais.</p>
+        </div>
+      </div>
+      <form onSubmit={handleSimulate} className="delivery-coverage-simulator__form">
+        <div className="delivery-coverage-simulator__fields">
+          <label className="gm-form-field">
+            <span>Zona a testar</span>
+            <NativeSelect
+              value={selectedZoneId}
+              onChange={(e) => setSelectedZoneId(e.target.value)}
+            >
+              <option value="auto">Todas as zonas ativas (busca automática)</option>
+              {zones
+                .filter((z) => z.active)
+                .map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name} ({formatMoney(z.feeCents)})
+                  </option>
+                ))}
+            </NativeSelect>
+          </label>
+          <label className="gm-form-field">
+            <span>CEP</span>
+            <Input
+              value={postalCode}
+              onChange={(e) => setPostalCode(e.target.value)}
+              placeholder="00000-000"
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Logradouro</span>
+            <Input
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Rua, Av..."
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Número</span>
+            <Input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="123"
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Bairro</span>
+            <Input
+              value={neighborhood}
+              onChange={(e) => setNeighborhood(e.target.value)}
+              placeholder="Bairro"
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Cidade</span>
+            <Input
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Cidade"
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>UF</span>
+            <Input
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              maxLength={2}
+              placeholder="SP"
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Latitude</span>
+            <Input
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+              placeholder="-23.56..."
+              required
+            />
+          </label>
+          <label className="gm-form-field">
+            <span>Longitude</span>
+            <Input
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+              placeholder="-46.65..."
+              required
+            />
+          </label>
+        </div>
+        <div className="delivery-coverage-simulator__actions">
+          <Button type="submit" disabled={simulating}>
+            {simulating ? "Consultando backend…" : "🔍 Testar Cobertura e Taxa"}
+          </Button>
+        </div>
+      </form>
+
+      {simResult && (
+        <div
+          className={`delivery-coverage-result ${simResult.covered ? "delivery-coverage-result--success" : "delivery-coverage-result--failure"}`}
+          role="status"
+        >
+          {simResult.covered ? (
+            <div className="delivery-coverage-result__content">
+              <strong>✅ Endereço Atendido pela Zona {simResult.zoneName}</strong>
+              <div className="delivery-coverage-result__metrics">
+                <span>
+                  Taxa de Entrega: <strong>{formatMoney(simResult.feeCents ?? 0)}</strong>
+                </span>
+                <span>
+                  Tempo Estimado: <strong>{simResult.estimatedMinutes} min</strong>
+                </span>
+                <span>
+                  Pedido Mínimo: <strong>{formatMoney(simResult.minimumOrderCents ?? 0)}</strong>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="delivery-coverage-result__content">
+              <strong>⚠️ Não Atendido</strong>
+              <p>
+                {simResult.message ??
+                  "O endereço informado não está coberto por nenhuma zona ativa no momento."}
+              </p>
+            </div>
+          )}
+        </div>
       )}
     </Card>
   );
@@ -857,92 +1324,97 @@ function Zones({
   onEdit,
   onToggle,
   remote,
+  scope,
 }: {
   canManage: boolean;
   busy: string;
   onEdit: (zone: DeliveryZone | "new") => void;
   onToggle: (zone: DeliveryZone) => void;
   remote: ReturnType<typeof useRemote<DeliveryZone[]>>;
+  scope: GrowthScope;
 }) {
   return (
     <section className="delivery-zones" aria-label="Zonas de entrega">
       <Card className="delivery-zones__notice" role="note">
         <Badge tone="info">Cobertura declarada</Badge>
         <p>
-          A cobertura não é validada automaticamente pelo endereço. Configure somente regiões que a
-          operação consegue atender.
+          Configure regiões e raios que a operação consegue atender. Utilize o simulador abaixo para
+          testar endereços reais diretamente com o backend.
         </p>
       </Card>
       <RemoteGate remote={remote}>
-        {(zones) =>
-          zones.length === 0 ? (
-            <EmptyState
-              action={
-                canManage ? (
-                  <Button onClick={() => onEdit("new")} size="sm">
-                    <Icon name="plus" size={15} /> Criar zona
-                  </Button>
-                ) : undefined
-              }
-              icon={<Icon name="delivery" size={28} />}
-              title="Nenhuma zona configurada"
-              description="A entrega própria exige uma zona, taxa e pedido mínimo persistidos."
-            />
-          ) : (
-            <div className="delivery-zones__grid">
-              {zones.map((zone) => (
-                <Card className="delivery-zone-real" key={zone.id}>
-                  <div className="delivery-zone-real__heading">
-                    <div>
-                      <h2>{zone.name}</h2>
-                      <small>Região declarada</small>
+        {(zones) => (
+          <>
+            <DeliveryCoverageSimulator zones={zones} scope={scope} />
+            {zones.length === 0 ? (
+              <EmptyState
+                action={
+                  canManage ? (
+                    <Button onClick={() => onEdit("new")} size="sm">
+                      <Icon name="plus" size={15} /> Criar zona
+                    </Button>
+                  ) : undefined
+                }
+                icon={<Icon name="delivery" size={28} />}
+                title="Nenhuma zona configurada"
+                description="A entrega própria exige uma zona, taxa e pedido mínimo persistidos."
+              />
+            ) : (
+              <div className="delivery-zones__grid">
+                {zones.map((zone) => (
+                  <Card className="delivery-zone-real" key={zone.id}>
+                    <div className="delivery-zone-real__heading">
+                      <div>
+                        <h2>{zone.name}</h2>
+                        <small>Região declarada</small>
+                      </div>
+                      <Badge tone={zone.active ? "success" : "neutral"}>
+                        {zone.active ? "Ativa" : "Inativa"}
+                      </Badge>
                     </div>
-                    <Badge tone={zone.active ? "success" : "neutral"}>
-                      {zone.active ? "Ativa" : "Inativa"}
-                    </Badge>
-                  </div>
-                  <dl>
-                    <div>
-                      <dt>Taxa</dt>
-                      <dd>{formatMoney(zone.feeCents)}</dd>
-                    </div>
-                    <div>
-                      <dt>Pedido mínimo</dt>
-                      <dd>{formatMoney(zone.minimumOrderCents)}</dd>
-                    </div>
-                    <div>
-                      <dt>Previsão</dt>
-                      <dd>{zone.estimatedDeliveryMinutes} min</dd>
-                    </div>
-                    <div>
-                      <dt>Alcance</dt>
-                      <dd>
-                        {typeof zone.geometry.radiusKm === "number"
-                          ? `Raio declarado: ${zone.geometry.radiusKm} km`
-                          : "Cobertura declarada"}
-                      </dd>
-                    </div>
-                  </dl>
-                  {canManage && (
-                    <div className="delivery-zone-real__actions">
-                      <Button onClick={() => onEdit(zone)} size="sm" variant="secondary">
-                        Editar
-                      </Button>
-                      <Button
-                        disabled={busy === zone.id}
-                        onClick={() => onToggle(zone)}
-                        size="sm"
-                        variant="ghost"
-                      >
-                        {busy === zone.id ? "Salvando…" : zone.active ? "Desativar" : "Ativar"}
-                      </Button>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          )
-        }
+                    <dl>
+                      <div>
+                        <dt>Taxa</dt>
+                        <dd>{formatMoney(zone.feeCents)}</dd>
+                      </div>
+                      <div>
+                        <dt>Pedido mínimo</dt>
+                        <dd>{formatMoney(zone.minimumOrderCents)}</dd>
+                      </div>
+                      <div>
+                        <dt>Previsão</dt>
+                        <dd>{zone.estimatedDeliveryMinutes} min</dd>
+                      </div>
+                      <div>
+                        <dt>Alcance</dt>
+                        <dd>
+                          {typeof zone.geometry.radiusKm === "number"
+                            ? `Raio declarado: ${zone.geometry.radiusKm} km`
+                            : "Cobertura declarada"}
+                        </dd>
+                      </div>
+                    </dl>
+                    {canManage && (
+                      <div className="delivery-zone-real__actions">
+                        <Button onClick={() => onEdit(zone)} size="sm" variant="secondary">
+                          Editar
+                        </Button>
+                        <Button
+                          disabled={busy === zone.id}
+                          onClick={() => onToggle(zone)}
+                          size="sm"
+                          variant="ghost"
+                        >
+                          {busy === zone.id ? "Salvando…" : zone.active ? "Desativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </RemoteGate>
     </section>
   );
@@ -968,10 +1440,17 @@ function OrderModal({
   onClose: () => void;
   onCourierChange: (value: string) => void;
   onDispatch: (event: FormEvent<HTMLFormElement>) => void;
-  onRequestNotification: () => void;
+  onRequestNotification: (
+    audience: "operations" | "customer",
+    type: "status_update" | "courier_assigned" | "courier_arriving",
+  ) => void;
   onTransition: () => void;
 }) {
   const action = order ? nextAction(order) : null;
+  const [notifAudience, setNotifAudience] = useState<"operations" | "customer">("operations");
+  const [notifType, setNotifType] = useState<
+    "status_update" | "courier_assigned" | "courier_arriving"
+  >("status_update");
   return (
     <Modal
       isOpen={order !== null}
@@ -1086,9 +1565,39 @@ function OrderModal({
               </ol>
             )}
           </section>
-          <Button disabled={busy} onClick={onRequestNotification} size="sm" variant="secondary">
-            Solicitar atualização operacional
-          </Button>
+          <div className="delivery-notification-trigger">
+            <div className="delivery-notification-trigger__fields">
+              <label className="gm-form-field">
+                <span>Destinatário da notificação</span>
+                <NativeSelect
+                  onChange={(e) => setNotifAudience(e.target.value as typeof notifAudience)}
+                  value={notifAudience}
+                >
+                  <option value="operations">Equipe Operacional</option>
+                  <option value="customer">Cliente (SMS/Push)</option>
+                </NativeSelect>
+              </label>
+              <label className="gm-form-field">
+                <span>Tipo do aviso</span>
+                <NativeSelect
+                  onChange={(e) => setNotifType(e.target.value as typeof notifType)}
+                  value={notifType}
+                >
+                  <option value="status_update">Atualização de status</option>
+                  <option value="courier_assigned">Entregador atribuído</option>
+                  <option value="courier_arriving">Entregador chegando</option>
+                </NativeSelect>
+              </label>
+            </div>
+            <Button
+              disabled={busy}
+              onClick={() => onRequestNotification(notifAudience, notifType)}
+              size="sm"
+              variant="secondary"
+            >
+              Solicitar notificação
+            </Button>
+          </div>
           {action?.dispatch ? (
             <form className="gm-form-stack" onSubmit={onDispatch}>
               <label className="gm-form-field">
