@@ -39,20 +39,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:a7de680eec10c7dfb5cc6b7c9cc1bffa3e9f775c",
+    "artifact": "git:c7e34b8c0ebb3a53c9775b7d72a413b2aad301ec",
     "migration": {
-      "id": "0077_people_multi_role_access",
+      "id": "0078_inventory_resale_product_unique",
       "status": "applied",
-      "evidence": "git:a7de680eec10c7dfb5cc6b7c9cc1bffa3e9f775c"
+      "evidence": "git:c7e34b8c0ebb3a53c9775b7d72a413b2aad301ec"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:a7de680eec10c7dfb5cc6b7c9cc1bffa3e9f775c"
+        "evidence": "git:c7e34b8c0ebb3a53c9775b7d72a413b2aad301ec"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:a7de680eec10c7dfb5cc6b7c9cc1bffa3e9f775c"
+        "evidence": "git:c7e34b8c0ebb3a53c9775b7d72a413b2aad301ec"
       }
     }
   },

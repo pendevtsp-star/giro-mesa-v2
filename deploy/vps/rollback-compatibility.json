@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0077_people_multi_role_access",
+  "requiredAppliedMigration": "0078_inventory_resale_product_unique",
   "transitions": [],
   "fullRestore": {
     "required": true,
