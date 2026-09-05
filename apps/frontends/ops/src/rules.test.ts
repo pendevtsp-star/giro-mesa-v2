@@ -9,7 +9,7 @@ const waiter: Profile = {
   shortName: "LM",
   role: "Garçom",
   description: "Atendimento",
-  permissions: ["dashboard.view", "salon.operate", "alerts.view"],
+  permissions: ["dashboard.view", "salon.operate"],
 };
 
 describe("regras operacionais", () => {

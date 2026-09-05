@@ -547,6 +547,13 @@
       "when": 1788310800000,
       "tag": "0077_people_multi_role_access",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1788610825689,
+      "tag": "0078_inventory_resale_product_unique",
+      "breakpoints": true
     }
   ]
 }

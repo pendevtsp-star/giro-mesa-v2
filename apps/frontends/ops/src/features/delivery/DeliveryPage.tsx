@@ -410,7 +410,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
       const dispatched = parseDeliveryOrders([
         await api.growth.transitionDelivery(scope.organizationId, selected.id, "dispatched"),
       ])[0];
-      if (!dispatched) throw new Error("A API não confirmou o despacho do pedido.");
+      if (!dispatched) throw new Error("O despacho do pedido não foi confirmado.");
       orders.update((rows) =>
         rows.map((row) => (row.id === selected.id ? { ...assigned, ...dispatched } : row)),
       );
@@ -438,7 +438,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
           active: !zone.active,
         }),
       ])[0];
-      if (!updated) throw new Error("A API não confirmou a zona atualizada.");
+      if (!updated) throw new Error("A alteração da zona não foi confirmada.");
       zones.update((rows) => rows.map((row) => (row.id === zone.id ? updated : row)));
       setNotice({ text: `Zona ${updated.active ? "ativada" : "desativada"}.` });
     } catch (error) {
@@ -569,7 +569,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
             geometry: { type: "unit-radius", radiusKm: values.radiusKm },
           });
       const updated = parseDeliveryZones([response])[0];
-      if (!updated) throw new Error("A API não confirmou a zona salva.");
+      if (!updated) throw new Error("A zona salva não foi confirmada.");
       zones.update((rows) =>
         currentZone
           ? rows.map((row) => (row.id === updated.id ? updated : row))
@@ -1166,7 +1166,7 @@ function DeliveryCoverageSimulator({
     } catch (err) {
       setSimResult({
         covered: false,
-        message: err instanceof Error ? err.message : "Erro ao validar endereço com a API.",
+        message: err instanceof Error ? err.message : "Não foi possível validar o endereço.",
       });
     } finally {
       setSimulating(false);
@@ -1181,7 +1181,7 @@ function DeliveryCoverageSimulator({
       <div className="delivery-coverage-simulator__header">
         <div>
           <h3>📍 Simulador de Cobertura e Taxa</h3>
-          <p>Validação em tempo real com o backend através da API de zonas operacionais.</p>
+          <p>Validação em tempo real com as zonas operacionais configuradas.</p>
         </div>
       </div>
       <form onSubmit={handleSimulate} className="delivery-coverage-simulator__form">

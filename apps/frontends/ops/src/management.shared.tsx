@@ -1890,7 +1890,7 @@ export type RemoteState<T> =
 
 export class InvalidManagementPayloadError extends Error {
   constructor() {
-    super("A API retornou dados gerenciais em formato inesperado.");
+    super("Os dados gerenciais vieram em formato inesperado.");
     this.name = "InvalidManagementPayloadError";
   }
 }
@@ -4833,7 +4833,6 @@ const overviewRoutes = new Set<RouteId>([
   "reservations",
   "crm",
   "multiunit",
-  "alerts",
 ]);
 
 function overviewTone(value: unknown): OverviewTone {

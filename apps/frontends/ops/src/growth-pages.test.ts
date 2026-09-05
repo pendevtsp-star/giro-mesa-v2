@@ -12,7 +12,7 @@ import {
   parseDeliveryOrders,
   parseDeliveryZones,
   parseMultiunitSummary,
-} from "./growth-pages";
+} from "./growth.shared";
 
 describe("contratos de crescimento reais", () => {
   it("mantém zonas e status de campanha exatamente como persistidos", () => {

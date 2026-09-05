@@ -106,6 +106,12 @@
     padding: 2px 8px;
   }
 
+  @media (max-width: 40rem), (pointer: coarse) {
+    .counter-minute-chips button {
+      min-height: 40px;
+    }
+  }
+
   .counter-open-form {
     align-items: start;
     gap: 12px;
@@ -352,17 +358,17 @@
   }
 
   .counter-metric-pill--prod {
-    border-left: 3px solid #3b82f6;
+    border-color: color-mix(in srgb, var(--gm-info) 35%, var(--gm-border));
   }
 
   .counter-metric-pill--ready {
-    background: color-mix(in srgb, #10b981 4%, var(--gm-paper));
-    border-left: 3px solid #10b981;
+    background: color-mix(in srgb, var(--gm-success) 4%, var(--gm-paper));
+    border-color: color-mix(in srgb, var(--gm-success) 35%, var(--gm-border));
   }
 
   .counter-metric-pill--late {
     background: color-mix(in srgb, var(--gm-danger) 6%, var(--gm-paper));
-    border-left: 3px solid var(--gm-danger);
+    border-color: color-mix(in srgb, var(--gm-danger) 40%, var(--gm-border));
   }
 
   .counter-metric-pill--late > strong {
@@ -370,7 +376,7 @@
   }
 
   .counter-metric-pill--total {
-    border-left: 3px solid var(--gm-action);
+    border-color: color-mix(in srgb, var(--gm-action) 35%, var(--gm-border));
   }
 
   /* Fila de cartões operacionais com ações diretas */

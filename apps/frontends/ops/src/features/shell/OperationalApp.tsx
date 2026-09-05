@@ -88,7 +88,6 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: NavGroup
   { route: "billing", label: "Assinatura e cobrança", icon: "finance", group: "Administração" },
   { route: "settings", label: "Configurações", icon: "settings", group: "Administração" },
   { route: "platform", label: "Plataforma", icon: "platform", group: "Administração" },
-  { route: "alerts", label: "Alertas", icon: "alerts", group: "Administração" },
 ];
 
 const attendanceRoutes: RouteId[] = ["reservations", "salon", "counter", "delivery"];
@@ -694,7 +693,7 @@ export function OperationalApp({
       } else {
         setSyncState("offline");
         setRuntimeError(
-          "Há comandos preservados aguardando ACK do Hub. O aplicativo tentará entregá-los novamente sem trocar a chave idempotente.",
+          "Há operações salvas neste dispositivo aguardando confirmação do servidor. O aplicativo tentará enviá-las novamente sem duplicar lançamentos.",
         );
       }
     };
@@ -731,7 +730,7 @@ export function OperationalApp({
         if (count > 0) {
           setSyncState("offline");
           setRuntimeError(
-            "A ação ficou na fila idempotente porque o Hub não estava acessível. O replay preservará o mesmo comando.",
+            "A ação ficou salva neste dispositivo e será reenviada quando a conexão voltar.",
           );
         }
         throw error;
@@ -749,7 +748,6 @@ export function OperationalApp({
   const visibleNav = navItems
     .filter((item) => canAccess(session.profile, item.route))
     .filter((item) => item.route !== "people" || peopleNavAllowed !== false)
-    .filter((item) => item.route !== "alerts")
     .filter((item) => pageMeta[item.route] !== undefined);
   const authorizedAttendanceItems = attendanceRoutes
     .map((attendanceRoute) => visibleNav.find((item) => item.route === attendanceRoute))
@@ -1571,9 +1569,8 @@ export function OperationalApp({
 
         {syncState === "offline" && (
           <div className="offline-banner" role="status">
-            <strong>Conectividade com o Hub interrompida.</strong> Comandos ainda não aceitos
-            permanecem na fila com a mesma chave idempotente; o cache criptografado e as operações
-            já aceitas continuam preservados.
+            <strong>Conexão com o servidor interrompida.</strong> As operações pendentes serão
+            reenviadas automaticamente; as já confirmadas continuam preservadas.
           </div>
         )}
 

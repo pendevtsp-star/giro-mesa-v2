@@ -694,7 +694,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                       <span>
                         <strong>{row.label}</strong>
                         <small>
-                          QR v{row.tokenVersion} · {row.scanCount} leitura(s)
+                          Código versão {row.tokenVersion} · {row.scanCount} leitura(s)
                           {row.lastScannedAt ? ` · última ${dateTimeLabel(row.lastScannedAt)}` : ""}
                         </small>
                       </span>

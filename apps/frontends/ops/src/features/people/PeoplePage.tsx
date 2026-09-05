@@ -623,7 +623,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               value={reauthMethod}
             >
               <option value="password">Senha atual</option>
-              <option value="mfa">Código MFA</option>
+              <option value="mfa">Código de verificação</option>
             </NativeSelect>
           </label>
           <label className="gm-field">

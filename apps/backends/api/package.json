@@ -26,7 +26,7 @@
     "@nestjs/swagger": "11.4.6",
     "argon2": "0.44.0",
     "drizzle-orm": "0.45.2",
-    "fastify": "5.10.0",
+    "fastify": "5.12.1",
     "jose": "6.2.8",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",

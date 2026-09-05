@@ -86,7 +86,7 @@ function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
         <div className="crm-section-heading">
           <div>
             <strong>Relacionamento</strong>
-            <small>Indicadores calculados pela API</small>
+            <small>Indicadores calculados automaticamente</small>
           </div>
         </div>
         <dl className="crm-metrics">

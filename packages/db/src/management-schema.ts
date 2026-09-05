@@ -353,6 +353,9 @@ export const managementInventoryItems = pgTable(
       table.unitId,
       table.barcode,
     ),
+    uniqueIndex("management_inventory_items_resale_product_unique")
+      .on(table.organizationId, table.unitId, table.productId)
+      .where(sql`${table.kind} = 'resale' and ${table.active} = true`),
     foreignKey({
       name: "management_inventory_items_unit_fk",
       columns: [table.organizationId, table.unitId],

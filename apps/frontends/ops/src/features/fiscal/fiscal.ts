@@ -168,7 +168,7 @@ export interface AccountantWorkspace {
 
 export class InvalidFiscalPayloadError extends Error {
   constructor() {
-    super("A API retornou dados fiscais incompletos. Atualize a página ou contate o suporte.");
+    super("Os dados fiscais vieram incompletos. Atualize a página ou contate o suporte.");
     this.name = "InvalidFiscalPayloadError";
   }
 }

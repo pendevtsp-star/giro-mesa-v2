@@ -401,7 +401,7 @@ export function KdsBatchesPanel({
         </form>
         <div className="kds-batch-list">
           {batches.length === 0 ? (
-            <p>Nenhum lote neste snapshot.</p>
+            <p>Nenhum lote nos dados atuais.</p>
           ) : (
             batches.map((batch) => {
               const completeKey = `batch:${batch.id}:complete`;

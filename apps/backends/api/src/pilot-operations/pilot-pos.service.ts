@@ -10,6 +10,8 @@ import type {
 import {
   auditEvents,
   type Database,
+  deliveryOrderStatusHistory,
+  deliveryOrders,
   deviceEnrollments,
   doseClubRedemptions,
   fiscalDocuments,
@@ -233,6 +235,21 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type JsonResponse = Record<string, unknown>;
 type CounterQueueStage = "new" | "production" | "ready" | "waiting" | "delivered" | "late";
 type CounterQueueRow = typeof posTabs.$inferSelect & { queueStage: CounterQueueStage };
+type DeliveryProjectionStatus = "placed" | "preparing" | "ready" | "canceled";
+const deliveryPreparationStates = ["draft", "placed", "confirmed", "preparing", "ready"] as const;
+
+function deliveryProjectionStatus(
+  statuses: Array<typeof posOrders.$inferSelect.status>,
+): DeliveryProjectionStatus {
+  const active = statuses.filter((status) => status !== "canceled");
+  if (active.length === 0) return "canceled";
+  if (active.every((status) => status === "ready" || status === "served")) return "ready";
+  if (active.some((status) => ["preparing", "ready", "served"].includes(status))) {
+    return "preparing";
+  }
+  return "placed";
+}
+
 type OpenReturnableCustody = {
   issueMovementId: string;
   tabId: string;
@@ -10127,6 +10144,147 @@ export class PilotPosService {
     }
   }
 
+  private async syncDeliveryProjection(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    posOrderId: string,
+    now: Date,
+    sending: boolean,
+  ) {
+    const [order] = await tx
+      .select({ tabId: posOrders.tabId })
+      .from(posOrders)
+      .where(
+        and(
+          eq(posOrders.organizationId, organizationId),
+          eq(posOrders.unitId, unitId),
+          eq(posOrders.id, posOrderId),
+        ),
+      )
+      .limit(1);
+    if (!order) return;
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtext(${`delivery-tab:${organizationId}:${unitId}:${order.tabId}`}))`,
+    );
+    const [[tab], [current]] = await Promise.all([
+      tx
+        .select()
+        .from(posTabs)
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.id, order.tabId),
+          ),
+        )
+        .limit(1),
+      tx
+        .select()
+        .from(deliveryOrders)
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            eq(deliveryOrders.unitId, unitId),
+            eq(deliveryOrders.orderRef, order.tabId),
+          ),
+        )
+        .for("update")
+        .limit(1),
+    ]);
+    if (!tab) return;
+    if (!current) {
+      if (sending && tab.fulfillmentType === "delivery") {
+        throw new ConflictException({
+          code: "DELIVERY_ORDER_REGISTRATION_REQUIRED",
+          message: "Registre zona e endereço na entrega antes de enviar o pedido.",
+        });
+      }
+      return;
+    }
+    if (sending && ["ready", "dispatched", "completed", "canceled"].includes(current.status)) {
+      throw new ConflictException({
+        code: "DELIVERY_ORDER_NOT_ACCEPTING_ITEMS",
+        message: "Uma entrega pronta não aceita novos itens. Abra outra comanda de delivery.",
+      });
+    }
+    if (["dispatched", "completed", "canceled"].includes(current.status)) return;
+    const orderStatuses = await tx
+      .select({ status: posOrders.status })
+      .from(posOrders)
+      .where(
+        and(
+          eq(posOrders.organizationId, organizationId),
+          eq(posOrders.unitId, unitId),
+          eq(posOrders.tabId, order.tabId),
+        ),
+      );
+    const projectedStatus = deliveryProjectionStatus(orderStatuses.map((order) => order.status));
+    const currentIndex = deliveryPreparationStates.indexOf(
+      current.status as (typeof deliveryPreparationStates)[number],
+    );
+    const projectedIndex = deliveryPreparationStates.indexOf(
+      projectedStatus as (typeof deliveryPreparationStates)[number],
+    );
+    const transitions =
+      projectedStatus === "canceled"
+        ? (["canceled"] as const)
+        : projectedIndex > currentIndex
+          ? deliveryPreparationStates.slice(currentIndex + 1, projectedIndex + 1)
+          : [];
+    let fromStatus = current.status;
+    for (const toStatus of transitions) {
+      await tx
+        .update(deliveryOrders)
+        .set({ status: toStatus, updatedAt: now })
+        .where(and(eq(deliveryOrders.id, current.id), eq(deliveryOrders.status, fromStatus)));
+      await tx.insert(deliveryOrderStatusHistory).values({
+        organizationId,
+        unitId,
+        deliveryOrderId: current.id,
+        fromStatus,
+        toStatus,
+        actorIdentityId: identityId,
+        metadata: { source: sending ? "pos_order_send" : "pos_kds_lifecycle", posOrderId },
+      });
+      fromStatus = toStatus;
+    }
+    if (sending) {
+      await tx
+        .update(deliveryOrders)
+        .set({
+          subtotalCents: tab.totalCents,
+          totalCents: tab.totalCents + current.deliveryFeeCents,
+          updatedAt: now,
+        })
+        .where(eq(deliveryOrders.id, current.id));
+    }
+    if (transitions.length === 0 && !sending) return;
+    const payload = {
+      organizationId,
+      unitId,
+      deliveryOrderId: current.id,
+      posOrderId,
+      status: fromStatus,
+    };
+    await tx.insert(auditEvents).values({
+      organizationId,
+      unitId,
+      actorIdentityId: identityId,
+      action: "growth.delivery_order.changed",
+      entityType: "growth_delivery_order",
+      entityId: current.id,
+      metadata: payload,
+    });
+    await tx.insert(outboxEvents).values({
+      topic: "growth.delivery_order_changed",
+      aggregateType: "growth_delivery_order",
+      aggregateId: current.id,
+      payload,
+    });
+  }
+
   async sendOrder(
     identityId: string,
     organizationId: string,
@@ -10511,6 +10669,15 @@ export class PilotPosService {
             },
           );
           await this.recalculateTab(tx, organizationId, unitId, order.tabId);
+          await this.syncDeliveryProjection(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            orderId,
+            now,
+            true,
+          );
           return { orderId, status: "sent", ticketIds, printJobIds };
         },
       );
@@ -14601,6 +14768,15 @@ export class PilotPosService {
     if (status === "ready") {
       await this.notifyOrderReadyOnce(tx, actorIdentityId, organizationId, unitId, orderId, now);
     }
+    await this.syncDeliveryProjection(
+      tx,
+      actorIdentityId,
+      organizationId,
+      unitId,
+      orderId,
+      now,
+      false,
+    );
     return status;
   }
 

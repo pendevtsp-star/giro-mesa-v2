@@ -145,51 +145,6 @@
   margin-inline: auto;
   text-align: center;
 }
-.product-gallery {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-.product-shot {
-  margin: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  background: var(--gm-surface);
-  box-shadow: 0 18px 45px rgba(26, 49, 39, 0.1);
-}
-.product-shot:first-child {
-  grid-column: 1 / -1;
-}
-.product-shot-frame {
-  overflow: hidden;
-  border-bottom: 1px solid var(--line);
-  background: var(--gm-surface-soft);
-}
-.product-shot-frame img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-.product-shot figcaption {
-  padding: 22px 24px 24px;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  gap: 5px 12px;
-}
-.product-shot-badge {
-  grid-row: 1 / 3;
-}
-.product-shot-title {
-  font-family: Georgia, serif;
-  font-size: 23px;
-}
-.product-shot-description {
-  margin: 0;
-  color: var(--legacy-muted);
-  font-size: 12px;
-}
 .capabilities {
   background: var(--forest-2);
   color: var(--gm-on-action);

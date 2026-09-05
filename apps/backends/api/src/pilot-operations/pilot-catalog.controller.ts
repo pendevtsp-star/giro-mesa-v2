@@ -28,6 +28,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiHeader } from "@nestjs/swagger";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import { PilotCatalogService } from "./pilot-catalog.service.js";
@@ -86,10 +87,11 @@ import {
   updateStationSchema,
 } from "./pilot-schemas.js";
 
-@Catch(Error)
+@Catch(DrizzleQueryError)
 class CatalogConflictFilter implements ExceptionFilter {
-  catch(exception: Error & { code?: string }, host: ArgumentsHost) {
-    if (exception.code !== "23505") throw exception;
+  catch(exception: DrizzleQueryError, host: ArgumentsHost) {
+    const cause = exception.cause;
+    if (!(cause && "code" in cause && cause.code === "23505")) throw exception;
     const conflict = new ConflictException({
       code: "CATALOG_CONFLICT",
       message: "Já existe um registro de catálogo com esses dados.",

@@ -41,10 +41,10 @@ export function tableQrContrast(background: string) {
 
 export function tableQrTestMessage(result: TableQrTestResult) {
   if (result.valid) {
-    return `Estabelecimento: ${result.displayName ?? "não informado"} · Unidade: ${result.unitName ?? "não informada"} · Mesa: ${result.tableLabel ?? "não informada"} · QR v${result.tokenVersion ?? "atual"}.`;
+    return `Estabelecimento: ${result.displayName ?? "não informado"} · Unidade: ${result.unitName ?? "não informada"} · Mesa: ${result.tableLabel ?? "não informada"} · Código válido.`;
   }
   const messages: Record<NonNullable<TableQrTestResult["reason"]>, string> = {
-    invalid_url: "A URL não pertence a um QR de mesa válido.",
+    invalid_url: "O endereço não pertence a um código de mesa válido.",
     invalid_signature: "A assinatura do QR é inválida.",
     table_not_found: "A mesa vinculada não está mais ativa nesta unidade.",
     rotated: "Este QR foi rotacionado e não deve mais ser usado.",

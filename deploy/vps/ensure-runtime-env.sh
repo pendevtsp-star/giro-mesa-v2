@@ -173,6 +173,7 @@ for name in ("QR_TABLE_TOKEN_SECRET", "TERMINAL_PIN_PEPPER"):
 
 runtime_defaults = {
     "MEDIA_ROOT": "/app/data/media",
+    "TRUST_PROXY": "loopback,uniquelocal",
     "EDGE_HUB_INSTALLER_HOST_PATH": "/srv/apps/giromesa-v2/shared/edge-hub-installer",
     "EDGE_HUB_WINDOWS_INSTALLER_PATH": "/app/data/edge-hub-installer/GiroMesa-Conector-Setup.exe",
     "EDGE_HUB_WINDOWS_INSTALLER_CHANNEL": "pilot",
@@ -188,6 +189,13 @@ runtime_defaults = {
 for name, default in runtime_defaults.items():
     if name not in values:
         additions[name] = default
+trust_proxy = values.get("TRUST_PROXY")
+if trust_proxy == "1":
+    obsolete_names.add("TRUST_PROXY")
+    additions["TRUST_PROXY"] = runtime_defaults["TRUST_PROXY"]
+elif trust_proxy and trust_proxy.isascii() and trust_proxy.isdigit():
+    print("TRUST_PROXY_HOP_COUNT_UNSAFE", file=sys.stderr)
+    raise SystemExit(1)
 if values.get("MEDIA_ROOT", "/app/data/media") != "/app/data/media":
     print("MEDIA_ROOT_INVALID", file=sys.stderr)
     raise SystemExit(1)

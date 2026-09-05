@@ -86,9 +86,7 @@ export type PilotLoader = <T>(
 
 export class QueuedOperationalMutationError extends Error {
   constructor() {
-    super(
-      "A API não confirmou a ação. O comando idempotente ficou preservado neste dispositivo e será reenviado após a reconexão.",
-    );
+    super("A ação não foi confirmada e ficou salva neste dispositivo para nova tentativa.");
     this.name = "QueuedOperationalMutationError";
   }
 }
@@ -97,7 +95,7 @@ export class RejectedOperationalMutationError extends Error {
   readonly code: string;
 
   constructor(code: string) {
-    super(`O Hub recusou a ação operacional (${code}).`);
+    super(`A conexão local recusou a ação operacional (${code}).`);
     this.name = "RejectedOperationalMutationError";
     this.code = code;
   }

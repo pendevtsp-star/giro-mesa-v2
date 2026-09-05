@@ -42,7 +42,7 @@ function downloadArtifact(value: unknown) {
     contentEncoding?: string;
     mimeType?: string;
   };
-  if (!artifact.content) throw new Error("A API não retornou o arquivo.");
+  if (!artifact.content) throw new Error("O arquivo não ficou disponível para download.");
   const bytes =
     artifact.contentEncoding === "base64"
       ? Uint8Array.from(atob(artifact.content), (character) => character.charCodeAt(0))

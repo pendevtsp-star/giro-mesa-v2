@@ -97,7 +97,7 @@ describe("QR das mesas", () => {
     expect(tableQrTestMessage(result)).toContain("Estabelecimento: Casa Aurora");
     expect(tableQrTestMessage(result)).toContain("Unidade: Centro");
     expect(tableQrTestMessage(result)).toContain("Mesa: Mesa 2");
-    expect(tableQrTestMessage(result)).toContain("QR v4");
+    expect(tableQrTestMessage(result)).toContain("Código válido");
   });
 
   it("gera HTML escapado, com CSS balanceado e layouts físicos", () => {

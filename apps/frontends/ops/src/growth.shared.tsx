@@ -18,7 +18,7 @@ export type RemoteState<T> =
 
 export class InvalidGrowthPayloadError extends Error {
   constructor() {
-    super("A API retornou dados de relacionamento em formato inesperado.");
+    super("Os dados de relacionamento vieram em formato inesperado.");
     this.name = "InvalidGrowthPayloadError";
   }
 }

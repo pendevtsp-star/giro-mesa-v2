@@ -295,7 +295,7 @@ export function KdsSettingsPage({
                     <small>
                       {details.length > 0
                         ? details.join(" · ")
-                        : "Sem capacidade quantitativa neste snapshot"}
+                        : "Sem capacidade quantitativa nos dados atuais"}
                     </small>
                     {capacity?.recommendation && capacity.recommendation.state !== "normal" && (
                       <Badge
@@ -378,7 +378,7 @@ export function KdsSettingsPage({
               <dd>{data.capabilities.partialReady ? "Disponível" : "Não habilitado"}</dd>
             </div>
             <div>
-              <dt>Handoff no passe</dt>
+              <dt>Entrega no passe</dt>
               <dd>{data.capabilities.handoff ? "Disponível" : "Não habilitado"}</dd>
             </div>
             <div>
@@ -387,8 +387,8 @@ export function KdsSettingsPage({
             </div>
           </dl>
           <small className="kds-settings-scope-note">
-            Esta tela não grava regras da unidade sem uma API confirmada; ela reflete o snapshot
-            recebido.
+            Esta tela só grava regras quando o serviço está disponível; ela reflete a configuração
+            recebida.
           </small>
         </Card>
 

@@ -31,7 +31,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 77;
+export const OPS_REQUIRED_SCHEMA_VERSION = 78;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -48,13 +48,13 @@ export const OPS_REQUIRED_API_CAPABILITIES = [
 export function apiCompatibilityError(value: unknown): string | null {
   const parsed = apiHealthResponseSchema.safeParse(value);
   if (!parsed.success) {
-    return "A API em execução é anterior a esta versão do GiroMesa. Atualize e reinicie a API.";
+    return "O serviço do GiroMesa está desatualizado. Atualize e reinicie o sistema.";
   }
   const missing = OPS_REQUIRED_API_CAPABILITIES.filter(
     (capability) => !parsed.data.capabilities.includes(capability),
   );
   if (parsed.data.schemaVersion < OPS_REQUIRED_SCHEMA_VERSION || missing.length > 0) {
-    return `Versão incompatível: frontend exige schema ${OPS_REQUIRED_SCHEMA_VERSION} e a API ${parsed.data.buildSha} oferece ${parsed.data.schemaVersion}. Atualize a API e execute as migrations.`;
+    return "A interface e o serviço estão em versões diferentes. Atualize o GiroMesa e aplique as atualizações pendentes.";
   }
   return null;
 }
@@ -650,6 +650,10 @@ export function operationalApiErrorMessage(
       ORDER_NOT_DRAFT: "Este pedido já foi enviado ou não está mais em espera. Atualize a comanda.",
       PRODUCT_WITHOUT_STATION:
         "Este pedido contém produto sem estação de produção. Configure a rota no Catálogo e tente novamente.",
+      INVENTORY_MAPPING_AMBIGUOUS:
+        "Um produto deste pedido está ligado a mais de um item de estoque. Corrija o vínculo em Estoque e tente novamente.",
+      INVENTORY_PRODUCT_ALREADY_LINKED:
+        "Este produto já está ligado a outro item de revenda ativo.",
       PRODUCTION_STATION_DELIVERY_DISABLED:
         "A estação deste pedido está impedida de receber produção. Ajuste a política da estação e tente novamente.",
       PERSON_ACCESS_CHANGED:
@@ -669,7 +673,7 @@ export function operationalApiErrorMessage(
       : status === 403
         ? "Seu perfil não possui permissão para esta operação."
         : status === 404
-          ? "Este recurso não está disponível na versão atual da API."
+          ? "Este recurso não está disponível nesta versão do GiroMesa."
           : status === 429
             ? `Muitas solicitações em sequência. Aguarde${Number.isFinite(retryAfterSeconds) ? ` ${retryAfterSeconds} segundos` : " alguns segundos"} e tente novamente.`
             : status >= 500
@@ -748,7 +752,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (error instanceof ApiClientError) throw error;
     const timedOut = error instanceof DOMException && error.name === "AbortError";
     throw new ApiClientError(
-      timedOut ? "A API demorou mais que o esperado." : "Não foi possível alcançar a API.",
+      timedOut
+        ? "O GiroMesa demorou mais que o esperado."
+        : "Não foi possível conectar ao GiroMesa.",
       0,
       timedOut ? "API_TIMEOUT" : "API_UNREACHABLE",
       true,
@@ -796,7 +802,12 @@ function parseLoginResponse(value: unknown): LoginResponse {
   const candidate = value as Record<string, unknown>;
   if (candidate.mfaRequired === true) {
     if (typeof candidate.challengeToken !== "string" || candidate.challengeToken.length < 32) {
-      throw new ApiClientError("Desafio MFA inválido.", 502, "INVALID_MFA_CHALLENGE", false);
+      throw new ApiClientError(
+        "Não foi possível validar a segunda etapa do acesso.",
+        502,
+        "INVALID_MFA_CHALLENGE",
+        false,
+      );
     }
     return {
       mfaRequired: true,
@@ -6555,6 +6566,30 @@ export const api = {
         growthPath(organizationId, `units/${encodeURIComponent(unitId)}/delivery-orders${suffix}`),
       );
     },
+    createDeliveryOrder: (
+      organizationId: string,
+      body: {
+        unitId: string;
+        zoneId: string;
+        orderRef: string;
+        fulfillment: "delivery";
+        address: {
+          street: string;
+          number: string;
+          complement?: string;
+          neighborhood: string;
+          city: string;
+          state: string;
+          postalCode: string;
+        };
+        promisedAt?: string;
+        idempotencyKey: string;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, "delivery-orders"), {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     createReservation: (
       organizationId: string,
       body: {

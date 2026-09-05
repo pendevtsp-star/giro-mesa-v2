@@ -33,8 +33,7 @@ export type Permission =
   | "multiunit.view"
   | "billing.manage"
   | "settings.manage"
-  | "platform.manage"
-  | "alerts.view";
+  | "platform.manage";
 
 export type RouteId =
   | "dashboard"
@@ -59,8 +58,7 @@ export type RouteId =
   | "billing"
   | "settings"
   | "platform"
-  | "device"
-  | "alerts";
+  | "device";
 
 export interface Profile {
   id: ProfileId;

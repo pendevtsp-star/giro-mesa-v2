@@ -59,17 +59,23 @@ const roles: readonly SystemRole[] = [
   "finance",
 ];
 
-function activityLabel(action: string) {
+export function activityLabel(action: string) {
   const labels: Record<string, string> = {
     "management.overview.priority-claimed": "Prioridade assumida",
     "management.overview.priority-snoozed": "Prioridade adiada",
     "management.overview.priority-resolved": "Prioridade marcada como tratada",
     "management.overview.preferences-updated": "Preferências da Visão Geral atualizadas",
     "management.inventory.event-recorded": "Movimento de estoque registrado",
+    "management.inventory-item.updated": "Item de estoque atualizado",
+    "management.product-returnable.configured": "Retornável configurado",
+    "pos.customer_ready": "Pedido pronto para retirada",
+    "pos.kds.critical_note_acknowledged": "Observação do pedido confirmada",
+    "pos.kds.item_transitioned": "Etapa de preparo atualizada",
+    "pos.kds.order_handoff": "Pedido movimentado no passe",
     "pos.order.sent": "Pedido enviado para produção",
     "pos.payment.recorded": "Pagamento registrado",
   };
-  return labels[action] ?? action.replaceAll(/[._-]+/g, " ");
+  return labels[action] ?? "Atualização operacional registrada";
 }
 
 function activityRoute(entityType: string): OverviewRoute | undefined {

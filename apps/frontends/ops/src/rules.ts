@@ -24,7 +24,6 @@ export const routePermissions: Record<RouteId, Permission> = {
   settings: "settings.manage",
   platform: "platform.manage",
   device: "dashboard.view",
-  alerts: "alerts.view",
 };
 
 export function canAccess(profile: Profile, route: RouteId): boolean {

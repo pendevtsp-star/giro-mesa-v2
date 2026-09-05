@@ -64,3 +64,9 @@
   min-height: 34px;
   padding: 0.4rem 0.65rem;
 }
+
+@media (max-width: 40rem), (pointer: coarse) {
+  .gm-button--sm {
+    min-height: 40px;
+  }
+}

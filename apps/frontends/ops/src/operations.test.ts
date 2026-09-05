@@ -10,7 +10,7 @@ import {
   summarizeOperationalLoad,
   summarizeTabPayments,
   usesQuickServiceMode,
-} from "./operations";
+} from "./operations.shared";
 
 describe("contratos operacionais reais", () => {
   it("usa abertura em um toque somente nos modos de alto giro", () => {

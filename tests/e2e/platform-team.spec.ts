@@ -80,7 +80,7 @@ test("admin convida a equipe no backoffice sem overflow em 375 px", async ({ pag
   await page.getByLabel("E-mail corporativo").fill("dev@giromesa.com.br");
   await page.getByRole("combobox", { name: "Perfil", exact: true }).selectOption("engineering");
   await page.getByLabel("Motivo auditável").first().fill("Apoio técnico durante o piloto");
-  await page.getByLabel("Seu código MFA atual").first().fill("123456");
+  await page.getByLabel("Seu código de verificação atual").first().fill("123456");
   await page.getByRole("button", { name: "Enviar convite" }).click();
   await expect(page.getByText("Convite enviado. Ele expira em sete dias.")).toBeVisible();
   await expect(page.getByText("dev@giromesa.com.br")).toBeVisible();
@@ -113,7 +113,7 @@ test("convidado aceita o acesso ao backoffice com token fora da query string", a
   await expect(page.getByRole("button", { name: "Abrir backoffice" })).toBeVisible();
 });
 
-test("aceite direciona para ativação de MFA sem expor o token na query", async ({
+test("aceite direciona para verificação em duas etapas sem expor o código na URL", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "O cenário é independente do projeto mobile.");
@@ -127,7 +127,9 @@ test("aceite direciona para ativação de MFA sem expor o token na query", async
 
   await page.goto(`http://localhost:3110/aceitar-convite#platform=${token}`);
   await page.getByRole("button", { name: "Validar e aceitar convite" }).click();
-  const link = page.getByRole("link", { name: "Ativar MFA para continuar" });
+  const link = page.getByRole("link", {
+    name: "Ativar verificação em duas etapas para continuar",
+  });
   await expect(link).toBeVisible();
   await expect(link).toHaveAttribute(
     "href",

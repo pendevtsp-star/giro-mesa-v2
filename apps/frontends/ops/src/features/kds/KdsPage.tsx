@@ -1432,7 +1432,7 @@ export function RealKdsPage({
         setErrors((current) => ({
           ...current,
           [input.key]:
-            "A API recebeu a ação, mas o estado atualizado não chegou. Atualize antes de repetir.",
+            "A ação foi recebida, mas a atualização não chegou. Atualize antes de repetir.",
         }));
         setLiveMessage(`${input.label} ainda sem confirmação do estado atualizado.`);
       }, 12_000);

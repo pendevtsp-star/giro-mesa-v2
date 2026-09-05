@@ -65,7 +65,7 @@ export default function SecurityPage() {
       setSetup(value);
       setMessage("Adicione a chave ao autenticador e confirme o código gerado.");
     } catch {
-      setMessage("Não foi possível iniciar o MFA. Confirme se sua sessão continua ativa.");
+      setMessage("Não foi possível iniciar a verificação em duas etapas. Entre novamente.");
     } finally {
       setBusy(false);
     }
@@ -91,7 +91,7 @@ export default function SecurityPage() {
       setRecoveryCodes(codes);
       setSetup(null);
       setEnabled(true);
-      setMessage("MFA ativado. Guarde os códigos de recuperação agora.");
+      setMessage("Verificação em duas etapas ativada. Guarde os códigos de recuperação agora.");
     } catch {
       setMessage("Código inválido. Confira o horário do dispositivo e tente novamente.");
     } finally {
@@ -117,9 +117,9 @@ export default function SecurityPage() {
       setEnabled(false);
       setRecoveryCodes([]);
       setDisableWithRecovery(false);
-      setMessage("MFA desativado.");
+      setMessage("Verificação em duas etapas desativada.");
     } catch {
-      setMessage("Não foi possível desativar o MFA com essa comprovação.");
+      setMessage("Não foi possível desativar a verificação com esse código.");
     } finally {
       setBusy(false);
     }
@@ -130,8 +130,8 @@ export default function SecurityPage() {
       <p className="eyebrow">Conta pessoal</p>
       <h1>Segurança da conta</h1>
       <p className="security-intro">
-        Use um autenticador TOTP e mantenha os códigos de recuperação fora do dispositivo de
-        trabalho. A sessão é protegida por cookie seguro; esta página não usa bearer token.
+        Use um aplicativo autenticador e mantenha os códigos de recuperação fora do dispositivo de
+        trabalho. O acesso fica protegido mesmo que sua senha seja descoberta.
       </p>
 
       <section className="legal-card security-card" aria-labelledby="mfa-title">
@@ -158,7 +158,7 @@ export default function SecurityPage() {
             disabled={busy}
             onClick={beginSetup}
           >
-            {busy ? "Preparando…" : "Ativar MFA"}
+            {busy ? "Preparando…" : "Ativar verificação em duas etapas"}
           </Button>
         )}
 
@@ -206,7 +206,8 @@ export default function SecurityPage() {
         {enabled === true && recoveryCodes.length === 0 && (
           <form className="auth-form security-form" onSubmit={disable}>
             <p className="security-form-copy">
-              MFA ativo. Para desativar, confirme um código TOTP atual ou um código de recuperação.
+              Verificação em duas etapas ativa. Para desativar, confirme um código atual do
+              aplicativo autenticador ou um código de recuperação.
             </p>
             <Label>
               {disableWithRecovery ? "Código de recuperação" : "Código de 6 dígitos"}
@@ -232,7 +233,7 @@ export default function SecurityPage() {
               type="submit"
               disabled={busy}
             >
-              {busy ? "Validando…" : "Desativar MFA"}
+              {busy ? "Validando…" : "Desativar verificação em duas etapas"}
             </Button>
           </form>
         )}
@@ -279,10 +280,10 @@ export default function SecurityPage() {
       </section>
 
       <aside className="security-note">
-        <strong>Sem persistência no navegador</strong>
+        <strong>Dados temporários</strong>
         <p className="security-note-copy">
-          O segredo TOTP, o desafio de login e os códigos de recuperação permanecem apenas em estado
-          temporário da interface. Não usamos localStorage ou sessionStorage para esses dados.
+          A chave do autenticador, a confirmação de acesso e os códigos de recuperação ficam apenas
+          nesta tela durante o uso e não são gravados no navegador.
         </p>
       </aside>
     </main>

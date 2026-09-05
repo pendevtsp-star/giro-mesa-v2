@@ -13,6 +13,7 @@ import { type ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { ApiClientError, api } from "../../api";
 import type { ProfileId, Unit } from "../../domain";
 import { routeHref } from "../../router";
+import { kdsAreaHref } from "../kds/kds.navigation";
 import {
   applyHoursTemplate,
   BRAZILIAN_TIMEZONES,
@@ -87,7 +88,7 @@ const SPECIALIZED_SETTINGS = [
     id: "kds",
     label: "Produção KDS",
     description: "Praças, terminal e fluxo",
-    href: "#/kds?area=settings",
+    href: kdsAreaHref("settings"),
   },
   { id: "fiscal", label: "Fiscal", description: "CNPJ, emissão e documentos", route: "fiscal" },
   {

@@ -149,6 +149,47 @@ it("persists an atomic tenant-isolated purchase, stock and payable flow", async 
       .values({ organizationId: organizationA.id, categoryId: category.id, name: "Lunch" })
       .returning();
     assert.ok(product);
+    const [resaleProduct] = await database.db
+      .insert(posProducts)
+      .values({
+        organizationId: organizationA.id,
+        categoryId: category.id,
+        name: "Sparkling water",
+      })
+      .returning();
+    assert.ok(resaleProduct);
+
+    const competingProductLinks = await Promise.allSettled(
+      ["A", "B"].map((suffix) =>
+        management.createInventoryItem(
+          identityA.id,
+          organizationA.id,
+          unitA.id,
+          `inventory-resale-${suffix}-${resaleProduct.id}`,
+          {
+            name: `Sparkling water ${suffix}`,
+            kind: "resale",
+            productId: resaleProduct.id,
+            unit: "un",
+            purchaseToStockFactor: "1",
+            minimumQuantity: "0",
+            reorderQuantity: "0",
+            leadTimeDays: 0,
+            allowNegative: false,
+          },
+        ),
+      ),
+    );
+    assert.equal(competingProductLinks.filter((result) => result.status === "fulfilled").length, 1);
+    const rejectedProductLink = competingProductLinks.find(
+      (result) => result.status === "rejected",
+    );
+    assert.ok(rejectedProductLink && rejectedProductLink.status === "rejected");
+    assert.equal(
+      (rejectedProductLink.reason as { cause?: { constraint_name?: string } }).cause
+        ?.constraint_name,
+      "management_inventory_items_resale_product_unique",
+    );
 
     const supplierB = await management.createSupplier(
       identityB.id,

@@ -1,7 +1,11 @@
 import {
+  type ArgumentsHost,
   Body,
+  Catch,
+  ConflictException,
   Controller,
   Delete,
+  type ExceptionFilter,
   Get,
   Headers,
   Param,
@@ -11,8 +15,10 @@ import {
   Put,
   Query,
   Req,
+  UseFilters,
   UseGuards,
 } from "@nestjs/common";
+import { DrizzleQueryError } from "drizzle-orm/errors";
 import { type AuthenticatedRequest, SessionGuard } from "../auth/session.guard.js";
 import { ZodPipe } from "../common/zod.pipe.js";
 import {
@@ -286,7 +292,32 @@ function punchContext(request: AuthenticatedRequest): PunchContext {
   };
 }
 
+@Catch(DrizzleQueryError)
+export class InventoryProductConflictFilter implements ExceptionFilter {
+  catch(exception: DrizzleQueryError, host: ArgumentsHost) {
+    const cause = exception.cause;
+    if (
+      typeof cause !== "object" ||
+      !cause ||
+      !("code" in cause) ||
+      cause.code !== "23505" ||
+      !("constraint_name" in cause) ||
+      cause.constraint_name !== "management_inventory_items_resale_product_unique"
+    )
+      throw exception;
+    const conflict = new ConflictException({
+      code: "INVENTORY_PRODUCT_ALREADY_LINKED",
+      message: "Este produto já está ligado a outro item de revenda ativo.",
+    });
+    const response = host.switchToHttp().getResponse<{
+      status(code: number): { send(body: unknown): void };
+    }>();
+    response.status(conflict.getStatus()).send(conflict.getResponse());
+  }
+}
+
 @UseGuards(SessionGuard)
+@UseFilters(InventoryProductConflictFilter)
 @Controller([
   "api/v1/organizations/:organizationId/units/:unitId/management",
   "v1/organizations/:organizationId/units/:unitId/management",

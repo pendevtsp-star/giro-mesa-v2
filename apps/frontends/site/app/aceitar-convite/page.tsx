@@ -149,7 +149,7 @@ export default function AcceptInvitationPage() {
             className="button button-primary"
             href={`/seguranca#returnTo=${encodeURIComponent(returnTo)}`}
           >
-            Ativar MFA para continuar
+            Ativar verificação em duas etapas para continuar
           </Link>
         )}
         {completed && (

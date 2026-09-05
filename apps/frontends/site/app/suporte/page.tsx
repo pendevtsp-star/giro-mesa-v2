@@ -27,7 +27,7 @@ export default function SupportPage() {
         <article id="senha">
           <span>↗</span>
           <h2>Acesso e senha</h2>
-          <p>Recuperação de senha, MFA, convites e dispositivos.</p>
+          <p>Recuperação de senha, verificação em duas etapas, convites e dispositivos.</p>
           <Link href="/login">Ir para o login</Link>
         </article>
         <article>

@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   auditEvents,
+  deliveryOrderStatusHistory,
+  deliveryOrders,
   deviceEnrollments,
   hubCommands,
   identities,
@@ -24,8 +26,9 @@ import {
   roleBindings,
   units,
 } from "@giromesa/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { GrowthService } from "../growth/growth.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 import { kdsReadModelSchema } from "./pilot-schemas.js";
@@ -49,6 +52,7 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     const documentPrefix = runId.replaceAll("-", "").slice(0, 13);
     const scope = new ScopeService(database);
     const productionPrinting = new ProductionPrintingService(database, scope);
+    const growth = new GrowthService(database, scope);
     const pos = new PilotPosService(
       database,
       scope,
@@ -226,6 +230,11 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
         unitId: unit.id,
         openedByIdentityId: owner.id,
         label: "Comanda KDS",
+        fulfillmentType: "delivery",
+        customerName: "Cliente delivery",
+        customerPhone: "11999990000",
+        deliveryAddress: "Rua da Entrega, 10",
+        promisedAt: new Date(Date.now() + 45 * 60_000),
       })
       .returning();
     assert.ok(tab);
@@ -238,9 +247,58 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
     );
     const order = created.order as { id: string };
+    const zone = await growth.createDeliveryZone(owner.id, organization.id, {
+      unitId: unit.id,
+      name: "Centro",
+      feeCents: 900,
+      minimumOrderCents: 2_000,
+      estimatedDeliveryMinutes: 45,
+      geometry: { type: "circle", center: [-46.65, -23.56], radiusKm: 5 },
+      active: true,
+    });
+    const deliveryInput = {
+      unitId: unit.id,
+      zoneId: zone.id,
+      orderRef: tab.id,
+      fulfillment: "delivery" as const,
+      address: {
+        street: "Rua da Entrega",
+        number: "10",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        postalCode: "01001-000",
+        latitude: -23.56,
+        longitude: -46.65,
+      },
+      idempotencyKey: `delivery-${runId}`,
+    };
+    await assert.rejects(
+      () =>
+        growth.createDeliveryOrder(owner.id, organization.id, {
+          ...deliveryInput,
+          address: { ...deliveryInput.address, latitude: -22, longitude: -43 },
+          idempotencyKey: `delivery-outside-${runId}`,
+        }),
+      (error) => errorCode(error) === "DELIVERY_ADDRESS_OUTSIDE_ZONE",
+    );
+    await assert.rejects(
+      () => pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-${runId}`),
+      (error) => errorCode(error) === "DELIVERY_ORDER_REGISTRATION_REQUIRED",
+    );
+    await growth.createDeliveryOrder(owner.id, organization.id, deliveryInput);
     const sent = await pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-${runId}`);
     const ticketIds = sent.ticketIds as string[];
     assert.equal(ticketIds.length, 2);
+    const visibleDelivery = (
+      await growth.listDeliveryOrders(owner.id, organization.id, unit.id, { limit: 10 })
+    ).find((delivery) => delivery.orderRef === tab.id);
+    assert.ok(visibleDelivery);
+    assert.equal(visibleDelivery.status, "placed");
+    assert.equal(visibleDelivery.deliveryFeeCents, 900);
+    assert.equal(visibleDelivery.totalCents, created.totals.totalCents + 900);
+    assert.equal(visibleDelivery.addressValidationStatus, "covered");
+    assert.equal(visibleDelivery.address?.street, "Rua da Entrega");
     const printJobIds = sent.printJobIds as string[];
     assert.equal(printJobIds.length, 2);
     const [orderSentOutbox] = await database.db
@@ -675,6 +733,11 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       `hot-start-${runId}`,
       { state: "preparing" },
     );
+    const [preparingDelivery] = await database.db
+      .select({ status: deliveryOrders.status })
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.orderRef, tab.id));
+    assert.equal(preparingDelivery?.status, "preparing");
     await pos.transitionKdsItem(
       kdsOperator.id,
       organization.id,
@@ -745,6 +808,155 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       { target: "served" },
     );
     assert.equal(served.target, "served");
+    const [readyDelivery] = await database.db
+      .select({ id: deliveryOrders.id, status: deliveryOrders.status })
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.orderRef, tab.id));
+    assert.equal(readyDelivery?.status, "ready");
+    const newRound = await pos.createOrder(
+      owner.id,
+      organization.id,
+      unit.id,
+      tab.id,
+      `new-round-create-${runId}`,
+      { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
+    );
+    const newRoundOrderId = (newRound.order as { id: string }).id;
+    await assert.rejects(
+      () =>
+        pos.sendOrder(
+          owner.id,
+          organization.id,
+          unit.id,
+          newRoundOrderId,
+          `new-round-send-${runId}`,
+        ),
+      (error) => errorCode(error) === "DELIVERY_ORDER_NOT_ACCEPTING_ITEMS",
+    );
+    const [rolledBackRound] = await database.db
+      .select({ status: posOrders.status })
+      .from(posOrders)
+      .where(eq(posOrders.id, newRoundOrderId));
+    assert.equal(rolledBackRound?.status, "draft");
+    const deliveryHistory = await database.db
+      .select({
+        from: deliveryOrderStatusHistory.fromStatus,
+        to: deliveryOrderStatusHistory.toStatus,
+      })
+      .from(deliveryOrderStatusHistory)
+      .where(eq(deliveryOrderStatusHistory.deliveryOrderId, readyDelivery?.id ?? ""));
+    assert.deepEqual(deliveryHistory.map((entry) => `${entry.from ?? "new"}->${entry.to}`).sort(), [
+      "confirmed->preparing",
+      "draft->placed",
+      "new->draft",
+      "placed->confirmed",
+      "preparing->ready",
+    ]);
+
+    const [concurrentProduct] = await database.db
+      .insert(posProducts)
+      .values({
+        organizationId: organization.id,
+        categoryId: category.id,
+        name: "Item delivery concorrente",
+      })
+      .returning();
+    assert.ok(concurrentProduct);
+    await database.db.insert(posProductPrices).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      productId: concurrentProduct.id,
+      priceCents: 1_200,
+    });
+    await database.db.insert(posProductAvailability).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      productId: concurrentProduct.id,
+      available: true,
+    });
+    await database.db.insert(posProductStations).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      productId: concurrentProduct.id,
+      stationId: hotStation.id,
+    });
+    const [concurrentTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        openedByIdentityId: owner.id,
+        fulfillmentType: "delivery",
+        deliveryAddress: "Rua Concorrente, 20",
+      })
+      .returning();
+    assert.ok(concurrentTab);
+    const concurrentOrders = await Promise.all(
+      ["a", "b"].map((suffix) =>
+        pos.createOrder(
+          owner.id,
+          organization.id,
+          unit.id,
+          concurrentTab.id,
+          `concurrent-create-${suffix}-${runId}`,
+          { items: [{ productId: concurrentProduct.id, quantity: 1, modifierOptionIds: [] }] },
+        ),
+      ),
+    );
+    const concurrentOrderIds = concurrentOrders.map((entry) => (entry.order as { id: string }).id);
+    await growth.createDeliveryOrder(owner.id, organization.id, {
+      ...deliveryInput,
+      orderRef: concurrentTab.id,
+      idempotencyKey: `delivery-concurrent-${runId}`,
+    });
+    await Promise.all(
+      concurrentOrderIds.map((id, index) =>
+        pos.sendOrder(owner.id, organization.id, unit.id, id, `concurrent-send-${index}-${runId}`),
+      ),
+    );
+    const concurrentTickets = await database.db
+      .select({ ticketId: posKdsTickets.id, itemId: posKdsTicketItems.orderItemId })
+      .from(posKdsTickets)
+      .innerJoin(posKdsTicketItems, eq(posKdsTicketItems.ticketId, posKdsTickets.id))
+      .where(inArray(posKdsTickets.orderId, concurrentOrderIds));
+    assert.equal(concurrentTickets.length, 2);
+    for (const [index, ticket] of concurrentTickets.entries()) {
+      await pos.claimKdsTicket(
+        kdsOperator.id,
+        organization.id,
+        unit.id,
+        ticket.ticketId,
+        `concurrent-claim-${index}-${runId}`,
+        { installationId: stationInstallationId, leaseSeconds: 120 },
+      );
+      await pos.transitionKdsItem(
+        kdsOperator.id,
+        organization.id,
+        unit.id,
+        ticket.ticketId,
+        ticket.itemId,
+        `concurrent-preparing-${index}-${runId}`,
+        { state: "preparing" },
+      );
+    }
+    await Promise.all(
+      concurrentTickets.map((ticket, index) =>
+        pos.transitionKdsItem(
+          kdsOperator.id,
+          organization.id,
+          unit.id,
+          ticket.ticketId,
+          ticket.itemId,
+          `concurrent-ready-${index}-${runId}`,
+          { state: "ready" },
+        ),
+      ),
+    );
+    const concurrentDeliveries = await database.db
+      .select({ status: deliveryOrders.status, totalCents: deliveryOrders.totalCents })
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.orderRef, concurrentTab.id));
+    assert.deepEqual(concurrentDeliveries, [{ status: "ready", totalCents: 3_300 }]);
   } finally {
     await database.onModuleDestroy();
   }

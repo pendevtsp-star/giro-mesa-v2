@@ -147,7 +147,7 @@ export function defaultSettlementPeriod(
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T {
   const parsed = requiredString(value);
-  if (!allowed.includes(parsed as T)) throw new Error("A API retornou uma opção inválida.");
+  if (!allowed.includes(parsed as T)) throw new Error("O serviço retornou uma opção inválida.");
   return parsed as T;
 }
 

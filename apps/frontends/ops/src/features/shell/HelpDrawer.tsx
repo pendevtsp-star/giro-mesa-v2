@@ -161,10 +161,6 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     title: "Administração da plataforma",
     steps: ["Use apenas ferramentas autenticadas e auditadas."],
   },
-  alerts: {
-    title: "Tratar alertas",
-    steps: ["Priorize exceções críticas.", "Confirme a resolução na fonte operacional."],
-  },
 };
 
 export function HelpDrawer({ route, onClose }: { route: RouteId; onClose: () => void }) {

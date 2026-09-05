@@ -1448,4 +1448,40 @@ describe("integração operacional", () => {
       }),
     );
   });
+
+  it("registra a entrega canônica com zona, endereço e chave estável", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ order: { id: "delivery-1" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const body = {
+      unitId: "unit-1",
+      zoneId: "zone-1",
+      orderRef: "tab-1",
+      fulfillment: "delivery" as const,
+      address: {
+        street: "Rua da Entrega",
+        number: "10",
+        neighborhood: "Centro",
+        city: "São Paulo",
+        state: "SP",
+        postalCode: "01001-000",
+      },
+      idempotencyKey: "delivery-tab-1",
+    };
+
+    await api.growth.createDeliveryOrder("org-1", body);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/v1/organizations/org-1/growth/delivery-orders"),
+      expect.objectContaining({
+        method: "POST",
+        credentials: "include",
+        body: JSON.stringify(body),
+      }),
+    );
+  });
 });

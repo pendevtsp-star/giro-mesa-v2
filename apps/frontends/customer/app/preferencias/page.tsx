@@ -17,12 +17,12 @@ export default async function PreferencesPage({
       <p className="preference-eyebrow">Privacidade e comunicação</p>
       <h1>Gerencie sua preferência.</h1>
       <p className="preference-intro">
-        Esta página executa apenas o descadastro por token emitido pelo estabelecimento. Pontos,
-        cupons e cadastro de cliente continuam restritos ao ambiente autenticado da unidade.
+        Esta página serve apenas para interromper o envio de campanhas. Pontos, cupons e cadastro de
+        cliente continuam sob responsabilidade da unidade.
       </p>
       <section className="preference-card" aria-labelledby="opt-out-title">
         <h2 id="opt-out-title">Não quero receber campanhas</h2>
-        <p>Abra o link recebido ou cole abaixo o token fornecido na comunicação.</p>
+        <p>Abra o link recebido ou cole abaixo o código de segurança enviado na comunicação.</p>
         <OptOutForm initialToken={initialToken} />
       </section>
     </main>

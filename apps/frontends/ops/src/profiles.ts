@@ -1,6 +1,6 @@
 import type { Permission, Profile, ProfileId } from "./domain";
 
-const basePermissions: Permission[] = ["dashboard.view", "alerts.view"];
+const basePermissions: Permission[] = ["dashboard.view"];
 
 function profile(
   id: ProfileId,

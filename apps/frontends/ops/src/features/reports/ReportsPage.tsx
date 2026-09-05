@@ -1552,7 +1552,7 @@ function ReportExportActions({
         throw new Error("O conteúdo recebido não corresponde ao hash auditado.");
       }
       saveBlob(content.blob, content.filename ?? item.filename);
-      setStatus(`${item.format.toUpperCase()} auditado baixado. SHA-256 ${checksum.slice(0, 12)}…`);
+      setStatus(`${item.format.toUpperCase()} baixado e verificado.`);
     } catch (cause) {
       setStatus(errorMessage(cause));
     } finally {

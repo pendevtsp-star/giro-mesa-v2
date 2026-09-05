@@ -365,6 +365,22 @@ test("runtime env accepts incident transition grant and rejects duplicate keys a
   }
 });
 
+test("runtime env migrates the legacy trust proxy hop count atomically", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-trust-proxy-"));
+  const envFile = join(directory, ".env");
+  writeFileSync(envFile, "POSTGRES_PASSWORD=preserve-me\nTRUST_PROXY=1\n");
+  try {
+    const result = run(ensureScript, [envFile]);
+    assert.equal(result.status, 0, output(result));
+    const updated = readFileSync(envFile, "utf8");
+    assert.match(updated, /^TRUST_PROXY=loopback,uniquelocal$/m);
+    assert.equal(updated.match(/^TRUST_PROXY=/gm)?.length, 1);
+    assert.match(updated, /^POSTGRES_PASSWORD=preserve-me$/m);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("runtime env rejects an unknown fiscal release environment atomically", () => {
   const directory = mkdtempSync(join(tmpdir(), "giromesa-runtime-env-fiscal-"));
   const envFile = join(directory, ".env");

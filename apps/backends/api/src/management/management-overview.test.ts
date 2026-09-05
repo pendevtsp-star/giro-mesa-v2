@@ -8,8 +8,15 @@ import {
   resolveOverviewProfile,
   shapeManagementOverview,
 } from "./management-overview.js";
+import { activityLabel } from "./management-overview.service.js";
 
 const generatedAt = new Date("2026-08-16T18:00:00.000Z");
+
+it("mantém nomes técnicos fora do histórico operacional", () => {
+  assert.equal(activityLabel("pos.kds.order_handoff"), "Pedido movimentado no passe");
+  assert.equal(activityLabel("internal.codegen.event"), "Atualização operacional registrada");
+});
+
 const snapshot: OverviewSnapshot = {
   activeShift: { label: "Jantar", startsAt: new Date("2026-08-16T17:00:00.000Z") },
   cashShift: {

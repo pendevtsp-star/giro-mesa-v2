@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ApiClientError } from "../../api";
 import { isValidCounterPhone, parseCounterQueue } from "./CounterPage";
 import {
   canCloseWithoutConsumption,
@@ -7,6 +8,7 @@ import {
   orderSubmissionErrorMessage,
   parseStoredCart,
   parseStoredIds,
+  requiresDeliveryRegistration,
 } from "./CounterWorkspace";
 
 describe("atalhos e rascunho operacional", () => {
@@ -102,6 +104,20 @@ describe("atalhos e rascunho operacional", () => {
     expect(orderSubmissionErrorMessage(1, new Error("Configure a rota no Catálogo."))).toBe(
       "Pedido salvo em espera, mas não enviado à produção. Configure a rota no Catálogo.",
     );
+  });
+
+  it("abre o cadastro de entrega apenas para a rejeição específica do backend", () => {
+    expect(
+      requiresDeliveryRegistration(
+        new ApiClientError(
+          "Registre a entrega.",
+          409,
+          "DELIVERY_ORDER_REGISTRATION_REQUIRED",
+          false,
+        ),
+      ),
+    ).toBe(true);
+    expect(requiresDeliveryRegistration(new Error("Falha de rede"))).toBe(false);
   });
 });
 

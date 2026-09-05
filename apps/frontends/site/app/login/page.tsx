@@ -293,7 +293,7 @@ export default function LoginPage() {
                 estabelecimento.
               </p>
               <p>
-                <Link href="/seguranca">Segurança da conta, MFA e recuperação</Link>
+                <Link href="/seguranca">Segurança da conta e recuperação</Link>
               </p>
             </div>
           )}

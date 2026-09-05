@@ -170,7 +170,9 @@ export function PlatformTeam() {
         <div>
           <p>ACESSO INTERNO</p>
           <h2 id="platform-team-title">Equipe de desenvolvimento</h2>
-          <span>Convites pessoais, permissões mínimas e MFA obrigatório.</span>
+          <span>
+            Convites pessoais, permissões mínimas e verificação em duas etapas obrigatória.
+          </span>
         </div>
         <Button disabled={loading} onClick={() => void load()} size="sm" variant="secondary">
           {loading ? "Atualizando…" : "Atualizar"}
@@ -210,7 +212,7 @@ export function PlatformTeam() {
             <Input id="platform-team-reason" minLength={8} name="reason" required />
           </label>
           <label htmlFor="platform-team-mfa">
-            Seu código MFA atual
+            Seu código de verificação atual
             <Input
               autoComplete="one-time-code"
               id="platform-team-mfa"
@@ -324,7 +326,7 @@ export function PlatformTeam() {
             <Input id="platform-team-action-reason" minLength={8} name="reason" required />
           </label>
           <label htmlFor="platform-team-action-mfa">
-            Seu código MFA atual
+            Seu código de verificação atual
             <Input
               autoComplete="one-time-code"
               id="platform-team-action-mfa"

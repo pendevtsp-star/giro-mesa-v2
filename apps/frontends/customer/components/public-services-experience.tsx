@@ -179,8 +179,8 @@ export function PublicServicesExperience({ menuSlug }: { menuSlug: string }) {
         </strong>
         <span>
           {configured
-            ? "As respostas só aparecem após aceite e persistência da API."
-            : "A configuração da API pública é necessária para enviar solicitações."}
+            ? "As respostas aparecem depois que a unidade recebe e registra a solicitação."
+            : "Este canal ainda não foi ativado pela unidade."}
         </span>
       </div>
 

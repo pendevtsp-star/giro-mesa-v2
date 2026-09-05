@@ -396,7 +396,7 @@ const platformApi = api.platform as unknown as PlatformApi;
 
 export class InvalidPlatformPayloadError extends Error {
   constructor() {
-    super("A API retornou a central da plataforma em formato inesperado.");
+    super("Os dados da central vieram em formato inesperado.");
     this.name = "InvalidPlatformPayloadError";
   }
 }
@@ -2662,7 +2662,7 @@ function CommercialLanding({
                 src={mediaPreview}
               />
             )}
-            <small>Prévia local; a URL só existirá após confirmação da API.</small>
+            <small>Prévia local; o endereço só existirá após a confirmação do sistema.</small>
             <label htmlFor="commercial-media-alt">Texto alternativo</label>
             <Input
               id="commercial-media-alt"
@@ -3695,7 +3695,7 @@ function TenantWorkspace({
           </div>
         </Card>
         <Card>
-          <SectionTitle eyebrow="Unidades e Edge" title="Hubs" />
+          <SectionTitle eyebrow="Unidades e operação local" title="Conexões locais" />
           {data.hubs.length ? (
             <div className="platform-compact-list">
               {data.hubs.map((hub) => (
@@ -3766,7 +3766,7 @@ function TenantWorkspace({
           </div>
           {!data.doseClub.available ? (
             <EmptyState
-              description="A API ainda não retornou a projeção segura do DoseClub. Atualize após publicar o backend."
+              description="Os dados seguros do DoseClub ainda não estão disponíveis. Atualize após publicar a nova versão do sistema."
               icon="◇"
               title="Estado indisponível"
             />

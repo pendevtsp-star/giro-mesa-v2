@@ -6,10 +6,10 @@ import {
   operationalApiErrorMessage,
 } from "./api";
 
-describe("compatibilidade e erros da API", () => {
-  it("bloqueia uma API antiga sem expor a rota técnica", () => {
+describe("compatibilidade e erros do serviço", () => {
+  it("bloqueia um serviço antigo sem expor a rota técnica", () => {
     expect(apiCompatibilityError({ status: "ok", version: "2.0.0" })).toContain(
-      "Atualize e reinicie a API",
+      "Atualize e reinicie o sistema",
     );
     expect(
       operationalApiErrorMessage(
@@ -17,7 +17,7 @@ describe("compatibilidade e erros da API", () => {
         "Cannot GET /v1/organizations/example/units/example/pilot/catalog/tables/qr/lifecycle",
         "request-123",
       ),
-    ).toBe("Este recurso não está disponível na versão atual da API. Referência: request-123.");
+    ).toBe("Este recurso não está disponível nesta versão do GiroMesa. Referência: request-123.");
   });
 
   it("explica quando um pedido não possui rota de produção", () => {
@@ -31,6 +31,20 @@ describe("compatibilidade e erros da API", () => {
       ),
     ).toBe(
       "Este pedido contém produto sem estação de produção. Configure a rota no Catálogo e tente novamente. Referência: request-409.",
+    );
+  });
+
+  it("explica o vínculo duplicado entre produto e estoque", () => {
+    expect(
+      operationalApiErrorMessage(
+        409,
+        undefined,
+        "request-inventory",
+        undefined,
+        "INVENTORY_MAPPING_AMBIGUOUS",
+      ),
+    ).toBe(
+      "Um produto deste pedido está ligado a mais de um item de estoque. Corrija o vínculo em Estoque e tente novamente. Referência: request-inventory.",
     );
   });
 

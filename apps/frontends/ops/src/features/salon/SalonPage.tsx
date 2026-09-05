@@ -2490,7 +2490,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     <small>
                       {online
                         ? floor.refreshError
-                        : "A última visão confirmada continua disponível. Comandos compatíveis ficam na fila idempotente do terminal."}
+                        : "A última visão confirmada continua disponível. As ações possíveis ficam salvas no terminal até a conexão voltar."}
                     </small>
                   </span>
                   <Button disabled={!online || floor.refreshing} onClick={floor.retry} size="sm">

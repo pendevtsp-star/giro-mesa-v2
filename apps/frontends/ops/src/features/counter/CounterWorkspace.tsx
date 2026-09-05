@@ -21,6 +21,7 @@ import {
   type PrintJobStatus,
 } from "../../api";
 import { sendShellPrintJob, shellPrintingAvailable } from "../../bridge";
+import { type DeliveryZone, parseDeliveryZones } from "../../growth.shared";
 import { pilotMutation } from "../../operational-dispatch";
 import {
   type PilotFloor,
@@ -40,6 +41,7 @@ import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
 import { currentTerminalPrinterId, readActiveTerminalProfile } from "../shell/terminal-profile";
 import { BrowserReceipt } from "./BrowserReceipt";
+import { type ManualPaymentMethod, manualPaymentSuccessMessage } from "./manual-payment";
 import type { PaymentAttempt } from "./pos-payments";
 import { promisedAtToIso, splitPromisedAt } from "./promisedAt";
 import { SmartPosPaymentModal } from "./SmartPosPaymentModal";
@@ -52,6 +54,20 @@ type DoseClubDraftSnapshot = {
   externalProductId: string;
   availableDoses: number;
   doseMl: number;
+};
+
+type DeliveryRegistrationDraft = {
+  orderId: string;
+  idempotencyKey: string;
+  registered: boolean;
+  zoneId: string;
+  street: string;
+  number: string;
+  complement: string;
+  neighborhood: string;
+  city: string;
+  state: string;
+  postalCode: string;
 };
 
 export type DraftCartItem = {
@@ -169,6 +185,10 @@ export function orderSubmissionErrorMessage(createdCount: number, error: unknown
   const message = error instanceof Error ? error.message : "Não foi possível salvar o pedido.";
   if (!createdCount) return message;
   return `${createdCount === 1 ? "Pedido salvo em espera, mas não enviado à produção." : `${createdCount} etapas salvas em espera, mas não enviadas à produção.`} ${message}`;
+}
+
+export function requiresDeliveryRegistration(error: unknown): error is ApiClientError {
+  return error instanceof ApiClientError && error.code === "DELIVERY_ORDER_REGISTRATION_REQUIRED";
 }
 
 export function canCloseWithoutConsumption(
@@ -519,9 +539,7 @@ export function TabWorkspace({
   const [discountReais, setDiscountReais] = useState(0);
   const [moveTargetTabId, setMoveTargetTabId] = useState("");
   const [moveItemId, setMoveItemId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "credit_card" | "debit_card" | "pix" | "other"
-  >("cash");
+  const [paymentMethod, setPaymentMethod] = useState<ManualPaymentMethod>("cash");
   const [paymentReais, setPaymentReais] = useState(0);
   const [cashReceivedReais, setCashReceivedReais] = useState(0);
   const [paymentReference, setPaymentReference] = useState("");
@@ -530,6 +548,11 @@ export function TabWorkspace({
   const [readyNotificationConsent, setReadyNotificationConsent] = useState(false);
   const [serviceNotes, setServiceNotes] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryRegistration, setDeliveryRegistration] =
+    useState<DeliveryRegistrationDraft | null>(null);
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [deliveryZonesLoading, setDeliveryZonesLoading] = useState(false);
+  const [deliveryRegistrationError, setDeliveryRegistrationError] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<"dine_in" | "pickup" | "delivery">(
     "dine_in",
   );
@@ -568,7 +591,44 @@ export function TabWorkspace({
     setDoseClubOpen(false);
     setDoseClubState({ status: "idle" });
     setDoseClubNotice("");
+    setDeliveryRegistration(null);
+    setDeliveryRegistrationError("");
   }, [tabId]);
+
+  useEffect(() => {
+    const orderId = deliveryRegistration?.orderId;
+    if (!orderId) return;
+    let cancelled = false;
+    setDeliveryZonesLoading(true);
+    setDeliveryRegistrationError("");
+    api.growth
+      .deliveryZones(scope.organizationId, scope.unitId)
+      .then((response) => {
+        if (cancelled) return;
+        const active = parseDeliveryZones(response).filter((zone) => zone.active);
+        setDeliveryZones(active);
+        setDeliveryRegistration((current) =>
+          current?.orderId === orderId && !current.zoneId && active.length === 1
+            ? { ...current, zoneId: active[0]?.id ?? "" }
+            : current,
+        );
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setDeliveryRegistrationError(
+            error instanceof Error
+              ? error.message
+              : "Não foi possível consultar as zonas de entrega.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDeliveryZonesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [deliveryRegistration?.orderId, scope.organizationId, scope.unitId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: o nonce de retry existe somente para repetir esta consulta remota.
   useEffect(() => {
@@ -1507,6 +1567,130 @@ export function TabWorkspace({
               prepareFullCashierPayment();
             }
 
+            function updateDeliveryRegistration(patch: Partial<DeliveryRegistrationDraft>) {
+              setDeliveryRegistration((current) => (current ? { ...current, ...patch } : current));
+            }
+
+            function promptDeliveryRegistration(orderId: string) {
+              setDeliveryRegistration((current) =>
+                current?.orderId === orderId
+                  ? current
+                  : {
+                      orderId,
+                      idempotencyKey: crypto.randomUUID(),
+                      registered: false,
+                      zoneId: "",
+                      street: deliveryAddress.trim(),
+                      number: "",
+                      complement: "",
+                      neighborhood: "",
+                      city: "",
+                      state: "",
+                      postalCode: "",
+                    },
+              );
+              setDeliveryRegistrationError("");
+              setFeedback("Pedido salvo em espera. Complete os dados de entrega para liberá-lo.");
+            }
+
+            async function sendOrderToProduction(orderId: string) {
+              try {
+                await scope.dispatch(
+                  "pos.order.send_requested",
+                  pilotMutation(
+                    "send-order",
+                    { orderId },
+                    data.tab.fulfillmentType === "delivery" ? "cloud-only" : undefined,
+                  ),
+                  (key) => api.pilot.sendOrder(scope.organizationId, scope.unitId, orderId, key),
+                );
+                return true;
+              } catch (error) {
+                if (!requiresDeliveryRegistration(error)) throw error;
+                promptDeliveryRegistration(orderId);
+                return false;
+              }
+            }
+
+            async function releaseOrder(orderId: string) {
+              setBusy(true);
+              setFeedback("");
+              try {
+                if (await sendOrderToProduction(orderId)) {
+                  setFeedback("Pedido enviado à produção.");
+                }
+              } catch (error) {
+                setFeedback(
+                  error instanceof Error ? error.message : "Não foi possível enviar o pedido.",
+                );
+              } finally {
+                setBusy(false);
+                detail.retry();
+                tabs.retry();
+                onChanged();
+              }
+            }
+
+            async function submitDeliveryRegistration(event: FormEvent<HTMLFormElement>) {
+              event.preventDefault();
+              const registration = deliveryRegistration;
+              if (!registration?.zoneId) return;
+              setBusy(true);
+              setDeliveryRegistrationError("");
+              try {
+                if (!registration.registered) {
+                  await api.growth.createDeliveryOrder(scope.organizationId, {
+                    unitId: scope.unitId,
+                    zoneId: registration.zoneId,
+                    orderRef: tabId,
+                    fulfillment: "delivery",
+                    address: {
+                      street: registration.street.trim(),
+                      number: registration.number.trim(),
+                      ...(registration.complement.trim()
+                        ? { complement: registration.complement.trim() }
+                        : {}),
+                      neighborhood: registration.neighborhood.trim(),
+                      city: registration.city.trim(),
+                      state: registration.state.trim().toUpperCase(),
+                      postalCode: registration.postalCode.trim(),
+                    },
+                    ...(data.tab.promisedAt ? { promisedAt: data.tab.promisedAt } : {}),
+                    idempotencyKey: registration.idempotencyKey,
+                  });
+                  setDeliveryRegistration((current) =>
+                    current?.orderId === registration.orderId
+                      ? { ...current, registered: true }
+                      : current,
+                  );
+                }
+                await scope.dispatch(
+                  "pos.order.send_requested",
+                  pilotMutation("send-order", { orderId: registration.orderId }, "cloud-only"),
+                  (key) =>
+                    api.pilot.sendOrder(
+                      scope.organizationId,
+                      scope.unitId,
+                      registration.orderId,
+                      key,
+                    ),
+                );
+                setDeliveryRegistration(null);
+                setFeedback("Entrega registrada e pedido enviado à produção.");
+              } catch (error) {
+                setDeliveryRegistrationError(
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível registrar e enviar a entrega.",
+                );
+              } finally {
+                setBusy(false);
+                detail.retry();
+                tabs.retry();
+                onChanged();
+              }
+            }
+
             async function submitCart(sendToProduction: boolean) {
               if (!cart.length) return;
               const unroutedProducts = [
@@ -1549,13 +1733,9 @@ export function TabWorkspace({
                   const createdIds = new Set(group.map((item) => item.id));
                   remainingCart = remainingCart.filter((item) => !createdIds.has(item.id));
                   setCart(remainingCart);
-                  if (sendToProduction) {
-                    await scope.dispatch(
-                      "pos.order.send_requested",
-                      pilotMutation("send-order", { orderId }),
-                      (key) =>
-                        api.pilot.sendOrder(scope.organizationId, scope.unitId, orderId, key),
-                    );
+                  if (sendToProduction && !(await sendOrderToProduction(orderId))) {
+                    setView("order");
+                    return;
                   }
                 }
                 setLastOrder(submittedCart);
@@ -2714,23 +2894,7 @@ export function TabWorkspace({
                           {order.status === "draft" && (
                             <Button
                               disabled={busy}
-                              onClick={() =>
-                                void mutate(
-                                  () =>
-                                    scope.dispatch(
-                                      "pos.order.send_requested",
-                                      pilotMutation("send-order", { orderId: order.id }),
-                                      (key) =>
-                                        api.pilot.sendOrder(
-                                          scope.organizationId,
-                                          scope.unitId,
-                                          order.id,
-                                          key,
-                                        ),
-                                    ),
-                                  "Pedido enviado à produção.",
-                                )
-                              }
+                              onClick={() => void releaseOrder(order.id)}
                               size="sm"
                             >
                               Liberar{" "}
@@ -3408,6 +3572,7 @@ export function TabWorkspace({
                             event.preventDefault();
                             if (paymentReais <= 0) return;
                             const changeReais = Math.max(0, cashReceivedReais - paymentReais);
+                            const amountCents = Math.round(paymentReais * 100);
                             const reference =
                               paymentReference.trim() ||
                               (paymentMethod === "cash" && cashReceivedReais > 0
@@ -3423,7 +3588,7 @@ export function TabWorkspace({
                                     tabId,
                                     body: {
                                       method: paymentMethod,
-                                      amountCents: Math.round(paymentReais * 100),
+                                      amountCents,
                                       reference,
                                       installationId,
                                     },
@@ -3435,16 +3600,19 @@ export function TabWorkspace({
                                       tabId,
                                       {
                                         method: paymentMethod,
-                                        amountCents: Math.round(paymentReais * 100),
+                                        amountCents,
                                         reference,
                                         installationId,
                                       },
                                       key,
                                     ),
                                 ),
-                              paymentMethod === "cash"
-                                ? `Pagamento registrado · troco ${formatMoney(Math.round(changeReais * 100))}.`
-                                : "Pagamento parcial registrado.",
+                              manualPaymentSuccessMessage(
+                                paymentMethod,
+                                amountCents,
+                                remainingCents,
+                                Math.round(changeReais * 100),
+                              ),
                             ).then((saved) => {
                               if (!saved) return;
                               setPaymentReais(0);
@@ -3940,6 +4108,177 @@ export function TabWorkspace({
                     </Button>
                   </form>
                 )}
+                <Modal
+                  description="Informe a zona e o endereço antes de liberar este pedido para a produção."
+                  isOpen={Boolean(deliveryRegistration)}
+                  onClose={() => {
+                    if (!busy) setDeliveryRegistration(null);
+                  }}
+                  size="lg"
+                  title="Dados da entrega"
+                >
+                  {deliveryRegistration && (
+                    <form className="gm-form-stack" onSubmit={submitDeliveryRegistration}>
+                      {deliveryRegistrationError && (
+                        <Callout tone="danger">{deliveryRegistrationError}</Callout>
+                      )}
+                      {deliveryZonesLoading ? (
+                        <Callout tone="info">Consultando zonas de entrega…</Callout>
+                      ) : deliveryZones.length === 0 ? (
+                        <Callout tone="warning">
+                          Não há zona ativa. Cadastre uma em Entregas antes de liberar o pedido.
+                        </Callout>
+                      ) : (
+                        <Label className="gm-form-field">
+                          <span>Zona de entrega</span>
+                          <NativeSelect
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ zoneId: event.target.value })
+                            }
+                            required
+                            value={deliveryRegistration.zoneId}
+                          >
+                            <option value="">Selecione a zona</option>
+                            {deliveryZones.map((zone) => (
+                              <option key={zone.id} value={zone.id}>
+                                {zone.name} · taxa {formatMoney(zone.feeCents)} · mínimo{" "}
+                                {formatMoney(zone.minimumOrderCents)}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </Label>
+                      )}
+                      {deliveryRegistration.zoneId && (
+                        <Callout tone="info">
+                          {(() => {
+                            const zone = deliveryZones.find(
+                              (candidate) => candidate.id === deliveryRegistration.zoneId,
+                            );
+                            return zone
+                              ? `Taxa ${formatMoney(zone.feeCents)} · pedido mínimo ${formatMoney(zone.minimumOrderCents)} · prazo estimado ${zone.estimatedDeliveryMinutes} min`
+                              : "A zona selecionada será validada ao registrar a entrega.";
+                          })()}
+                        </Callout>
+                      )}
+                      <div className="gm-form-grid gm-form-grid--split">
+                        <Label className="gm-form-field">
+                          <span>Rua ou avenida</span>
+                          <Input
+                            autoComplete="address-line1"
+                            maxLength={160}
+                            minLength={2}
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ street: event.target.value })
+                            }
+                            required
+                            value={deliveryRegistration.street}
+                          />
+                        </Label>
+                        <Label className="gm-form-field">
+                          <span>Número</span>
+                          <Input
+                            maxLength={30}
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ number: event.target.value })
+                            }
+                            required
+                            value={deliveryRegistration.number}
+                          />
+                        </Label>
+                      </div>
+                      <Label className="gm-form-field">
+                        <span>Complemento (opcional)</span>
+                        <Input
+                          autoComplete="address-line2"
+                          maxLength={120}
+                          onChange={(event) =>
+                            updateDeliveryRegistration({ complement: event.target.value })
+                          }
+                          value={deliveryRegistration.complement}
+                        />
+                      </Label>
+                      <div className="gm-form-grid gm-form-grid--split">
+                        <Label className="gm-form-field">
+                          <span>Bairro</span>
+                          <Input
+                            autoComplete="address-level3"
+                            maxLength={120}
+                            minLength={2}
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ neighborhood: event.target.value })
+                            }
+                            required
+                            value={deliveryRegistration.neighborhood}
+                          />
+                        </Label>
+                        <Label className="gm-form-field">
+                          <span>Cidade</span>
+                          <Input
+                            autoComplete="address-level2"
+                            maxLength={120}
+                            minLength={2}
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ city: event.target.value })
+                            }
+                            required
+                            value={deliveryRegistration.city}
+                          />
+                        </Label>
+                      </div>
+                      <div className="gm-form-grid gm-form-grid--split">
+                        <Label className="gm-form-field">
+                          <span>Estado (UF)</span>
+                          <Input
+                            autoComplete="address-level1"
+                            maxLength={2}
+                            minLength={2}
+                            onChange={(event) =>
+                              updateDeliveryRegistration({
+                                state: event.target.value.replace(/[^a-z]/gi, "").toUpperCase(),
+                              })
+                            }
+                            required
+                            value={deliveryRegistration.state}
+                          />
+                        </Label>
+                        <Label className="gm-form-field">
+                          <span>CEP</span>
+                          <Input
+                            autoComplete="postal-code"
+                            inputMode="numeric"
+                            onChange={(event) =>
+                              updateDeliveryRegistration({ postalCode: event.target.value })
+                            }
+                            pattern="\d{5}-?\d{3}"
+                            placeholder="00000-000"
+                            required
+                            value={deliveryRegistration.postalCode}
+                          />
+                        </Label>
+                      </div>
+                      <div className="gm-toolbar">
+                        <Button
+                          disabled={busy}
+                          onClick={() => setDeliveryRegistration(null)}
+                          type="button"
+                          variant="ghost"
+                        >
+                          Manter em espera
+                        </Button>
+                        <Button
+                          disabled={busy || deliveryZonesLoading || !deliveryRegistration.zoneId}
+                          type="submit"
+                        >
+                          {busy
+                            ? "Registrando…"
+                            : deliveryRegistration.registered
+                              ? "Tentar enviar novamente"
+                              : "Registrar e enviar"}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </Modal>
                 {integratedPaymentEnabled && (
                   <SmartPosPaymentModal
                     embedded={scope.embedded === true}

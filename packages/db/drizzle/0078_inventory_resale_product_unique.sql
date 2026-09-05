@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "management_inventory_items_resale_product_unique" ON "management_inventory_items" USING btree ("organization_id","unit_id","product_id") WHERE "management_inventory_items"."kind" = 'resale' and "management_inventory_items"."active" = true;

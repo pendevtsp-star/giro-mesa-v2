@@ -114,7 +114,7 @@ const activationPresentation: Record<
   fiscalChoice: {
     label: "Decisão sobre emissão fiscal",
     description: "Uso de documentos fiscais definido para a operação.",
-    href: "#/fiscal/setup",
+    href: "#/fiscal?secao=setup",
   },
   training: {
     label: "Treinamento da equipe",

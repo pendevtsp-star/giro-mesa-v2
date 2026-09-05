@@ -166,7 +166,7 @@ write_key NEXT_PUBLIC_CUSTOMER_API_ENABLED true
 write_key VITE_API_URL https://api.giromesa.com.br
 write_key VITE_SITE_URL https://giromesa.com.br
 write_key LOG_LEVEL info
-write_key TRUST_PROXY 1
+write_key TRUST_PROXY loopback,uniquelocal
 write_key CORS_ORIGINS https://giromesa.com.br,https://www.giromesa.com.br,https://menu.giromesa.com.br,https://app.giromesa.com.br
 write_key SESSION_SECRET "$session_secret"
 write_key QR_TABLE_TOKEN_SECRET "$qr_table_token_secret"

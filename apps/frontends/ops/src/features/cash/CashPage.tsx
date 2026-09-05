@@ -861,7 +861,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                               <Badge tone="warning">Saldo: {formatMoney(tab.remainingCents)}</Badge>
                               <a
                                 className="button button--sm button--secondary"
-                                href={`#/counter?tabId=${encodeURIComponent(tab.id)}`}
+                                href={`#/counter?tab=${encodeURIComponent(tab.id)}`}
                               >
                                 Cobrar no balcão
                               </a>

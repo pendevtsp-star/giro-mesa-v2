@@ -438,7 +438,7 @@ export function CatalogExperience({
       <html>
         <head>
           <meta charset="utf-8">
-          <title>Cardápio - ${restaurantName}</title>
+          <title>Cardápio - ${escapeCatalogHtml(restaurantName)}</title>
           <style>
             @page {
               size: A4;

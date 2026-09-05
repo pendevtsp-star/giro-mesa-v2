@@ -47,7 +47,7 @@ export interface AuthenticatedAccess {
 
 export class InvalidSessionPayloadError extends Error {
   constructor() {
-    super("A API retornou uma sessão incompleta. Entre novamente ou contate o suporte.");
+    super("O acesso retornou incompleto. Entre novamente ou contate o suporte.");
     this.name = "InvalidSessionPayloadError";
   }
 }

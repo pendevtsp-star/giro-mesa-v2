@@ -92,20 +92,6 @@ export interface RecipeIngredient {
   costCents: number;
 }
 
-export interface PendingStockProductSuggestion {
-  id: string;
-  name: string;
-  sku: string;
-  eanBarcode: string;
-  suggestedCategoryName: string;
-  stockCostCents: number;
-  suggestedPriceCents: number;
-  currentStockUnits: number;
-  unit: string;
-  supplier: string;
-  receivedDate: string;
-}
-
 export interface ProductSizeVariation {
   id: string;
   name: string; // ex: "P (300ml)", "M (500ml)", "Individual", "Para 2 Pessoas"
@@ -841,7 +827,7 @@ export const kdsActionLabel: Partial<Record<KdsTicket["status"], string>> = {
 
 export class InvalidPilotPayloadError extends Error {
   constructor() {
-    super("A API retornou dados operacionais em formato inesperado.");
+    super("Os dados operacionais vieram em formato inesperado.");
     this.name = "InvalidPilotPayloadError";
   }
 }

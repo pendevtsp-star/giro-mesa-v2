@@ -122,19 +122,6 @@
     align-items: flex-start;
     flex-direction: column;
   }
-  .product-gallery {
-    grid-template-columns: 1fr;
-  }
-  .product-shot:first-child {
-    grid-column: auto;
-  }
-  .product-shot figcaption {
-    grid-template-columns: 1fr;
-  }
-  .product-shot-badge {
-    grid-row: auto;
-    justify-self: start;
-  }
   .capability-grid,
   .plan-grid,
   .testimonial-grid,

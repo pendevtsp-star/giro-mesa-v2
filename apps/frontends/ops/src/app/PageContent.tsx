@@ -184,10 +184,6 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
     title: "Equipamentos e produção",
     description: "Conecte impressoras, organize o preparo e configure pagamentos.",
   },
-  alerts: {
-    title: "Central de alertas",
-    description: "Exceções priorizadas com ação recomendada.",
-  },
 };
 
 export function PageHeading({ title, description }: { title: string; description: string }) {
@@ -343,8 +339,6 @@ export function PageContent({
           unitId={session.unitId}
         />
       );
-    case "alerts":
-      return <UnavailableRealPage title="Central de alertas" />;
   }
 }
 
@@ -352,8 +346,8 @@ function UnavailableRealPage({ title }: { title: string }) {
   return (
     <EmptyState
       icon="◇"
-      title={`${title} sem fonte autenticada`}
-      description="Esta V2 não exibe fixtures em sessões reais. A tela será ativada quando houver um endpoint autenticado correspondente."
+      title={`${title} ainda indisponível`}
+      description="Esta área será ativada quando os dados reais estiverem disponíveis com acesso seguro."
     />
   );
 }

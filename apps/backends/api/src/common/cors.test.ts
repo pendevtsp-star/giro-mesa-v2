@@ -37,7 +37,7 @@ describe("CORS configuration", () => {
 
   it("does not trust arbitrary forwarded addresses in production", () => {
     assert.equal(configuredTrustProxy(undefined, "production"), false);
-    assert.equal(configuredTrustProxy("1", "production"), 1);
+    assert.throws(() => configuredTrustProxy("1", "production"));
     assert.deepEqual(configuredTrustProxy("loopback, 10.0.0.0/8", "production"), [
       "loopback",
       "10.0.0.0/8",

@@ -11,7 +11,7 @@ import {
   parseSelfTimeTracking,
   recipeLossToBasisPoints,
   recipeQuantityToMilli,
-} from "./management";
+} from "./management.shared";
 
 describe("dados gerenciais reais", () => {
   it("aceita o limite de aprovação financeiro desativado", () => {

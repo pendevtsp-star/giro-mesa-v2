@@ -24,7 +24,6 @@ export const routeIds: RouteId[] = [
   "settings",
   "platform",
   "device",
-  "alerts",
 ];
 
 export function parseRoute(hash: string): RouteId {
