@@ -104,7 +104,10 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      `CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL);
+      `CREATE ROLE giromesa_dr_policy NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+       CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL);
+       ALTER TABLE dr_probe ENABLE ROW LEVEL SECURITY;
+       CREATE POLICY giromesa_dr_policy_read ON dr_probe FOR SELECT TO giromesa_dr_policy USING (true);
        CREATE TABLE identities (id uuid PRIMARY KEY);
        CREATE TABLE auth_sessions (identity_id uuid NOT NULL REFERENCES identities(id));
        CREATE TABLE oauth_accounts (identity_id uuid NOT NULL REFERENCES identities(id));
@@ -182,39 +185,57 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
     const crossBackup = join(directory, "cross-backup");
     cpSync(backupDirectory, crossBackup, { recursive: true });
 
+    const restoreArguments = [
+      restoreScript,
+      "--backup-directory",
+      backupDirectory,
+      "--target-database-container",
+      target,
+      "--database-name",
+      "giromesa",
+      "--database-user",
+      "giromesa",
+      "--expected-artifact",
+      artifact,
+      "--expected-source-migration-id",
+      "0029_platform_incident_projection_actions",
+      "--expected-target-artifact",
+      targetArtifact,
+      "--expected-target-migration-id",
+      "0029_platform_incident_projection_actions",
+      "--restore-object-directory",
+      path(objectRestore),
+      "--restore-encrypted-config-directory",
+      path(configRestore),
+      "--smoke-sql-file",
+      path(smokeSql),
+    ];
+    const restoreEnvironment = {
+      ...env,
+      GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+    };
+    run("docker", [
+      "exec", target, "psql", "-U", "giromesa", "-d", "giromesa", "-v", "ON_ERROR_STOP=1", "-c",
+      `CREATE ROLE giromesa_dr_policy NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+       CREATE ROLE giromesa_dr_member LOGIN;
+       GRANT giromesa_dr_policy TO giromesa_dr_member;`,
+    ]);
+    const unsafeRestore = spawnSync(bash, restoreArguments, {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: restoreEnvironment,
+    });
+    assert.notEqual(unsafeRestore.status, 0);
+    assert.match(`${unsafeRestore.stdout ?? ""}${unsafeRestore.stderr ?? ""}`, /RESTORE_DATABASE_ROLE_UNSAFE/);
+    run("docker", [
+      "exec", target, "psql", "-U", "giromesa", "-d", "giromesa", "-v", "ON_ERROR_STOP=1", "-c",
+      "REVOKE giromesa_dr_policy FROM giromesa_dr_member; DROP ROLE giromesa_dr_member; DROP ROLE giromesa_dr_policy;",
+    ]);
+
     const evidencePath = run(
       bash,
-      [
-        restoreScript,
-        "--backup-directory",
-        backupDirectory,
-        "--target-database-container",
-        target,
-        "--database-name",
-        "giromesa",
-        "--database-user",
-        "giromesa",
-        "--expected-artifact",
-        artifact,
-        "--expected-source-migration-id",
-        "0029_platform_incident_projection_actions",
-        "--expected-target-artifact",
-        targetArtifact,
-        "--expected-target-migration-id",
-        "0029_platform_incident_projection_actions",
-        "--restore-object-directory",
-        path(objectRestore),
-        "--restore-encrypted-config-directory",
-        path(configRestore),
-        "--smoke-sql-file",
-        path(smokeSql),
-      ],
-      {
-        env: {
-          ...env,
-          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
-        },
-      },
+      restoreArguments,
+      { env: restoreEnvironment },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -232,6 +253,20 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
         "SELECT payload FROM dr_probe WHERE id=1",
       ]),
       "linux-ok",
+    );
+    assert.equal(
+      run("docker", [
+        "exec",
+        target,
+        "psql",
+        "-U",
+        "giromesa",
+        "-d",
+        "giromesa",
+        "-Atc",
+        "SELECT concat_ws(':', rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolreplication, rolbypassrls) FROM pg_roles WHERE rolname='giromesa_dr_policy'",
+      ]),
+      "f:f:f:f:f:f:f",
     );
     assert.equal(
       readFileSync(join(objectRestore, "menus", "cover.txt"), "utf8"),

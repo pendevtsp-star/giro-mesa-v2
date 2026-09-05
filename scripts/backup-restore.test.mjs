@@ -136,7 +136,7 @@ function createStoredZip(entries) {
   return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
-function writeSignedBackup(directory, { objectArchive } = {}) {
+function writeSignedBackup(directory, { databaseRoles, objectArchive } = {}) {
   const files = [];
   const addFile = (name, kind, contents) => {
     writeFileSync(join(directory, name), contents);
@@ -149,6 +149,13 @@ function writeSignedBackup(directory, { objectArchive } = {}) {
   };
 
   addFile("database.dump", "postgresql", Buffer.from("not-a-real-dump\n"));
+  if (databaseRoles) {
+    addFile(
+      "database-roles.json",
+      "postgresql_roles",
+      Buffer.from(JSON.stringify(databaseRoles)),
+    );
+  }
   if (objectArchive) addFile("objects.zip", "objects", objectArchive);
 
   const payloadBytes = Buffer.from(
@@ -257,6 +264,33 @@ test("restore rejects a forged manifest before touching the target", () => {
 
     assert.notEqual(result.status, 0);
     assert.match(output(result), /MANIFEST_SIGNATURE_INVALID/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("restore rejects a signed privileged database role before touching the target", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-restore-role-negative-"));
+  try {
+    writeSignedBackup(directory, {
+      databaseRoles: [{
+        name: "giromesa_dr_policy",
+        canLogin: false,
+        superuser: true,
+        createDb: false,
+        createRole: false,
+        hasMembership: false,
+        inherit: false,
+        replication: false,
+        bypassRls: false,
+      }],
+    });
+    const result = powershell(restoreScript, restoreArgs(directory), {
+      GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey.toString("base64"),
+    });
+
+    assert.notEqual(result.status, 0);
+    assert.match(output(result), /BACKUP_DATABASE_ROLES_INVALID/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

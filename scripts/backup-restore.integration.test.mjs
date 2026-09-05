@@ -120,7 +120,11 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      "CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL); INSERT INTO dr_probe VALUES (1, 'giromesa-dr-ok');",
+      `CREATE ROLE giromesa_dr_policy NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+       CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL);
+       ALTER TABLE dr_probe ENABLE ROW LEVEL SECURITY;
+       CREATE POLICY giromesa_dr_policy_read ON dr_probe FOR SELECT TO giromesa_dr_policy USING (true);
+       INSERT INTO dr_probe VALUES (1, 'giromesa-dr-ok');`,
     ]);
 
     const backupOutput = run(
@@ -163,42 +167,60 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
     const crossBackup = join(directory, "cross-backup");
     cpSync(backupDirectory, crossBackup, { recursive: true });
 
+    const restoreArguments = [
+      "-NoProfile",
+      "-File",
+      restoreScript,
+      "-BackupDirectory",
+      backupDirectory,
+      "-TargetDatabaseContainer",
+      target,
+      "-DatabaseName",
+      "giromesa",
+      "-DatabaseUser",
+      "giromesa",
+      "-ExpectedSourceArtifact",
+      sourceArtifact,
+      "-ExpectedSourceMigrationId",
+      sourceMigrationId,
+      "-ExpectedTargetArtifact",
+      targetArtifact,
+      "-ExpectedTargetMigrationId",
+      targetMigrationId,
+      "-RestoreObjectDirectory",
+      objectRestore,
+      "-RestoreEncryptedConfigDirectory",
+      configRestore,
+      "-SmokeSqlFile",
+      smokeSql,
+    ];
+    const restoreEnvironment = {
+      ...process.env,
+      GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
+      GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+    };
+    run("docker", [
+      "exec", target, "psql", "-U", "giromesa", "-d", "giromesa", "-v", "ON_ERROR_STOP=1", "-c",
+      `CREATE ROLE giromesa_dr_policy NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+       CREATE ROLE giromesa_dr_member LOGIN;
+       GRANT giromesa_dr_policy TO giromesa_dr_member;`,
+    ]);
+    const unsafeRestore = spawnSync("powershell", restoreArguments, {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: restoreEnvironment,
+    });
+    assert.notEqual(unsafeRestore.status, 0);
+    assert.match(`${unsafeRestore.stdout ?? ""}${unsafeRestore.stderr ?? ""}`, /RESTORE_DATABASE_ROLE_UNSAFE/);
+    run("docker", [
+      "exec", target, "psql", "-U", "giromesa", "-d", "giromesa", "-v", "ON_ERROR_STOP=1", "-c",
+      "REVOKE giromesa_dr_policy FROM giromesa_dr_member; DROP ROLE giromesa_dr_member; DROP ROLE giromesa_dr_policy;",
+    ]);
+
     const evidencePath = run(
       "powershell",
-      [
-        "-NoProfile",
-        "-File",
-        restoreScript,
-        "-BackupDirectory",
-        backupDirectory,
-        "-TargetDatabaseContainer",
-        target,
-        "-DatabaseName",
-        "giromesa",
-        "-DatabaseUser",
-        "giromesa",
-        "-ExpectedSourceArtifact",
-        sourceArtifact,
-        "-ExpectedSourceMigrationId",
-        sourceMigrationId,
-        "-ExpectedTargetArtifact",
-        targetArtifact,
-        "-ExpectedTargetMigrationId",
-        targetMigrationId,
-        "-RestoreObjectDirectory",
-        objectRestore,
-        "-RestoreEncryptedConfigDirectory",
-        configRestore,
-        "-SmokeSqlFile",
-        smokeSql,
-      ],
-      {
-        env: {
-          ...process.env,
-          GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
-          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
-        },
-      },
+      restoreArguments,
+      { env: restoreEnvironment },
     )
       .split(/\r?\n/)
       .at(-1);
@@ -217,6 +239,20 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         "SELECT payload FROM dr_probe WHERE id = 1",
       ]),
       "giromesa-dr-ok",
+    );
+    assert.equal(
+      run("docker", [
+        "exec",
+        target,
+        "psql",
+        "-U",
+        "giromesa",
+        "-d",
+        "giromesa",
+        "-Atc",
+        "SELECT concat_ws(':', rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolreplication, rolbypassrls) FROM pg_roles WHERE rolname='giromesa_dr_policy'",
+      ]),
+      "f:f:f:f:f:f:f",
     );
     assert.equal(
       readFileSync(join(objectRestore, "menus", "cover.txt"), "utf8"),
@@ -302,6 +338,20 @@ test("round-trips PostgreSQL, objects and encrypted configuration before a funct
         "SELECT payload FROM dr_probe WHERE id = 1",
       ]),
       "giromesa-dr-ok",
+    );
+    assert.equal(
+      run("docker", [
+        "exec",
+        targetCross,
+        "psql",
+        "-U",
+        "giromesa",
+        "-d",
+        "giromesa",
+        "-Atc",
+        "SELECT concat_ws(':', rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolinherit, rolreplication, rolbypassrls) FROM pg_roles WHERE rolname='giromesa_dr_policy'",
+      ]),
+      "f:f:f:f:f:f:f",
     );
     assert.deepEqual(
       readFileSync(join(configRestoreCross, "runtime.env.restored")),

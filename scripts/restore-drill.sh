@@ -167,6 +167,7 @@ if not isinstance(source, str) or not source or source == target_container:
 
 allowed = {
     "database.dump": "postgresql",
+    "database-roles.json": "postgresql_roles",
     "objects.zip": "objects",
     "configuration.age": "encrypted_configuration",
     "configuration.gpg": "encrypted_configuration",
@@ -201,6 +202,27 @@ for item in payload.get("files", []):
 if database_count != 1:
     fail("BACKUP_DATABASE_FILE_INVALID")
 
+database_roles = []
+roles_file = stage / "database-roles.json"
+if roles_file.exists():
+    expected_role_keys = {"name", "canLogin", "superuser", "createDb", "createRole", "inherit", "replication", "bypassRls", "hasMembership"}
+    try:
+        roles = json.loads(roles_file.read_text(encoding="utf-8"))
+    except Exception:
+        fail("BACKUP_DATABASE_ROLES_INVALID")
+    seen_roles = set()
+    if not isinstance(roles, list):
+        fail("BACKUP_DATABASE_ROLES_INVALID")
+    for role in roles:
+        name = role.get("name") if isinstance(role, dict) else None
+        flags = [role.get(key) for key in expected_role_keys - {"name"}] if isinstance(role, dict) else []
+        if (not isinstance(role, dict) or set(role) != expected_role_keys or not isinstance(name, str)
+                or not re.fullmatch(r"giromesa_[a-z0-9_]{1,54}", name)
+                or name in seen_roles or any(value is not False for value in flags)):
+            fail("BACKUP_DATABASE_ROLES_INVALID")
+        seen_roles.add(name)
+        database_roles.append(name)
+
 archive = stage / "objects.zip"
 if archive.exists():
     try:
@@ -229,6 +251,7 @@ plan = {
     "hasObjects": archive.exists(),
     "configName": next((name for name in ("configuration.age", "configuration.gpg", "configuration.enc") if (stage / name).exists()), ""),
     "runtimeConfigurationHmacSha256": runtime_config_hmac,
+    "databaseRoles": database_roles,
 }
 (stage / "plan.json").write_text(json.dumps(plan), encoding="utf-8")
 PY
@@ -252,6 +275,13 @@ target_migration_id=${plan[4]}
 has_objects=${plan[6]}
 config_name=${plan[7]}
 runtime_configuration_hmac=${plan[8]}
+mapfile -t database_roles < <(python3 - "$stage/plan.json" <<'PY'
+import json, sys
+for role in json.load(open(sys.argv[1], encoding="utf-8")).get("databaseRoles", []):
+    print(role)
+PY
+)
+for index in "${!database_roles[@]}"; do database_roles[index]=${database_roles[index]%$'\r'}; done
 
 if [[ $has_objects == True ]]; then
   if [[ -z $restore_object_directory ]]; then
@@ -332,6 +362,25 @@ PY
 fi
 
 docker_touched=1
+for role in "${database_roles[@]}"; do
+  docker exec "$target_database_container" psql --username "$database_user" --dbname "$database_name" \
+    --set ON_ERROR_STOP=1 --quiet --command "
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$role') THEN
+    CREATE ROLE \"$role\" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_roles WHERE rolname = '$role'
+      AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole
+      AND NOT rolinherit AND NOT rolreplication AND NOT rolbypassrls
+      AND NOT EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.roleid = pg_roles.oid OR m.member = pg_roles.oid)
+  ) THEN
+    RAISE EXCEPTION 'RESTORE_DATABASE_ROLE_UNSAFE:$role';
+  END IF;
+END
+\$\$;" >/dev/null
+done
 docker cp "$stage/database.dump" "$target_database_container:$container_dump"
 docker exec "$target_database_container" pg_restore --clean --if-exists --no-owner --no-acl \
   --exit-on-error --username "$database_user" --dbname "$database_name" "$container_dump"

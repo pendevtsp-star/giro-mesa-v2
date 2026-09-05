@@ -281,6 +281,52 @@ if [[ -n $database_integrity_violations ]]; then
   echo "BACKUP_DATABASE_INTEGRITY_INVALID:$database_integrity_violations" >&2
   exit 1
 fi
+database_roles_file="$backup_directory/database-roles.json"
+if ! docker exec "$database_container" psql \
+  --username "$database_user" --dbname "$database_name" --no-psqlrc \
+  --tuples-only --no-align --set ON_ERROR_STOP=1 --command "
+WITH policy_role_names AS (
+  SELECT DISTINCT policy_role::text AS name
+  FROM pg_policies
+  CROSS JOIN LATERAL unnest(roles) AS policy_role
+  WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+), policy_roles AS (
+  SELECT r.rolname AS name, r.rolcanlogin AS can_login, r.rolsuper AS superuser,
+    r.rolcreatedb AS create_db, r.rolcreaterole AS create_role, r.rolinherit AS inherit_role,
+    r.rolreplication AS replication, r.rolbypassrls AS bypass_rls,
+    EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.roleid = r.oid OR m.member = r.oid) AS has_membership
+  FROM pg_roles r
+  JOIN policy_role_names p ON p.name = r.rolname
+  WHERE r.rolname <> 'public'
+)
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'name', name, 'canLogin', can_login, 'superuser', superuser,
+  'createDb', create_db, 'createRole', create_role, 'inherit', inherit_role,
+  'replication', replication, 'bypassRls', bypass_rls, 'hasMembership', has_membership
+) ORDER BY name), '[]'::jsonb)
+FROM policy_roles;" >"$database_roles_file"; then
+  echo "BACKUP_DATABASE_ROLES_FAILED" >&2
+  exit 1
+fi
+python3 - "$database_roles_file" <<'PY'
+import json, pathlib, re, sys
+try:
+    roles = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+except Exception:
+    raise SystemExit("BACKUP_DATABASE_ROLES_INVALID")
+expected = {"name", "canLogin", "superuser", "createDb", "createRole", "inherit", "replication", "bypassRls", "hasMembership"}
+seen = set()
+if not isinstance(roles, list):
+    raise SystemExit("BACKUP_DATABASE_ROLES_INVALID")
+for role in roles:
+    name = role.get("name") if isinstance(role, dict) else None
+    flags = [role.get(key) for key in expected - {"name"}] if isinstance(role, dict) else []
+    if (not isinstance(role, dict) or set(role) != expected or not isinstance(name, str)
+            or not re.fullmatch(r"giromesa_[a-z0-9_]{1,54}", name)
+            or name in seen or any(value is not False for value in flags)):
+        raise SystemExit("BACKUP_DATABASE_ROLES_INVALID")
+    seen.add(name)
+PY
 docker exec "$database_container" pg_dump \
   --format=custom --compress=6 --no-owner --no-acl \
   --username "$database_user" --dbname "$database_name" --file "$container_dump"
@@ -393,6 +439,7 @@ import base64, hashlib, hmac, json, os, pathlib, sys
 root = pathlib.Path(root_raw)
 kind_by_name = {
     "database.dump": "postgresql",
+    "database-roles.json": "postgresql_roles",
     "objects.zip": "objects",
     "configuration.age": "encrypted_configuration",
     "configuration.gpg": "encrypted_configuration",

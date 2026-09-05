@@ -395,6 +395,7 @@ try {
 
   $allowed = @{
     'database.dump' = 'postgresql'; 'objects.zip' = 'objects'
+    'database-roles.json' = 'postgresql_roles'
     'configuration.age' = 'encrypted_configuration'; 'configuration.gpg' = 'encrypted_configuration'
     'configuration.enc' = 'encrypted_configuration'
   }
@@ -415,6 +416,32 @@ try {
     Copy-VerifiedFileToStage -Source $candidate -Destination $stagedFile -ExpectedBytes ([long]$file.bytes) -ExpectedSha256 ([string]$file.sha256)
   }
   if ($databaseFileCount -ne 1) { throw 'BACKUP_DATABASE_FILE_INVALID' }
+
+  $databaseRoles = @()
+  $databaseRolesPath = Join-Path $stage 'database-roles.json'
+  if (Test-Path -LiteralPath $databaseRolesPath) {
+    $roleText = Read-SafeUtf8Text -Path $databaseRolesPath
+    if (-not $roleText.TrimStart().StartsWith('[', [StringComparison]::Ordinal)) { throw 'BACKUP_DATABASE_ROLES_INVALID' }
+    try {
+      $parsedRoles = ConvertFrom-Json -InputObject $roleText
+      $roleDocument = @($parsedRoles)
+    }
+    catch { throw 'BACKUP_DATABASE_ROLES_INVALID' }
+    $seenRoles = @{}
+    $expectedRoleProperties = @('bypassRls', 'canLogin', 'createDb', 'createRole', 'hasMembership', 'inherit', 'name', 'replication', 'superuser')
+    foreach ($role in $roleDocument) {
+      $name = [string]$role.name
+      $properties = @($role.PSObject.Properties.Name | Sort-Object)
+      $flags = @($role.canLogin, $role.superuser, $role.createDb, $role.createRole, $role.hasMembership, $role.inherit, $role.replication, $role.bypassRls)
+      if (($properties -join ',') -cne ($expectedRoleProperties -join ',') -or
+        $name -notmatch '^giromesa_[a-z0-9_]{1,54}$' -or $seenRoles.ContainsKey($name) -or
+        @($flags | Where-Object { $_ -isnot [bool] -or $_ }).Count -ne 0) {
+        throw 'BACKUP_DATABASE_ROLES_INVALID'
+      }
+      $seenRoles[$name] = $true
+      $databaseRoles += $name
+    }
+  }
 
   $objects = Join-Path $stage 'objects.zip'
   $stagedObjects = Join-Path $stage 'objects'
@@ -466,6 +493,10 @@ try {
 
   $databaseDump = Join-Path $stage 'database.dump'
   $dockerTouched = $true
+  foreach ($databaseRole in $databaseRoles) {
+    $roleSql = "DO `$`$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$databaseRole') THEN CREATE ROLE `"$databaseRole`" NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS; END IF; IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '$databaseRole' AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolinherit AND NOT rolreplication AND NOT rolbypassrls AND NOT EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.roleid = pg_roles.oid OR m.member = pg_roles.oid)) THEN RAISE EXCEPTION 'RESTORE_DATABASE_ROLE_UNSAFE:$databaseRole'; END IF; END `$`$;"
+    Invoke-CheckedDocker -Arguments @('exec', $TargetDatabaseContainer, 'psql', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--set', 'ON_ERROR_STOP=1', '--quiet', '--command', $roleSql)
+  }
   Invoke-CheckedDocker -Arguments @('cp', $databaseDump, "${TargetDatabaseContainer}:${containerDump}")
   Invoke-CheckedDocker -Arguments @('exec', $TargetDatabaseContainer, 'pg_restore', '--clean', '--if-exists', '--no-owner', '--no-acl', '--exit-on-error', '--username', $DatabaseUser, '--dbname', $DatabaseName, $containerDump)
   Invoke-CheckedDocker -Arguments @('exec', $TargetDatabaseContainer, 'psql', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--set', 'ON_ERROR_STOP=1', '--tuples-only', '--command', 'SELECT 1')

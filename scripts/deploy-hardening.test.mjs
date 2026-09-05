@@ -170,6 +170,63 @@ test("Linux restore rejects a forged manifest before Docker", () => {
   }
 });
 
+test("Linux restore rejects a signed privileged database role before Docker", () => {
+  const directory = mkdtempSync(join(tmpdir(), "giromesa-linux-restore-role-negative-"));
+  const key = Buffer.alloc(32, 19);
+  try {
+    const dump = Buffer.from("not-a-real-dump\n");
+    const roles = Buffer.from(JSON.stringify([{
+      name: "giromesa_dr_policy",
+      canLogin: false,
+      superuser: true,
+      createDb: false,
+      createRole: false,
+      hasMembership: false,
+      inherit: false,
+      replication: false,
+      bypassRls: false,
+    }]));
+    writeFileSync(join(directory, "database.dump"), dump);
+    writeFileSync(join(directory, "database-roles.json"), roles);
+    signedManifest(
+      directory,
+      {
+        schemaVersion: 2,
+        backupId: "privileged-role",
+        artifact: `git:${"1".repeat(40)}`,
+        migrationId: "0029_platform_incident_projection_actions",
+        coverage: { mode: "embedded", database: true, objects: true, encryptedConfiguration: true },
+        runtimeConfigurationHmacSha256: "0".repeat(64),
+        sourceDatabaseContainer: "source-container",
+        databaseName: "giromesa",
+        declaredRpoMinutes: 5,
+        files: [
+          { path: "database.dump", kind: "postgresql", bytes: dump.length, sha256: createHash("sha256").update(dump).digest("hex") },
+          { path: "database-roles.json", kind: "postgresql_roles", bytes: roles.length, sha256: createHash("sha256").update(roles).digest("hex") },
+        ],
+      },
+      key,
+    );
+    const result = run(
+      restoreScript,
+      [
+        "--backup-directory", directory,
+        "--target-database-container", "container-that-must-not-run",
+        "--database-name", "giromesa",
+        "--database-user", "giromesa",
+        "--expected-artifact", `git:${"1".repeat(40)}`,
+        "--expected-source-migration-id", "0029_platform_incident_projection_actions",
+      ],
+      { GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: key.toString("base64") },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(output(result), /BACKUP_DATABASE_ROLES_INVALID/);
+    assert.doesNotMatch(output(result), /container-that-must-not-run.*No such container/i);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("Linux restore rejects signed path traversal before Docker", () => {
   const directory = mkdtempSync(join(tmpdir(), "giromesa-linux-restore-traversal-"));
   const key = Buffer.alloc(32, 19);

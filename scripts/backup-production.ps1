@@ -309,6 +309,51 @@ try {
     try { $runtimeSource.CopyTo($runtimeTarget); $runtimeTarget.Flush($true) } finally { $runtimeTarget.Dispose() }
   } finally { $runtimeSource.Dispose() }
   if ((Get-Sha256Hex -Path $runtimeSnapshot) -cne $runtimeEnvState.Sha256) { throw 'BACKUP_RUNTIME_ENV_CHANGED' }
+  $databaseRolesPath = Join-Path $backupDirectory 'database-roles.json'
+  $databaseRolesSql = @'
+WITH policy_role_names AS (
+  SELECT DISTINCT policy_role::text AS name
+  FROM pg_policies
+  CROSS JOIN LATERAL unnest(roles) AS policy_role
+  WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+), policy_roles AS (
+  SELECT r.rolname AS name, r.rolcanlogin AS can_login, r.rolsuper AS superuser,
+    r.rolcreatedb AS create_db, r.rolcreaterole AS create_role, r.rolinherit AS inherit_role,
+    r.rolreplication AS replication, r.rolbypassrls AS bypass_rls,
+    EXISTS (SELECT 1 FROM pg_auth_members m WHERE m.roleid = r.oid OR m.member = r.oid) AS has_membership
+  FROM pg_roles r
+  JOIN policy_role_names p ON p.name = r.rolname
+  WHERE r.rolname <> 'public'
+)
+SELECT COALESCE(jsonb_agg(jsonb_build_object(
+  'name', name, 'canLogin', can_login, 'superuser', superuser,
+  'createDb', create_db, 'createRole', create_role, 'inherit', inherit_role,
+  'replication', replication, 'bypassRls', bypass_rls, 'hasMembership', has_membership
+) ORDER BY name), '[]'::jsonb)
+FROM policy_roles;
+'@
+  $databaseRolesJson = (& docker exec $DatabaseContainer psql --username $DatabaseUser --dbname $DatabaseName --no-psqlrc --tuples-only --no-align --set ON_ERROR_STOP=1 --command $databaseRolesSql) -join "`n"
+  if ($LASTEXITCODE -ne 0) { throw 'BACKUP_DATABASE_ROLES_FAILED' }
+  if (-not $databaseRolesJson.TrimStart().StartsWith('[', [StringComparison]::Ordinal)) { throw 'BACKUP_DATABASE_ROLES_INVALID' }
+  try {
+    $parsedRoles = ConvertFrom-Json -InputObject $databaseRolesJson
+    $databaseRoles = @($parsedRoles)
+  }
+  catch { throw 'BACKUP_DATABASE_ROLES_INVALID' }
+  $seenRoles = @{}
+  $expectedRoleProperties = @('bypassRls', 'canLogin', 'createDb', 'createRole', 'hasMembership', 'inherit', 'name', 'replication', 'superuser')
+  foreach ($role in $databaseRoles) {
+    $name = [string]$role.name
+    $properties = @($role.PSObject.Properties.Name | Sort-Object)
+    $flags = @($role.canLogin, $role.superuser, $role.createDb, $role.createRole, $role.hasMembership, $role.inherit, $role.replication, $role.bypassRls)
+    if (($properties -join ',') -cne ($expectedRoleProperties -join ',') -or
+      $name -notmatch '^giromesa_[a-z0-9_]{1,54}$' -or $seenRoles.ContainsKey($name) -or
+      @($flags | Where-Object { $_ -isnot [bool] -or $_ }).Count -ne 0) {
+      throw 'BACKUP_DATABASE_ROLES_INVALID'
+    }
+    $seenRoles[$name] = $true
+  }
+  [IO.File]::WriteAllText($databaseRolesPath, $databaseRolesJson.Trim() + "`n", [Text.UTF8Encoding]::new($false))
   $databaseDump = Join-Path $backupDirectory 'database.dump'
   $dockerTouched = $true
   Invoke-CheckedDocker -Arguments @('exec', $DatabaseContainer, 'pg_dump', '--format=custom', '--compress=6', '--no-owner', '--no-acl', '--username', $DatabaseUser, '--dbname', $DatabaseName, '--file', $containerDump)
@@ -327,6 +372,7 @@ try {
 
   $files = [System.Collections.ArrayList]::new()
   Add-BackupFile -Files $files -Root $backupDirectory -Path $databaseDump -Kind 'postgresql'
+  Add-BackupFile -Files $files -Root $backupDirectory -Path $databaseRolesPath -Kind 'postgresql_roles'
   $objectArchive = Join-Path $backupDirectory 'objects.zip'
   if (Test-Path -LiteralPath $objectArchive) { Add-BackupFile -Files $files -Root $backupDirectory -Path $objectArchive -Kind 'objects' }
   Get-ChildItem -LiteralPath $backupDirectory -File -Filter 'configuration.*' | ForEach-Object {
