@@ -59931,14 +59931,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          status:
-            | "placed"
-            | "confirmed"
-            | "preparing"
-            | "ready"
-            | "dispatched"
-            | "completed"
-            | "canceled";
+          status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled";
         };
       };
     };
@@ -59965,14 +59958,7 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          status:
-            | "placed"
-            | "confirmed"
-            | "preparing"
-            | "ready"
-            | "dispatched"
-            | "completed"
-            | "canceled";
+          status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled";
         };
       };
     };
@@ -59999,6 +59985,7 @@ export interface operations {
       content: {
         "application/json": {
           courierReference: string;
+          coverageOverrideReason?: string;
           idempotencyKey: string;
         };
       };
@@ -60026,6 +60013,7 @@ export interface operations {
       content: {
         "application/json": {
           courierReference: string;
+          coverageOverrideReason?: string;
           idempotencyKey: string;
         };
       };

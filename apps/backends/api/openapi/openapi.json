@@ -116410,7 +116410,6 @@
                       "confirmed",
                       "preparing",
                       "ready",
-                      "dispatched",
                       "completed",
                       "canceled"
                     ]
@@ -116468,7 +116467,6 @@
                       "confirmed",
                       "preparing",
                       "ready",
-                      "dispatched",
                       "completed",
                       "canceled"
                     ]
@@ -116523,6 +116521,11 @@
                     "type": "string",
                     "minLength": 2,
                     "maxLength": 160
+                  },
+                  "coverageOverrideReason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
                   },
                   "idempotencyKey": {
                     "type": "string",
@@ -116580,6 +116583,11 @@
                     "type": "string",
                     "minLength": 2,
                     "maxLength": 160
+                  },
+                  "coverageOverrideReason": {
+                    "type": "string",
+                    "minLength": 10,
+                    "maxLength": 500
                   },
                   "idempotencyKey": {
                     "type": "string",
