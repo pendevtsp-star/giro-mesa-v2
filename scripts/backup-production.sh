@@ -252,6 +252,35 @@ finally: os.close(fd)
 print(hashlib.sha256(encoded).hexdigest(),end="")
 PY
 )
+if ! database_integrity_violations=$(docker exec "$database_container" psql \
+  --username "$database_user" --dbname "$database_name" --no-psqlrc \
+  --tuples-only --no-align --set ON_ERROR_STOP=1 --command "
+SELECT relation || ':' || orphan_count
+FROM (
+  SELECT 'auth_sessions.identity_id' AS relation, count(*) AS orphan_count
+  FROM public.auth_sessions child
+  WHERE NOT EXISTS (SELECT 1 FROM public.identities parent WHERE parent.id = child.identity_id)
+  UNION ALL
+  SELECT 'oauth_accounts.identity_id', count(*)
+  FROM public.oauth_accounts child
+  WHERE NOT EXISTS (SELECT 1 FROM public.identities parent WHERE parent.id = child.identity_id)
+  UNION ALL
+  SELECT 'password_credentials.identity_id', count(*)
+  FROM public.password_credentials child
+  WHERE NOT EXISTS (SELECT 1 FROM public.identities parent WHERE parent.id = child.identity_id)
+) violations
+WHERE orphan_count > 0
+ORDER BY relation;"); then
+  echo "BACKUP_DATABASE_INTEGRITY_CHECK_FAILED" >&2
+  exit 1
+fi
+database_integrity_violations=${database_integrity_violations//$'\r'/}
+database_integrity_violations=${database_integrity_violations//$'\n'/,}
+database_integrity_violations=${database_integrity_violations%,}
+if [[ -n $database_integrity_violations ]]; then
+  echo "BACKUP_DATABASE_INTEGRITY_INVALID:$database_integrity_violations" >&2
+  exit 1
+fi
 docker exec "$database_container" pg_dump \
   --format=custom --compress=6 --no-owner --no-acl \
   --username "$database_user" --dbname "$database_name" --file "$container_dump"

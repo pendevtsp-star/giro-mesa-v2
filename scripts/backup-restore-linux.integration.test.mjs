@@ -104,7 +104,17 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
       "-v",
       "ON_ERROR_STOP=1",
       "-c",
-      "CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL); INSERT INTO dr_probe VALUES (1, 'linux-ok');",
+      `CREATE TABLE dr_probe (id integer PRIMARY KEY, payload text NOT NULL);
+       CREATE TABLE identities (id uuid PRIMARY KEY);
+       CREATE TABLE auth_sessions (identity_id uuid NOT NULL REFERENCES identities(id));
+       CREATE TABLE oauth_accounts (identity_id uuid NOT NULL REFERENCES identities(id));
+       CREATE TABLE password_credentials (identity_id uuid NOT NULL REFERENCES identities(id));
+       INSERT INTO dr_probe VALUES (1, 'linux-ok');
+       SET session_replication_role = replica;
+       INSERT INTO auth_sessions VALUES ('00000000-0000-0000-0000-000000000001');
+       INSERT INTO oauth_accounts VALUES ('00000000-0000-0000-0000-000000000001');
+       INSERT INTO password_credentials VALUES ('00000000-0000-0000-0000-000000000001');
+       RESET session_replication_role;`,
     ]);
 
     const env = {
@@ -113,38 +123,59 @@ test("Linux backup and restore round-trip database, objects, encrypted config an
       TMPDIR: path(directory),
       GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: manifestKey,
     };
-    const backupDirectory = run(
-      bash,
-      [
-        backupScript,
-        "--database-container",
-        source,
-        "--database-name",
-        "giromesa",
-        "--database-user",
-        "giromesa",
-        "--output-directory",
-        path(backupRoot),
-        "--source-artifact",
-        artifact,
-        "--source-migration-id",
-        "0029_platform_incident_projection_actions",
-        "--target-artifact",
-        targetArtifact,
-        "--target-migration-id",
-        "0029_platform_incident_projection_actions",
-        "--object-directory",
-        path(objectSource),
-        "--runtime-env-file",
-        path(runtimeEnv),
-      ],
-      {
-        env: {
-          ...env,
-          GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
-        },
-      },
-    )
+    const backupArgs = [
+      backupScript,
+      "--database-container",
+      source,
+      "--database-name",
+      "giromesa",
+      "--database-user",
+      "giromesa",
+      "--output-directory",
+      path(backupRoot),
+      "--source-artifact",
+      artifact,
+      "--source-migration-id",
+      "0029_platform_incident_projection_actions",
+      "--target-artifact",
+      targetArtifact,
+      "--target-migration-id",
+      "0029_platform_incident_projection_actions",
+      "--object-directory",
+      path(objectSource),
+      "--runtime-env-file",
+      path(runtimeEnv),
+    ];
+    const backupEnv = {
+      ...env,
+      GIROMESA_BACKUP_CONFIG_ENCRYPTION_KEY_BASE64: Buffer.alloc(32, 19).toString("base64"),
+    };
+    const rejectedBackup = spawnSync(bash, backupArgs, {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: backupEnv,
+    });
+    assert.notEqual(rejectedBackup.status, 0);
+    assert.match(
+      rejectedBackup.stderr,
+      /BACKUP_DATABASE_INTEGRITY_INVALID:auth_sessions\.identity_id:1,oauth_accounts\.identity_id:1,password_credentials\.identity_id:1/,
+    );
+    run("docker", [
+      "exec",
+      source,
+      "psql",
+      "-U",
+      "giromesa",
+      "-d",
+      "giromesa",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "TRUNCATE auth_sessions, oauth_accounts, password_credentials;",
+    ]);
+    const backupDirectory = run(bash, backupArgs, {
+      env: backupEnv,
+    })
       .split(/\r?\n/)
       .at(-1);
     assert.ok(backupDirectory);
