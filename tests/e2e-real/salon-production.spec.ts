@@ -1360,19 +1360,21 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
     });
   expect(formColumns).toBe(3);
   expect(Math.min(...fieldFillRatios)).toBeGreaterThan(0.95);
-  expect(
-    Math.abs(
-      (nameBounds?.y ?? 0) +
-        (nameBounds?.height ?? 0) -
-        ((actionBounds?.y ?? 0) + (actionBounds?.height ?? 0)),
-    ),
-  ).toBeLessThan(2);
+  expect(Math.abs((nameBounds?.y ?? 0) - (actionBounds?.y ?? 0))).toBeLessThan(2);
   expect(searchWidthRatio).toBeGreaterThan(0.9);
   await page.setViewportSize({ width: 375, height: 812 });
 
   await page.getByText("Prazo e identificação").click();
   await expect(page.getByLabel("Data")).toHaveAttribute("type", "date");
   await expect(page.getByLabel("Telefone")).toBeVisible();
+
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const [dateBounds, timeBounds] = await Promise.all([
+    page.getByLabel("Data").boundingBox(),
+    page.getByLabel("Hora").boundingBox(),
+  ]);
+  expect(Math.abs((dateBounds?.y ?? 0) - (timeBounds?.y ?? 0))).toBeLessThan(2);
+  await page.setViewportSize({ width: 375, height: 812 });
 
   for (const viewport of [
     { width: 375, height: 812 },

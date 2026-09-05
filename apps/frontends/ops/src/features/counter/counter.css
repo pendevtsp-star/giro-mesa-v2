@@ -37,7 +37,7 @@
   .counter-operation .counter-quick-open-card {
     background: var(--gm-surface);
     border-color: var(--gm-border);
-    padding: clamp(16px, 2.2vw, 24px);
+    padding: clamp(12px, 1.7vw, 20px);
   }
 
   .counter-quick-open-header {
@@ -47,8 +47,8 @@
     flex-wrap: wrap;
     gap: 10px;
     justify-content: space-between;
-    margin-bottom: 16px;
-    padding-bottom: 14px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
   }
 
   .counter-quick-open-header > div:first-child {
@@ -80,8 +80,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+    grid-column: 1 / -1;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     width: 100%;
   }
 
@@ -155,8 +156,10 @@
   }
 
   .counter-operation--idle .counter-open-form > .gm-button {
+    align-self: start;
     grid-column: 3;
     grid-row: 1;
+    margin-top: var(--gm-space-5);
     min-width: 160px;
     width: auto;
   }
@@ -179,9 +182,9 @@
     border: 1px solid var(--gm-border);
     border-radius: 10px;
     display: grid;
-    gap: 12px;
-    grid-template-columns: minmax(220px, 0.8fr) minmax(260px, 1fr) minmax(420px, 1.4fr);
-    padding: 12px;
+    gap: 10px;
+    grid-template-columns: minmax(180px, 0.85fr) minmax(220px, 1fr) minmax(360px, 1.25fr);
+    padding: 10px;
   }
 
   .counter-open-advanced > div > .promised-at-field {
@@ -198,6 +201,7 @@
 
   .counter-notification-consent {
     align-items: center;
+    align-self: end;
     display: flex;
     gap: 8px;
     min-height: 38px;
@@ -1626,6 +1630,17 @@
     }
   }
 
+  @container counter-operation (max-width: 1050px) {
+    .counter-open-advanced > div {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .counter-open-advanced > div > .promised-at-field,
+    .counter-open-advanced > div > .inline-form__wide {
+      grid-column: 1 / -1;
+    }
+  }
+
   @container counter-operation (max-width: 930px) {
     .ops-layout.counter-operation--selected {
       display: block;
@@ -1663,7 +1678,7 @@
 
   @container counter-operation (max-width: 760px) {
     .counter-operation--idle .counter-open-form {
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+      grid-template-columns: minmax(0, 1fr);
     }
 
     :where(.counter-operation--idle .counter-open-form > .counter-field) {
@@ -1680,8 +1695,26 @@
     }
 
     .counter-operation--idle .counter-open-form > .gm-button {
+      align-self: stretch;
       grid-column: 1 / -1;
       grid-row: auto;
+      margin-top: 0;
+      width: 100%;
+    }
+
+    .counter-quick-open-header {
+      align-items: stretch;
+    }
+
+    .counter-quick-presets {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+      width: 100%;
+    }
+
+    .counter-quick-presets .gm-button {
+      min-width: 0;
+      padding-inline: 8px;
       width: 100%;
     }
   }
@@ -1716,6 +1749,15 @@
     .counter-open-advanced > div > .promised-at-field,
     .counter-open-advanced > div > .inline-form__wide {
       grid-column: auto;
+    }
+
+    .counter-open-advanced > div > .promised-at-field {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .promised-at-field__legend-row {
+      align-items: flex-start;
+      flex-direction: column;
     }
 
     .counter-operation .ops-tab-list {
