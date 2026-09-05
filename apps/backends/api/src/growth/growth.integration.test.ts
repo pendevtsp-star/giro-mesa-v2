@@ -344,7 +344,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
         growth.createDeliveryOrder(identityA.id, organizationA.id, {
           ...deliveryInput,
           fulfillment: "pickup",
-          idempotencyKey: "delivery-fulfillment-mismatch-0001",
+          idempotencyKey: "samekey1",
         }),
       hasCode("DELIVERY_FULFILLMENT_MISMATCH"),
     );
