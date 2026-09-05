@@ -22,6 +22,7 @@ export const OPERATIONAL_CAPABILITIES = [
   "operations:tabs:open",
   "operations:reception:manage",
   "operations:reception:seat",
+  "operations:delivery:operate",
   "operations:tables:turnover",
   "operations:floor:manage",
   "operations:shift:manage",
@@ -100,7 +101,7 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
   ],
   busser: ["tables:read", "customer_calls:write", "operations:tables:turnover"],
   kds: ["kds:write", "orders:read", "availability:write", "operations:printing:request"],
-  delivery: ["orders:read", "orders:write"],
+  delivery: ["orders:read", "orders:write", "operations:delivery:operate"],
   inventory: [
     "inventory:write",
     "inventory:nfe:import",

@@ -86,6 +86,7 @@ export type DeliveryOrderStatus =
   | "dispatched"
   | "completed"
   | "canceled";
+export type DeliveryAddressValidationStatus = "covered" | "unchecked" | "unavailable";
 
 export interface DeliveryOrder {
   id: string;
@@ -101,6 +102,7 @@ export interface DeliveryOrder {
   paymentMethod: string;
   paymentStatus: string;
   address: DeliveryAddress | null;
+  addressValidationStatus: DeliveryAddressValidationStatus;
   scheduledFor: string | null;
   promisedAt: string | null;
   createdAt: string;
@@ -235,7 +237,10 @@ function deliveryNotifications(value: unknown): DeliveryNotification[] {
 export function parseDeliveryOrders(value: unknown): DeliveryOrder[] {
   return records(value).map((row) => {
     const fulfillment = text(row.fulfillment);
+    const addressValidationStatus = text(row.addressValidationStatus);
     if (fulfillment !== "delivery" && fulfillment !== "pickup")
+      throw new InvalidGrowthPayloadError();
+    if (!["covered", "unchecked", "unavailable"].includes(addressValidationStatus))
       throw new InvalidGrowthPayloadError();
     return {
       id: text(row.id),
@@ -251,6 +256,7 @@ export function parseDeliveryOrders(value: unknown): DeliveryOrder[] {
       paymentMethod: text(row.paymentMethod),
       paymentStatus: text(row.paymentStatus),
       address: address(row.address),
+      addressValidationStatus: addressValidationStatus as DeliveryAddressValidationStatus,
       scheduledFor: optionalText(row.scheduledFor),
       promisedAt: optionalText(row.promisedAt),
       createdAt: text(row.createdAt),

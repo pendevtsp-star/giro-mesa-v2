@@ -9,8 +9,10 @@ import {
   customerUpdateSchema,
   deliveryOrderQuerySchema,
   deliveryOrderSchema,
+  deliveryTransitionSchema,
   deliveryZoneSchema,
   deliveryZoneUpdateSchema,
+  dispatchSchema,
   evolutionConfigurationSchema,
   evolutionWebhookSchema,
   publicCouponValidationSchema,
@@ -93,6 +95,23 @@ describe("growth API boundaries", () => {
     assert.equal(deliveryOrderQuerySchema.parse({ sla: "overdue" }).sla, "overdue");
     assert.equal(deliveryOrderQuerySchema.safeParse({ sla: "late" }).success, false);
     assert.equal(deliveryOrderQuerySchema.safeParse({ unknown: "value" }).success, false);
+    assert.equal(deliveryTransitionSchema.safeParse({ status: "dispatched" }).success, false);
+    assert.equal(
+      dispatchSchema.safeParse({
+        courierReference: "moto-01",
+        coverageOverrideReason: "  Conferido por telefone com o cliente.  ",
+        idempotencyKey: "delivery-dispatch-0001",
+      }).data?.coverageOverrideReason,
+      "Conferido por telefone com o cliente.",
+    );
+    assert.equal(
+      dispatchSchema.safeParse({
+        courierReference: "moto-01",
+        coverageOverrideReason: "curto",
+        idempotencyKey: "delivery-dispatch-0002",
+      }).success,
+      false,
+    );
   });
 
   it("validates delivery SLA and reuses the shared address contract", () => {

@@ -6659,14 +6659,7 @@ export const api = {
     transitionDelivery: (
       organizationId: string,
       orderId: string,
-      status:
-        | "placed"
-        | "confirmed"
-        | "preparing"
-        | "ready"
-        | "dispatched"
-        | "completed"
-        | "canceled",
+      status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled",
     ) =>
       request<unknown>(
         growthPath(organizationId, `delivery-orders/${encodeURIComponent(orderId)}/status`),
@@ -6675,7 +6668,11 @@ export const api = {
     dispatchDelivery: (
       organizationId: string,
       orderId: string,
-      body: { courierReference: string; idempotencyKey: string },
+      body: {
+        courierReference: string;
+        coverageOverrideReason?: string;
+        idempotencyKey: string;
+      },
     ) =>
       request<unknown>(
         growthPath(organizationId, `delivery-orders/${encodeURIComponent(orderId)}/dispatch`),

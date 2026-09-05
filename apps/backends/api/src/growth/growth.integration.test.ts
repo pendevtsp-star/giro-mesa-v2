@@ -3,6 +3,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   auditEvents,
+  deliveryOrderStatusHistory,
   deliveryOrders,
   identities,
   memberships,
@@ -62,16 +63,17 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       ])
       .returning();
     assert.ok(unitA && unitB);
-    const [identityA, identityB, deliveryIdentity] = await database.db
+    const [identityA, identityB, deliveryIdentity, waiterIdentity] = await database.db
       .insert(identities)
       .values([
         { email: `growth-a-${randomUUID()}@example.test`, displayName: "Owner A" },
         { email: `growth-b-${randomUUID()}@example.test`, displayName: "Owner B" },
         { email: `growth-delivery-${randomUUID()}@example.test`, displayName: "Delivery A" },
+        { email: `growth-waiter-${randomUUID()}@example.test`, displayName: "Waiter A" },
       ])
       .returning();
-    assert.ok(identityA && identityB && deliveryIdentity);
-    const [membershipA, membershipB, deliveryMembership] = await database.db
+    assert.ok(identityA && identityB && deliveryIdentity && waiterIdentity);
+    const [membershipA, membershipB, deliveryMembership, waiterMembership] = await database.db
       .insert(memberships)
       .values([
         { identityId: identityA.id, organizationId: organizationA.id, status: "active" },
@@ -81,13 +83,19 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
           organizationId: organizationA.id,
           status: "active",
         },
+        {
+          identityId: waiterIdentity.id,
+          organizationId: organizationA.id,
+          status: "active",
+        },
       ])
       .returning();
-    assert.ok(membershipA && membershipB && deliveryMembership);
+    assert.ok(membershipA && membershipB && deliveryMembership && waiterMembership);
     await database.db.insert(roleBindings).values([
       { membershipId: membershipA.id, role: "owner" },
       { membershipId: membershipB.id, role: "owner" },
       { membershipId: deliveryMembership.id, unitId: unitA.id, role: "delivery" },
+      { membershipId: waiterMembership.id, unitId: unitA.id, role: "waiter" },
     ]);
 
     await assert.rejects(
@@ -285,7 +293,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       feeCents: 900,
       minimumOrderCents: 4_500,
       estimatedDeliveryMinutes: 60,
-      geometry: { type: "Polygon", coordinates: [[[-46.7, -23.6]]] },
+      geometry: { type: "circle", center: [-46.65, -23.56], radiusKm: 5 },
       active: false,
     });
     assert.equal(disabledZone.active, false);
@@ -297,6 +305,9 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
         unitId: unitA.id,
         openedByIdentityId: identityA.id,
         label: "Delivery integration",
+        fulfillmentType: "delivery",
+        customerName: "Maria da comanda",
+        customerPhone: "11988880000",
         subtotalCents: 5_000,
         totalCents: 5_000,
       })
@@ -315,6 +326,8 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
         city: "Sao Paulo",
         state: "SP",
         postalCode: "01001-000",
+        latitude: -23.56,
+        longitude: -46.65,
       },
       idempotencyKey: "delivery-order-0001",
     };
@@ -326,6 +339,15 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       active: true,
     });
     assert.equal(activeZone.active, true);
+    await assert.rejects(
+      () =>
+        growth.createDeliveryOrder(identityA.id, organizationA.id, {
+          ...deliveryInput,
+          fulfillment: "pickup",
+          idempotencyKey: "delivery-fulfillment-mismatch-0001",
+        }),
+      hasCode("DELIVERY_FULFILLMENT_MISMATCH"),
+    );
     const deliveryCreatedAt = Date.now();
     const delivery = await growth.createDeliveryOrder(
       identityA.id,
@@ -342,6 +364,9 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     assert.equal(delivery.order.subtotalCents, 5_000);
     assert.equal(delivery.order.deliveryFeeCents, 900);
     assert.equal(delivery.order.totalCents, 5_900);
+    assert.equal(delivery.order.customerName, "Maria da comanda");
+    assert.equal(delivery.order.customerPhone, "+5511988880000");
+    assert.equal(delivery.order.addressValidationStatus, "covered");
     assert.ok(delivery.order.promisedAt);
     assert.ok(delivery.order.promisedAt.getTime() >= deliveryCreatedAt + 59 * 60_000);
     assert.ok(delivery.order.promisedAt.getTime() <= Date.now() + 61 * 60_000);
@@ -354,20 +379,139 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       );
       assert.equal(updated.status, status);
     }
-    const dispatch = await growth.dispatchDelivery(
-      identityA.id,
-      organizationA.id,
-      delivery.order.id,
-      { courierReference: "courier-42", idempotencyKey: "delivery-dispatch-0001" },
+    await assert.rejects(
+      () =>
+        growth.transitionDelivery(identityA.id, organizationA.id, delivery.order.id, {
+          status: "dispatched",
+        } as never),
+      hasCode("DELIVERY_DISPATCH_ENDPOINT_REQUIRED"),
     );
-    const replayedDispatch = await growth.dispatchDelivery(
-      identityA.id,
-      organizationA.id,
-      delivery.order.id,
-      { courierReference: "courier-42", idempotencyKey: "delivery-dispatch-0001" },
+    await assert.rejects(
+      () =>
+        growth.dispatchDelivery(waiterIdentity.id, organizationA.id, delivery.order.id, {
+          courierReference: "courier-42",
+          idempotencyKey: "delivery-dispatch-waiter-0001",
+        }),
+      hasCode("GROWTH_CAPABILITY_DENIED"),
     );
+    await assert.rejects(
+      () =>
+        growth.listDeliveryOrders(waiterIdentity.id, organizationA.id, unitA.id, {
+          limit: 10,
+        }),
+      hasCode("GROWTH_CAPABILITY_DENIED"),
+    );
+    const concurrentDispatches = await Promise.all(
+      [0, 1].map(() =>
+        growth.dispatchDelivery(identityA.id, organizationA.id, delivery.order.id, {
+          courierReference: "courier-42",
+          idempotencyKey: "delivery-dispatch-0001",
+        }),
+      ),
+    );
+    const dispatch = concurrentDispatches.find((result) => !result.duplicate);
+    const replayedDispatch = concurrentDispatches.find((result) => result.duplicate);
+    assert.ok(dispatch && replayedDispatch);
     assert.equal(replayedDispatch.duplicate, true);
     assert.equal(replayedDispatch.dispatch.id, dispatch.dispatch.id);
+    assert.equal(replayedDispatch.order.status, "dispatched");
+    const [uncheckedTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        openedByIdentityId: identityA.id,
+        label: "Delivery sem coordenadas",
+        fulfillmentType: "delivery",
+        subtotalCents: 5_000,
+        totalCents: 5_000,
+      })
+      .returning();
+    assert.ok(uncheckedTab);
+    const uncheckedDelivery = await growth.createDeliveryOrder(identityA.id, organizationA.id, {
+      ...deliveryInput,
+      orderRef: uncheckedTab.id,
+      address: {
+        street: "Rua sem coordenadas",
+        number: "20",
+        neighborhood: "Centro",
+        city: "Sao Paulo",
+        state: "SP",
+        postalCode: "01001-000",
+      },
+      idempotencyKey: "delivery-unchecked-0001",
+    });
+    assert.equal(uncheckedDelivery.order.addressValidationStatus, "unchecked");
+    for (const status of ["placed", "confirmed", "preparing", "ready"] as const) {
+      await growth.transitionDelivery(identityA.id, organizationA.id, uncheckedDelivery.order.id, {
+        status,
+      });
+    }
+    await assert.rejects(
+      () =>
+        growth.dispatchDelivery(identityA.id, organizationA.id, uncheckedDelivery.order.id, {
+          courierReference: "courier-unchecked",
+          idempotencyKey: "delivery-dispatch-unchecked-0001",
+        }),
+      hasCode("DELIVERY_COVERAGE_OVERRIDE_REQUIRED"),
+    );
+    const overrideReason = "Cobertura confirmada por telefone com o cliente.";
+    const overrideDispatch = await growth.dispatchDelivery(
+      identityA.id,
+      organizationA.id,
+      uncheckedDelivery.order.id,
+      {
+        courierReference: "courier-unchecked",
+        coverageOverrideReason: overrideReason,
+        idempotencyKey: "delivery-dispatch-unchecked-0002",
+      },
+    );
+    const [[overrideHistory], [overrideAudit], [overrideOutbox]] = await Promise.all([
+      database.db
+        .select({ metadata: deliveryOrderStatusHistory.metadata })
+        .from(deliveryOrderStatusHistory)
+        .where(
+          and(
+            eq(deliveryOrderStatusHistory.deliveryOrderId, uncheckedDelivery.order.id),
+            eq(deliveryOrderStatusHistory.toStatus, "dispatched"),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ metadata: auditEvents.metadata })
+        .from(auditEvents)
+        .where(
+          and(
+            eq(auditEvents.entityId, overrideDispatch.dispatch.id),
+            eq(auditEvents.action, "growth.delivery.dispatched"),
+          ),
+        )
+        .limit(1),
+      database.db
+        .select({ payload: outboxEvents.payload })
+        .from(outboxEvents)
+        .where(
+          and(
+            eq(outboxEvents.aggregateId, uncheckedDelivery.order.id),
+            eq(outboxEvents.topic, "growth.delivery_dispatched"),
+          ),
+        )
+        .limit(1),
+    ]);
+    for (const metadata of [
+      overrideHistory?.metadata,
+      overrideAudit?.metadata,
+      overrideOutbox?.payload,
+    ]) {
+      assert.equal(
+        (metadata as { addressValidationStatus?: string } | null)?.addressValidationStatus,
+        "unchecked",
+      );
+      assert.equal(
+        (metadata as { coverageOverrideReason?: string } | null)?.coverageOverrideReason,
+        overrideReason,
+      );
+    }
     const [scheduledTab] = await database.db
       .insert(posTabs)
       .values({
@@ -375,6 +519,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
         unitId: unitA.id,
         openedByIdentityId: identityA.id,
         label: "Scheduled pickup integration",
+        fulfillmentType: "pickup",
         subtotalCents: 2_000,
         totalCents: 2_000,
       })
@@ -404,10 +549,11 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       unitA.id,
       { status: "dispatched", limit: 10 },
     );
-    assert.equal(dispatched.length, 1);
-    assert.equal(dispatched[0]?.zoneName, "Centro");
-    assert.equal(dispatched[0]?.courierReference, "courier-42");
-    assert.ok(dispatched[0]?.promisedAt);
+    assert.equal(dispatched.length, 2);
+    const canonicalDispatch = dispatched.find((order) => order.id === delivery.order.id);
+    assert.equal(canonicalDispatch?.zoneName, "Centro");
+    assert.equal(canonicalDispatch?.courierReference, "courier-42");
+    assert.ok(canonicalDispatch?.promisedAt);
     const onTime = await growth.listDeliveryOrders(
       deliveryIdentity.id,
       organizationA.id,

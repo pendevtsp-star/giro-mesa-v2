@@ -10203,32 +10203,46 @@ export class PilotPosService {
       }
       return;
     }
+    if (tab.fulfillmentType !== current.fulfillment) {
+      if (sending) {
+        throw new ConflictException({
+          code: "DELIVERY_FULFILLMENT_MISMATCH",
+          message: "O tipo de atendimento da entrega não corresponde ao da comanda.",
+        });
+      }
+      return;
+    }
     if (sending && ["ready", "dispatched", "completed", "canceled"].includes(current.status)) {
       throw new ConflictException({
         code: "DELIVERY_ORDER_NOT_ACCEPTING_ITEMS",
         message: "Uma entrega pronta não aceita novos itens. Abra outra comanda de delivery.",
       });
     }
-    if (["dispatched", "completed", "canceled"].includes(current.status)) return;
-    const orderStatuses = await tx
-      .select({ status: posOrders.status })
-      .from(posOrders)
-      .where(
-        and(
-          eq(posOrders.organizationId, organizationId),
-          eq(posOrders.unitId, unitId),
-          eq(posOrders.tabId, order.tabId),
-        ),
-      );
-    const projectedStatus = deliveryProjectionStatus(orderStatuses.map((order) => order.status));
+    const terminal = ["dispatched", "completed", "canceled"].includes(current.status);
+    const orderStatuses = terminal
+      ? []
+      : await tx
+          .select({ status: posOrders.status })
+          .from(posOrders)
+          .where(
+            and(
+              eq(posOrders.organizationId, organizationId),
+              eq(posOrders.unitId, unitId),
+              eq(posOrders.tabId, order.tabId),
+            ),
+          );
+    const projectedStatus = terminal
+      ? current.status
+      : deliveryProjectionStatus(orderStatuses.map((order) => order.status));
     const currentIndex = deliveryPreparationStates.indexOf(
       current.status as (typeof deliveryPreparationStates)[number],
     );
     const projectedIndex = deliveryPreparationStates.indexOf(
       projectedStatus as (typeof deliveryPreparationStates)[number],
     );
-    const transitions =
-      projectedStatus === "canceled"
+    const transitions = terminal
+      ? []
+      : projectedStatus === "canceled"
         ? (["canceled"] as const)
         : projectedIndex > currentIndex
           ? deliveryPreparationStates.slice(currentIndex + 1, projectedIndex + 1)
@@ -10250,23 +10264,34 @@ export class PilotPosService {
       });
       fromStatus = toStatus;
     }
-    if (sending) {
+    const subtotalCents = tab.totalCents;
+    const totalCents = subtotalCents + current.deliveryFeeCents;
+    const financialChanged =
+      current.subtotalCents !== subtotalCents || current.totalCents !== totalCents;
+    if (financialChanged) {
       await tx
         .update(deliveryOrders)
         .set({
-          subtotalCents: tab.totalCents,
-          totalCents: tab.totalCents + current.deliveryFeeCents,
+          subtotalCents,
+          totalCents,
           updatedAt: now,
         })
         .where(eq(deliveryOrders.id, current.id));
     }
-    if (transitions.length === 0 && !sending) return;
+    if (transitions.length === 0 && !financialChanged) return;
     const payload = {
       organizationId,
       unitId,
       deliveryOrderId: current.id,
       posOrderId,
       status: fromStatus,
+      source: sending
+        ? "pos_order_send"
+        : transitions.length > 0
+          ? "pos_kds_lifecycle"
+          : "pos_tab_totals",
+      subtotalCents,
+      totalCents,
     };
     await tx.insert(auditEvents).values({
       organizationId,
@@ -12533,7 +12558,17 @@ export class PilotPosService {
               eq(posOrderItems.id, itemId),
             ),
           );
+        const now = new Date();
         const totals = await this.recalculateTab(tx, organizationId, unitId, row.tabId);
+        await this.syncDeliveryProjection(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          row.item.orderId,
+          now,
+          false,
+        );
         await this.recordEvent(
           tx,
           identityId,
@@ -12698,6 +12733,15 @@ export class PilotPosService {
           }
         }
         const totals = await this.recalculateTab(tx, organizationId, unitId, row.tabId);
+        await this.syncDeliveryProjection(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          row.item.orderId,
+          now,
+          false,
+        );
         await this.doseClub?.markCancellationPending(tx, organizationId, unitId, itemId);
         await this.recordEvent(tx, identityId, organizationId, unitId, row.tabId, "item.canceled", {
           itemId,

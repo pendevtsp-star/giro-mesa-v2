@@ -109,6 +109,8 @@ MSYS_NO_PATHCONV=1 docker run --rm --volume "$candidate_directory:/repo:ro" "$tr
 
 (cd -- "$candidate_directory" && pnpm install --frozen-lockfile)
 (cd -- "$candidate_directory" && pnpm turbo run build --filter=@giromesa/worker...)
+(cd -- "$candidate_directory" && pnpm --filter @giromesa/db test)
+(cd -- "$trust_root" && pnpm install --frozen-lockfile)
 
 suffix="${recovery_sha:0:12}-$$"
 declare -a containers=()
@@ -147,9 +149,9 @@ wait_for_postgres() {
   return 1
 }
 
-run_database_matrix() {
+run_target_database_matrix() {
   local major="$1" image="$2" binding port
-  local container="gm-recovery-db-${major}-${suffix}"
+  local container="gm-recovery-target-db-${major}-${suffix}"
   containers+=("$container")
   docker run -d --name "$container" -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 "$image" >/dev/null
   wait_for_postgres "$container" postgres postgres
@@ -159,15 +161,15 @@ run_database_matrix() {
   port="${binding##*:}"
   [[ "$port" =~ ^[0-9]+$ ]] || { printf 'RECOVERY_POSTGRES_PORT_INVALID\n' >&2; return 1; }
   (
-    cd -- "$candidate_directory"
+    cd -- "$trust_root"
     DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:${port}/postgres" pnpm db:migrate
     pnpm --filter @giromesa/db test
   )
   docker rm -f "$container" >/dev/null
 }
 
-run_database_matrix 16 "$postgres16"
-run_database_matrix 17 "$postgres17"
+run_target_database_matrix 16 "$postgres16"
+run_target_database_matrix 17 "$postgres17"
 
 run_legacy_upgrade_matrix() {
   local major="$1" image="$2" binding port container tag when file hash latest

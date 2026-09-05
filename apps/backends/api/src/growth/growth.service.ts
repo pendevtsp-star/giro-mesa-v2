@@ -325,7 +325,7 @@ export class GrowthService {
     ) {
       throw new ForbiddenException({
         code: "GROWTH_CAPABILITY_DENIED",
-        message: "Ação de recepção não autorizada nesta unidade.",
+        message: "Ação operacional não autorizada nesta unidade.",
         capability,
       });
     }
@@ -3151,13 +3151,23 @@ export class GrowthService {
         code: "DELIVERY_ZONE_NOT_FOUND",
         message: "Zona de entrega não encontrada.",
       });
-    await this.scope.requireUnitAccess(identityId, organizationId, zone.unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      zone.unitId,
+      "operations:tabs:open",
+    );
     const validationStatus = deliveryCoverageStatus(zone.geometry, input);
     return { covered: validationStatus === "covered", validationStatus };
   }
 
   async listDeliveryCouriers(identityId: string, organizationId: string, unitId: string) {
-    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:delivery:operate",
+    );
     const couriers = await this.database.db
       .select()
       .from(deliveryCouriers)
@@ -3451,7 +3461,7 @@ export class GrowthService {
   }
 
   async listDeliveryZones(identityId: string, organizationId: string, unitId: string) {
-    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.requireUnitCapability(identityId, organizationId, unitId, "operations:tabs:open");
     return this.database.db
       .select()
       .from(deliveryZones)
@@ -3466,7 +3476,12 @@ export class GrowthService {
     unitId: string,
     input: DeliveryOrderQueryInput,
   ) {
-    await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:delivery:operate",
+    );
     const rows = await this.database.db
       .select({
         order: deliveryOrders,
@@ -3610,9 +3625,20 @@ export class GrowthService {
   }
 
   async createDeliveryOrder(identityId: string, organizationId: string, input: DeliveryOrderInput) {
-    await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      input.unitId,
+      "operations:tabs:open",
+    );
     const [tab] = await this.database.db
-      .select({ id: posTabs.id, totalCents: posTabs.totalCents })
+      .select({
+        id: posTabs.id,
+        totalCents: posTabs.totalCents,
+        fulfillmentType: posTabs.fulfillmentType,
+        customerName: posTabs.customerName,
+        customerPhone: posTabs.customerPhone,
+      })
       .from(posTabs)
       .where(
         and(
@@ -3627,6 +3653,11 @@ export class GrowthService {
       throw new BadRequestException({
         code: "DELIVERY_OPERATIONAL_TAB_NOT_FOUND",
         message: "Entrega ou retirada exige uma comanda operacional aberta e persistida.",
+      });
+    if (tab.fulfillmentType !== input.fulfillment)
+      throw new BadRequestException({
+        code: "DELIVERY_FULFILLMENT_MISMATCH",
+        message: "O tipo de atendimento deve ser o mesmo na comanda e na entrega.",
       });
     const [link] = await this.database.db
       .select({ customerId: posTabCustomerLinks.customerId })
@@ -3645,7 +3676,9 @@ export class GrowthService {
         message: "A comanda está vinculada a outro cliente.",
       });
     const customerId = input.customerId ?? link?.customerId;
-    if (customerId) await this.customer(organizationId, customerId);
+    const customer = customerId ? await this.customer(organizationId, customerId) : null;
+    const customerName = tab.customerName?.trim() || customer?.name || null;
+    const customerPhone = normalizeCustomerPhone(tab.customerPhone ?? customer?.phone);
     let deliveryFeeCents = 0;
     let zoneId: string | null = null;
     let addressValidationStatus: "covered" | "unchecked" | "unavailable" = "unchecked";
@@ -3697,6 +3730,8 @@ export class GrowthService {
     const totalCents = tab.totalCents + deliveryFeeCents;
     const requestFingerprint = payloadFingerprint({
       input: { ...input, customerId },
+      customerName,
+      customerPhone,
       zoneId,
       operationalSubtotalCents: tab.totalCents,
       deliveryFeeCents,
@@ -3709,6 +3744,8 @@ export class GrowthService {
           organizationId,
           unitId: input.unitId,
           customerId: customerId ?? null,
+          customerName,
+          customerPhone,
           zoneId,
           orderRef: input.orderRef,
           fulfillment: input.fulfillment,
@@ -3787,7 +3824,12 @@ export class GrowthService {
         code: "DELIVERY_ORDER_NOT_FOUND",
         message: "Pedido não encontrado.",
       });
-    await this.scope.requireUnitAccess(identityId, organizationId, order.unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      order.unitId,
+      "operations:delivery:operate",
+    );
     const courier = await this.deliveryCourier(organizationId, input.courierId);
     if (courier.unitId !== order.unitId || !courier.active)
       throw new BadRequestException({
@@ -3930,7 +3972,12 @@ export class GrowthService {
         code: "DELIVERY_ORDER_NOT_FOUND",
         message: "Pedido não encontrado.",
       });
-    await this.scope.requireUnitAccess(identityId, organizationId, order.unitId);
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      order.unitId,
+      "operations:delivery:operate",
+    );
     const requestFingerprint = payloadFingerprint({ orderId, input });
     const [created] = await this.database.db.transaction(async (tx) => {
       const rows = await tx
@@ -4014,8 +4061,13 @@ export class GrowthService {
         code: "DELIVERY_ORDER_NOT_FOUND",
         message: "Pedido não encontrado.",
       });
-    await this.scope.requireUnitAccess(identityId, organizationId, current.unitId);
-    if (input.status === "dispatched")
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      current.unitId,
+      "operations:delivery:operate",
+    );
+    if ((input.status as string) === "dispatched")
       throw new ConflictException({
         code: "DELIVERY_DISPATCH_ENDPOINT_REQUIRED",
         message: "Use o endpoint de despacho para iniciar a entrega.",
@@ -4098,38 +4150,87 @@ export class GrowthService {
         code: "DELIVERY_ORDER_NOT_FOUND",
         message: "Pedido não encontrado.",
       });
-    await this.scope.requireUnitAccess(identityId, organizationId, order.unitId);
-    const requestFingerprint = payloadFingerprint({ orderId, input });
-    const [known] = await this.database.db
-      .select()
-      .from(deliveryDispatches)
-      .where(
-        and(
-          eq(deliveryDispatches.organizationId, organizationId),
-          eq(deliveryDispatches.idempotencyKey, input.idempotencyKey),
-        ),
-      )
-      .limit(1);
-    if (known) {
-      if (known.requestFingerprint !== requestFingerprint) return this.idempotencyConflict();
-      return { duplicate: true, dispatch: known };
-    }
-    if (order.fulfillment !== "delivery" || order.status !== "ready")
-      throw new ConflictException({
-        code: "DELIVERY_NOT_READY",
-        message: "Entrega não está pronta para despacho.",
-      });
-    const assignedCourier = order.courierId
-      ? await this.deliveryCourier(organizationId, order.courierId)
-      : null;
-    const courierReference = assignedCourier?.reference ?? input.courierReference;
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      order.unitId,
+      "operations:delivery:operate",
+    );
+    const coverageOverrideReason = input.coverageOverrideReason?.trim() || null;
+    const requestFingerprint = payloadFingerprint({
+      orderId,
+      input: { ...input, coverageOverrideReason },
+    });
     return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`growth-delivery-dispatch:${organizationId}:${input.idempotencyKey}`}))`,
+      );
+      const [lockedOrder] = await tx
+        .select()
+        .from(deliveryOrders)
+        .where(
+          and(eq(deliveryOrders.organizationId, organizationId), eq(deliveryOrders.id, orderId)),
+        )
+        .for("update")
+        .limit(1);
+      if (!lockedOrder)
+        throw new NotFoundException({
+          code: "DELIVERY_ORDER_NOT_FOUND",
+          message: "Pedido não encontrado.",
+        });
+      const [known] = await tx
+        .select()
+        .from(deliveryDispatches)
+        .where(
+          and(
+            eq(deliveryDispatches.organizationId, organizationId),
+            eq(deliveryDispatches.idempotencyKey, input.idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (known) {
+        if (known.requestFingerprint !== requestFingerprint) return this.idempotencyConflict();
+        return { duplicate: true, dispatch: known, order: lockedOrder };
+      }
+      if (
+        lockedOrder.fulfillment === "delivery" &&
+        lockedOrder.addressValidationStatus !== "covered" &&
+        (!coverageOverrideReason || coverageOverrideReason.length < 10)
+      )
+        throw new ConflictException({
+          code: "DELIVERY_COVERAGE_OVERRIDE_REQUIRED",
+          message: "Informe o motivo da confirmação manual de cobertura para despachar.",
+        });
+      if (lockedOrder.fulfillment !== "delivery" || lockedOrder.status !== "ready")
+        throw new ConflictException({
+          code: "DELIVERY_NOT_READY",
+          message: "Entrega não está pronta para despacho.",
+        });
+      const [assignedCourier] = lockedOrder.courierId
+        ? await tx
+            .select()
+            .from(deliveryCouriers)
+            .where(
+              and(
+                eq(deliveryCouriers.organizationId, organizationId),
+                eq(deliveryCouriers.id, lockedOrder.courierId),
+              ),
+            )
+            .for("update")
+            .limit(1)
+        : [null];
+      if (lockedOrder.courierId && !assignedCourier)
+        throw new ConflictException({
+          code: "DELIVERY_COURIER_NOT_ASSIGNED",
+          message: "Entregador atribuído não está disponível para despacho.",
+        });
+      const courierReference = assignedCourier?.reference ?? input.courierReference;
       const [dispatch] = await tx
         .insert(deliveryDispatches)
         .values({
           organizationId,
-          unitId: order.unitId,
-          deliveryOrderId: order.id,
+          unitId: lockedOrder.unitId,
+          deliveryOrderId: lockedOrder.id,
           courierReference,
           idempotencyKey: input.idempotencyKey,
           requestFingerprint,
@@ -4142,7 +4243,7 @@ export class GrowthService {
         .where(
           and(
             eq(deliveryOrders.organizationId, organizationId),
-            eq(deliveryOrders.id, order.id),
+            eq(deliveryOrders.id, lockedOrder.id),
             eq(deliveryOrders.status, "ready"),
           ),
         )
@@ -4154,21 +4255,26 @@ export class GrowthService {
         });
       await tx.insert(deliveryOrderStatusHistory).values({
         organizationId,
-        unitId: order.unitId,
-        deliveryOrderId: order.id,
+        unitId: lockedOrder.unitId,
+        deliveryOrderId: lockedOrder.id,
         fromStatus: "ready",
         toStatus: "dispatched",
         actorIdentityId: identityId,
-        metadata: { source: "dispatch", dispatchId: dispatch.id },
+        metadata: {
+          source: "dispatch",
+          dispatchId: dispatch.id,
+          addressValidationStatus: lockedOrder.addressValidationStatus,
+          coverageOverrideReason,
+        },
       });
-      if (order.courierId) {
+      if (lockedOrder.courierId) {
         const [courier] = await tx
           .update(deliveryCouriers)
           .set({ status: "delivering", updatedAt: new Date() })
           .where(
             and(
               eq(deliveryCouriers.organizationId, organizationId),
-              eq(deliveryCouriers.id, order.courierId),
+              eq(deliveryCouriers.id, lockedOrder.courierId),
               eq(deliveryCouriers.status, "assigned"),
             ),
           )
@@ -4181,21 +4287,28 @@ export class GrowthService {
       }
       await this.audit(tx, {
         organizationId,
-        unitId: order.unitId,
+        unitId: lockedOrder.unitId,
         identityId,
         action: "growth.delivery.dispatched",
         entityType: "growth_delivery_dispatch",
         entityId: dispatch.id,
-        metadata: { orderId: order.id, courierReference },
+        metadata: {
+          orderId: lockedOrder.id,
+          courierReference,
+          addressValidationStatus: lockedOrder.addressValidationStatus,
+          coverageOverrideReason,
+        },
       });
-      await this.outbox(tx, "growth.delivery_dispatched", "growth_delivery_order", order.id, {
+      await this.outbox(tx, "growth.delivery_dispatched", "growth_delivery_order", lockedOrder.id, {
         organizationId,
-        unitId: order.unitId,
-        orderId: order.id,
+        unitId: lockedOrder.unitId,
+        orderId: lockedOrder.id,
         dispatchId: dispatch.id,
-        courierId: order.courierId,
+        courierId: lockedOrder.courierId,
+        addressValidationStatus: lockedOrder.addressValidationStatus,
+        coverageOverrideReason,
       });
-      return { duplicate: false, dispatch };
+      return { duplicate: false, dispatch, order: updated };
     });
   }
 

@@ -422,12 +422,13 @@ export const deliveryOrderSchema = z.object({
 export type DeliveryOrderInput = z.infer<typeof deliveryOrderSchema>;
 
 export const deliveryTransitionSchema = z.object({
-  status: deliveryOrderStatus.exclude(["draft"]),
+  status: deliveryOrderStatus.exclude(["draft", "dispatched"]),
 });
 export type DeliveryTransitionInput = z.infer<typeof deliveryTransitionSchema>;
 
 export const dispatchSchema = z.object({
   courierReference: z.string().trim().min(2).max(160),
+  coverageOverrideReason: z.string().trim().min(10).max(500).optional(),
   idempotencyKey,
 });
 export type DispatchInput = z.infer<typeof dispatchSchema>;

@@ -9,6 +9,7 @@ import {
   parseStoredCart,
   parseStoredIds,
   requiresDeliveryRegistration,
+  stableDeliveryIdempotencyKey,
 } from "./CounterWorkspace";
 
 describe("atalhos e rascunho operacional", () => {
@@ -118,6 +119,17 @@ describe("atalhos e rascunho operacional", () => {
       ),
     ).toBe(true);
     expect(requiresDeliveryRegistration(new Error("Falha de rede"))).toBe(false);
+  });
+
+  it("reutiliza as chaves da entrega em retries e separa cadastro de envio", () => {
+    const keys = new Map<string, string>();
+    let sequence = 0;
+    const createKey = () => `key-${++sequence}`;
+
+    expect(stableDeliveryIdempotencyKey(keys, "send", "order-1", createKey)).toBe("key-1");
+    expect(stableDeliveryIdempotencyKey(keys, "send", "order-1", createKey)).toBe("key-1");
+    expect(stableDeliveryIdempotencyKey(keys, "register", "order-1", createKey)).toBe("key-2");
+    expect(stableDeliveryIdempotencyKey(keys, "send", "order-2", createKey)).toBe("key-3");
   });
 });
 

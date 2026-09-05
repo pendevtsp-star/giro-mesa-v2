@@ -98,6 +98,7 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       { membershipId: ownerMembership.id, role: "owner" },
       { membershipId: kdsMembership.id, unitId: unit.id, role: "kds" },
     ]);
+    await pos.setManagerPin(owner.id, organization.id, unit.id, { pin: "1234" });
 
     const [category] = await database.db
       .insert(posCatalogCategories)
@@ -286,7 +287,25 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       () => pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-${runId}`),
       (error) => errorCode(error) === "DELIVERY_ORDER_REGISTRATION_REQUIRED",
     );
-    await growth.createDeliveryOrder(owner.id, organization.id, deliveryInput);
+    const registeredDelivery = await growth.createDeliveryOrder(
+      owner.id,
+      organization.id,
+      deliveryInput,
+    );
+    assert.equal(registeredDelivery.order.customerName, "Cliente delivery");
+    assert.equal(registeredDelivery.order.customerPhone, "+5511999990000");
+    await database.db
+      .update(deliveryOrders)
+      .set({ fulfillment: "pickup" })
+      .where(eq(deliveryOrders.id, registeredDelivery.order.id));
+    await assert.rejects(
+      () => pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-mismatch-${runId}`),
+      (error) => errorCode(error) === "DELIVERY_FULFILLMENT_MISMATCH",
+    );
+    await database.db
+      .update(deliveryOrders)
+      .set({ fulfillment: "delivery" })
+      .where(eq(deliveryOrders.id, registeredDelivery.order.id));
     const sent = await pos.sendOrder(owner.id, organization.id, unit.id, order.id, `send-${runId}`);
     const ticketIds = sent.ticketIds as string[];
     assert.equal(ticketIds.length, 2);
@@ -298,6 +317,8 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     assert.equal(visibleDelivery.deliveryFeeCents, 900);
     assert.equal(visibleDelivery.totalCents, created.totals.totalCents + 900);
     assert.equal(visibleDelivery.addressValidationStatus, "covered");
+    assert.equal(visibleDelivery.customerName, "Cliente delivery");
+    assert.equal(visibleDelivery.customerPhone, "+5511999990000");
     assert.equal(visibleDelivery.address?.street, "Rua da Entrega");
     const printJobIds = sent.printJobIds as string[];
     assert.equal(printJobIds.length, 2);
@@ -904,7 +925,7 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       ),
     );
     const concurrentOrderIds = concurrentOrders.map((entry) => (entry.order as { id: string }).id);
-    await growth.createDeliveryOrder(owner.id, organization.id, {
+    const concurrentDelivery = await growth.createDeliveryOrder(owner.id, organization.id, {
       ...deliveryInput,
       orderRef: concurrentTab.id,
       idempotencyKey: `delivery-concurrent-${runId}`,
@@ -957,6 +978,73 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       .from(deliveryOrders)
       .where(eq(deliveryOrders.orderRef, concurrentTab.id));
     assert.deepEqual(concurrentDeliveries, [{ status: "ready", totalCents: 3_300 }]);
+    await growth.dispatchDelivery(owner.id, organization.id, concurrentDelivery.order.id, {
+      courierReference: "entregador-externo",
+      idempotencyKey: `delivery-concurrent-dispatch-${runId}`,
+    });
+    const adjustedTicket = concurrentTickets[0];
+    assert.ok(adjustedTicket);
+    await pos.discountItem(
+      owner.id,
+      organization.id,
+      unit.id,
+      adjustedTicket.itemId,
+      `delivery-discount-${runId}`,
+      {
+        discountCents: 200,
+        approval: {
+          approverMembershipId: ownerMembership.id,
+          pin: "1234",
+          reason: "Cortesia operacional",
+        },
+      },
+    );
+    const [discountedDelivery] = await database.db
+      .select({ totalCents: deliveryOrders.totalCents })
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.orderRef, concurrentTab.id));
+    assert.equal(discountedDelivery?.totalCents, 3_100);
+    await pos.cancelItem(
+      owner.id,
+      organization.id,
+      unit.id,
+      adjustedTicket.itemId,
+      `delivery-cancel-${runId}`,
+      {
+        approval: {
+          approverMembershipId: ownerMembership.id,
+          pin: "1234",
+          reason: "Cancelamento operacional",
+        },
+      },
+    );
+    const [adjustedDelivery] = await database.db
+      .select({
+        id: deliveryOrders.id,
+        status: deliveryOrders.status,
+        totalCents: deliveryOrders.totalCents,
+      })
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.orderRef, concurrentTab.id));
+    assert.ok(adjustedDelivery);
+    assert.equal(adjustedDelivery.status, "dispatched");
+    assert.equal(adjustedDelivery.totalCents, 2_100);
+    const totalSyncAudits = await database.db
+      .select({ metadata: auditEvents.metadata })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organization.id),
+          eq(auditEvents.entityId, adjustedDelivery.id),
+          eq(auditEvents.action, "growth.delivery_order.changed"),
+        ),
+      );
+    assert.equal(
+      totalSyncAudits.filter(
+        ({ metadata }) => (metadata as { source?: string } | null)?.source === "pos_tab_totals",
+      ).length,
+      2,
+    );
   } finally {
     await database.onModuleDestroy();
   }

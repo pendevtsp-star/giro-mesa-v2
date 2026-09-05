@@ -11,6 +11,13 @@ const recoveryMatrixPath = join(root, "deploy", "vps", "recovery-compatibility.j
 const entrypointPath = join(root, "deploy", "vps", "deploy-entrypoint.sh");
 const provenancePath = join(root, "deploy", "vps", "verify-image-provenance.sh");
 const migration43Path = join(root, "packages", "db", "drizzle", "0043_tricky_diamondback.sql");
+const migration61Path = join(
+  root,
+  "packages",
+  "db",
+  "drizzle",
+  "0061_accountant_portal_security.sql",
+);
 
 test("manual recovery validation is non-privileged and bound to the default branch", () => {
   const workflow = readFileSync(workflowPath, "utf8");
@@ -45,6 +52,10 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /for level in "\$recovery_level" "\$target_level"/);
   assert.match(script, /target_tag="\$\{target_identity\[0\]/);
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
+  assert.match(script, /run_target_database_matrix 16/);
+  assert.match(script, /run_target_database_matrix 17/);
+  assert.match(script, /cd -- "\$trust_root"[\s\S]*DATABASE_URL=.*pnpm db:migrate/);
+  assert.match(script, /cd -- "\$candidate_directory"[\s\S]*pnpm --filter @giromesa\/db test/);
   assert.match(script, /APP=api/);
   assert.match(script, /APP=worker/);
   assert.match(script, /"doseClubReconciliation":\s*"legacy-source-upgraded"/);
@@ -61,6 +72,12 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /recovery-validation\.json/);
   assert.match(script, /recovery-validation\.json\.sha256/);
   assert.match(script, /json\.dumps\(value, sort_keys=True, separators=\(",", ":"\)\)/);
+});
+
+test("fresh bootstrap does not use a newly-added enum value in the same transaction", () => {
+  const migration = readFileSync(migration61Path, "utf8");
+  assert.match(migration, /binding\."role"::text = 'accountant'/);
+  assert.doesNotMatch(migration, /binding\."role" = 'accountant'/);
 });
 
 test("schema 0043 adopts the historical event and DoseClub objects", () => {

@@ -59,6 +59,7 @@ type DoseClubDraftSnapshot = {
 type DeliveryRegistrationDraft = {
   orderId: string;
   idempotencyKey: string;
+  sendIdempotencyKey: string;
   registered: boolean;
   zoneId: string;
   street: string;
@@ -189,6 +190,20 @@ export function orderSubmissionErrorMessage(createdCount: number, error: unknown
 
 export function requiresDeliveryRegistration(error: unknown): error is ApiClientError {
   return error instanceof ApiClientError && error.code === "DELIVERY_ORDER_REGISTRATION_REQUIRED";
+}
+
+export function stableDeliveryIdempotencyKey(
+  keys: Map<string, string>,
+  operation: "register" | "send",
+  orderId: string,
+  createKey: () => string = () => crypto.randomUUID(),
+) {
+  const reference = `${operation}:${orderId}`;
+  const known = keys.get(reference);
+  if (known) return known;
+  const created = createKey();
+  keys.set(reference, created);
+  return created;
 }
 
 export function canCloseWithoutConsumption(
@@ -575,6 +590,7 @@ export function TabWorkspace({
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
   const paymentAmountRef = useRef<HTMLInputElement>(null);
+  const deliveryIdempotencyKeysRef = useRef(new Map<string, string>());
   const terminalProfile = readActiveTerminalProfile(scope.unitId);
   const terminalPaymentMode =
     terminalProfile?.paymentMode ??
@@ -1577,7 +1593,16 @@ export function TabWorkspace({
                   ? current
                   : {
                       orderId,
-                      idempotencyKey: crypto.randomUUID(),
+                      idempotencyKey: stableDeliveryIdempotencyKey(
+                        deliveryIdempotencyKeysRef.current,
+                        "register",
+                        orderId,
+                      ),
+                      sendIdempotencyKey: stableDeliveryIdempotencyKey(
+                        deliveryIdempotencyKeysRef.current,
+                        "send",
+                        orderId,
+                      ),
                       registered: false,
                       zoneId: "",
                       street: deliveryAddress.trim(),
@@ -1595,15 +1620,26 @@ export function TabWorkspace({
 
             async function sendOrderToProduction(orderId: string) {
               try {
-                await scope.dispatch(
-                  "pos.order.send_requested",
-                  pilotMutation(
-                    "send-order",
-                    { orderId },
-                    data.tab.fulfillmentType === "delivery" ? "cloud-only" : undefined,
-                  ),
-                  (key) => api.pilot.sendOrder(scope.organizationId, scope.unitId, orderId, key),
-                );
+                if (data.tab.fulfillmentType === "delivery") {
+                  await api.pilot.sendOrder(
+                    scope.organizationId,
+                    scope.unitId,
+                    orderId,
+                    stableDeliveryIdempotencyKey(
+                      deliveryIdempotencyKeysRef.current,
+                      "send",
+                      orderId,
+                    ),
+                  );
+                  deliveryIdempotencyKeysRef.current.delete(`register:${orderId}`);
+                  deliveryIdempotencyKeysRef.current.delete(`send:${orderId}`);
+                } else {
+                  await scope.dispatch(
+                    "pos.order.send_requested",
+                    pilotMutation("send-order", { orderId }),
+                    (key) => api.pilot.sendOrder(scope.organizationId, scope.unitId, orderId, key),
+                  );
+                }
                 return true;
               } catch (error) {
                 if (!requiresDeliveryRegistration(error)) throw error;
@@ -1639,22 +1675,23 @@ export function TabWorkspace({
               setDeliveryRegistrationError("");
               try {
                 if (!registration.registered) {
+                  const address = {
+                    street: registration.street.trim(),
+                    number: registration.number.trim(),
+                    ...(registration.complement.trim()
+                      ? { complement: registration.complement.trim() }
+                      : {}),
+                    neighborhood: registration.neighborhood.trim(),
+                    city: registration.city.trim(),
+                    state: registration.state.trim().toUpperCase(),
+                    postalCode: registration.postalCode.trim(),
+                  };
                   await api.growth.createDeliveryOrder(scope.organizationId, {
                     unitId: scope.unitId,
                     zoneId: registration.zoneId,
                     orderRef: tabId,
                     fulfillment: "delivery",
-                    address: {
-                      street: registration.street.trim(),
-                      number: registration.number.trim(),
-                      ...(registration.complement.trim()
-                        ? { complement: registration.complement.trim() }
-                        : {}),
-                      neighborhood: registration.neighborhood.trim(),
-                      city: registration.city.trim(),
-                      state: registration.state.trim().toUpperCase(),
-                      postalCode: registration.postalCode.trim(),
-                    },
+                    address,
                     ...(data.tab.promisedAt ? { promisedAt: data.tab.promisedAt } : {}),
                     idempotencyKey: registration.idempotencyKey,
                   });
@@ -1664,17 +1701,14 @@ export function TabWorkspace({
                       : current,
                   );
                 }
-                await scope.dispatch(
-                  "pos.order.send_requested",
-                  pilotMutation("send-order", { orderId: registration.orderId }, "cloud-only"),
-                  (key) =>
-                    api.pilot.sendOrder(
-                      scope.organizationId,
-                      scope.unitId,
-                      registration.orderId,
-                      key,
-                    ),
+                await api.pilot.sendOrder(
+                  scope.organizationId,
+                  scope.unitId,
+                  registration.orderId,
+                  registration.sendIdempotencyKey,
                 );
+                deliveryIdempotencyKeysRef.current.delete(`register:${registration.orderId}`);
+                deliveryIdempotencyKeysRef.current.delete(`send:${registration.orderId}`);
                 setDeliveryRegistration(null);
                 setFeedback("Entrega registrada e pedido enviado à produção.");
               } catch (error) {

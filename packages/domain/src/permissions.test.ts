@@ -88,6 +88,12 @@ describe("operational capabilities", () => {
     assert.equal(hasPermission("delivery", "operations:payments:record"), false);
   });
 
+  it("limits delivery operations to the operational delivery profile", () => {
+    assert.equal(hasPermission("delivery", "operations:delivery:operate"), true);
+    assert.equal(hasPermission("manager", "operations:delivery:operate"), true);
+    assert.equal(hasPermission("waiter", "operations:delivery:operate"), false);
+  });
+
   it("separates reception and turnover duties without widening financial access", () => {
     assert.equal(hasPermission("receptionist", "operations:reception:manage"), true);
     assert.equal(hasPermission("receptionist", "operations:reception:seat"), true);

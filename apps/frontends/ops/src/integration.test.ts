@@ -315,6 +315,7 @@ describe("integração operacional", () => {
     await api.growth.transitionDelivery("org-1", "delivery-1", "confirmed");
     await api.growth.dispatchDelivery("org-1", "delivery-1", {
       courierReference: "courier-1",
+      coverageOverrideReason: "Cobertura confirmada por telefone.",
       idempotencyKey: "delivery-dispatch-1",
     });
     await api.growth.assignDeliveryCourier("org-1", "delivery-1", {
@@ -354,6 +355,7 @@ describe("integração operacional", () => {
     expect(fetchMock.mock.calls[3]?.[1]).toMatchObject({
       body: JSON.stringify({
         courierReference: "courier-1",
+        coverageOverrideReason: "Cobertura confirmada por telefone.",
         idempotencyKey: "delivery-dispatch-1",
       }),
       method: "POST",

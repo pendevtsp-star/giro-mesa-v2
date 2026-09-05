@@ -2,6 +2,7 @@
 import {
   Badge,
   Button,
+  Callout,
   Card,
   EmptyState,
   Icon,
@@ -10,6 +11,7 @@ import {
   NativeSelect,
   SearchField,
   SegmentedTabs,
+  Textarea,
 } from "@giromesa/ui";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api";
@@ -45,7 +47,7 @@ import { formatMoney } from "../../rules";
 type Tab = "orders" | "zones";
 type Filter = "all" | "late" | "scheduled";
 type Column = "received" | "preparing" | "ready" | "dispatched";
-type TransitionStatus = Exclude<DeliveryOrderStatus, "draft">;
+type TransitionStatus = Exclude<DeliveryOrderStatus, "draft" | "dispatched">;
 
 const columns: Array<{ id: Column; label: string }> = [
   { id: "received", label: "Recebidos" },
@@ -140,6 +142,45 @@ function address(order: DeliveryOrder) {
     order.address.postalCode ? `CEP ${order.address.postalCode}` : undefined,
   ].filter((field): field is string => Boolean(field));
   return value.length ? value.join(", ") : "Endereço informado";
+}
+
+export function requiresDeliveryCoverageOverride(
+  order: Pick<DeliveryOrder, "fulfillment" | "addressValidationStatus">,
+) {
+  return order.fulfillment === "delivery" && order.addressValidationStatus !== "covered";
+}
+
+type DeliveryDispatchAttemptKeys = {
+  courierId: string;
+  assignmentKey: string;
+  dispatchKey: string;
+};
+
+export function stableDeliveryDispatchAttempt(
+  attempts: Map<string, DeliveryDispatchAttemptKeys>,
+  orderId: string,
+  courierId: string,
+  createKey: (prefix: string) => string = mutationKey,
+) {
+  const known = attempts.get(orderId);
+  if (known?.courierId === courierId) return known;
+  const created = {
+    courierId,
+    assignmentKey: createKey("delivery-courier-assignment"),
+    dispatchKey: createKey("delivery-dispatch"),
+  };
+  attempts.set(orderId, created);
+  return created;
+}
+
+export function refreshAuthoritativeDeliveryState(
+  refreshOrders: () => void,
+  refreshCouriers: () => void,
+  refreshFilteredOrders?: () => void,
+) {
+  refreshOrders();
+  refreshFilteredOrders?.();
+  refreshCouriers();
 }
 
 function useOnline() {
@@ -251,6 +292,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
   const [syncWarning, setSyncWarning] = useState("");
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [realtimeEvents, setRealtimeEvents] = useState<ScopeRealtimeEvent[]>([]);
+  const dispatchAttemptsRef = useRef(new Map<string, DeliveryDispatchAttemptKeys>());
   const online = useOnline();
 
   const hasServerFilter = Boolean(debouncedSearch || filter !== "all");
@@ -390,7 +432,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     }
   }
 
-  async function dispatch(event: FormEvent<HTMLFormElement>) {
+  async function dispatch(event: FormEvent<HTMLFormElement>, coverageOverrideReason: string) {
     event.preventDefault();
     if (!selected || !courierId) return;
     const assignedCourier =
@@ -398,24 +440,58 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         ? couriers.state.data.find((item) => item.id === courierId)
         : undefined;
     if (!assignedCourier) return;
+    const normalizedOverrideReason = coverageOverrideReason.trim();
+    if (requiresDeliveryCoverageOverride(selected) && normalizedOverrideReason.length < 10) {
+      setNotice({
+        error: true,
+        text: "Explique como a cobertura foi confirmada manualmente antes de despachar.",
+      });
+      return;
+    }
+    const attempt = stableDeliveryDispatchAttempt(
+      dispatchAttemptsRef.current,
+      selected.id,
+      courierId,
+    );
     setBusy(selected.id);
     setNotice(null);
     try {
-      const assigned = parseDeliveryOrderMutation(
-        await api.growth.assignDeliveryCourier(scope.organizationId, selected.id, {
+      let assigned = selected;
+      if (selected.courierId !== courierId) {
+        const persistedAssignment = parseDeliveryOrderMutation(
+          await api.growth.assignDeliveryCourier(scope.organizationId, selected.id, {
+            courierId,
+            idempotencyKey: attempt.assignmentKey,
+          }),
+        ).order;
+        assigned = {
+          ...selected,
+          ...persistedAssignment,
+          zoneName: selected.zoneName,
+          history: selected.history,
+          notifications: selected.notifications,
           courierId,
-          idempotencyKey: mutationKey("delivery-dispatch"),
-        }),
-      ).order;
-      const dispatched = parseDeliveryOrders([
-        await api.growth.transitionDelivery(scope.organizationId, selected.id, "dispatched"),
-      ])[0];
-      if (!dispatched) throw new Error("O despacho do pedido não foi confirmado.");
-      orders.update((rows) =>
-        rows.map((row) => (row.id === selected.id ? { ...assigned, ...dispatched } : row)),
-      );
-      filteredOrders.update((rows) =>
-        rows.map((row) => (row.id === selected.id ? { ...assigned, ...dispatched } : row)),
+          courierReference: assignedCourier.reference,
+          courierStatus: "assigned",
+        };
+        orders.update((rows) => rows.map((row) => (row.id === selected.id ? assigned : row)));
+        filteredOrders.update((rows) =>
+          rows.map((row) => (row.id === selected.id ? assigned : row)),
+        );
+        setSelected(assigned);
+      }
+      await api.growth.dispatchDelivery(scope.organizationId, selected.id, {
+        courierReference: assignedCourier.reference,
+        ...(requiresDeliveryCoverageOverride(selected)
+          ? { coverageOverrideReason: normalizedOverrideReason }
+          : {}),
+        idempotencyKey: attempt.dispatchKey,
+      });
+      dispatchAttemptsRef.current.delete(selected.id);
+      refreshAuthoritativeDeliveryState(
+        orders.retry,
+        couriers.retry,
+        hasServerFilter ? filteredOrders.retry : undefined,
       );
       setNotice({ text: `Pedido ${orderId(selected)} despachado.` });
       setSelected(null);
@@ -912,6 +988,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         couriers={couriers.state.status === "ready" ? couriers.state.data : []}
         couriersLoading={couriers.state.status === "loading"}
         courierId={courierId}
+        key={selected?.id ?? "closed"}
         onClose={() => setSelected(null)}
         onCourierChange={setCourierId}
         onDispatch={dispatch}
@@ -1439,7 +1516,7 @@ function OrderModal({
   courierId: string;
   onClose: () => void;
   onCourierChange: (value: string) => void;
-  onDispatch: (event: FormEvent<HTMLFormElement>) => void;
+  onDispatch: (event: FormEvent<HTMLFormElement>, coverageOverrideReason: string) => void;
   onRequestNotification: (
     audience: "operations" | "customer",
     type: "status_update" | "courier_assigned" | "courier_arriving",
@@ -1451,6 +1528,7 @@ function OrderModal({
   const [notifType, setNotifType] = useState<
     "status_update" | "courier_assigned" | "courier_arriving"
   >("status_update");
+  const [coverageOverrideReason, setCoverageOverrideReason] = useState("");
   return (
     <Modal
       isOpen={order !== null}
@@ -1480,6 +1558,14 @@ function OrderModal({
             <div>
               <dt>Zona</dt>
               <dd>{order.zoneName ?? "Não informada"}</dd>
+            </div>
+            <div>
+              <dt>Cobertura</dt>
+              <dd>
+                {order.addressValidationStatus === "covered"
+                  ? "Validada pela zona"
+                  : "Aguardando confirmação manual"}
+              </dd>
             </div>
             <div>
               <dt>Entregador</dt>
@@ -1599,7 +1685,10 @@ function OrderModal({
             </Button>
           </div>
           {action?.dispatch ? (
-            <form className="gm-form-stack" onSubmit={onDispatch}>
+            <form
+              className="gm-form-stack"
+              onSubmit={(event) => onDispatch(event, coverageOverrideReason)}
+            >
               <label className="gm-form-field">
                 <span>Entregador disponível</span>
                 <NativeSelect
@@ -1626,7 +1715,35 @@ function OrderModal({
                   Nenhum entregador disponível para atribuição.
                 </p>
               )}
-              <Button disabled={busy || !courierId} type="submit">
+              {requiresDeliveryCoverageOverride(order) && (
+                <>
+                  <Callout tone="warning">
+                    A cobertura deste endereço não foi validada automaticamente. Confirme antes de
+                    liberar o entregador.
+                  </Callout>
+                  <label className="gm-form-field">
+                    <span>Motivo da confirmação manual de cobertura</span>
+                    <Textarea
+                      maxLength={500}
+                      minLength={10}
+                      onChange={(event) => setCoverageOverrideReason(event.target.value)}
+                      placeholder="Ex.: endereço confirmado por telefone com o cliente"
+                      required
+                      rows={3}
+                      value={coverageOverrideReason}
+                    />
+                  </label>
+                </>
+              )}
+              <Button
+                disabled={
+                  busy ||
+                  !courierId ||
+                  (requiresDeliveryCoverageOverride(order) &&
+                    coverageOverrideReason.trim().length < 10)
+                }
+                type="submit"
+              >
                 {busy ? "Despachando…" : "Atribuir e despachar"}
               </Button>
             </form>
