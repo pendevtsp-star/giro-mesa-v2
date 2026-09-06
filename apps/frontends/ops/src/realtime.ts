@@ -71,6 +71,7 @@ export function subscribeScopeRealtime(
   let lastConfirmedAt: number | null = null;
   let recoveryGeneration = 0;
   let recoveryRequired = false;
+  let pollingGeneration = 0;
   let reconnectTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let pollingTimer: ReturnType<typeof globalThis.setInterval> | undefined;
   let handshakeTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
@@ -97,6 +98,7 @@ export function subscribeScopeRealtime(
   };
 
   const stopPolling = () => {
+    pollingGeneration += 1;
     if (pollingTimer !== undefined) globalThis.clearInterval(pollingTimer);
     pollingTimer = undefined;
   };
@@ -107,11 +109,17 @@ export function subscribeScopeRealtime(
     clearSocketTimers();
     onStatus("polling");
     freshness("polling");
+    const pollingCycle = ++pollingGeneration;
     const poll = async () => {
       const generation = recoveryGeneration;
       try {
         const confirmed = await onInvalidate();
-        if (confirmed === true && generation === recoveryGeneration) {
+        if (
+          !disposed &&
+          pollingCycle === pollingGeneration &&
+          confirmed === true &&
+          generation === recoveryGeneration
+        ) {
           recoveryGeneration += 1;
           recoveryRequired = false;
           lastConfirmedAt = Date.now();
@@ -119,7 +127,7 @@ export function subscribeScopeRealtime(
       } catch {
         // O polling só confirma freshness quando o recarregamento informa sucesso.
       } finally {
-        freshness("polling");
+        if (!disposed && pollingCycle === pollingGeneration) freshness("polling");
       }
     };
     void poll();

@@ -112,6 +112,7 @@ describe("invalidação em tempo real", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(freshness.mock.calls.at(-1)?.[0]).toMatchObject({
+      transport: "websocket",
       lastConfirmedAt: null,
       stale: true,
     });
@@ -120,10 +121,19 @@ describe("invalidação em tempo real", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(freshness.mock.calls.at(-1)?.[0]).toMatchObject({
+      transport: "websocket",
       lastConfirmedAt: null,
       stale: true,
     });
+
+    secondSocket?.emit("close");
+    expect(invalidate).toHaveBeenCalledTimes(3);
+    const callsBeforeUnsubscribe = freshness.mock.calls.length;
     unsubscribe();
+    resolvers[2]?.(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(freshness).toHaveBeenCalledTimes(callsBeforeUnsubscribe);
   });
 
   it("usa polling determinístico quando WebSocket não existe", () => {
