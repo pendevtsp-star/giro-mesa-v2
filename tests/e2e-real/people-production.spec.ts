@@ -170,7 +170,7 @@ async function mockPeopleApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "people-e2e",
-        schemaVersion: 78,
+        schemaVersion: 79,
         database: "up",
         integrations: {},
         capabilities: [

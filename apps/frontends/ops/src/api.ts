@@ -31,7 +31,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 78;
+export const OPS_REQUIRED_SCHEMA_VERSION = 79;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",

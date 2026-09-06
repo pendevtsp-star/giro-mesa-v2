@@ -7,7 +7,7 @@ export async function mockCompatibleApiHealth(page: Page, buildSha: string) {
         status: "ok",
         version: "2.0.0",
         buildSha,
-        schemaVersion: 78,
+        schemaVersion: 79,
         database: "up",
         integrations: {},
         capabilities: [

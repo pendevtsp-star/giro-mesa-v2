@@ -49,7 +49,7 @@ test("terminal compartilhado troca o operador por PIN e volta bloqueado", async 
         status: "ok",
         version: "2.0.0",
         buildSha: "terminal-switch-e2e",
-        schemaVersion: 78,
+        schemaVersion: 79,
         database: "up",
         integrations: {},
         capabilities: [

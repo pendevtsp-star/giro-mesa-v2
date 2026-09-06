@@ -1,6 +1,6 @@
 import { authSessions, identities, outboxEvents } from "@giromesa/db";
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
-import { and, asc, eq, gt, isNull, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import type { AuthContext } from "../auth/auth.service.js";
 import { DatabaseService } from "../database/database.module.js";
@@ -30,29 +30,44 @@ const subscriptionSchema = z.object({
   unitId: z.string().uuid(),
 });
 
+const REALTIME_OUTBOX_CHANNEL = "giromesa_realtime_outbox";
+const REALTIME_OUTBOX_BATCH_SIZE = 200;
+const outboxEventIdSchema = z.string().uuid();
+
 @Injectable()
 export class RealtimeService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RealtimeService.name);
   private readonly clients = new Set<RealtimeClient>();
-  private readonly startedAt = new Date();
-  private lastCreatedAt = this.startedAt;
-  private lastId = "00000000-0000-0000-0000-000000000000";
-  private timer?: NodeJS.Timeout;
-  private polling = false;
-  private nextAuthorizationCheckAt = Date.now() + 30_000;
+  private authorizationTimer?: NodeJS.Timeout;
+  private listenerReady = false;
+  private readonly pendingEventIds = new Set<string>();
+  private notificationScheduled = false;
+  private notificationWork: Promise<void> = Promise.resolve();
+  private unlisten?: () => Promise<void>;
 
   constructor(
     private readonly database: DatabaseService,
     private readonly scopes: ScopeService,
   ) {}
 
-  onModuleInit() {
-    this.timer = setInterval(() => void this.pollOutbox(), 500);
-    this.timer.unref();
+  async onModuleInit() {
+    const listener = await this.database.client.listen(
+      REALTIME_OUTBOX_CHANNEL,
+      (eventId) => this.enqueueOutboxEvent(eventId),
+      () => {
+        if (this.listenerReady) this.invalidateSubscribedClients();
+        this.listenerReady = true;
+      },
+    );
+    this.unlisten = () => listener.unlisten();
+    this.authorizationTimer = setInterval(() => void this.revalidateClients(), 30_000);
+    this.authorizationTimer.unref();
   }
 
-  onModuleDestroy() {
-    if (this.timer) clearInterval(this.timer);
+  async onModuleDestroy() {
+    if (this.authorizationTimer) clearInterval(this.authorizationTimer);
+    await this.unlisten?.();
+    await this.notificationWork;
     for (const client of this.clients) client.socket.close(1001, "Servidor encerrando");
     this.clients.clear();
   }
@@ -138,16 +153,31 @@ export class RealtimeService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async pollOutbox() {
-    if (this.polling || this.clients.size === 0) return;
-    this.polling = true;
-    try {
-      if (Date.now() >= this.nextAuthorizationCheckAt) {
-        await this.revalidateClients();
-        this.nextAuthorizationCheckAt = Date.now() + 30_000;
-      }
-      if (this.clients.size === 0) return;
-      const rows = await this.database.db
+  private enqueueOutboxEvent(eventId: string) {
+    const parsedEventId = outboxEventIdSchema.safeParse(eventId);
+    if (!parsedEventId.success) return;
+    this.pendingEventIds.add(parsedEventId.data);
+    if (this.notificationScheduled) return;
+    this.notificationScheduled = true;
+    this.notificationWork = this.notificationWork
+      .then(async () => {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        const eventIds = [...this.pendingEventIds];
+        this.pendingEventIds.clear();
+        this.notificationScheduled = false;
+        await this.publishOutboxEvents(eventIds);
+      })
+      .catch((error) => {
+        this.invalidateSubscribedClients();
+        this.logger.error("Falha ao publicar evento realtime", error);
+      });
+  }
+
+  private async publishOutboxEvents(eventIds: string[]) {
+    if (this.clients.size === 0) return;
+    for (let offset = 0; offset < eventIds.length; offset += REALTIME_OUTBOX_BATCH_SIZE) {
+      const batch = eventIds.slice(offset, offset + REALTIME_OUTBOX_BATCH_SIZE);
+      const events = await this.database.db
         .select({
           id: outboxEvents.id,
           topic: outboxEvents.topic,
@@ -157,17 +187,11 @@ export class RealtimeService implements OnModuleInit, OnModuleDestroy {
           createdAt: outboxEvents.createdAt,
         })
         .from(outboxEvents)
-        .where(
-          or(
-            gt(outboxEvents.createdAt, this.lastCreatedAt),
-            and(eq(outboxEvents.createdAt, this.lastCreatedAt), gt(outboxEvents.id, this.lastId)),
-          ),
-        )
-        .orderBy(asc(outboxEvents.createdAt), asc(outboxEvents.id))
-        .limit(200);
-      for (const event of rows) {
-        this.lastCreatedAt = event.createdAt;
-        this.lastId = event.id;
+        .where(inArray(outboxEvents.id, batch));
+      const eventsById = new Map(events.map((event) => [event.id, event]));
+      for (const eventId of batch) {
+        const event = eventsById.get(eventId);
+        if (!event) continue;
         const organizationId = event.payload.organizationId;
         const unitId = event.payload.unitId;
         if (typeof organizationId !== "string" || typeof unitId !== "string") continue;
@@ -181,10 +205,25 @@ export class RealtimeService implements OnModuleInit, OnModuleDestroy {
           createdAt: event.createdAt,
         });
       }
-    } catch (error) {
-      this.logger.error("Falha ao ler eventos para realtime", error);
-    } finally {
-      this.polling = false;
+    }
+  }
+
+  private invalidateSubscribedClients() {
+    const createdAt = new Date().toISOString();
+    for (const client of this.clients) {
+      if (client.expiresAt <= new Date()) {
+        this.disconnect(client, 1008, "Sessão expirada");
+        continue;
+      }
+      if (!client.organizationId || !client.unitId) continue;
+      this.send(client, {
+        type: "event",
+        topic: "system.realtime_resync",
+        aggregateType: "realtime",
+        aggregateId: client.unitId,
+        payload: { organizationId: client.organizationId, unitId: client.unitId },
+        createdAt,
+      });
     }
   }
 

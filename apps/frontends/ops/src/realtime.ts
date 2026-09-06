@@ -69,6 +69,8 @@ export function subscribeScopeRealtime(
   let socket: WebSocket | null = null;
   let subscribed = false;
   let lastConfirmedAt: number | null = null;
+  let recoveryGeneration = 0;
+  let recoveryRequired = false;
   let reconnectTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
   let pollingTimer: ReturnType<typeof globalThis.setInterval> | undefined;
   let handshakeTimer: ReturnType<typeof globalThis.setTimeout> | undefined;
@@ -106,9 +108,14 @@ export function subscribeScopeRealtime(
     onStatus("polling");
     freshness("polling");
     const poll = async () => {
+      const generation = recoveryGeneration;
       try {
         const confirmed = await onInvalidate();
-        if (confirmed === true) lastConfirmedAt = Date.now();
+        if (confirmed === true && generation === recoveryGeneration) {
+          recoveryGeneration += 1;
+          recoveryRequired = false;
+          lastConfirmedAt = Date.now();
+        }
       } catch {
         // O polling só confirma freshness quando o recarregamento informa sucesso.
       } finally {
@@ -180,7 +187,7 @@ export function subscribeScopeRealtime(
           if (heartbeatAckTimer !== undefined) globalThis.clearTimeout(heartbeatAckTimer);
           handshakeTimer = undefined;
           heartbeatAckTimer = undefined;
-          lastConfirmedAt = Date.now();
+          if (!recoveryRequired) lastConfirmedAt = Date.now();
           onStatus("live");
           freshness("websocket");
           if (heartbeatTimer === undefined) {
@@ -190,7 +197,27 @@ export function subscribeScopeRealtime(
         }
         const scopedEvent = scopeEvent(value);
         if (subscribed && scopedEvent) {
-          lastConfirmedAt = Date.now();
+          if (scopedEvent.topic === "system.realtime_resync") {
+            const generation = ++recoveryGeneration;
+            recoveryRequired = true;
+            lastConfirmedAt = null;
+            freshness("websocket");
+            void (async () => {
+              try {
+                const confirmed = await onInvalidate();
+                if (!disposed && generation === recoveryGeneration && confirmed === true) {
+                  recoveryRequired = false;
+                  lastConfirmedAt = Date.now();
+                }
+              } catch {
+                // A recuperação continua marcada como desatualizada até o próximo snapshot confirmado.
+              } finally {
+                if (!disposed && generation === recoveryGeneration) freshness("websocket");
+              }
+            })();
+            return;
+          }
+          if (!recoveryRequired) lastConfirmedAt = Date.now();
           freshness("websocket");
           options.onEvent?.(scopedEvent);
           if (options.shouldInvalidate?.(scopedEvent) ?? true) onInvalidate();

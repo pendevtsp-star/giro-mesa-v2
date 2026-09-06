@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0078_inventory_resale_product_unique",
+  "requiredAppliedMigration": "0079_realtime_outbox_notify",
   "transitions": [],
   "fullRestore": {
     "required": true,
