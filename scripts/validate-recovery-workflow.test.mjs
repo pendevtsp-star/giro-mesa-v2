@@ -88,16 +88,38 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
   assert.match(migration, /CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx"/);
 });
 
-test("recovery authorization stays closed until schema 79 evidence exists", () => {
+test("privileged recovery authorization binds the schema 79 evidence", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
   assert.equal(matrix.targetMigration, "0079_realtime_outbox_notify");
-  assert.deepEqual(matrix.transitions, []);
-  assert.match(publish, /if not transitions:/);
-  assert.match(publish, /enabled=false/);
+  assert.equal(matrix.transitions.length, 10);
+  const expectedEvidence = {
+    path: "docs/evidence/recovery/36cec6-validation-0079.json",
+    sha256: "sha256:ef02a8bcc62efa356237b9711515d4bfb9b31cae24fb0e371757a220ea610c84",
+    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34002795549",
+    testReportDigest:
+      "sha256:ef02a8bcc62efa356237b9711515d4bfb9b31cae24fb0e371757a220ea610c84",
+  };
+  for (const transition of matrix.transitions) {
+    assert.equal(transition.appliedAfter, matrix.targetMigration);
+    assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
+    assert.equal(transition.recoveryArtifact, "git:36cec6535b1826f6ebe34b98cb697762e3517ceb");
+    assert.equal(transition.testedUpgrade, true);
+    assert.deepEqual(transition.evidence, expectedEvidence);
+  }
+  const evidence = JSON.parse(readFileSync(join(root, expectedEvidence.path), "utf8"));
+  assert.equal(evidence.targetMigration, matrix.targetMigration);
+  assert.deepEqual(evidence.schemaLevels, [77, 79]);
+  assert.equal(evidence.runtime.schemaLevel, 79);
+  assert.equal(evidence.securityScan.gitleaks, "passed");
+  assert.equal(evidence.securityScan.trivy, "passed");
   for (const scriptPath of [entrypointPath, provenancePath]) {
     const script = readFileSync(scriptPath, "utf8");
     assert.match(script, /evidence\.get\("schemaLevels"\) == expected_levels/);
     assert.match(script, /"schemaLevel":(?:target_identity\[1\]|expected_levels\[1\])/);
   }
+  assert.match(publish, /docs\/evidence\/recovery\//);
+  assert.match(publish, /recovery evidence hash mismatch/);
+  assert.match(publish, /exactly one recovery artifact and evidence are allowed/);
+  assert.match(publish, /duplicate recovery source transition/);
 });

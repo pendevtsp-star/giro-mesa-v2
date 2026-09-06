@@ -748,7 +748,35 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
   assert.equal(recovery.targetMigration, "0079_realtime_outbox_notify");
-  assert.deepEqual(recovery.transitions, []);
+  assert.deepEqual(
+    recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
+      appliedBefore,
+      appliedBeforeWhen,
+    })),
+    [
+      { appliedBefore: "0026_doseclub_integration", appliedBeforeWhen: "1786493658116" },
+      { appliedBefore: "0042_shallow_lenny_balinger", appliedBeforeWhen: "1787029862431" },
+      { appliedBefore: "0045_strong_pride", appliedBeforeWhen: "1787256690924" },
+      { appliedBefore: "0053_petite_trauma", appliedBeforeWhen: "1787373316439" },
+      { appliedBefore: "0074_crm_operational_inbox", appliedBeforeWhen: "1787709600000" },
+      { appliedBefore: "0075_platform_staff_invitations", appliedBeforeWhen: "1787796000000" },
+      { appliedBefore: "0076_edge_hub_pairing", appliedBeforeWhen: "1788307200000" },
+      { appliedBefore: "0077_people_multi_role_access", appliedBeforeWhen: "1788310800000" },
+      {
+        appliedBefore: "0078_inventory_resale_product_unique",
+        appliedBeforeWhen: "1788610825689",
+      },
+      { appliedBefore: "0079_realtime_outbox_notify", appliedBeforeWhen: "1788654500000" },
+    ],
+  );
+  for (const transition of recovery.transitions) {
+    assert.equal(transition.appliedAfter, recovery.targetMigration);
+    assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
+    assert.equal(transition.recoveryArtifact, "git:36cec6535b1826f6ebe34b98cb697762e3517ceb");
+    assert.equal(transition.testedUpgrade, true);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34002795549$/);
+    assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
+  }
 });
 
 test("deployment and rollback compose contracts always include observability and digest images", () => {
