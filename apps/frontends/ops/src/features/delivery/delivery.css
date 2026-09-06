@@ -717,6 +717,7 @@
   margin: 0;
 }
 
+.delivery-realtime-notices li,
 .delivery-history li,
 .delivery-notifications li {
   display: grid;
