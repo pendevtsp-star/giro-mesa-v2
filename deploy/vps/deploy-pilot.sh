@@ -335,6 +335,13 @@ export DOCKER_CONFIG=${GIROMESA_DOCKER_CONFIG_DIRECTORY:?GIROMESA_DOCKER_CONFIG_
 compose=(docker compose --project-name giromesa-v2-pilot --env-file "$env_file" -f "$compose_file" -f "$images_file" -f "$observability_file")
 "${compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
+target_image_candidate_text=$("${compose[@]}" config --format json | python3 -c '
+import json, sys
+for service, definition in json.load(sys.stdin).get("services", {}).items():
+    image = definition.get("image")
+    if isinstance(image, str): print(f"{service}\t{image}")
+')
+mapfile -t target_image_candidates <<<"$target_image_candidate_text"
 mapfile -t recovery_image_values < <(python3 - "$recovery_attestation" <<'PY'
 import json, sys
 value = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -353,13 +360,6 @@ recovery_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$e
 export COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT:-1}
 "${recovery_compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
-target_image_candidate_text=$("${compose[@]}" config --format json | python3 -c '
-import json, sys
-for service, definition in json.load(sys.stdin).get("services", {}).items():
-    image = definition.get("image")
-    if isinstance(image, str): print(f"{service}\t{image}")
-')
-mapfile -t target_image_candidates <<<"$target_image_candidate_text"
 recovery_image_candidate_text=$("${recovery_compose[@]}" config --format json | python3 -c '
 import json, sys
 for service, definition in json.load(sys.stdin).get("services", {}).items():

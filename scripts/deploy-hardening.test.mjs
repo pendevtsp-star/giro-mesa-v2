@@ -521,6 +521,10 @@ test("deploy rejects insufficient Docker bytes or inodes before any recovery pul
   assert.match(deploy, /DISK_INODES_INSUFFICIENT/);
   assert.match(deploy, /DISK_IMAGE_ESTIMATE_UNAVAILABLE/);
   assert.match(deploy, /config --format json/);
+  const targetSnapshot = deploy.indexOf('target_image_candidate_text=$(');
+  const recoveryEnvironment = deploy.indexOf('export GIROMESA_API_IMAGE=${recovery_image_values[0]}');
+  assert.ok(targetSnapshot >= 0 && targetSnapshot < recoveryEnvironment,
+    "capture target images before Compose inherits recovery image variables");
 });
 
 test("disk estimate supports OCI and Docker manifests and rejects ambiguous platforms", () => {
