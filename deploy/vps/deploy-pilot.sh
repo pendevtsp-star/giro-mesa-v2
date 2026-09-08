@@ -102,12 +102,12 @@ if isinstance(payload, list):
     if len(matches) != 1:
         raise SystemExit(1)
     payload = matches[0]
-manifest = payload.get("SchemaV2Manifest", payload)
+manifest = payload.get("OCIManifest") or payload.get("SchemaV2Manifest") or payload
 layers = manifest.get("layers")
 if not isinstance(layers, list) or not layers:
     raise SystemExit(1)
 sizes = [layer.get("size") for layer in layers]
-if not all(isinstance(size, int) and size >= 0 for size in sizes):
+if not all(type(size) is int and size >= 0 for size in sizes):
     raise SystemExit(1)
 print(sum(sizes))
 ' "$architecture") || { echo "DISK_IMAGE_ESTIMATE_UNAVAILABLE:$service" >&2; return 1; }

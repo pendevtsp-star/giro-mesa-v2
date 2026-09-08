@@ -523,6 +523,38 @@ test("deploy rejects insufficient Docker bytes or inodes before any recovery pul
   assert.match(deploy, /config --format json/);
 });
 
+test("disk estimate supports OCI and Docker manifests and rejects ambiguous platforms", () => {
+  const source = readFileSync(deployScript, "utf8").match(
+    /docker manifest inspect --verbose "\$image" \| python3 -c '\n([\s\S]*?)\n' "\$architecture"/,
+  )?.[1];
+  assert.ok(source);
+  const layers = [{ size: 100 }, { size: 900 }];
+  const oci = {
+    Descriptor: { platform: { os: "linux", architecture: "amd64" } },
+    OCIManifest: { layers },
+  };
+  for (const [payload, expected] of [
+    [{ layers }, "1000"],
+    [{ SchemaV2Manifest: { layers } }, "1000"],
+    [oci, "1000"],
+    [[oci, { Descriptor: { platform: { os: "unknown", architecture: "unknown" } } }], "1000"],
+    [[oci, oci], null],
+    [{ layers: [{ size: true }] }, null],
+    [{ OCIManifest: {} }, null],
+  ]) {
+    const result = spawnSync(
+      process.platform === "win32" ? "python" : "python3",
+      ["-c", source, "amd64"],
+      {
+        input: JSON.stringify(payload),
+        encoding: "utf8",
+      },
+    );
+    assert.equal(result.status === 0, expected !== null, output(result));
+    if (expected !== null) assert.equal(result.stdout.trim(), expected);
+  }
+});
+
 test("disk gate preserves headroom, deduplicates images and fails closed on unavailable estimates", () => {
   const source = readFileSync(deployScript, "utf8").match(
     /release_disk_gate\(\) \{[\s\S]*?\n\}/,
@@ -688,7 +720,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0079_realtime_outbox_notify");
+  assert.equal(matrix.requiredAppliedMigration, "0080_campaign_attribution_cost");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -805,7 +837,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0079_realtime_outbox_notify");
+  assert.equal(recovery.targetMigration, "0080_campaign_attribution_cost");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -825,6 +857,7 @@ test("pre-migration backup binds the migration actually applied in the source da
         appliedBeforeWhen: "1788610825689",
       },
       { appliedBefore: "0079_realtime_outbox_notify", appliedBeforeWhen: "1788654500000" },
+      { appliedBefore: "0080_campaign_attribution_cost", appliedBeforeWhen: "1788829660611" },
     ],
   );
   for (const transition of recovery.transitions) {
@@ -832,7 +865,7 @@ test("pre-migration backup binds the migration actually applied in the source da
     assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
     assert.equal(transition.recoveryArtifact, "git:36cec6535b1826f6ebe34b98cb697762e3517ceb");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34002795549$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34253704633$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });

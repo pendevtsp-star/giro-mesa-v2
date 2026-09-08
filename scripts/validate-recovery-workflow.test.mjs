@@ -88,17 +88,17 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
   assert.match(migration, /CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx"/);
 });
 
-test("privileged recovery authorization binds the schema 79 evidence", () => {
+test("privileged recovery authorization binds the schema 80 evidence", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0079_realtime_outbox_notify");
-  assert.equal(matrix.transitions.length, 10);
+  assert.equal(matrix.targetMigration, "0080_campaign_attribution_cost");
+  assert.equal(matrix.transitions.length, 11);
   const expectedEvidence = {
-    path: "docs/evidence/recovery/36cec6-validation-0079.json",
-    sha256: "sha256:ef02a8bcc62efa356237b9711515d4bfb9b31cae24fb0e371757a220ea610c84",
-    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34002795549",
+    path: "docs/evidence/recovery/36cec6-validation-0080.json",
+    sha256: "sha256:8f2574d745496c2c49986c1c7a8994b7f093a3154e2d48f28493d7ee1acc8a06",
+    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34253704633",
     testReportDigest:
-      "sha256:ef02a8bcc62efa356237b9711515d4bfb9b31cae24fb0e371757a220ea610c84",
+      "sha256:8f2574d745496c2c49986c1c7a8994b7f093a3154e2d48f28493d7ee1acc8a06",
   };
   for (const transition of matrix.transitions) {
     assert.equal(transition.appliedAfter, matrix.targetMigration);
@@ -109,8 +109,8 @@ test("privileged recovery authorization binds the schema 79 evidence", () => {
   }
   const evidence = JSON.parse(readFileSync(join(root, expectedEvidence.path), "utf8"));
   assert.equal(evidence.targetMigration, matrix.targetMigration);
-  assert.deepEqual(evidence.schemaLevels, [77, 79]);
-  assert.equal(evidence.runtime.schemaLevel, 79);
+  assert.deepEqual(evidence.schemaLevels, [77, 80]);
+  assert.equal(evidence.runtime.schemaLevel, 80);
   assert.equal(evidence.securityScan.gitleaks, "passed");
   assert.equal(evidence.securityScan.trivy, "passed");
   for (const scriptPath of [entrypointPath, provenancePath]) {
