@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -142,4 +144,20 @@ test("importing the validator does not execute the CLI", () => {
   assert.equal(result.status, 0);
   assert.equal(result.stdout, "");
   assert.equal(result.stderr, "");
+});
+
+test("CI keeps the required baseline gate after technical checks and E2E", () => {
+  const workflow = readFileSync(join(process.cwd(), ".github", "workflows", "ci.yml"), "utf8");
+  const e2eIndex = workflow.indexOf("      - run: pnpm test:e2e");
+  const baselineStep =
+    "      - name: Verify production baseline manifest\n        run: pnpm production:baseline";
+  const baselineIndex = workflow.indexOf(baselineStep);
+
+  assert.ok(e2eIndex >= 0, "CI must run E2E");
+  assert.ok(baselineIndex > e2eIndex, "CI must validate the baseline after E2E");
+  assert.equal([...workflow.matchAll(/run: pnpm production:baseline/g)].length, 1);
+  const nextJobIndex = workflow.indexOf("\n  dotnet:", baselineIndex);
+  assert.ok(nextJobIndex > baselineIndex);
+  assert.doesNotMatch(workflow.slice(0, nextJobIndex), /continue-on-error:\s*true/);
+  assert.doesNotMatch(workflow.slice(baselineIndex, nextJobIndex), /\bif:/);
 });

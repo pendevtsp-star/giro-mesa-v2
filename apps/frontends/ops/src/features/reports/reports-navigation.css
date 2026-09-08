@@ -202,7 +202,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .reports-multiunit-table thead {
+  .reports-responsive-table thead {
     border: 0;
     clip: rect(0 0 0 0);
     height: 1px;
@@ -214,25 +214,25 @@
     width: 1px;
   }
 
-  .reports-multiunit-table,
-  .reports-multiunit-table tbody,
-  .reports-multiunit-table tr {
+  .reports-responsive-table,
+  .reports-responsive-table tbody,
+  .reports-responsive-table tr {
     display: grid;
     min-width: 0;
     width: 100%;
   }
 
-  .reports-multiunit-table tbody {
+  .reports-responsive-table tbody {
     gap: var(--gm-space-3);
   }
 
-  .reports-multiunit-table tr {
+  .reports-responsive-table tr {
     border: 1px solid var(--gm-border);
     border-radius: 8px;
     padding: var(--gm-space-2);
   }
 
-  .reports-multiunit-table :is(td, th) {
+  .reports-responsive-table :is(td, th) {
     align-items: start;
     border: 0;
     display: flex;
@@ -243,7 +243,7 @@
     text-align: right;
   }
 
-  .reports-multiunit-table :is(td, th)::before {
+  .reports-responsive-table :is(td, th)::before {
     color: var(--gm-muted);
     content: attr(data-label);
     flex: 0 0 42%;

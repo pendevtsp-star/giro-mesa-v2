@@ -42,6 +42,7 @@ Get-ChildItem -LiteralPath "packages/api-client-csharp/Generated" -Recurse -Filt
     [System.Text.RegularExpressions.RegexOptions]::Multiline
   )
   [System.IO.File]::WriteAllText($_.FullName, $normalized, $utf8NoBom)
+  Write-LfUtf8File -Path $_.FullName
 }
 
 Get-ChildItem -LiteralPath "packages/api-client-csharp/Generated" -Recurse -Filter "*.json" | ForEach-Object {

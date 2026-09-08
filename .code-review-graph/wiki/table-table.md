@@ -63,7 +63,7 @@ Directory-based community: packages/ui
 | TableHeader | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 13-21 |
 | TableBody | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 22-30 |
 
-*... and 20 more members.*
+*... and 22 more members.*
 
 ## Execution Flows
 
@@ -78,7 +78,6 @@ No execution flows pass through this community.
 - `expect` (25 edge(s))
 - `ReactNode` (18 edge(s))
 - `HTMLAttributes` (9 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx::Icon` (6 edge(s))
 - `useEffect` (4 edge(s))
 - `onClose` (2 edge(s))
 - `stopPropagation` (2 edge(s))
@@ -88,6 +87,7 @@ No execution flows pass through this community.
 - `close` (2 edge(s))
 - `VariantProps` (1 edge(s))
 - `alertVariants` (1 edge(s))
+- `badgeVariants` (1 edge(s))
 
 ### Incoming
 
@@ -99,10 +99,10 @@ No execution flows pass through this community.
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Accordion/Accordion.tsx` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Pagination/Pagination.tsx` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Alert/Alert.tsx` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Button/Button.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Separator/Separator.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Toast/Toast.tsx` (2 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/layouts/KanbanBoard/KanbanBoard.tsx` (2 edge(s))

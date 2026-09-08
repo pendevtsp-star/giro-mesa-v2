@@ -480,6 +480,7 @@ export const campaignDeliveries = pgTable(
     attributedOrderRef: uuid("attributed_order_ref"),
     attributedCouponRedemptionId: uuid("attributed_coupon_redemption_id"),
     attributedRevenueCents: integer("attributed_revenue_cents"),
+    attributedCostCents: integer("attributed_cost_cents"),
     experimentVariant: varchar("experiment_variant", { length: 10 })
       .$type<"control" | "a" | "b">()
       .notNull()

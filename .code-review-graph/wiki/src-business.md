@@ -4,8 +4,8 @@
 
 Directory-based community: packages/domain
 
-- **Size**: 79 nodes
-- **Cohesion**: 0.4149
+- **Size**: 80 nodes
+- **Cohesion**: 0.4177
 - **Dominant Language**: typescript
 
 ## Members
@@ -63,7 +63,7 @@ Directory-based community: packages/domain
 | ActivationChecklist | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 17-17 |
 | missingActivationItems | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 19-21 |
 
-*... and 29 more members.*
+*... and 30 more members.*
 
 ## Execution Flows
 
@@ -73,7 +73,7 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `equal` (62 edge(s))
+- `equal` (65 edge(s))
 - `from` (10 edge(s))
 - `some` (7 edge(s))
 - `update` (6 edge(s))
@@ -91,7 +91,7 @@ No execution flows pass through this community.
 
 ### Incoming
 
-- `equal` (62 edge(s))
+- `equal` (65 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts` (13 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts` (9 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/billing.ts` (7 edge(s))

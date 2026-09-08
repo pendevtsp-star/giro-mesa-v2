@@ -16,12 +16,21 @@ import {
   identities,
   managementCashSettings,
   managementTimeTrackingSettings,
+  memberships,
   organizations,
   outboxEvents,
   posCatalogBranding,
+  posDiningRooms,
+  posDiningTables,
   posIdempotencyReceipts,
+  posOrders,
+  posProductionPrinters,
   posProductionStations,
+  posProductPrices,
+  posProducts,
+  posTabs,
   publicMenus,
+  roleBindings,
   units,
 } from "@giromesa/db";
 import {
@@ -31,7 +40,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { replayResult, requestHash } from "../pilot-operations/pilot-rules.js";
 import { ScopeService } from "./scope.service.js";
@@ -678,7 +687,20 @@ export class EstablishmentSettingsService {
 
   async specializedSummary(identityId: string, organizationId: string, unitId: string) {
     await this.requireManager(identityId, organizationId, unitId);
-    const [catalog, cash, people, stations, fiscal, devices, organization] = await Promise.all([
+    const [
+      catalog,
+      cash,
+      people,
+      stations,
+      fiscal,
+      devices,
+      organization,
+      products,
+      tables,
+      team,
+      printers,
+      completedService,
+    ] = await Promise.all([
       this.database.db
         .select({ active: publicMenus.active, publishedVersion: publicMenus.version })
         .from(publicMenus)
@@ -736,6 +758,78 @@ export class EstablishmentSettingsService {
         .from(organizations)
         .where(eq(organizations.id, organizationId))
         .limit(1),
+      this.database.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(posProducts)
+        .innerJoin(
+          posProductPrices,
+          and(
+            eq(posProductPrices.productId, posProducts.id),
+            eq(posProductPrices.organizationId, organizationId),
+            eq(posProductPrices.unitId, unitId),
+          ),
+        )
+        .where(and(eq(posProducts.organizationId, organizationId), eq(posProducts.active, true))),
+      this.database.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(posDiningTables)
+        .innerJoin(
+          posDiningRooms,
+          and(
+            eq(posDiningRooms.id, posDiningTables.roomId),
+            eq(posDiningRooms.organizationId, organizationId),
+            eq(posDiningRooms.unitId, unitId),
+          ),
+        )
+        .where(
+          and(
+            eq(posDiningTables.organizationId, organizationId),
+            eq(posDiningTables.unitId, unitId),
+            eq(posDiningTables.active, true),
+            eq(posDiningRooms.active, true),
+          ),
+        ),
+      this.database.db
+        .select({ count: sql<number>`count(distinct ${memberships.identityId})::int` })
+        .from(memberships)
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .where(
+          and(
+            eq(memberships.organizationId, organizationId),
+            eq(memberships.status, "active"),
+            or(eq(roleBindings.unitId, unitId), isNull(roleBindings.unitId)),
+          ),
+        ),
+      this.database.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(posProductionPrinters)
+        .where(
+          and(
+            eq(posProductionPrinters.organizationId, organizationId),
+            eq(posProductionPrinters.unitId, unitId),
+            eq(posProductionPrinters.active, true),
+          ),
+        ),
+      this.database.db
+        .select({ id: posOrders.id })
+        .from(posOrders)
+        .innerJoin(
+          posTabs,
+          and(
+            eq(posTabs.id, posOrders.tabId),
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+          ),
+        )
+        .where(
+          and(
+            eq(posOrders.organizationId, organizationId),
+            eq(posOrders.unitId, unitId),
+            eq(posOrders.status, "served"),
+            eq(posTabs.status, "closed"),
+          ),
+        )
+        .limit(1),
     ]);
     return {
       catalog: {
@@ -748,6 +842,13 @@ export class EstablishmentSettingsService {
       fiscal: { configured: fiscal.length > 0 },
       devices: { activeCount: devices[0]?.count ?? 0 },
       billing: { state: organization[0]?.billingState ?? "unknown" },
+      setup: {
+        activeProducts: products[0]?.count ?? 0,
+        activeTables: tables[0]?.count ?? 0,
+        activePeople: team[0]?.count ?? 0,
+        activePrinters: printers[0]?.count ?? 0,
+        completedService: completedService.length > 0,
+      },
     };
   }
 

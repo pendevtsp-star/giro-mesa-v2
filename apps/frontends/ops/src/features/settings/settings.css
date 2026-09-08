@@ -4,7 +4,100 @@
   min-width: 0;
 }
 .settings-page section {
-  scroll-margin-top: var(--gm-space-4);
+  scroll-margin-top: calc(var(--gm-shell-topbar-height, 64px) + var(--gm-space-4));
+}
+
+.setup-checklist {
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius);
+  min-width: 0;
+  padding: var(--gm-space-4);
+}
+
+.setup-checklist > header,
+.setup-checklist__extras > li {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.setup-checklist h2,
+.setup-checklist h3 {
+  margin: 0;
+}
+
+.setup-checklist h3 {
+  font-size: var(--gm-font-base);
+}
+
+.setup-checklist p {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+  margin: var(--gm-space-1) 0 0;
+}
+
+.setup-checklist__summary {
+  padding: var(--gm-space-3) 0;
+}
+
+.setup-checklist__summary strong {
+  color: var(--gm-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-checklist__steps,
+.setup-checklist__extras {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.setup-checklist__steps > li {
+  align-items: center;
+  border-top: 1px solid var(--gm-border);
+  display: grid;
+  gap: var(--gm-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  padding: var(--gm-space-4) 0;
+}
+
+.setup-checklist__steps > li > svg {
+  color: var(--gm-muted);
+}
+
+.setup-checklist__steps a {
+  text-decoration: none;
+}
+
+.setup-checklist__extras > li {
+  border-bottom: 1px solid var(--gm-border);
+  padding: var(--gm-space-3) 0;
+}
+
+.setup-checklist .setup-checklist__note {
+  line-height: var(--gm-leading-normal);
+  margin-top: var(--gm-space-3);
+}
+
+@media (max-width: 760px) {
+  .setup-checklist__steps > li {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .setup-checklist__steps > li > :where(.gm-badge),
+  .setup-checklist__steps > li > a {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .setup-checklist .gm-button,
+  .setup-checklist summary {
+    min-height: 40px;
+  }
 }
 .settings-status-bar,
 .settings-card > header,

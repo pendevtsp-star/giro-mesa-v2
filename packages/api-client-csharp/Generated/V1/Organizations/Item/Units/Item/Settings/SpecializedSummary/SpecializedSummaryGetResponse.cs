@@ -68,6 +68,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Specializ
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_people People { get; set; }
 #endif
+        /// <summary>The setup property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_setup? Setup { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_setup Setup { get; set; }
+#endif
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -93,6 +101,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Specializ
                 { "fiscal", n => { Fiscal = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_fiscal>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_fiscal.CreateFromDiscriminatorValue); } },
                 { "kds", n => { Kds = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_kds>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_kds.CreateFromDiscriminatorValue); } },
                 { "people", n => { People = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_people>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_people.CreateFromDiscriminatorValue); } },
+                { "setup", n => { Setup = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_setup>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_setup.CreateFromDiscriminatorValue); } },
             };
         }
         /// <summary>
@@ -109,6 +118,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.Specializ
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_fiscal>("fiscal", Fiscal);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_kds>("kds", Kds);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_people>("people", People);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Settings.SpecializedSummary.SpecializedSummaryGetResponse_setup>("setup", Setup);
         }
     }
 }

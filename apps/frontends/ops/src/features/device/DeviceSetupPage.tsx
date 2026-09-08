@@ -10,7 +10,7 @@ import {
   type ShellPaymentCapabilities,
   type ShellPaymentPairingResult,
 } from "../counter/pos-payment-bridge";
-import { type PaymentCapabilities, posPayments } from "../counter/pos-payments";
+import { type PaymentCapabilities, paymentBlockReason, posPayments } from "../counter/pos-payments";
 import { ProductionPrintersPanel } from "./ProductionPrintersPanel";
 import { SmartPosAdminPanel } from "./SmartPosAdminPanel";
 import "./device.css";
@@ -91,16 +91,15 @@ function NativePairingCard({ onPaired }: { onPaired: () => void }) {
     <Card className="device-setup__card device-pairing-card">
       <div className="device-setup__heading">
         <div>
-          <p className="eyebrow">Ativar este APK</p>
-          <h2>Pareamento do SmartPOS</h2>
+          <h2>Ativar esta maquininha</h2>
         </div>
         <Badge tone={result?.success ? "success" : error ? "danger" : "info"}>
           {busy ? "Verificando" : result?.success ? "Pareado" : "Aguardando código"}
         </Badge>
       </div>
       <p>
-        Ao abrir o QR Code pelo sistema do terminal, o APK consome o deep link uma vez e executa o
-        pareamento P-256. Se isso não ocorrer, digite o código temporário abaixo.
+        Abra o QR Code no aplicativo da maquininha para vinculá-la à unidade. Se a ativação não
+        iniciar, digite o código temporário abaixo.
       </p>
       <form
         className="device-pairing-form"
@@ -133,7 +132,7 @@ function NativePairingCard({ onPaired }: { onPaired: () => void }) {
           <p>
             {result.available
               ? `Pagamento disponível${result.provider ? ` via ${result.provider.toUpperCase()}` : ""}.`
-              : "O terminal foi identificado, mas pagamento continua bloqueado até certificação e capabilities confirmadas pelo servidor."}
+              : "A maquininha foi identificada. Para cobrar, ainda é preciso concluir a homologação e confirmar a liberação do aplicativo e do servidor."}
           </p>
         </Callout>
       )}
@@ -192,8 +191,9 @@ export function DeviceSetupPage({
   }, [organizationId, pairingRevision, runtime.deviceId, unitId]);
 
   useEffect(() => {
+    void pairingRevision;
+    setNativePayment(null);
     if (!runtime.embedded) {
-      setNativePayment(null);
       return;
     }
     let active = true;
@@ -203,13 +203,15 @@ export function DeviceSetupPage({
     return () => {
       active = false;
     };
-  }, [runtime.embedded]);
+  }, [pairingRevision, runtime.embedded]);
 
   const nativeMatchesBackend =
     payment.status === "ready" &&
     nativePayment?.available === true &&
     nativePayment.configured &&
     nativePayment.homologated &&
+    payment.data.provider !== null &&
+    payment.data.methods.length > 0 &&
     nativePayment.provider === payment.data.provider &&
     payment.data.methods.every((method) => nativePayment.methods.includes(method));
   const paymentReady =
@@ -222,12 +224,12 @@ export function DeviceSetupPage({
     <section className="device-setup" aria-label="Instalação e diagnóstico do dispositivo">
       <Callout tone={runtime.embedded ? "success" : "info"}>
         <strong>
-          {runtime.embedded ? "Aplicativo do terminal conectado" : "Executando como PWA"}
+          {runtime.embedded ? "Aplicativo da maquininha conectado" : "Atendimento pelo navegador"}
         </strong>
         <p>
           {runtime.embedded
-            ? "O GiroMesa pode entregar cobranças ao adaptador homologado desta maquininha."
-            : "A PWA instala o atendimento, sem pagamento direto. O navegador não recebe dados de cartão."}
+            ? "Confira abaixo se esta maquininha está liberada para cobrar. A conexão do aplicativo, sozinha, não libera pagamentos."
+            : "Você pode instalar o GiroMesa na tela inicial. A cobrança integrada exige o aplicativo homologado da maquininha; o navegador não recebe dados de cartão."}
         </p>
       </Callout>
 
@@ -254,17 +256,16 @@ export function DeviceSetupPage({
         <Card className="device-setup__card">
           <div className="device-setup__heading">
             <div>
-              <p className="eyebrow">Aplicativo</p>
               <h2>{runtime.embedded ? "Aplicativo SmartPOS" : "Instalar neste dispositivo"}</h2>
             </div>
             <Badge tone={runtime.embedded || pwa.install === "installed" ? "success" : "info"}>
-              {runtime.embedded ? "APK conectado" : installLabel(pwa.install)}
+              {runtime.embedded ? "Aplicativo conectado" : installLabel(pwa.install)}
             </Badge>
           </div>
           <p>
             {runtime.embedded
-              ? "Este APK deve ser iniciado pelo portal público e instalado pela loja ou pelo processo homologado do fabricante."
-              : "Instale a PWA pelo navegador para deixar o atendimento na tela inicial, em modo retrato. Ela não substitui o APK de pagamento."}
+              ? "Use a versão distribuída pela loja ou pelo processo aprovado pelo fabricante da maquininha."
+              : "Instale pelo navegador para abrir o atendimento diretamente da tela inicial. Isso não habilita a cobrança integrada."}
           </p>
           <dl className="device-diagnostics">
             {runtime.embedded ? (
@@ -289,8 +290,12 @@ export function DeviceSetupPage({
                   <dd>{pwa.secureContext ? "Pronta" : "HTTPS obrigatório"}</dd>
                 </div>
                 <div>
-                  <dt>Uso sem rede</dt>
-                  <dd>{pwa.serviceWorker ? "Shell preparado" : "Ainda não preparado"}</dd>
+                  <dt>Abertura do aplicativo sem rede</dt>
+                  <dd>
+                    {pwa.serviceWorker
+                      ? "Interface salva neste dispositivo"
+                      : "Ainda não preparada"}
+                  </dd>
                 </div>
                 <div>
                   <dt>Atualização</dt>
@@ -335,7 +340,6 @@ export function DeviceSetupPage({
         <Card className="device-setup__card">
           <div className="device-setup__heading">
             <div>
-              <p className="eyebrow">Pagamento</p>
               <h2>Maquininha integrada</h2>
             </div>
             <Badge
@@ -381,8 +385,8 @@ export function DeviceSetupPage({
                   <strong>Pagamento direto bloqueado</strong>
                   <p>
                     {!runtime.embedded
-                      ? "A PWA operacional não acessa o SDK da maquininha. Cartão e Pix não serão registrados manualmente."
-                      : (payment.data.reason ??
+                      ? "Abra o GiroMesa no aplicativo homologado da maquininha para usar a cobrança integrada. Nenhum pagamento será confirmado sem retorno do provedor."
+                      : (paymentBlockReason(payment.data.reason) ??
                         "Esta instalação ainda não possui provedor homologado. Cartão e Pix não serão registrados manualmente.")}
                   </p>
                 </Callout>
@@ -394,8 +398,8 @@ export function DeviceSetupPage({
                     {!nativeMatchesBackend
                       ? "Configuração, provedor ou métodos do aplicativo divergem do servidor."
                       : nativePayment?.errorCode
-                        ? `O shell bloqueou o início (${nativePayment.errorCode}).`
-                        : "A integração do servidor está homologada, mas o adaptador nativo ainda não confirmou prontidão."}
+                        ? `O aplicativo não liberou a cobrança. Referência para o suporte: ${nativePayment.errorCode}.`
+                        : "O servidor liberou a integração, mas o aplicativo da maquininha ainda não confirmou que pode cobrar."}
                   </p>
                 </Callout>
               )}
@@ -408,14 +412,22 @@ export function DeviceSetupPage({
           ) : (
             <p role="status">Consultando a configuração desta instalação…</p>
           )}
+          <Button
+            disabled={payment.status === "loading"}
+            onClick={() => setPairingRevision((value) => value + 1)}
+            variant="secondary"
+          >
+            Conferir maquininha novamente
+          </Button>
         </Card>
       </div>
 
       <Callout tone="warning">
-        <strong>Limite importante</strong>
+        <strong>Antes de receber o primeiro pagamento</strong>
         <p>
-          Instalar a PWA não instala o SDK bancário. O pagamento só é liberado pela certificação
-          interna e pelo APK homologado para o terminal; nunca pela PWA.
+          Contrate um provedor compatível, obtenha o equipamento e conclua a homologação. Teste
+          cobrança, cancelamento e recuperação de uma operação sem resposta no equipamento real.
+          Instalar o GiroMesa não substitui essas etapas.
         </p>
       </Callout>
     </section>

@@ -68,6 +68,8 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
   };
   let copyKey = "";
   let mediaUploads = 0;
+  let specializedSummary: "backend79" | "ready" = "backend79";
+  let specializedSummaryFailuresRemaining = 0;
 
   await page.route(/\/v1\//, async (route) => {
     const request = route.request();
@@ -119,7 +121,11 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
       ]);
     if (path.endsWith(`/units/${unitId}/settings`) && request.method() === "GET")
       return json(settings);
-    if (path.endsWith(`/units/${unitId}/settings/specialized-summary`))
+    if (path.endsWith(`/units/${unitId}/settings/specialized-summary`)) {
+      if (specializedSummaryFailuresRemaining > 0) {
+        specializedSummaryFailuresRemaining -= 1;
+        return route.fulfill({ status: 503, json: { message: "Resumo indisponível" } });
+      }
       return json({
         catalog: { active: true, publishedVersion: 1 },
         cash: { configured: true },
@@ -128,7 +134,19 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
         fiscal: { configured: true },
         devices: { activeCount: 1 },
         billing: { state: "active" },
+        ...(specializedSummary === "ready"
+          ? {
+              setup: {
+                activeProducts: 3,
+                activeTables: 5,
+                activePeople: 2,
+                activePrinters: 1,
+                completedService: true,
+              },
+            }
+          : {}),
       });
+    }
     if (path.endsWith(`/units/${unitId}/settings/history`))
       return json([
         {
@@ -183,19 +201,58 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
       await page.evaluate((nextTheme) => localStorage.setItem("giromesa-theme", nextTheme), theme);
       await page.reload();
     } else {
-      await page.goto("http://127.0.0.1:3112/#/settings");
+      await page.goto("http://127.0.0.1:3112/#/settings?section=setup");
     }
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole("heading", { name: "Organização" })).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const checklist = document.getElementById("settings-setup")?.getBoundingClientRect();
+          const topbar = document.querySelector(".topbar")?.getBoundingClientRect();
+          return Boolean(checklist && topbar && checklist.top >= topbar.bottom);
+        }),
+      )
+      .toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
     await page.keyboard.press("Tab");
     expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
   }
+
+  await expect(
+    page.getByText(
+      "O servidor ainda não fornece a conferência inicial. As configurações abaixo continuam disponíveis.",
+    ),
+  ).toBeVisible();
+  await page.getByLabel("Nome interno da unidade").fill("Centro Histórico");
+  specializedSummaryFailuresRemaining = 1;
+  await page.getByRole("button", { name: "Conferir novamente" }).click();
+  await expect(page.getByRole("alert")).toContainText("Não foi possível conferir a preparação");
+  await expect(page.getByLabel("Nome interno da unidade")).toHaveValue("Centro Histórico");
+
+  specializedSummary = "ready";
+  await page.getByRole("button", { name: "Conferir novamente" }).click();
+  await expect(page.getByText("4 de 4 etapas com registro no sistema")).toBeVisible();
+  await expect(page.getByText("3 produtos ativos.")).toBeVisible();
+  await expect(page.getByText("Cadastro não é homologação")).toBeVisible();
+  await expect(page.getByLabel("Nome interno da unidade")).toHaveValue("Centro Histórico");
+  await page.locator(".setup-checklist").screenshot({
+    path: testInfo.outputPath("settings-checklist-375-dark.png"),
+  });
+
+  await page.evaluate(() => localStorage.setItem("giromesa-theme", "light"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await expect(page.getByText("4 de 4 etapas com registro no sistema")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.locator(".setup-checklist").screenshot({
+    path: testInfo.outputPath("settings-checklist-375-light.png"),
+  });
 
   await page.getByLabel("Nome interno da unidade").fill("Centro Histórico");
   await page.getByLabel("Telefone / WhatsApp").fill("82999999999");

@@ -2507,6 +2507,7 @@ export class GrowthService {
           attributedOrderRef: campaignDeliveries.attributedOrderRef,
           attributedCouponRedemptionId: campaignDeliveries.attributedCouponRedemptionId,
           attributedRevenueCents: campaignDeliveries.attributedRevenueCents,
+          attributedCostCents: campaignDeliveries.attributedCostCents,
           createdAt: campaignDeliveries.createdAt,
         })
         .from(campaignDeliveries)
@@ -2532,13 +2533,31 @@ export class GrowthService {
         orders: number;
         coupons: number;
         revenueCents: number;
+        costedOrders: number;
+        incompleteCostOrders: number;
+        costCents: number | null;
+        grossMarginCents: number | null;
       }>(sql`
         select count(delivered_at)::int as delivered,
                count(read_at)::int as read,
                count(replied_at)::int as replied,
                count(attributed_order_ref)::int as orders,
                count(attributed_coupon_redemption_id)::int as coupons,
-               coalesce(sum(attributed_revenue_cents), 0)::int as "revenueCents"
+               coalesce(sum(attributed_revenue_cents), 0)::int as "revenueCents",
+               count(attributed_order_ref) filter (where attributed_cost_cents is not null)::int as "costedOrders",
+               count(attributed_order_ref) filter (where attributed_cost_cents is null)::int as "incompleteCostOrders",
+               case
+                 when count(attributed_order_ref) > 0
+                   and count(attributed_order_ref) filter (where attributed_cost_cents is null) = 0
+                   then coalesce(sum(attributed_cost_cents), 0)::int
+                 else null
+               end as "costCents",
+               case
+                 when count(attributed_order_ref) > 0
+                   and count(attributed_order_ref) filter (where attributed_cost_cents is null) = 0
+                   then (coalesce(sum(attributed_revenue_cents), 0) - coalesce(sum(attributed_cost_cents), 0))::int
+                 else null
+               end as "grossMarginCents"
         from growth_campaign_deliveries
         where organization_id = ${organizationId}
           and campaign_id = ${campaignId}
@@ -2576,6 +2595,10 @@ export class GrowthService {
         orders: 0,
         coupons: 0,
         revenueCents: 0,
+        costedOrders: 0,
+        incompleteCostOrders: 0,
+        costCents: null,
+        grossMarginCents: null,
       },
       experiments,
       deliveries,

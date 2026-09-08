@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePaymentAttempt, parsePaymentCapabilities } from "./pos-payments";
+import { parsePaymentAttempt, parsePaymentCapabilities, paymentBlockReason } from "./pos-payments";
 
 const attempt = {
   id: "attempt-1",
@@ -21,6 +21,14 @@ const attempt = {
 };
 
 describe("contratos defensivos do pagamento SmartPOS", () => {
+  it("explica bloqueios sem expor códigos técnicos e preserva motivos do responsável", () => {
+    expect(paymentBlockReason("PAYMENT_DEVICE_NOT_ENROLLED")).toContain("código de ativação");
+    expect(paymentBlockReason("PAYMENT_FUTURE_REASON")).not.toContain("PAYMENT_");
+    expect(paymentBlockReason("Bloqueio preventivo do suporte")).toBe(
+      "Bloqueio preventivo do suporte",
+    );
+    expect(paymentBlockReason(null)).toBeNull();
+  });
   it("aceita capacidades homologadas sem abrir o formato para provedores desconhecidos", () => {
     expect(
       parsePaymentCapabilities({

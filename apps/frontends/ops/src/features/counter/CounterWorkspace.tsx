@@ -1,3 +1,4 @@
+import type { OperationalCommandInput } from "@giromesa/contracts";
 import {
   Badge,
   Button,
@@ -10,7 +11,7 @@ import {
   Textarea,
   Toast,
 } from "@giromesa/ui";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { type FormEvent, type SetStateAction, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   ApiClientError,
@@ -21,8 +22,9 @@ import {
   type PrintJobStatus,
 } from "../../api";
 import { sendShellPrintJob, shellPrintingAvailable } from "../../bridge";
+import { createCommand, queuedCommands } from "../../commands";
 import { type DeliveryZone, parseDeliveryZones } from "../../growth.shared";
-import { pilotMutation } from "../../operational-dispatch";
+import { pilotMutation, QueuedOperationalMutationError } from "../../operational-dispatch";
 import {
   type PilotFloor,
   type PilotScope,
@@ -103,6 +105,28 @@ type PrintJob = {
 export type WorkspaceView = "order" | "account" | "table" | "activity";
 type PrintMode = "account" | "payments" | "final";
 type CloseTabBody = Parameters<typeof api.pilot.closeTab>[3];
+
+type PendingOrderSubmissionScope = {
+  organizationId: string;
+  unitId: string;
+  identityId: string;
+  tabId: string;
+};
+
+type PendingOrderSubmissionGroup = {
+  itemIds: string[];
+  createCommand: OperationalCommandInput;
+  orderId?: string;
+  sendCommand?: OperationalCommandInput;
+};
+
+export type PendingOrderSubmission = {
+  version: 1;
+  scope: PendingOrderSubmissionScope;
+  items: DraftCartItem[];
+  sendToProduction: boolean;
+  groups: PendingOrderSubmissionGroup[];
+};
 
 const printDocuments: Record<PrintMode, { documentType: PrintDocumentType; label: string }> = {
   account: { documentType: "partial_statement", label: "Extrato parcial" },
@@ -186,6 +210,42 @@ export function orderSubmissionErrorMessage(createdCount: number, error: unknown
   const message = error instanceof Error ? error.message : "Não foi possível salvar o pedido.";
   if (!createdCount) return message;
   return `${createdCount === 1 ? "Pedido salvo em espera, mas não enviado à produção." : `${createdCount} etapas salvas em espera, mas não enviadas à produção.`} ${message}`;
+}
+
+export function canReleaseOrderDraftAfterPermanentCreateError(
+  error: unknown,
+  submission: PendingOrderSubmission,
+  createdCount: number,
+  queuedCommandIds: ReadonlySet<string>,
+) {
+  if (
+    !(error instanceof ApiClientError) ||
+    error.retryable ||
+    createdCount !== 0 ||
+    queuedOrderCommandIds(submission).some((id) => queuedCommandIds.has(id))
+  ) {
+    return false;
+  }
+  const remainingItemIds = new Set(submission.groups.flatMap((group) => group.itemIds));
+  if (
+    submission.groups.some((group) => Boolean(group.orderId)) ||
+    remainingItemIds.size !== new Set(submission.items.map((item) => item.id)).size
+  ) {
+    return false;
+  }
+  return (
+    error.status === 400 ||
+    error.status === 422 ||
+    (error.status === 409 &&
+      (error.code === "PRODUCT_UNAVAILABLE" || error.code === "PRODUCT_DAILY_STOCK_EXCEEDED"))
+  );
+}
+
+function queuedOrderCommandIds(submission: PendingOrderSubmission) {
+  return submission.groups.flatMap((group) => [
+    group.createCommand.id,
+    ...(group.sendCommand ? [group.sendCommand.id] : []),
+  ]);
 }
 
 export function requiresDeliveryRegistration(error: unknown) {
@@ -430,6 +490,158 @@ export function parseStoredIds(value: string | null): string[] {
   }
 }
 
+function readStoredValue(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValue(key: string, value: string | null): boolean {
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isPendingOrderCommand(
+  value: unknown,
+  action: "create-order" | "send-order",
+  scope: PendingOrderSubmissionScope,
+  orderId?: string,
+): value is OperationalCommandInput {
+  if (!isPlainRecord(value) || typeof value.id !== "string" || typeof value.deviceId !== "string") {
+    return false;
+  }
+  if (
+    typeof value.idempotencyKey !== "string" ||
+    value.idempotencyKey !== `${value.deviceId}:${value.id}` ||
+    typeof value.type !== "string" ||
+    typeof value.occurredAt !== "string" ||
+    !isPlainRecord(value.payload)
+  ) {
+    return false;
+  }
+  const payload = value.payload;
+  if (
+    payload.kind !== "pilot.mutation" ||
+    payload.action !== action ||
+    !isPlainRecord(payload.data)
+  ) {
+    return false;
+  }
+  return action === "create-order"
+    ? payload.data.tabId === scope.tabId && isPlainRecord(payload.data.body)
+    : payload.data.orderId === orderId;
+}
+
+export function createPendingOrderSubmission(
+  scope: PendingOrderSubmissionScope,
+  deviceId: string,
+  items: DraftCartItem[],
+  sendToProduction: boolean,
+): PendingOrderSubmission {
+  return {
+    version: 1,
+    scope,
+    items,
+    sendToProduction,
+    groups: groupDraftItemsByCourse(items).map((group) => {
+      const body = { items: draftItemsToOrderItems(group) };
+      return {
+        itemIds: group.map((item) => item.id),
+        createCommand: createCommand(
+          deviceId,
+          "pos.order.create_requested",
+          pilotMutation("create-order", { tabId: scope.tabId, body }),
+        ),
+      };
+    }),
+  };
+}
+
+export function parsePendingOrderSubmission(
+  value: string | null,
+  expectedScope: PendingOrderSubmissionScope,
+): PendingOrderSubmission | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      !isPlainRecord(parsed) ||
+      parsed.version !== 1 ||
+      !isPlainRecord(parsed.scope) ||
+      parsed.scope.organizationId !== expectedScope.organizationId ||
+      parsed.scope.unitId !== expectedScope.unitId ||
+      parsed.scope.identityId !== expectedScope.identityId ||
+      parsed.scope.tabId !== expectedScope.tabId ||
+      typeof parsed.sendToProduction !== "boolean" ||
+      !Array.isArray(parsed.items) ||
+      !Array.isArray(parsed.groups) ||
+      parsed.groups.length === 0 ||
+      parsed.groups.length > 4
+    ) {
+      return null;
+    }
+    const items = parseStoredCart(JSON.stringify(parsed.items));
+    if (items.length !== parsed.items.length) return null;
+    const itemIds = new Set(items.map((item) => item.id));
+    const submittedIds = new Set<string>();
+    const groups = parsed.groups.flatMap((candidate): PendingOrderSubmissionGroup[] => {
+      if (!isPlainRecord(candidate) || !Array.isArray(candidate.itemIds)) return [];
+      const ids = candidate.itemIds.filter((item): item is string => typeof item === "string");
+      if (
+        !ids.length ||
+        ids.length !== candidate.itemIds.length ||
+        ids.some((id) => !itemIds.has(id) || submittedIds.has(id))
+      ) {
+        return [];
+      }
+      ids.forEach((id) => {
+        submittedIds.add(id);
+      });
+      if (!isPendingOrderCommand(candidate.createCommand, "create-order", expectedScope)) return [];
+      if (candidate.orderId !== undefined && typeof candidate.orderId !== "string") return [];
+      if (
+        candidate.sendCommand !== undefined &&
+        (!candidate.orderId ||
+          !isPendingOrderCommand(
+            candidate.sendCommand,
+            "send-order",
+            expectedScope,
+            candidate.orderId,
+          ))
+      ) {
+        return [];
+      }
+      return [
+        {
+          itemIds: ids,
+          createCommand: candidate.createCommand,
+          ...(typeof candidate.orderId === "string" ? { orderId: candidate.orderId } : {}),
+          ...(candidate.sendCommand ? { sendCommand: candidate.sendCommand } : {}),
+        },
+      ];
+    });
+    // Confirmed groups are removed while the original items remain for repeating the last order.
+    return groups.length === parsed.groups.length
+      ? {
+          version: 1,
+          scope: expectedScope,
+          items,
+          sendToProduction: parsed.sendToProduction,
+          groups,
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 const activityLabels: Record<string, string> = {
   "approval.approved": "Ajuste autorizado",
   "approval.rejected": "Ajuste recusado",
@@ -501,30 +713,63 @@ export function TabWorkspace({
   const favoriteStorageKey = `gm:attendance:favorites:${scope.unitId}:${scope.identityId}`;
   const recentStorageKey = `gm:attendance:recent:${scope.unitId}:${scope.identityId}`;
   const lastOrderStorageKey = `gm:attendance:last-order:${scope.unitId}:${scope.identityId}`;
-  const [cart, setCart] = useState<DraftCartItem[]>(() =>
-    typeof window === "undefined"
-      ? []
-      : parseStoredCart(window.localStorage.getItem(cartStorageKey)),
+  const submissionScope = useMemo<PendingOrderSubmissionScope>(
+    () => ({
+      organizationId: scope.organizationId,
+      unitId: scope.unitId,
+      identityId: scope.identityId,
+      tabId,
+    }),
+    [scope.identityId, scope.organizationId, scope.unitId, tabId],
+  );
+  const pendingSubmissionStorageKey = `gm:attendance:pending-order:v1:${scope.organizationId}:${scope.unitId}:${scope.identityId}:${tabId}`;
+  const [cart, setStoredCart] = useState<DraftCartItem[]>(() =>
+    typeof window === "undefined" ? [] : parseStoredCart(readStoredValue(cartStorageKey)),
   );
   const [favoriteProductIds, setFavoriteProductIds] = useState<string[]>(() =>
-    typeof window === "undefined"
-      ? []
-      : parseStoredIds(window.localStorage.getItem(favoriteStorageKey)),
+    typeof window === "undefined" ? [] : parseStoredIds(readStoredValue(favoriteStorageKey)),
   );
   const [recentProductIds, setRecentProductIds] = useState<string[]>(() =>
-    typeof window === "undefined"
-      ? []
-      : parseStoredIds(window.localStorage.getItem(recentStorageKey)),
+    typeof window === "undefined" ? [] : parseStoredIds(readStoredValue(recentStorageKey)),
   );
   const [lastOrder, setLastOrder] = useState<DraftCartItem[]>(() =>
-    typeof window === "undefined"
-      ? []
-      : parseStoredCart(window.localStorage.getItem(lastOrderStorageKey)),
+    typeof window === "undefined" ? [] : parseStoredCart(readStoredValue(lastOrderStorageKey)),
   );
+  const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(() =>
+    typeof window === "undefined"
+      ? null
+      : parsePendingOrderSubmission(readStoredValue(pendingSubmissionStorageKey), submissionScope),
+  );
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
+  const activePendingSubmission =
+    pendingSubmission &&
+    pendingSubmission.scope.organizationId === submissionScope.organizationId &&
+    pendingSubmission.scope.unitId === submissionScope.unitId &&
+    pendingSubmission.scope.identityId === submissionScope.identityId &&
+    pendingSubmission.scope.tabId === submissionScope.tabId
+      ? pendingSubmission
+      : null;
   const [lastRemovedItem, setLastRemovedItem] = useState<DraftCartItem | null>(null);
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
+
+  function setCart(next: SetStateAction<DraftCartItem[]>) {
+    if (activePendingSubmission) {
+      setFeedback(
+        "O pedido anterior aguarda confirmação. Reenvie-o antes de alterar este rascunho.",
+      );
+      return;
+    }
+    setStoredCart(next);
+  }
+
+  function savePendingSubmission(next: PendingOrderSubmission | null) {
+    setPendingSubmission(next);
+    if (!writeStoredValue(pendingSubmissionStorageKey, next ? JSON.stringify(next) : null)) {
+      setStorageUnavailable(true);
+    }
+  }
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
   const visiblePrintJobs = printJobs.filter(
     (job) => job.mode !== "account" || job.status !== "printed",
@@ -953,17 +1198,28 @@ export function TabWorkspace({
   }
 
   useEffect(() => {
-    if (cart.length) window.localStorage.setItem(cartStorageKey, JSON.stringify(cart));
-    else window.localStorage.removeItem(cartStorageKey);
+    if (!writeStoredValue(cartStorageKey, cart.length ? JSON.stringify(cart) : null)) {
+      setStorageUnavailable(true);
+    }
   }, [cart, cartStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(favoriteStorageKey, JSON.stringify(favoriteProductIds));
+    if (!writeStoredValue(favoriteStorageKey, JSON.stringify(favoriteProductIds))) {
+      setStorageUnavailable(true);
+    }
   }, [favoriteProductIds, favoriteStorageKey]);
 
   useEffect(() => {
-    window.localStorage.setItem(recentStorageKey, JSON.stringify(recentProductIds));
+    if (!writeStoredValue(recentStorageKey, JSON.stringify(recentProductIds))) {
+      setStorageUnavailable(true);
+    }
   }, [recentProductIds, recentStorageKey]);
+
+  useEffect(() => {
+    setPendingSubmission(
+      parsePendingOrderSubmission(readStoredValue(pendingSubmissionStorageKey), submissionScope),
+    );
+  }, [pendingSubmissionStorageKey, submissionScope]);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -1265,6 +1521,10 @@ export function TabWorkspace({
               membership: DoseClubEligibleMembership,
               externalProductId: string,
             ) {
+              if (activePendingSubmission) {
+                setDoseClubNotice("Retome o pedido pendente antes de alterar o rascunho.");
+                return;
+              }
               const selectedProduct = menu.products.find(
                 (item) =>
                   item.id === externalProductId &&
@@ -1351,6 +1611,12 @@ export function TabWorkspace({
               if (!window.matchMedia("(max-width: 640px)").matches) setDraftExpanded(true);
             }
             function addItem(selectedProduct = product) {
+              if (activePendingSubmission) {
+                setFeedback(
+                  "O pedido anterior aguarda confirmação. Reenvie-o antes de alterar este rascunho.",
+                );
+                return;
+              }
               if (
                 !selectedProduct ||
                 selectedProduct.priceCents === null ||
@@ -1731,16 +1997,18 @@ export function TabWorkspace({
             }
 
             async function submitCart(sendToProduction: boolean) {
-              if (!cart.length) return;
+              if (busy) return;
+              const existingSubmission = activePendingSubmission;
+              if (!existingSubmission && !cart.length) return;
               const unroutedProducts = [
                 ...new Set(
-                  cart.flatMap((item) => {
+                  (existingSubmission?.items ?? cart).flatMap((item) => {
                     const selected = menu.products.find((product) => product.id === item.productId);
                     return selected && !canReachProduction(selected) ? [selected.name] : [];
                   }),
                 ),
               ];
-              if (sendToProduction && unroutedProducts.length) {
+              if (!existingSubmission && sendToProduction && unroutedProducts.length) {
                 setFeedback(
                   `Configure uma estação de produção ativa no Catálogo para: ${unroutedProducts.join(", ")}.`,
                 );
@@ -1750,35 +2018,92 @@ export function TabWorkspace({
               setFeedback("");
               let createdCount = 0;
               let remainingCart = cart;
+              let submission = existingSubmission;
               try {
-                const submittedCart = cart;
-                for (const group of groupDraftItemsByCourse(submittedCart)) {
-                  const body = {
-                    items: draftItemsToOrderItems(group),
-                  };
-                  const value = record(
-                    await scope.dispatch(
-                      "pos.order.create_requested",
-                      pilotMutation("create-order", { tabId, body }),
-                      (key) =>
-                        api.pilot.createOrder(scope.organizationId, scope.unitId, tabId, body, key),
-                    ),
-                  );
-                  const orderId = record(value.order).id;
-                  if (typeof orderId !== "string" || !orderId) {
-                    throw new Error("O servidor não confirmou o número do pedido.");
+                submission ??= createPendingOrderSubmission(
+                  submissionScope,
+                  scope.installationId ?? "browser",
+                  cart,
+                  sendToProduction,
+                );
+                if (!existingSubmission) savePendingSubmission(submission);
+                for (const pendingGroup of submission.groups) {
+                  let group = pendingGroup;
+                  let orderId = group.orderId;
+                  if (!orderId) {
+                    const body = record(record(group.createCommand.payload).data)
+                      .body as Parameters<typeof api.pilot.createOrder>[3];
+                    const value = record(
+                      await scope.dispatch(
+                        "pos.order.create_requested",
+                        pilotMutation("create-order", { tabId, body }),
+                        (key) =>
+                          api.pilot.createOrder(
+                            scope.organizationId,
+                            scope.unitId,
+                            tabId,
+                            body,
+                            key,
+                          ),
+                        group.createCommand,
+                      ),
+                    );
+                    const confirmedOrderId = record(value.order).id;
+                    if (typeof confirmedOrderId !== "string" || !confirmedOrderId) {
+                      throw new Error("O servidor não confirmou o número do pedido.");
+                    }
+                    orderId = confirmedOrderId;
+                    createdCount += 1;
+                    group = { ...group, orderId };
+                    submission = {
+                      ...submission,
+                      groups: submission.groups.map((candidate) =>
+                        candidate.createCommand.id === group.createCommand.id ? group : candidate,
+                      ),
+                    };
+                    savePendingSubmission(submission);
                   }
-                  createdCount += 1;
-                  const createdIds = new Set(group.map((item) => item.id));
+                  const createdIds = new Set(group.itemIds);
                   remainingCart = remainingCart.filter((item) => !createdIds.has(item.id));
-                  setCart(remainingCart);
-                  if (sendToProduction && !(await sendOrderToProduction(orderId))) {
-                    setView("order");
-                    return;
+                  setStoredCart(remainingCart);
+                  if (submission.sendToProduction) {
+                    if (!group.sendCommand) {
+                      group = {
+                        ...group,
+                        sendCommand: createCommand(
+                          scope.installationId ?? "browser",
+                          "pos.order.send_requested",
+                          pilotMutation("send-order", { orderId }),
+                        ),
+                      };
+                      submission = {
+                        ...submission,
+                        groups: submission.groups.map((candidate) =>
+                          candidate.createCommand.id === group.createCommand.id ? group : candidate,
+                        ),
+                      };
+                      savePendingSubmission(submission);
+                    }
+                    await scope.dispatch(
+                      "pos.order.send_requested",
+                      pilotMutation("send-order", { orderId }),
+                      (key) =>
+                        api.pilot.sendOrder(scope.organizationId, scope.unitId, orderId, key),
+                      group.sendCommand,
+                    );
                   }
+                  submission = {
+                    ...submission,
+                    groups: submission.groups.filter(
+                      (candidate) => candidate.createCommand.id !== group.createCommand.id,
+                    ),
+                  };
+                  savePendingSubmission(submission.groups.length ? submission : null);
                 }
-                setLastOrder(submittedCart);
-                window.localStorage.setItem(lastOrderStorageKey, JSON.stringify(submittedCart));
+                setLastOrder(submission.items);
+                if (!writeStoredValue(lastOrderStorageKey, JSON.stringify(submission.items))) {
+                  setStorageUnavailable(true);
+                }
                 setFeedback(
                   sendToProduction
                     ? createdCount > 1
@@ -1789,6 +2114,35 @@ export function TabWorkspace({
                       : "Pedido mantido em espera.",
                 );
               } catch (error) {
+                if (error instanceof QueuedOperationalMutationError && !error.persisted) {
+                  setStorageUnavailable(true);
+                }
+                let queuedCommandIds: ReadonlySet<string> | null = null;
+                try {
+                  queuedCommandIds = new Set(
+                    queuedCommands({
+                      organizationId: scope.organizationId,
+                      unitId: scope.unitId,
+                      actorId: scope.identityId,
+                    }).map((command) => command.id),
+                  );
+                } catch {
+                  // Sem conseguir confirmar a fila local, preservamos o rascunho por segurança.
+                }
+                if (
+                  submission &&
+                  queuedCommandIds &&
+                  canReleaseOrderDraftAfterPermanentCreateError(
+                    error,
+                    submission,
+                    createdCount,
+                    queuedCommandIds,
+                  )
+                ) {
+                  savePendingSubmission(null);
+                  setFeedback("O pedido não foi salvo. Ajuste o rascunho e tente novamente.");
+                  return;
+                }
                 setFeedback(orderSubmissionErrorMessage(createdCount, error));
                 if (createdCount) setView("order");
               } finally {
@@ -2749,7 +3103,11 @@ export function TabWorkspace({
                       <header className="cart-preview__heading">
                         <span>
                           <strong>Rascunho automático</strong>
-                          <small>Preservado neste dispositivo até o envio.</small>
+                          <small>
+                            {activePendingSubmission
+                              ? "Aguardando confirmação com a mesma referência do envio anterior."
+                              : "Preservado neste dispositivo até o envio."}
+                          </small>
                         </span>
                         {lastRemovedItem && (
                           <Button
@@ -2763,11 +3121,29 @@ export function TabWorkspace({
                           </Button>
                         )}
                       </header>
+                      {activePendingSubmission && (
+                        <Callout tone="warning">
+                          O pedido ainda não foi confirmado. Retome o mesmo envio antes de alterar
+                          os itens.
+                        </Callout>
+                      )}
+                      {storageUnavailable && (
+                        <Callout tone="warning">
+                          Este dispositivo não conseguiu salvar a continuidade. Mantenha esta tela
+                          aberta até a confirmação.
+                        </Callout>
+                      )}
                       {cart.length === 0 && (
                         <div className="cart-preview__empty">
-                          <strong>Pedido ainda vazio</strong>
+                          <strong>
+                            {activePendingSubmission
+                              ? "Pedido aguardando confirmação"
+                              : "Pedido ainda vazio"}
+                          </strong>
                           <small>
-                            Os itens adicionados aparecem aqui antes de seguir para a produção.
+                            {activePendingSubmission
+                              ? "Retome o mesmo envio para confirmar o resultado antes de criar outro pedido."
+                              : "Os itens adicionados aparecem aqui antes de seguir para a produção."}
                           </small>
                         </div>
                       )}
@@ -2864,19 +3240,34 @@ export function TabWorkspace({
                           </span>
                         </div>
                       ))}
-                      {cart.length > 0 && !compactHeading && (
+                      {(cart.length > 0 || activePendingSubmission) && !compactHeading && (
                         <div className="cart-preview__submit">
-                          <Button
-                            disabled={busy}
-                            onClick={() => void submitCart(false)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            Manter em espera
-                          </Button>
-                          <Button disabled={busy} onClick={() => void submitCart(true)}>
-                            Enviar {cartQuantity} item(ns) · {formatMoney(cartTotalCents)}
-                          </Button>
+                          {activePendingSubmission ? (
+                            <Button
+                              disabled={busy}
+                              onClick={() =>
+                                void submitCart(activePendingSubmission.sendToProduction)
+                              }
+                            >
+                              {activePendingSubmission.sendToProduction
+                                ? "Retomar envio do pedido"
+                                : "Retomar pedido em espera"}
+                            </Button>
+                          ) : (
+                            <>
+                              <Button
+                                disabled={busy}
+                                onClick={() => void submitCart(false)}
+                                size="sm"
+                                variant="secondary"
+                              >
+                                Manter em espera
+                              </Button>
+                              <Button disabled={busy} onClick={() => void submitCart(true)}>
+                                Enviar {cartQuantity} item(ns) · {formatMoney(cartTotalCents)}
+                              </Button>
+                            </>
+                          )}
                         </div>
                       )}
                     </aside>
@@ -4360,21 +4751,35 @@ export function TabWorkspace({
                       </small>
                     </div>
                     <div className="service-action-dock__actions">
-                      {compactHeading && cart.length > 0 && (
-                        <>
+                      {compactHeading &&
+                        (cart.length > 0 || activePendingSubmission) &&
+                        (activePendingSubmission ? (
                           <Button
                             disabled={busy}
-                            onClick={() => void submitCart(false)}
+                            onClick={() =>
+                              void submitCart(activePendingSubmission.sendToProduction)
+                            }
                             size="sm"
-                            variant="secondary"
                           >
-                            Manter em espera
+                            {activePendingSubmission.sendToProduction
+                              ? "Retomar envio"
+                              : "Retomar pedido"}
                           </Button>
-                          <Button disabled={busy} onClick={() => void submitCart(true)} size="sm">
-                            Enviar pedido ({cartQuantity})
-                          </Button>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <Button
+                              disabled={busy}
+                              onClick={() => void submitCart(false)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Manter em espera
+                            </Button>
+                            <Button disabled={busy} onClick={() => void submitCart(true)} size="sm">
+                              Enviar pedido ({cartQuantity})
+                            </Button>
+                          </>
+                        ))}
                       {!cart.length && data.tab.tableId && (
                         <Button
                           disabled={busy || billRequestPending || Boolean(billCall)}

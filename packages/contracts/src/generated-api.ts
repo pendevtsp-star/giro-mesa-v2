@@ -17113,6 +17113,18 @@ export interface components {
           lowStockItems: number;
           /** Format: int64 */
           currentInventoryValueCents: number | null;
+          countVariance: {
+            key: string;
+            label: string;
+            locationLabel: string;
+            plannedConsumptionQuantity: number;
+            expectedQuantity: number;
+            countedQuantity: number;
+            differenceQuantity: number;
+            lossQuantity: number;
+            /** Format: int64 */
+            lossValueCents: number | null;
+          }[];
           analysis: {
             /** Format: uuid */
             key: string;
@@ -17207,6 +17219,25 @@ export interface components {
           grossMarginPercent: number | null;
           /** @enum {string} */
           productProfitabilityCoverage: "complete" | "partial" | "unavailable";
+          channels: {
+            /** @enum {string} */
+            key: "dine_in" | "pickup" | "delivery";
+            label: string;
+            /** Format: int64 */
+            revenueCents: number;
+            /** Format: int64 */
+            costCents: number | null;
+            /** Format: int64 */
+            feeCents: number | null;
+            /** Format: int64 */
+            grossMarginCents: number | null;
+            /** Format: int64 */
+            netMarginAfterFeesCents: number | null;
+            /** @enum {string} */
+            costCoverage: "complete" | "partial" | "unavailable";
+            /** @enum {string} */
+            feeCoverage: "complete" | "partial" | "unavailable";
+          }[];
           products: {
             /** Format: uuid */
             key: string;
@@ -22333,6 +22364,13 @@ export interface operations {
             billing: {
               state: string;
             };
+            setup?: {
+              activeProducts: number;
+              activeTables: number;
+              activePeople: number;
+              activePrinters: number;
+              completedService: boolean;
+            };
           };
         };
       };
@@ -22377,6 +22415,13 @@ export interface operations {
             };
             billing: {
               state: string;
+            };
+            setup?: {
+              activeProducts: number;
+              activeTables: number;
+              activePeople: number;
+              activePrinters: number;
+              completedService: boolean;
             };
           };
         };

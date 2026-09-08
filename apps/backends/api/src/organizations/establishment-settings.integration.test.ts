@@ -8,9 +8,18 @@ import {
   organizations,
   outboxEvents,
   posCatalogBranding,
+  posCatalogCategories,
+  posDiningRooms,
+  posDiningTables,
+  posOrders,
+  posProductionStations,
+  posProductPrices,
+  posProducts,
+  posTabs,
   roleBindings,
   units,
 } from "@giromesa/db";
+import { ForbiddenException } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { PilotCatalogService } from "../pilot-operations/pilot-catalog.service.js";
@@ -253,6 +262,220 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
     );
   } finally {
     if (organizationIds.length) {
+      await database.db.delete(organizations).where(inArray(organizations.id, organizationIds));
+    }
+    if (identityIds.length) {
+      await database.db.delete(identities).where(inArray(identities.id, identityIds));
+    }
+    await database.onModuleDestroy();
+  }
+});
+
+it("projects the first-turn checklist by tenant and unit, and denies a manager outside its unit", async (context) => {
+  const databaseUrl = process.env.PILOT_DATABASE_URL;
+  if (!databaseUrl) {
+    context.skip("PILOT_DATABASE_URL not configured");
+    return;
+  }
+  process.env.DATABASE_URL = databaseUrl;
+  const database = new DatabaseService();
+  const organizationIds: string[] = [];
+  const identityIds: string[] = [];
+  try {
+    const suffix = randomUUID();
+    const documentPrefix = suffix.replaceAll("-", "").slice(0, 13);
+    const [organization, foreignOrganization] = await database.db
+      .insert(organizations)
+      .values([
+        {
+          legalName: "Checklist Local Ltda",
+          tradeName: "Casa Local",
+          document: `${documentPrefix}3`,
+          billingState: "active",
+        },
+        {
+          legalName: "Checklist Externo Ltda",
+          tradeName: "Casa Externa",
+          document: `${documentPrefix}4`,
+          billingState: "active",
+        },
+      ])
+      .returning();
+    assert.ok(organization && foreignOrganization);
+    organizationIds.push(organization.id, foreignOrganization.id);
+    const [emptyUnit, configuredUnit, foreignUnit] = await database.db
+      .insert(units)
+      .values([
+        { organizationId: organization.id, name: "Ainda vazia" },
+        { organizationId: organization.id, name: "Configurada" },
+        { organizationId: foreignOrganization.id, name: "Outra casa" },
+      ])
+      .returning();
+    assert.ok(emptyUnit && configuredUnit && foreignUnit);
+    const [owner, scopedManager] = await database.db
+      .insert(identities)
+      .values([
+        { email: `summary-owner+${suffix}@example.test`, displayName: "Owner" },
+        { email: `summary-manager+${suffix}@example.test`, displayName: "Manager" },
+      ])
+      .returning();
+    assert.ok(owner && scopedManager);
+    identityIds.push(owner.id, scopedManager.id);
+    const [ownerMembership, managerMembership] = await database.db
+      .insert(memberships)
+      .values([
+        { identityId: owner.id, organizationId: organization.id, status: "active" },
+        { identityId: scopedManager.id, organizationId: organization.id, status: "active" },
+      ])
+      .returning();
+    assert.ok(ownerMembership && managerMembership);
+    await database.db.insert(roleBindings).values([
+      { membershipId: ownerMembership.id, role: "owner" },
+      { membershipId: managerMembership.id, unitId: configuredUnit.id, role: "manager" },
+    ]);
+
+    const [localCategory, foreignCategory] = await database.db
+      .insert(posCatalogCategories)
+      .values([
+        { organizationId: organization.id, name: "Pratos", slug: `pratos-${suffix}` },
+        {
+          organizationId: foreignOrganization.id,
+          name: "Pratos externos",
+          slug: `externos-${suffix}`,
+        },
+      ])
+      .returning();
+    assert.ok(localCategory && foreignCategory);
+    const [localProduct, foreignProduct] = await database.db
+      .insert(posProducts)
+      .values([
+        { organizationId: organization.id, categoryId: localCategory.id, name: "Prato local" },
+        {
+          organizationId: foreignOrganization.id,
+          categoryId: foreignCategory.id,
+          name: "Prato externo",
+        },
+      ])
+      .returning();
+    assert.ok(localProduct && foreignProduct);
+    await database.db.insert(posProductPrices).values([
+      {
+        organizationId: organization.id,
+        unitId: configuredUnit.id,
+        productId: localProduct.id,
+        priceCents: 2500,
+      },
+      {
+        organizationId: foreignOrganization.id,
+        unitId: foreignUnit.id,
+        productId: foreignProduct.id,
+        priceCents: 3500,
+      },
+    ]);
+    const [localRoom, foreignRoom] = await database.db
+      .insert(posDiningRooms)
+      .values([
+        { organizationId: organization.id, unitId: configuredUnit.id, name: "Salão" },
+        { organizationId: foreignOrganization.id, unitId: foreignUnit.id, name: "Salão externo" },
+      ])
+      .returning();
+    assert.ok(localRoom && foreignRoom);
+    await database.db.insert(posDiningTables).values([
+      {
+        organizationId: organization.id,
+        unitId: configuredUnit.id,
+        roomId: localRoom.id,
+        label: "Mesa 1",
+      },
+      {
+        organizationId: foreignOrganization.id,
+        unitId: foreignUnit.id,
+        roomId: foreignRoom.id,
+        label: "Mesa externa",
+      },
+    ]);
+    await database.db.insert(posProductionStations).values([
+      {
+        organizationId: organization.id,
+        unitId: configuredUnit.id,
+        name: "Cozinha",
+        code: `kitchen-${suffix.slice(0, 8)}`,
+      },
+      {
+        organizationId: foreignOrganization.id,
+        unitId: foreignUnit.id,
+        name: "Cozinha externa",
+        code: `outside-${suffix.slice(0, 8)}`,
+      },
+    ]);
+    const [localTab, foreignTab] = await database.db
+      .insert(posTabs)
+      .values([
+        {
+          organizationId: organization.id,
+          unitId: configuredUnit.id,
+          openedByIdentityId: owner.id,
+          status: "closed",
+          closedAt: new Date(),
+        },
+        {
+          organizationId: foreignOrganization.id,
+          unitId: foreignUnit.id,
+          openedByIdentityId: owner.id,
+          status: "closed",
+          closedAt: new Date(),
+        },
+      ])
+      .returning();
+    assert.ok(localTab && foreignTab);
+    await database.db.insert(posOrders).values([
+      {
+        organizationId: organization.id,
+        unitId: configuredUnit.id,
+        tabId: localTab.id,
+        createdByIdentityId: owner.id,
+        status: "served",
+      },
+      {
+        organizationId: foreignOrganization.id,
+        unitId: foreignUnit.id,
+        tabId: foreignTab.id,
+        createdByIdentityId: owner.id,
+        status: "served",
+      },
+    ]);
+
+    const settings = new EstablishmentSettingsService(database, new ScopeService(database));
+    const empty = await settings.specializedSummary(owner.id, organization.id, emptyUnit.id);
+    assert.deepEqual(empty.setup, {
+      activeProducts: 0,
+      activeTables: 0,
+      activePeople: 1,
+      activePrinters: 0,
+      completedService: false,
+    });
+    assert.equal(empty.kds.activeStations, 0);
+    const configured = await settings.specializedSummary(
+      owner.id,
+      organization.id,
+      configuredUnit.id,
+    );
+    assert.deepEqual(configured.setup, {
+      activeProducts: 1,
+      activeTables: 1,
+      activePeople: 2,
+      activePrinters: 0,
+      completedService: true,
+    });
+    assert.equal(configured.kds.activeStations, 1);
+    await assert.rejects(
+      () => settings.specializedSummary(scopedManager.id, organization.id, emptyUnit.id),
+      (error: unknown) => error instanceof ForbiddenException && error.getStatus() === 403,
+    );
+  } finally {
+    if (organizationIds.length) {
+      await database.db.delete(posOrders).where(inArray(posOrders.organizationId, organizationIds));
+      await database.db.delete(posTabs).where(inArray(posTabs.organizationId, organizationIds));
       await database.db.delete(organizations).where(inArray(organizations.id, organizationIds));
     }
     if (identityIds.length) {

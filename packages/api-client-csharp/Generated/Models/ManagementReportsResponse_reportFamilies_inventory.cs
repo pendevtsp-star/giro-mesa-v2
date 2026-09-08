@@ -32,6 +32,14 @@ namespace GiroMesa.ApiClient.Models
 #else
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_comparison Comparison { get; set; }
 #endif
+        /// <summary>The countVariance property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_countVariance>? CountVariance { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_countVariance> CountVariance { get; set; }
+#endif
         /// <summary>The coverage property</summary>
         public global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_coverage? Coverage { get; set; }
         /// <summary>The currentInventoryValueCents property</summary>
@@ -74,6 +82,7 @@ namespace GiroMesa.ApiClient.Models
                 { "analysis", n => { Analysis = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_analysis>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_analysis.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "basis", n => { Basis = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_basis>(); } },
                 { "comparison", n => { Comparison = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_comparison>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_comparison.CreateFromDiscriminatorValue); } },
+                { "countVariance", n => { CountVariance = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_countVariance>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_countVariance.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "coverage", n => { Coverage = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_coverage>(); } },
                 { "currentInventoryValueCents", n => { CurrentInventoryValueCents = n.GetLongValue(); } },
                 { "lossEvents", n => { LossEvents = n.GetIntValue(); } },
@@ -93,6 +102,7 @@ namespace GiroMesa.ApiClient.Models
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_analysis>("analysis", Analysis);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_basis>("basis", Basis);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_comparison>("comparison", Comparison);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_countVariance>("countVariance", CountVariance);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_inventory_coverage>("coverage", Coverage);
             writer.WriteLongValue("currentInventoryValueCents", CurrentInventoryValueCents);
             writer.WriteIntValue("lossEvents", LossEvents);

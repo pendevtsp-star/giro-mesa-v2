@@ -24,6 +24,13 @@ export interface QuarantinedCommand {
   queuedAt: string;
 }
 
+export class CommandQueuePersistenceError extends Error {
+  constructor() {
+    super("Não foi possível preservar a ação neste dispositivo.");
+    this.name = "CommandQueuePersistenceError";
+  }
+}
+
 export function createCommand(
   deviceId: string,
   type: string,
@@ -49,12 +56,11 @@ export function enqueueCommand(
   const queue = readQueue(scope);
   const dedupeKey = commandDedupeKey(command);
   if (
-    dedupeKey &&
     queue.some(
       (entry) =>
         entry.status === "pending" &&
         sameScope(entry.scope, scope) &&
-        entry.dedupeKey === dedupeKey,
+        (entry.command.id === command.id || (dedupeKey && entry.dedupeKey === dedupeKey)),
     )
   ) {
     return countPending(queue, scope);
@@ -114,8 +120,12 @@ export function removeQueuedCommand(commandId: string, scope?: CommandQueueScope
 
 export function clearCommandQueue(scope?: CommandQueueScope): void {
   if (!scope) {
-    localStorage.removeItem(queueKey);
-    localStorage.removeItem(legacyQueueKey);
+    try {
+      localStorage.removeItem(queueKey);
+      localStorage.removeItem(legacyQueueKey);
+    } catch {
+      throw new CommandQueuePersistenceError();
+    }
     return;
   }
   writeQueue(readQueue(scope).filter((entry) => !sameScope(entry.scope, scope)));
@@ -159,16 +169,24 @@ function readQueue(adoptLegacyScope?: CommandQueueScope): StoredCommand[] {
     if (migrated) writeQueue(queue);
     return queue;
   } catch {
-    localStorage.removeItem(queueKey);
-    localStorage.removeItem(legacyQueueKey);
+    try {
+      localStorage.removeItem(queueKey);
+      localStorage.removeItem(legacyQueueKey);
+    } catch {
+      // A malformed queue must not make the interface unusable when storage is blocked.
+    }
     return [];
   }
 }
 
 function writeQueue(queue: StoredCommand[]): void {
-  localStorage.removeItem(legacyQueueKey);
-  if (queue.length === 0) localStorage.removeItem(queueKey);
-  else localStorage.setItem(queueKey, JSON.stringify(queue));
+  try {
+    localStorage.removeItem(legacyQueueKey);
+    if (queue.length === 0) localStorage.removeItem(queueKey);
+    else localStorage.setItem(queueKey, JSON.stringify(queue));
+  } catch {
+    throw new CommandQueuePersistenceError();
+  }
 }
 
 function countPending(queue: StoredCommand[], scope?: CommandQueueScope): number {

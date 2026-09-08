@@ -13,6 +13,7 @@ import {
   type IntegratedPaymentMethod,
   type PaymentAttempt,
   type PaymentCapabilities,
+  paymentBlockReason,
   posPayments,
 } from "./pos-payments";
 
@@ -311,7 +312,7 @@ export function SmartPosPaymentModal({
         <Callout tone="warning">
           <strong>Pagamento direto indisponível</strong>
           <p>
-            {capabilities?.reason ??
+            {paymentBlockReason(capabilities?.reason) ??
               bridgeMismatchReason ??
               (embedded && shellCapabilities?.errorCode
                 ? `O aplicativo bloqueou a cobrança (${shellCapabilities.errorCode}).`

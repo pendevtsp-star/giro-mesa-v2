@@ -1,7 +1,20 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { it } from "node:test";
-import { identities, memberships, organizations, roleBindings, units } from "@giromesa/db";
+import {
+  identities,
+  memberships,
+  organizations,
+  posCatalogCategories,
+  posOrderItems,
+  posOrders,
+  posPaymentReconciliations,
+  posProducts,
+  posTabPayments,
+  posTabs,
+  roleBindings,
+  units,
+} from "@giromesa/db";
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { MetricsService } from "../health/health.module.js";
@@ -62,11 +75,230 @@ it("executes every management report family against PostgreSQL", async (context)
     assert.equal(report.reportFamilies.purchasing.orderCount, 0);
     assert.equal(report.reportFamilies.operations.averageServiceMinutes, null);
     assert.equal(report.reportFamilies.profitability.productProfitabilityCoverage, "unavailable");
+    assert.deepEqual(report.reportFamilies.inventory.countVariance, []);
+    assert.deepEqual(report.reportFamilies.profitability.channels, []);
     assert.equal(report.reportFamilies.labor.workedMinutes, 0);
     assert.equal(report.reportFamilies.reconciliation.paymentDifferenceCents, 0);
     assert.equal(report.reportFamilies.forecast.method, "weekday_seasonality_v2");
     assert.equal(report.reportFamilies.forecast.available, false);
     assert.equal(report.reportFamilies.forecast.revenue.forecastCents, 0);
+
+    const closedAt = new Date("2026-08-12T15:00:00.000Z");
+    const [category] = await database.db
+      .insert(posCatalogCategories)
+      .values({
+        organizationId,
+        name: "Reports menu",
+        slug: `reports-${randomUUID()}`,
+      })
+      .returning({ id: posCatalogCategories.id });
+    assert.ok(category);
+    const [product] = await database.db
+      .insert(posProducts)
+      .values({ organizationId, categoryId: category.id, name: "Reports plate" })
+      .returning({ id: posProducts.id });
+    assert.ok(product);
+    const [cashTab, pixTab, pendingFeeTab] = await database.db
+      .insert(posTabs)
+      .values([
+        {
+          organizationId,
+          unitId: unit.id,
+          openedByIdentityId: identityId,
+          label: "Cash channel",
+          fulfillmentType: "dine_in",
+          status: "closed",
+          subtotalCents: 1_000,
+          totalCents: 1_000,
+          closedAt,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          openedByIdentityId: identityId,
+          label: "Pix channel",
+          fulfillmentType: "delivery",
+          status: "closed",
+          subtotalCents: 2_000,
+          serviceChargeCents: 200,
+          totalCents: 2_200,
+          closedAt,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          openedByIdentityId: identityId,
+          label: "Pending fee channel",
+          fulfillmentType: "pickup",
+          status: "closed",
+          subtotalCents: 3_000,
+          totalCents: 3_000,
+          closedAt,
+        },
+      ])
+      .returning({ id: posTabs.id });
+    assert.ok(cashTab && pixTab && pendingFeeTab);
+    const [cashOrder, pixOrder, pendingFeeOrder] = await database.db
+      .insert(posOrders)
+      .values([
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: cashTab.id,
+          createdByIdentityId: identityId,
+          status: "sent",
+          sentAt: closedAt,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: pixTab.id,
+          createdByIdentityId: identityId,
+          status: "sent",
+          sentAt: closedAt,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: pendingFeeTab.id,
+          createdByIdentityId: identityId,
+          status: "sent",
+          sentAt: closedAt,
+        },
+      ])
+      .returning({ id: posOrders.id });
+    assert.ok(cashOrder && pixOrder && pendingFeeOrder);
+    await database.db.insert(posOrderItems).values([
+      {
+        organizationId,
+        unitId: unit.id,
+        orderId: cashOrder.id,
+        productId: product.id,
+        productName: "Cash plate",
+        quantity: 1,
+        unitPriceCents: 1_000,
+        grossCents: 1_000,
+        netCents: 1_000,
+        costCents: 400,
+        status: "queued",
+      },
+      {
+        organizationId,
+        unitId: unit.id,
+        orderId: pixOrder.id,
+        productId: product.id,
+        productName: "Pix plate",
+        quantity: 1,
+        unitPriceCents: 2_000,
+        grossCents: 2_000,
+        netCents: 2_000,
+        costCents: 800,
+        status: "queued",
+      },
+      {
+        organizationId,
+        unitId: unit.id,
+        orderId: pendingFeeOrder.id,
+        productId: product.id,
+        productName: "Pending fee plate",
+        quantity: 1,
+        unitPriceCents: 3_000,
+        grossCents: 3_000,
+        netCents: 3_000,
+        costCents: 1_200,
+        status: "queued",
+      },
+    ]);
+    const [cashPayment, pixPayment, pendingFeePayment] = await database.db
+      .insert(posTabPayments)
+      .values([
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: cashTab.id,
+          method: "cash",
+          amountCents: 1_000,
+          createdByIdentityId: identityId,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: pixTab.id,
+          method: "pix",
+          amountCents: 2_200,
+          createdByIdentityId: identityId,
+        },
+        {
+          organizationId,
+          unitId: unit.id,
+          tabId: pendingFeeTab.id,
+          method: "credit_card",
+          amountCents: 3_000,
+          createdByIdentityId: identityId,
+        },
+      ])
+      .returning({ id: posTabPayments.id });
+    assert.ok(cashPayment && pixPayment && pendingFeePayment);
+    await database.db.insert(posPaymentReconciliations).values({
+      organizationId,
+      unitId: unit.id,
+      paymentId: pixPayment.id,
+      provider: "reports-test",
+      providerSettlementId: `settlement-${randomUUID()}`,
+      providerReference: `reference-${randomUUID()}`,
+      grossCents: 2_200,
+      feeCents: 264,
+      netCents: 1_936,
+      expectedSettlementAt: closedAt,
+      settledAt: closedAt,
+      status: "settled",
+      source: "import",
+    });
+    const profitabilityReport = await reports.reports(identityId, organizationId, unit.id, {
+      from: "2026-08-01",
+      to: "2026-08-17",
+      comparisonMode: "previous_period",
+      family: "profitability",
+    });
+    const channels = new Map(
+      profitabilityReport.reportFamilies.profitability.channels.map((channel) => [
+        channel.key,
+        channel,
+      ]),
+    );
+    assert.deepEqual(channels.get("dine_in"), {
+      key: "dine_in",
+      label: "Salão",
+      revenueCents: 1_000,
+      costCents: 400,
+      feeCents: 0,
+      grossMarginCents: 600,
+      netMarginAfterFeesCents: 600,
+      costCoverage: "complete",
+      feeCoverage: "complete",
+    });
+    assert.deepEqual(channels.get("delivery"), {
+      key: "delivery",
+      label: "Delivery",
+      revenueCents: 2_000,
+      costCents: 800,
+      feeCents: 264,
+      grossMarginCents: 1_200,
+      netMarginAfterFeesCents: 936,
+      costCoverage: "complete",
+      feeCoverage: "complete",
+    });
+    assert.deepEqual(channels.get("pickup"), {
+      key: "pickup",
+      label: "Retirada",
+      revenueCents: 3_000,
+      costCents: 1_200,
+      feeCents: null,
+      grossMarginCents: 1_800,
+      netMarginAfterFeesCents: null,
+      costCoverage: "complete",
+      feeCoverage: "partial",
+    });
 
     const view = await reports.createView(
       identityId,
@@ -179,8 +411,24 @@ it("executes every management report family against PostgreSQL", async (context)
     });
     assert.equal(closedReport.reportFamilies.reconciliation.closure.status, "closed");
   } finally {
-    if (organizationId)
+    if (organizationId) {
+      await database.db
+        .delete(posPaymentReconciliations)
+        .where(eq(posPaymentReconciliations.organizationId, organizationId));
+      await database.db
+        .delete(posTabPayments)
+        .where(eq(posTabPayments.organizationId, organizationId));
+      await database.db
+        .delete(posOrderItems)
+        .where(eq(posOrderItems.organizationId, organizationId));
+      await database.db.delete(posOrders).where(eq(posOrders.organizationId, organizationId));
+      await database.db.delete(posTabs).where(eq(posTabs.organizationId, organizationId));
+      await database.db.delete(posProducts).where(eq(posProducts.organizationId, organizationId));
+      await database.db
+        .delete(posCatalogCategories)
+        .where(eq(posCatalogCategories.organizationId, organizationId));
       await database.db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
     if (identityId) await database.db.delete(identities).where(eq(identities.id, identityId));
     await database.client.end();
   }

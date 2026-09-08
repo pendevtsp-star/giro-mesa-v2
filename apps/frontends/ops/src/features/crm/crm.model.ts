@@ -109,6 +109,10 @@ export interface CrmCampaignDeliveries {
     orders: number;
     coupons: number;
     revenueCents: number;
+    costedOrders: number;
+    incompleteCostOrders: number;
+    costCents: number | null;
+    grossMarginCents: number | null;
   };
   experiments: Array<{
     variant: string;
@@ -379,15 +383,26 @@ export function parseCrmCampaignDeliveries(value: unknown): CrmCampaignDeliverie
   const payload = record(value);
   const counts = record(payload.counts);
   const attribution = record(payload.attribution);
+  const orders = number(attribution.orders);
+  const costedOrders =
+    attribution.costedOrders === undefined ? 0 : number(attribution.costedOrders);
+  const incompleteCostOrders =
+    attribution.incompleteCostOrders === undefined
+      ? orders
+      : number(attribution.incompleteCostOrders);
   return {
     counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, number(value)])),
     attribution: {
       delivered: number(attribution.delivered),
       read: number(attribution.read),
       replied: number(attribution.replied),
-      orders: number(attribution.orders),
+      orders,
       coupons: number(attribution.coupons),
       revenueCents: number(attribution.revenueCents),
+      costedOrders,
+      incompleteCostOrders,
+      costCents: nullableNumber(attribution.costCents),
+      grossMarginCents: nullableNumber(attribution.grossMarginCents),
     },
     experiments: (payload.experiments === undefined ? [] : records(payload.experiments)).map(
       (row) => ({

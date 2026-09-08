@@ -12,6 +12,7 @@ import {
 import QRCode from "qrcode";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoney } from "../../rules";
+import { paymentBlockReason } from "../counter/pos-payments";
 import {
   type SmartPosDevice,
   type SmartPosHealth,
@@ -387,7 +388,7 @@ function DevicesPanel({ devices }: { devices: SmartPosDevice[] }) {
                     <p>
                       {device.capabilities.killSwitch.reason ??
                         device.certification?.killSwitchReason ??
-                        device.capabilities.reason}
+                        paymentBlockReason(device.capabilities.reason)}
                     </p>
                   </Callout>
                 )}

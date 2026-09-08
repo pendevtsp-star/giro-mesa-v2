@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { expect, type Page, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { mockCompatibleApiHealth } from "./api-health-mock";
 
 const organizationId = "org-1";
@@ -24,6 +25,25 @@ async function expectNoHorizontalOverflow(page: Page) {
     };
   });
   expect(dimensions.document, JSON.stringify(dimensions)).toBe(dimensions.viewport);
+}
+
+async function expectResponsiveReportTable(page: Page, table: Locator, mobile = false) {
+  await expectNoHorizontalOverflow(page);
+  if (mobile) {
+    expect(
+      await table
+        .locator("xpath=..")
+        .evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true);
+  }
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .include(".reports-family-view")
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
 }
 
 function report(period: { from: string; to: string }, legacyEmpty = false) {
@@ -114,6 +134,43 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
         stockoutItems: legacyEmpty ? 0 : 2,
         lowStockItems: legacyEmpty ? 0 : 3,
         currentInventoryValueCents: legacyEmpty ? 0 : 75_000,
+        countVariance: legacyEmpty
+          ? []
+          : [
+              {
+                key: "rice-storage",
+                label: "Arroz agulhinha",
+                locationLabel: "Estoque seco",
+                plannedConsumptionQuantity: 7.5,
+                expectedQuantity: 12,
+                countedQuantity: 10,
+                differenceQuantity: -2,
+                lossQuantity: 2,
+                lossValueCents: 1_500,
+              },
+              {
+                key: "ground-beef-cold",
+                label: "Carne moída",
+                locationLabel: "Câmara fria",
+                plannedConsumptionQuantity: 3,
+                expectedQuantity: 4,
+                countedQuantity: 3.5,
+                differenceQuantity: -0.5,
+                lossQuantity: 0.5,
+                lossValueCents: null,
+              },
+              {
+                key: "oil-storage",
+                label: "Óleo de soja",
+                locationLabel: "Estoque seco",
+                plannedConsumptionQuantity: 0,
+                expectedQuantity: 6,
+                countedQuantity: 6,
+                differenceQuantity: 0,
+                lossQuantity: 0,
+                lossValueCents: 0,
+              },
+            ],
       },
       purchasing: {
         coverage: "complete",
@@ -148,6 +205,43 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
         coverage: "partial",
         grossMarginPercent: null,
         productProfitabilityCoverage: "unavailable",
+        channels: legacyEmpty
+          ? []
+          : [
+              {
+                key: "dine_in",
+                label: "Salão",
+                revenueCents: 120_000,
+                costCents: 50_000,
+                feeCents: 3_000,
+                grossMarginCents: 70_000,
+                netMarginAfterFeesCents: 67_000,
+                costCoverage: "complete",
+                feeCoverage: "complete",
+              },
+              {
+                key: "pickup",
+                label: "Retirada",
+                revenueCents: 30_000,
+                costCents: null,
+                feeCents: null,
+                grossMarginCents: null,
+                netMarginAfterFeesCents: null,
+                costCoverage: "partial",
+                feeCoverage: "unavailable",
+              },
+              {
+                key: "delivery",
+                label: "Delivery",
+                revenueCents: 0,
+                costCents: 0,
+                feeCents: 0,
+                grossMarginCents: 0,
+                netMarginAfterFeesCents: 0,
+                costCoverage: "complete",
+                feeCoverage: "complete",
+              },
+            ],
       },
     },
     meta: {
@@ -402,7 +496,9 @@ test("navegação sai de Relatórios ao selecionar outro módulo", async ({ page
   await expect(page.getByRole("heading", { level: 1, name: "Financeiro" })).toBeVisible();
 });
 
-test("financeiro consulta relatório real por período sem inventar margem", async ({ page }) => {
+test("financeiro consulta relatório real por período sem inventar margem", async ({
+  page,
+}, testInfo) => {
   const requestedPeriods: string[] = [];
   await mockReportsApi(page, requestedPeriods);
   await page.goto("/#/reports");
@@ -464,6 +560,43 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("heading", { name: "Motivos de cancelamento" })).toBeVisible();
   await family.selectOption("inventory");
   await expect(page.getByRole("heading", { name: "Perdas e cobertura atual" })).toBeVisible();
+  const inventoryVariance = page.getByRole("table", {
+    name: "Consumo previsto, sistema, contado e divergência por insumo e local",
+  });
+  await expect(inventoryVariance).toContainText("Arroz agulhinha");
+  await expect(inventoryVariance).toContainText("Estoque seco");
+  await expect(inventoryVariance).toContainText("7,5");
+  await expect(inventoryVariance).toContainText("2 · R$ 15,00");
+  await expect(inventoryVariance).toContainText("Carne moída");
+  await expect(inventoryVariance).toContainText("0,5 · Indisponível");
+  await expect(inventoryVariance).toContainText("Óleo de soja");
+  await expect(inventoryVariance).toContainText("Sem perda");
+  const inventorySection = page
+    .locator(".reports-section-card")
+    .filter({ has: page.getByRole("heading", { name: "Conferência física mais recente" }) });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectResponsiveReportTable(page, inventoryVariance);
+  await inventorySection.screenshot({
+    path: testInfo.outputPath("reports-inventory-light-1440.png"),
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectResponsiveReportTable(page, inventoryVariance, true);
+  await inventorySection.screenshot({
+    path: testInfo.outputPath("reports-inventory-light-375.png"),
+  });
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectResponsiveReportTable(page, inventoryVariance);
+  await inventorySection.screenshot({
+    path: testInfo.outputPath("reports-inventory-dark-1440.png"),
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectResponsiveReportTable(page, inventoryVariance, true);
+  await inventorySection.screenshot({
+    path: testInfo.outputPath("reports-inventory-dark-375.png"),
+  });
+  await page.locator("html").evaluate((element) => element.removeAttribute("data-theme"));
+  await page.setViewportSize({ width: 1280, height: 720 });
   await family.selectOption("purchasing");
   await expect(
     page.getByRole("heading", { name: "Pedidos, recebimentos e fornecedores" }),
@@ -472,6 +605,42 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("heading", { name: "Giro e atendimento das mesas" })).toBeVisible();
   await family.selectOption("profitability");
   await expect(page.getByRole("heading", { name: "Margem e resultado operacional" })).toBeVisible();
+  const profitabilityChannels = page.getByRole("table", {
+    name: "Receita, custo, taxas e margens por canal de venda",
+  });
+  await expect(profitabilityChannels).toContainText("Salão");
+  await expect(profitabilityChannels).toContainText("R$ 1.200,00");
+  await expect(profitabilityChannels).toContainText("R$ 670,00");
+  await expect(profitabilityChannels).toContainText("Retirada");
+  await expect(profitabilityChannels).toContainText("Indisponível");
+  await expect(profitabilityChannels).toContainText("Delivery");
+  await expect(profitabilityChannels).toContainText("R$ 0,00");
+  const profitabilitySection = page
+    .locator(".reports-section-card")
+    .filter({ has: page.getByRole("heading", { name: "Margem por canal" }) });
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectResponsiveReportTable(page, profitabilityChannels);
+  await profitabilitySection.screenshot({
+    path: testInfo.outputPath("reports-profitability-dark-1440.png"),
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectResponsiveReportTable(page, profitabilityChannels, true);
+  await profitabilitySection.screenshot({
+    path: testInfo.outputPath("reports-profitability-dark-375.png"),
+  });
+  await page.locator("html").evaluate((element) => element.removeAttribute("data-theme"));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expectResponsiveReportTable(page, profitabilityChannels);
+  await profitabilitySection.screenshot({
+    path: testInfo.outputPath("reports-profitability-light-1440.png"),
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectResponsiveReportTable(page, profitabilityChannels, true);
+  await profitabilitySection.screenshot({
+    path: testInfo.outputPath("reports-profitability-light-375.png"),
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await family.selectOption("multiunit");
   await expect(page.getByRole("heading", { name: "Comparativo entre unidades" })).toBeVisible();
   await family.selectOption("labor");

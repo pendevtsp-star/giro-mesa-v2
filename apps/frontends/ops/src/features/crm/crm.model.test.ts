@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   filterCrmCustomers,
   parseCrmAutomations,
+  parseCrmCampaignDeliveries,
   parseCrmCampaignPreview,
   parseCrmCustomerDetail,
   parseCrmCustomerPage,
@@ -72,6 +73,25 @@ describe("CRM customer collection", () => {
         provider: { ready: true, unavailableCode: null },
       }).eligibleRecipients,
     ).toBe(8);
+    expect(
+      parseCrmCampaignDeliveries({
+        counts: {},
+        attribution: {
+          delivered: 1,
+          read: 1,
+          replied: 0,
+          orders: 1,
+          coupons: 0,
+          revenueCents: 500,
+          costedOrders: 1,
+          incompleteCostOrders: 0,
+          costCents: 200,
+          grossMarginCents: 300,
+        },
+        experiments: [],
+        deliveries: [],
+      }).attribution,
+    ).toMatchObject({ costCents: 200, grossMarginCents: 300 });
   });
 
   it("parses Evolution status, inbox, messages and automation rules", () => {

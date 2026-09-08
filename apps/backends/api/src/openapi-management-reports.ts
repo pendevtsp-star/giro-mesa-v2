@@ -268,6 +268,7 @@ export const managementReportsResponseSchema: SchemaObject = {
             "lowStockItems",
             "currentInventoryValueCents",
             "analysis",
+            "countVariance",
             "comparison",
           ],
           properties: {
@@ -279,6 +280,34 @@ export const managementReportsResponseSchema: SchemaObject = {
             stockoutItems: { type: "integer" },
             lowStockItems: { type: "integer" },
             currentInventoryValueCents: nullableCents,
+            countVariance: {
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "key",
+                  "label",
+                  "locationLabel",
+                  "plannedConsumptionQuantity",
+                  "expectedQuantity",
+                  "countedQuantity",
+                  "differenceQuantity",
+                  "lossQuantity",
+                  "lossValueCents",
+                ],
+                properties: {
+                  key: { type: "string" },
+                  label: { type: "string" },
+                  locationLabel: { type: "string" },
+                  plannedConsumptionQuantity: { type: "number" },
+                  expectedQuantity: { type: "number" },
+                  countedQuantity: { type: "number" },
+                  differenceQuantity: { type: "number" },
+                  lossQuantity: { type: "number" },
+                  lossValueCents: nullableCents,
+                },
+              },
+            },
             analysis: {
               type: "array",
               items: {
@@ -428,12 +457,41 @@ export const managementReportsResponseSchema: SchemaObject = {
             "grossMarginPercent",
             "productProfitabilityCoverage",
             "products",
+            "channels",
             "comparison",
           ],
           properties: {
             coverage: { type: "string", enum: ["complete", "partial", "unavailable"] },
             grossMarginPercent: { type: "number", nullable: true },
             productProfitabilityCoverage: coverage,
+            channels: {
+              type: "array",
+              items: {
+                type: "object",
+                required: [
+                  "key",
+                  "label",
+                  "revenueCents",
+                  "costCents",
+                  "feeCents",
+                  "grossMarginCents",
+                  "netMarginAfterFeesCents",
+                  "costCoverage",
+                  "feeCoverage",
+                ],
+                properties: {
+                  key: { type: "string", enum: ["dine_in", "pickup", "delivery"] },
+                  label: { type: "string" },
+                  revenueCents: cents,
+                  costCents: nullableCents,
+                  feeCents: nullableCents,
+                  grossMarginCents: nullableCents,
+                  netMarginAfterFeesCents: nullableCents,
+                  costCoverage: coverage,
+                  feeCoverage: coverage,
+                },
+              },
+            },
             products: {
               type: "array",
               items: {

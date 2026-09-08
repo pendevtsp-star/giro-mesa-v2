@@ -36,6 +36,7 @@ import {
   WEEKDAYS,
 } from "./settings";
 import "./settings.css";
+import { SetupChecklist } from "./SetupChecklist";
 
 type SettingsPageProps = {
   organizationId: string;
@@ -123,8 +124,9 @@ const PUBLIC_SECTION_LABELS = {
 function specializedStatus(
   id: (typeof SPECIALIZED_SETTINGS)[number]["id"],
   summary: EstablishmentSpecializedSettingsSummary | null,
+  status: "loading" | "ready" | "error",
 ) {
-  if (!summary) return "Carregando estado…";
+  if (!summary) return status === "error" ? "Conferência indisponível" : "Carregando estado…";
   if (id === "catalog")
     return summary.catalog.active
       ? `Publicado · versão ${summary.catalog.publishedVersion ?? "—"}`
@@ -281,6 +283,8 @@ export function SettingsPage({
   );
   const [specializedSummary, setSpecializedSummary] =
     useState<EstablishmentSpecializedSettingsSummary | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [summaryRevision, setSummaryRevision] = useState(0);
   const [history, setHistory] = useState<EstablishmentSettingsHistoryEntry[]>([]);
   const [reloadToken, setReloadToken] = useState(0);
   const [online, setOnline] = useState(() => globalThis.navigator?.onLine ?? true);
@@ -316,18 +320,38 @@ export function SettingsPage({
       .finally(() => {
         if (active) setLoading(false);
       });
-    void Promise.allSettled([
-      api.settings.specializedSummary(organizationId, unitId),
-      api.settings.history(organizationId, unitId),
-    ]).then(([summaryResult, historyResult]) => {
-      if (!active) return;
-      if (summaryResult.status === "fulfilled") setSpecializedSummary(summaryResult.value);
-      if (historyResult.status === "fulfilled") setHistory(historyResult.value);
-    });
+    setHistory([]);
+    void api.settings
+      .history(organizationId, unitId)
+      .then((value) => {
+        if (active) setHistory(value);
+      })
+      .catch(() => undefined);
     return () => {
       active = false;
     };
   }, [organizationId, reloadToken, unitId]);
+
+  useEffect(() => {
+    void summaryRevision;
+    void reloadToken;
+    let active = true;
+    setSpecializedSummary(null);
+    setSummaryStatus("loading");
+    void api.settings
+      .specializedSummary(organizationId, unitId)
+      .then((value) => {
+        if (!active) return;
+        setSpecializedSummary(value);
+        setSummaryStatus("ready");
+      })
+      .catch(() => {
+        if (active) setSummaryStatus("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [organizationId, unitId, summaryRevision, reloadToken]);
 
   useEffect(() => {
     const updateOnline = () => setOnline(navigator.onLine);
@@ -748,6 +772,12 @@ export function SettingsPage({
           {feedback.message}
         </div>
       )}
+
+      <SetupChecklist
+        summary={specializedSummary}
+        status={summaryStatus}
+        onRefresh={() => setSummaryRevision((value) => value + 1)}
+      />
 
       <section id="settings-organization" aria-labelledby="settings-organization-title">
         <Card className="settings-card">
@@ -1478,7 +1508,9 @@ export function SettingsPage({
               <span>
                 <strong>{item.label}</strong>
                 <small>{item.description}</small>
-                <Badge tone="neutral">{specializedStatus(item.id, specializedSummary)}</Badge>
+                <Badge tone="neutral">
+                  {specializedStatus(item.id, specializedSummary, summaryStatus)}
+                </Badge>
               </span>
               <Icon name="chevron-right" size={16} />
             </a>

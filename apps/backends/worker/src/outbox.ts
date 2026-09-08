@@ -197,22 +197,19 @@ export class OutboxWorker {
 
   async runCrmAutomations(scope?: { organizationId: string; unitId: string }) {
     await this.connection.db.execute(sql`
-      with candidate_orders as (
+      with eligible_payment_touches as (
         select
           deliveries.id as delivery_id,
           deliveries.organization_id,
-          deliveries.sent_at,
+          links.unit_id,
           links.tab_id,
-          sum(payments.amount_cents)::integer as revenue_cents,
-          (
-            select redemptions.id
-            from growth_coupon_redemptions as redemptions
-            where redemptions.organization_id = deliveries.organization_id
-              and redemptions.order_ref = links.tab_id
-            order by redemptions.redeemed_at asc
-            limit 1
-          ) as coupon_redemption_id,
-          min(payments.created_at) as converted_at
+          payments.id as payment_id,
+          payments.created_at as payment_created_at,
+          greatest(payments.amount_cents - coalesce(reversals.amount_cents, 0), 0)::integer as revenue_cents,
+          row_number() over (
+            partition by payments.organization_id, payments.unit_id, payments.id
+            order by deliveries.sent_at desc, deliveries.id desc
+          ) as touch_rank
         from growth_campaign_deliveries as deliveries
         inner join growth_marketing_campaigns as campaigns
           on campaigns.organization_id = deliveries.organization_id
@@ -224,36 +221,162 @@ export class OutboxWorker {
           on payments.organization_id = links.organization_id
          and payments.unit_id = links.unit_id
          and payments.tab_id = links.tab_id
+        left join lateral (
+          select coalesce(sum(payment_reversals.amount_cents), 0)::integer as amount_cents
+          from pos_payment_reversals as payment_reversals
+          where payment_reversals.organization_id = payments.organization_id
+            and payment_reversals.unit_id = payments.unit_id
+            and payment_reversals.payment_id = payments.id
+            and payment_reversals.status = 'approved'
+        ) as reversals on true
         where deliveries.sent_at is not null
-          and deliveries.attributed_order_ref is null
           and deliveries.experiment_variant <> 'control'
           and payments.created_at between deliveries.sent_at
               and deliveries.sent_at + (campaigns.attribution_window_days * interval '1 day')
-        group by deliveries.id, deliveries.organization_id, links.tab_id
-      ), ranked as (
-        select candidate_orders.*,
-               row_number() over (
-                 partition by organization_id, tab_id
-                 order by sent_at desc, delivery_id desc
-               ) as touch_rank
-        from candidate_orders
-      ), conversions as (
-        select distinct on (delivery_id)
-               delivery_id,
-               tab_id,
-               revenue_cents,
-               coupon_redemption_id
-        from ranked
+          ${
+            scope
+              ? sql`and deliveries.organization_id = ${scope.organizationId}
+                  and links.unit_id = ${scope.unitId}`
+              : sql``
+          }
+      ), winning_payments as (
+        select *
+        from eligible_payment_touches
         where touch_rank = 1
-        order by delivery_id, converted_at
+      ), eligible_deliveries as (
+        select distinct delivery_id
+        from eligible_payment_touches
+      ), delivery_tabs as (
+        -- attributed_order_ref is a single tab. Preserve that contract by retaining
+        -- the first tab won by a delivery and ignoring later tabs for that delivery.
+        select distinct on (delivery_id)
+          delivery_id,
+          organization_id,
+          unit_id,
+          tab_id
+        from winning_payments
+        order by delivery_id, payment_created_at, payment_id
+      ), attributed_payments as (
+        select payments.*
+        from winning_payments as payments
+        inner join delivery_tabs as tabs
+          on tabs.delivery_id = payments.delivery_id
+         and tabs.organization_id = payments.organization_id
+         and tabs.unit_id = payments.unit_id
+         and tabs.tab_id = payments.tab_id
+      ), tab_costs as (
+        select distinct
+          tabs.organization_id,
+          tabs.unit_id,
+          tabs.tab_id,
+          item_costs.missing_cost_items,
+          item_costs.cost_cents,
+          item_costs.net_cents
+        from delivery_tabs as tabs
+        left join lateral (
+          select
+            count(*) filter (where items.cost_cents is null)::integer as missing_cost_items,
+            coalesce(sum(items.cost_cents), 0)::integer as cost_cents,
+            coalesce(sum(items.net_cents), 0)::integer as net_cents
+          from pos_orders as orders
+          inner join pos_order_items as items
+            on items.organization_id = orders.organization_id
+           and items.unit_id = orders.unit_id
+           and items.order_id = orders.id
+          where orders.organization_id = tabs.organization_id
+            and orders.unit_id = tabs.unit_id
+            and orders.tab_id = tabs.tab_id
+            and items.status <> 'canceled'
+        ) as item_costs on true
+      ), delivery_revenue as (
+        select
+          payments.delivery_id,
+          payments.organization_id,
+          payments.unit_id,
+          payments.tab_id,
+          sum(payments.revenue_cents)::integer as revenue_cents,
+          min(payments.payment_created_at) as first_payment_at,
+          costs.missing_cost_items,
+          costs.cost_cents,
+          costs.net_cents
+        from attributed_payments as payments
+        inner join tab_costs as costs
+          on costs.organization_id = payments.organization_id
+         and costs.unit_id = payments.unit_id
+         and costs.tab_id = payments.tab_id
+        group by
+          payments.delivery_id,
+          payments.organization_id,
+          payments.unit_id,
+          payments.tab_id,
+          costs.missing_cost_items,
+          costs.cost_cents,
+          costs.net_cents
+      ), cost_allocation as (
+        select
+          revenue.*,
+          coalesce(
+            sum(revenue_cents) over (
+              partition by organization_id, unit_id, tab_id
+              order by first_payment_at, delivery_id
+              rows between unbounded preceding and 1 preceding
+            ),
+            0
+          )::integer as prior_revenue_cents,
+          sum(revenue_cents) over (
+            partition by organization_id, unit_id, tab_id
+          )::integer as attributed_tab_revenue_cents
+        from delivery_revenue as revenue
+      ), conversions as (
+        select
+          allocation.delivery_id,
+          allocation.organization_id,
+          allocation.unit_id,
+          allocation.tab_id,
+          allocation.revenue_cents,
+          case
+            when allocation.net_cents <= 0
+              or allocation.missing_cost_items > 0
+              or allocation.revenue_cents <= 0
+              or allocation.attributed_tab_revenue_cents > allocation.net_cents
+              then null
+            else (
+              ceil(
+                allocation.cost_cents::numeric
+                * (allocation.prior_revenue_cents + allocation.revenue_cents)
+                / allocation.net_cents
+              ) - ceil(
+                allocation.cost_cents::numeric
+                * allocation.prior_revenue_cents
+                / allocation.net_cents
+              )
+            )::integer
+          end as cost_cents,
+          (
+            select redemptions.id
+            from growth_coupon_redemptions as redemptions
+            where redemptions.organization_id = allocation.organization_id
+              and redemptions.order_ref = allocation.tab_id
+            order by redemptions.redeemed_at asc
+            limit 1
+          ) as coupon_redemption_id
+        from cost_allocation as allocation
       )
       update growth_campaign_deliveries as deliveries
       set attributed_order_ref = conversions.tab_id,
           attributed_coupon_redemption_id = conversions.coupon_redemption_id,
-          attributed_revenue_cents = conversions.revenue_cents,
+          attributed_revenue_cents = coalesce(conversions.revenue_cents, 0),
+          attributed_cost_cents = conversions.cost_cents,
           updated_at = now()
-      from conversions
-      where deliveries.id = conversions.delivery_id
+      from eligible_deliveries
+      left join conversions on conversions.delivery_id = eligible_deliveries.delivery_id
+      where deliveries.id = eligible_deliveries.delivery_id
+        and (
+          deliveries.attributed_order_ref is distinct from conversions.tab_id
+          or deliveries.attributed_coupon_redemption_id is distinct from conversions.coupon_redemption_id
+          or deliveries.attributed_revenue_cents is distinct from coalesce(conversions.revenue_cents, 0)
+          or deliveries.attributed_cost_cents is distinct from conversions.cost_cents
+        )
     `);
     const rules = await this.connection.db
       .select()

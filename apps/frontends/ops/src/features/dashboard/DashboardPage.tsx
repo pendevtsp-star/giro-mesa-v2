@@ -73,6 +73,8 @@ export function RealDashboard({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [alertDigest, setAlertDigest] = useState<string | null>(null);
+  const [priorityFilter, setPriorityFilter] = useState<"all" | "mine" | "unassigned">("all");
+  const [showAllPriorities, setShowAllPriorities] = useState(false);
   const visited = useRef(false);
   const visitedScope = useRef("");
   const seenPriorities = useRef<Set<string> | null>(null);
@@ -97,6 +99,8 @@ export function RealDashboard({
       visitedScope.current = nextScope;
       visited.current = false;
       seenPriorities.current = null;
+      setPriorityFilter("all");
+      setShowAllPriorities(false);
     }
   }, [organizationId, unitId]);
 
@@ -187,10 +191,17 @@ export function RealDashboard({
         const metrics = overview.metrics
           .filter((item) => canAccess(profile, item.route))
           .slice(0, 4);
-        const priorities = overview.priorities
+        const allPriorities = overview.priorities
           .filter((item) => canAccess(profile, item.route))
-          .sort((left, right) => toneWeight(right.tone) - toneWeight(left.tone))
-          .slice(0, 5);
+          .sort((left, right) => toneWeight(right.tone) - toneWeight(left.tone));
+        const filteredPriorities = allPriorities.filter((item) =>
+          priorityFilter === "mine"
+            ? item.assignedTo?.isMe
+            : priorityFilter === "unassigned"
+              ? !item.assignedTo
+              : true,
+        );
+        const priorities = showAllPriorities ? filteredPriorities : filteredPriorities.slice(0, 5);
         const pulse = overview.pulse
           .filter((item) => !item.route || canAccess(profile, item.route))
           .slice(0, 6);
@@ -311,21 +322,59 @@ export function RealDashboard({
             <Card className="dashboard-priorities">
               <div className="card-header">
                 <div>
-                  <p className="eyebrow">Prioridades</p>
                   <h2>Faça agora</h2>
+                  <p className="dashboard-muted">Pendências do turno, em ordem de urgência.</p>
                 </div>
                 <Badge
                   tone={
-                    priorities.length || overview.unavailableSources.length ? "warning" : "success"
+                    allPriorities.length || overview.unavailableSources.length
+                      ? "warning"
+                      : "success"
                   }
                 >
-                  {priorities.length
-                    ? `${priorities.length} pendência(s)`
+                  {allPriorities.length
+                    ? `${allPriorities.length} ${allPriorities.length === 1 ? "pendência" : "pendências"}`
                     : overview.unavailableSources.length
                       ? "Dados parciais"
                       : "Tudo em dia"}
                 </Badge>
               </div>
+              {allPriorities.length > 0 && (
+                <fieldset
+                  aria-label="Filtrar prioridades por responsável"
+                  className="dashboard-priority-filters"
+                >
+                  {(
+                    [
+                      ["all", "Todas", allPriorities.length],
+                      [
+                        "mine",
+                        "Comigo",
+                        allPriorities.filter((item) => item.assignedTo?.isMe).length,
+                      ],
+                      [
+                        "unassigned",
+                        "Sem responsável",
+                        allPriorities.filter((item) => !item.assignedTo).length,
+                      ],
+                    ] as const
+                  ).map(([filter, label, count]) => (
+                    <Button
+                      aria-pressed={priorityFilter === filter}
+                      key={filter}
+                      onClick={() => {
+                        setPriorityFilter(filter);
+                        setShowAllPriorities(false);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant={priorityFilter === filter ? "secondary" : "ghost"}
+                    >
+                      {label} <span className="dashboard-priority-count">{count}</span>
+                    </Button>
+                  ))}
+                </fieldset>
+              )}
               {priorities.length ? (
                 <div className="dashboard-priority-list">
                   {priorities.map((item) => (
@@ -350,8 +399,11 @@ export function RealDashboard({
                         )}
                       </a>
                       <div className="dashboard-priority__controls">
-                        <a className="dashboard-priority__action" href={routeHref(item.route)}>
-                          {item.actionLabel} →
+                        <a
+                          className="dashboard-priority__action gm-button gm-button--secondary gm-button--sm"
+                          href={routeHref(item.route)}
+                        >
+                          {item.actionLabel} <Icon name="chevron-right" size={14} />
                         </a>
                         <details className="dashboard-priority__more">
                           <summary>Mais ações</summary>
@@ -379,6 +431,7 @@ export function RealDashboard({
                               onClick={() => void actOnPriority(item, "resolve")}
                               size="sm"
                               type="button"
+                              variant="secondary"
                             >
                               Marcar tratada
                             </Button>
@@ -388,6 +441,16 @@ export function RealDashboard({
                     </article>
                   ))}
                 </div>
+              ) : allPriorities.length ? (
+                <EmptyState
+                  icon={<Icon name="check" />}
+                  description="Use Todas para acompanhar as outras pendências do turno."
+                  title={
+                    priorityFilter === "mine"
+                      ? "Nenhuma pendência com você"
+                      : "Todas têm responsável"
+                  }
+                />
               ) : (
                 <EmptyState
                   description={
@@ -402,6 +465,23 @@ export function RealDashboard({
                       : "Operação em dia"
                   }
                 />
+              )}
+              {filteredPriorities.length > 5 && (
+                <div className="dashboard-priority-footer">
+                  <span role="status">
+                    Exibindo {priorities.length} de {filteredPriorities.length}
+                  </span>
+                  <Button
+                    onClick={() => setShowAllPriorities((current) => !current)}
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {showAllPriorities
+                      ? "Mostrar só as 5 primeiras"
+                      : `Ver todas as ${filteredPriorities.length} pendências`}
+                  </Button>
+                </div>
               )}
             </Card>
 
@@ -483,7 +563,6 @@ export function RealDashboard({
               <Card className="dashboard-multiunit">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Multiunidade</p>
                     <h2>Onde agir primeiro</h2>
                   </div>
                   <a href={routeHref("multiunit")}>Comparar tudo →</a>
@@ -510,7 +589,6 @@ export function RealDashboard({
               <Card className="dashboard-pulse">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Operação ao vivo</p>
                     <h2>Pulso do turno</h2>
                   </div>
                   <Badge tone={overview.activeShift ? "success" : "neutral"}>
@@ -542,7 +620,6 @@ export function RealDashboard({
               <Card className="dashboard-quick-actions">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Atalhos</p>
                     <h2>Próximas ações</h2>
                   </div>
                 </div>
@@ -558,12 +635,20 @@ export function RealDashboard({
                 ) : (
                   <p className="dashboard-muted">Use o menu para acessar seus módulos.</p>
                 )}
+                {canAccess(profile, "settings") && (
+                  <a
+                    className="gm-button gm-button--secondary gm-button--sm"
+                    href={`${routeHref("settings")}?section=setup`}
+                  >
+                    Preparar a unidade <Icon name="chevron-right" size={14} />
+                  </a>
+                )}
               </Card>
               <Card className="dashboard-activity">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Desde sua última visita</p>
                     <h2>O que mudou</h2>
+                    <p className="dashboard-muted">Desde sua última visita</p>
                   </div>
                   <Badge tone="info">{activity.length}</Badge>
                 </div>
@@ -596,7 +681,6 @@ export function RealDashboard({
               <Card className="dashboard-freshness">
                 <div className="card-header">
                   <div>
-                    <p className="eyebrow">Qualidade dos dados</p>
                     <h2>Fontes consultadas</h2>
                   </div>
                 </div>

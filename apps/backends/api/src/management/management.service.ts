@@ -1039,6 +1039,17 @@ type ReportFamilySource = {
       grossMarginCents: number | null;
       grossMarginPercent: number | null;
     }>;
+    channels?: Array<{
+      key: keyof typeof CHANNEL_LABELS;
+      label: string;
+      revenueCents: number;
+      costCents: number | null;
+      feeCents: number | null;
+      grossMarginCents: number | null;
+      netMarginAfterFeesCents: number | null;
+      costCoverage: "complete" | "partial" | "unavailable";
+      feeCoverage: "complete" | "partial" | "unavailable";
+    }>;
   };
   comparisons?: Record<
     "sales" | "exceptions" | "inventory" | "purchasing" | "operations" | "profitability",
@@ -1061,6 +1072,17 @@ type ReportFamilySource = {
     consumedValueCents: number | null;
     currentQuantity: number;
     coverageDays: number | null;
+  }>;
+  countVariance?: Array<{
+    key: string;
+    label: string;
+    locationLabel: string;
+    plannedConsumptionQuantity: number;
+    expectedQuantity: number;
+    countedQuantity: number;
+    differenceQuantity: number;
+    lossQuantity: number;
+    lossValueCents: number | null;
   }>;
   supplierPerformance?: Array<{
     key: string;
@@ -1149,6 +1171,7 @@ export function buildReportFamilies(source: ReportFamilySource) {
       basis: "period_events_and_current_balance" as const,
       ...source.inventory,
       analysis: source.inventoryAnalysis ?? [],
+      countVariance: source.countVariance ?? [],
       comparison: comparisons.inventory,
     },
     purchasing: {
@@ -1173,6 +1196,7 @@ export function buildReportFamilies(source: ReportFamilySource) {
       grossMarginPercent,
       productProfitabilityCoverage: source.profitability.coverage,
       products: source.profitability.products ?? [],
+      channels: source.profitability.channels ?? [],
       comparison: comparisons.profitability,
     },
     multiunit: {
@@ -4699,6 +4723,7 @@ export class ManagementService {
             .select({
               inventoryItemId: managementStockBalances.inventoryItemId,
               version: managementStockBalances.version,
+              averageCostCents: managementStockBalances.averageCostCents,
             })
             .from(managementStockBalances)
             .where(
@@ -4709,12 +4734,13 @@ export class ManagementService {
                 inArray(managementStockBalances.inventoryItemId, countedItemIds),
               ),
             );
-          const versionByItem = new Map(
-            currentBalances.map((balance) => [balance.inventoryItemId, balance.version]),
+          const balanceByItem = new Map(
+            currentBalances.map((balance) => [balance.inventoryItemId, balance]),
           );
           const staleLine = sessionLines.find(
             (line) =>
-              (versionByItem.get(line.inventoryItemId) ?? 1) !== line.expectedBalanceVersion,
+              (balanceByItem.get(line.inventoryItemId)?.version ?? 1) !==
+              line.expectedBalanceVersion,
           );
           if (staleLine)
             throw new ConflictException({
@@ -4735,6 +4761,7 @@ export class ManagementService {
               sourceType: "inventory_count_session_line",
               sourceId: line.id,
               actorIdentityId: identityId,
+              unitCostCents: balanceByItem.get(line.inventoryItemId)?.averageCostCents ?? null,
               allowHeldLotAdjustment: true,
             });
           }
@@ -18245,6 +18272,24 @@ export class ManagementService {
       missingCostMovements: number;
       currentQuantity: number;
     };
+    type InventoryCountVarianceRow = {
+      key: string;
+      label: string;
+      locationLabel: string;
+      plannedConsumptionQuantity: number;
+      expectedQuantity: number;
+      countedQuantity: number;
+      differenceQuantity: number;
+      lossQuantity: number;
+      lossValueCents: number | null;
+    };
+    type ChannelProfitabilityRow = {
+      channel: keyof typeof CHANNEL_LABELS;
+      revenueCents: number;
+      costCents: number;
+      missingCostItems: number;
+      feeCents: number | null;
+    };
     type SupplierPerformanceRow = {
       key: string;
       label: string;
@@ -18276,6 +18321,8 @@ export class ManagementService {
       hourlySales,
       shiftRows,
       inventoryAnalysisRows,
+      inventoryCountVarianceRows,
+      channelProfitabilityRows,
       supplierPerformanceRows,
       multiunitRows,
     ] = await Promise.all([
@@ -18390,6 +18437,196 @@ export class ManagementService {
         order by consumption.consumed_value_cents desc nulls last, items.name
       `)
         : Promise.resolve([] as InventoryAnalysisRow[]),
+      !period.family || period.family === "overview" || period.family === "inventory"
+        ? this.database.db.execute<InventoryCountVarianceRow>(sql`
+        with counted as (
+          select sessions.id as session_id,
+                 sessions.location_id,
+                 lines.inventory_item_id,
+                 sum(lines.expected_quantity::numeric)::double precision as expected_quantity,
+                 sum(lines.counted_quantity::numeric)::double precision as counted_quantity,
+                 sum(lines.difference_quantity::numeric)::double precision as difference_quantity,
+                 sessions.reviewed_at
+          from management_inventory_count_sessions sessions
+          inner join management_inventory_count_session_lines lines
+            on lines.organization_id = sessions.organization_id
+           and lines.unit_id = sessions.unit_id
+           and lines.session_id = sessions.id
+          where sessions.organization_id = ${organizationId}::uuid
+            and sessions.unit_id = ${unitId}::uuid
+            and sessions.status = 'approved'
+            and timezone(${unit.timezone}, sessions.reviewed_at)::date between ${period.from}::date and ${period.to}::date
+          group by sessions.id, sessions.location_id, lines.inventory_item_id, sessions.reviewed_at
+        ), latest_counts as (
+          select *, row_number() over (
+            partition by location_id, inventory_item_id
+            order by reviewed_at desc, session_id desc
+          ) as position
+          from counted
+        ), consumption as (
+          select location_id, inventory_item_id,
+                 coalesce(sum(abs(quantity_delta::numeric)), 0)::double precision as planned_consumption_quantity
+          from management_inventory_movements
+          where organization_id = ${organizationId}::uuid
+            and unit_id = ${unitId}::uuid
+            and type = 'order_consumption'
+            and timezone(${unit.timezone}, occurred_at)::date between ${period.from}::date and ${period.to}::date
+          group by location_id, inventory_item_id
+        ), count_costs as (
+          select latest_counts.session_id,
+                 latest_counts.location_id,
+                 latest_counts.inventory_item_id,
+                 count(*) filter (
+                   where lines.difference_quantity::numeric < 0
+                     and (movements.id is null or movements.unit_cost_cents is null)
+                 )::int as missing_cost_movements,
+                 coalesce(
+                   round(sum(abs(movements.quantity_delta::numeric) * movements.unit_cost_cents) filter (
+                     where movements.quantity_delta < 0
+                   )),
+                   0
+                 )::int as loss_value_cents
+          from latest_counts
+          inner join management_inventory_count_session_lines lines
+            on lines.organization_id = ${organizationId}::uuid
+           and lines.unit_id = ${unitId}::uuid
+           and lines.session_id = latest_counts.session_id
+           and lines.inventory_item_id = latest_counts.inventory_item_id
+          left join management_inventory_movements movements
+            on movements.organization_id = lines.organization_id
+           and movements.unit_id = lines.unit_id
+           and movements.source_type = 'inventory_count_session_line'
+           and movements.source_id = lines.id
+           and movements.type = 'blind_count'
+          where latest_counts.position = 1
+          group by latest_counts.session_id, latest_counts.location_id, latest_counts.inventory_item_id
+        ), keys as (
+          select location_id, inventory_item_id
+          from latest_counts
+          where position = 1
+        )
+        select (items.id::text || ':' || locations.id::text) as key,
+               items.name as label,
+               locations.name as "locationLabel",
+               coalesce(consumption.planned_consumption_quantity, 0)::double precision as "plannedConsumptionQuantity",
+               coalesce(latest_counts.expected_quantity, 0)::double precision as "expectedQuantity",
+               coalesce(latest_counts.counted_quantity, 0)::double precision as "countedQuantity",
+               coalesce(latest_counts.difference_quantity, 0)::double precision as "differenceQuantity",
+               greatest(-coalesce(latest_counts.difference_quantity, 0), 0)::double precision as "lossQuantity",
+               case
+                 when coalesce(latest_counts.difference_quantity, 0) >= 0 then 0
+                 when count_costs.session_id is null or count_costs.missing_cost_movements > 0 then null
+                 else count_costs.loss_value_cents
+               end as "lossValueCents"
+        from keys
+        inner join management_inventory_items items
+          on items.organization_id = ${organizationId}::uuid
+         and items.unit_id = ${unitId}::uuid
+         and items.id = keys.inventory_item_id
+        inner join management_stock_locations locations
+          on locations.organization_id = ${organizationId}::uuid
+         and locations.unit_id = ${unitId}::uuid
+         and locations.id = keys.location_id
+        left join latest_counts
+          on latest_counts.location_id = keys.location_id
+         and latest_counts.inventory_item_id = keys.inventory_item_id
+         and latest_counts.position = 1
+        left join consumption
+          on consumption.location_id = keys.location_id
+         and consumption.inventory_item_id = keys.inventory_item_id
+        left join count_costs
+          on count_costs.session_id = latest_counts.session_id
+         and count_costs.location_id = latest_counts.location_id
+         and count_costs.inventory_item_id = latest_counts.inventory_item_id
+        order by locations.name, items.name
+      `)
+        : Promise.resolve([] as InventoryCountVarianceRow[]),
+      !period.family || period.family === "overview" || period.family === "profitability"
+        ? this.database.db.execute<ChannelProfitabilityRow>(sql`
+        with scoped_tabs as (
+          select id, fulfillment_type, total_cents
+          from pos_tabs
+          where organization_id = ${organizationId}::uuid
+            and unit_id = ${unitId}::uuid
+            and status = 'closed'
+            and timezone(${unit.timezone}, closed_at)::date between ${period.from}::date and ${period.to}::date
+        ), item_totals as (
+          select tabs.id as tab_id,
+                 tabs.fulfillment_type as channel,
+                 tabs.total_cents as tab_total_cents,
+                 coalesce(sum(items.net_cents) filter (where items.status <> 'canceled'), 0)::int as revenue_cents,
+                 coalesce(sum(items.cost_cents) filter (where items.status <> 'canceled' and items.cost_cents is not null), 0)::int as cost_cents,
+                 count(*) filter (where items.status <> 'canceled' and items.cost_cents is null)::int as missing_cost_items
+          from scoped_tabs tabs
+          left join pos_orders orders
+            on orders.organization_id = ${organizationId}::uuid
+           and orders.unit_id = ${unitId}::uuid
+           and orders.tab_id = tabs.id
+          left join pos_order_items items
+            on items.organization_id = orders.organization_id
+           and items.unit_id = orders.unit_id
+           and items.order_id = orders.id
+          group by tabs.id, tabs.fulfillment_type, tabs.total_cents
+        ), reversal_totals as (
+          select payment_id, coalesce(sum(amount_cents), 0)::int as reversed_cents
+          from pos_payment_reversals
+          where organization_id = ${organizationId}::uuid
+            and unit_id = ${unitId}::uuid
+            and status = 'approved'
+          group by payment_id
+        ), fee_by_payment as (
+          select payments.id as payment_id,
+                 payments.tab_id,
+                 payments.amount_cents - coalesce(reversal_totals.reversed_cents, 0) as net_cents,
+                 case
+                   when payments.method = 'cash' then 0
+                   when count(reconciliations.id) = 1
+                     and bool_or(reconciliations.status in ('matched', 'settled'))
+                     and max(reconciliations.gross_cents) = payments.amount_cents
+                     and coalesce(reversal_totals.reversed_cents, 0) = 0
+                     then max(reconciliations.fee_cents)
+                   else null
+                 end as fee_cents
+          from pos_tab_payments payments
+          inner join scoped_tabs tabs on tabs.id = payments.tab_id
+          left join reversal_totals on reversal_totals.payment_id = payments.id
+          left join pos_payment_reconciliations reconciliations
+            on reconciliations.organization_id = payments.organization_id
+           and reconciliations.unit_id = payments.unit_id
+           and reconciliations.payment_id = payments.id
+          where payments.organization_id = ${organizationId}::uuid
+            and payments.unit_id = ${unitId}::uuid
+          group by payments.id, payments.tab_id, payments.amount_cents, payments.method, reversal_totals.reversed_cents
+        ), settlement_by_tab as (
+          select tab_id,
+                 coalesce(sum(net_cents), 0)::int as net_cents,
+                 count(*) filter (where fee_cents is null)::int as unknown_fee_payments,
+                 coalesce(sum(fee_cents), 0)::int as fee_cents
+          from fee_by_payment
+          group by tab_id
+        )
+        select item_totals.channel,
+               coalesce(sum(item_totals.revenue_cents), 0)::int as "revenueCents",
+               coalesce(sum(item_totals.cost_cents), 0)::int as "costCents",
+               coalesce(sum(item_totals.missing_cost_items), 0)::int as "missingCostItems",
+               case
+                 when count(*) filter (
+                   where item_totals.revenue_cents > 0 and (
+                     settlement_by_tab.tab_id is null
+                     or settlement_by_tab.net_cents <> item_totals.tab_total_cents
+                     or settlement_by_tab.unknown_fee_payments > 0
+                   )
+                 ) = 0
+                   then coalesce(sum(settlement_by_tab.fee_cents), 0)::int
+                 else null
+               end as "feeCents"
+        from item_totals
+        left join settlement_by_tab on settlement_by_tab.tab_id = item_totals.tab_id
+        where item_totals.revenue_cents > 0
+        group by item_totals.channel
+        order by item_totals.channel
+      `)
+        : Promise.resolve([] as ChannelProfitabilityRow[]),
       !period.family || period.family === "overview" || period.family === "purchasing"
         ? this.database.db.execute<SupplierPerformanceRow>(sql`
         with order_stats as (
@@ -18614,6 +18851,47 @@ export class ManagementService {
             : null,
       };
     });
+    const inventoryCountVariance = inventoryCountVarianceRows.map((row) => ({
+      key: row.key,
+      label: row.label,
+      locationLabel: row.locationLabel,
+      plannedConsumptionQuantity: Number(row.plannedConsumptionQuantity),
+      expectedQuantity: Number(row.expectedQuantity),
+      countedQuantity: Number(row.countedQuantity),
+      differenceQuantity: Number(row.differenceQuantity),
+      lossQuantity: Number(row.lossQuantity),
+      lossValueCents: row.lossValueCents === null ? null : Number(row.lossValueCents),
+    }));
+    const channelProfitability = channelProfitabilityRows.map((row) => {
+      const revenueCents = Number(row.revenueCents);
+      const costCoverage =
+        revenueCents === 0
+          ? ("unavailable" as const)
+          : Number(row.missingCostItems) === 0
+            ? ("complete" as const)
+            : ("partial" as const);
+      const feeCoverage =
+        revenueCents === 0
+          ? ("unavailable" as const)
+          : row.feeCents === null
+            ? ("partial" as const)
+            : ("complete" as const);
+      const costCents = costCoverage === "complete" ? Number(row.costCents) : null;
+      const feeCents = feeCoverage === "complete" ? Number(row.feeCents) : null;
+      const grossMarginCents = costCents === null ? null : revenueCents - costCents;
+      return {
+        key: row.channel,
+        label: CHANNEL_LABELS[row.channel],
+        revenueCents,
+        costCents,
+        feeCents,
+        grossMarginCents,
+        netMarginAfterFeesCents:
+          grossMarginCents === null || feeCents === null ? null : grossMarginCents - feeCents,
+        costCoverage,
+        feeCoverage,
+      };
+    });
     const supplierPerformance = supplierPerformanceRows.map((row) => {
       const expected = Number(row.expectedLineCents);
       const received = Number(row.receivedLineCents);
@@ -18730,6 +19008,7 @@ export class ManagementService {
           ? inventoryBalanceRows.reduce((sum, row) => sum + row.valueCents, 0)
           : null,
       },
+      countVariance: inventoryCountVariance,
       purchasing: {
         orderCount: purchaseOrderRows.reduce((sum, row) => sum + row.orderCount, 0),
         orderedCents: purchaseOrderRows.reduce((sum, row) => sum + row.orderedCents, 0),
@@ -18752,6 +19031,7 @@ export class ManagementService {
         grossMarginCents,
         revenueCents,
         products: productProfitability,
+        channels: channelProfitability,
       },
       comparisons: {
         sales: {

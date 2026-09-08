@@ -946,6 +946,17 @@ export interface ReportFamilies {
       currentQuantity: number;
       coverageDays: number | null;
     }>;
+    countVariance: Array<{
+      key: string;
+      label: string;
+      locationLabel: string;
+      plannedConsumptionQuantity: number;
+      expectedQuantity: number;
+      countedQuantity: number;
+      differenceQuantity: number;
+      lossQuantity: number;
+      lossValueCents: number | null;
+    }>;
     comparison: ReportFamilyComparison;
   };
   purchasing: {
@@ -1004,6 +1015,17 @@ export interface ReportFamilies {
       costCents: number | null;
       grossMarginCents: number | null;
       grossMarginPercent: number | null;
+    }>;
+    channels: Array<{
+      key: "dine_in" | "pickup" | "delivery";
+      label: string;
+      revenueCents: number;
+      costCents: number | null;
+      feeCents: number | null;
+      grossMarginCents: number | null;
+      netMarginAfterFeesCents: number | null;
+      costCoverage: ReportCoverage;
+      feeCoverage: ReportCoverage;
     }>;
     comparison: ReportFamilyComparison;
   };
@@ -3126,6 +3148,11 @@ export function parseReports(value: unknown): ReportData {
     const result = typeof entry === "string" ? entry : "unavailable";
     return result === "complete" || result === "partial" ? result : "unavailable";
   };
+  const channelKey = (entry: unknown): "dine_in" | "pickup" | "delivery" => {
+    const key = requiredString(entry);
+    if (key === "dine_in" || key === "pickup" || key === "delivery") return key;
+    throw new InvalidManagementPayloadError();
+  };
   const comparisonMode = (entry: unknown): ReportComparisonMode =>
     entry === "previous_year" || entry === "none" ? entry : "previous_period";
   const metaSourceCounts = meta ? record(meta.sourceCounts) : {};
@@ -3357,6 +3384,17 @@ export function parseReports(value: unknown): ReportData {
           currentQuantity: numeric(entry.currentQuantity) ?? 0,
           coverageDays: numeric(entry.coverageDays, true),
         })),
+        countVariance: optionalRows(inventoryFamily, "countVariance").map((entry) => ({
+          key: requiredString(entry.key),
+          label: requiredString(entry.label),
+          locationLabel: requiredString(entry.locationLabel),
+          plannedConsumptionQuantity: numeric(entry.plannedConsumptionQuantity) ?? 0,
+          expectedQuantity: numeric(entry.expectedQuantity) ?? 0,
+          countedQuantity: numeric(entry.countedQuantity) ?? 0,
+          differenceQuantity: numeric(entry.differenceQuantity) ?? 0,
+          lossQuantity: numeric(entry.lossQuantity) ?? 0,
+          lossValueCents: numeric(entry.lossValueCents, true),
+        })),
         comparison: parseFamilyComparison(inventoryFamily),
       },
       purchasing: {
@@ -3417,6 +3455,17 @@ export function parseReports(value: unknown): ReportData {
           costCents: numeric(entry.costCents, true),
           grossMarginCents: numeric(entry.grossMarginCents, true),
           grossMarginPercent: numeric(entry.grossMarginPercent, true),
+        })),
+        channels: optionalRows(profitabilityFamily, "channels").map((entry) => ({
+          key: channelKey(entry.key),
+          label: requiredString(entry.label),
+          revenueCents: numeric(entry.revenueCents) ?? 0,
+          costCents: numeric(entry.costCents, true),
+          feeCents: numeric(entry.feeCents, true),
+          grossMarginCents: numeric(entry.grossMarginCents, true),
+          netMarginAfterFeesCents: numeric(entry.netMarginAfterFeesCents, true),
+          costCoverage: reportCoverage(entry.costCoverage),
+          feeCoverage: reportCoverage(entry.feeCoverage),
         })),
         comparison: parseFamilyComparison(profitabilityFamily),
       },

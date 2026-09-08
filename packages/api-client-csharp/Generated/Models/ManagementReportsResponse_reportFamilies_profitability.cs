@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.Models
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The channels property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_channels>? Channels { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_channels> Channels { get; set; }
+#endif
         /// <summary>The comparison property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -61,6 +69,7 @@ namespace GiroMesa.ApiClient.Models
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "channels", n => { Channels = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_channels>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_channels.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "comparison", n => { Comparison = n.GetObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_comparison>(global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_comparison.CreateFromDiscriminatorValue); } },
                 { "coverage", n => { Coverage = n.GetEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_coverage>(); } },
                 { "grossMarginPercent", n => { GrossMarginPercent = n.GetDoubleValue(); } },
@@ -75,6 +84,7 @@ namespace GiroMesa.ApiClient.Models
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_channels>("channels", Channels);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_comparison>("comparison", Comparison);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Models.ManagementReportsResponse_reportFamilies_profitability_coverage>("coverage", Coverage);
             writer.WriteDoubleValue("grossMarginPercent", GrossMarginPercent);

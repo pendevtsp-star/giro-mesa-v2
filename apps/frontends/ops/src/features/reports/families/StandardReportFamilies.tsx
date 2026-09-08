@@ -493,6 +493,60 @@ export function ReportFamilyView({
             />
           )}
         </Card>
+        <Card className="reports-section-card">
+          <div className="reports-section-heading">
+            <div>
+              <h2>Conferência física mais recente</h2>
+              <p>
+                Consumo previsto cobre o período; sistema e contado pertencem à última contagem
+                aprovada por insumo e local.
+              </p>
+            </div>
+          </div>
+          {report.inventory.countVariance.length ? (
+            <DataTable
+              className="reports-responsive-table"
+              caption="Consumo previsto, sistema, contado e divergência por insumo e local"
+            >
+              <thead>
+                <tr>
+                  <th>Insumo</th>
+                  <th>Local</th>
+                  <th>Consumo previsto</th>
+                  <th>Sistema</th>
+                  <th>Contado</th>
+                  <th>Diferença</th>
+                  <th>Perda apurada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.inventory.countVariance.map((row) => (
+                  <tr key={row.key}>
+                    <th data-label="Insumo" scope="row">
+                      {row.label}
+                    </th>
+                    <td data-label="Local">{row.locationLabel}</td>
+                    <td data-label="Consumo previsto">{number(row.plannedConsumptionQuantity)}</td>
+                    <td data-label="Sistema">{number(row.expectedQuantity)}</td>
+                    <td data-label="Contado">{number(row.countedQuantity)}</td>
+                    <td data-label="Diferença">{number(row.differenceQuantity)}</td>
+                    <td data-label="Perda apurada">
+                      {row.lossQuantity > 0
+                        ? `${number(row.lossQuantity)} · ${moneyOrUnavailable(row.lossValueCents)}`
+                        : "Sem perda"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          ) : (
+            <EmptyState
+              icon="◇"
+              title="Sem contagem aprovada no período"
+              description="A comparação aparecerá após a aprovação de uma contagem física."
+            />
+          )}
+        </Card>
       </div>
     );
   }
@@ -840,6 +894,67 @@ export function ReportFamilyView({
         </Callout>
       )}
       <FamilyComparisonCard comparison={report.profitability.comparison} />
+      {report.profitability.channels.some(
+        (row) => row.costCoverage !== "complete" || row.feeCoverage !== "complete",
+      ) && (
+        <Callout tone="warning">
+          <strong>Margem por canal parcialmente indisponível</strong>
+          <span>
+            Custos sem histórico ou pagamentos pendentes, divergentes e com devolução sem
+            conciliação impedem calcular a margem após taxas com segurança.
+          </span>
+        </Callout>
+      )}
+      <Card className="reports-section-card">
+        <div className="reports-section-heading">
+          <div>
+            <h2>Margem por canal</h2>
+            <p>
+              A margem considera os produtos vendidos menos as taxas de todos os pagamentos da
+              comanda, quando a conciliação fecha com o total da comanda.
+            </p>
+          </div>
+        </div>
+        {report.profitability.channels.length ? (
+          <DataTable
+            className="reports-responsive-table"
+            caption="Receita, custo, taxas e margens por canal de venda"
+          >
+            <thead>
+              <tr>
+                <th>Canal</th>
+                <th>Receita</th>
+                <th>CMV</th>
+                <th>Taxas</th>
+                <th>Margem bruta</th>
+                <th>Margem após taxas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.profitability.channels.map((row) => (
+                <tr key={row.key}>
+                  <th data-label="Canal" scope="row">
+                    {row.label}
+                  </th>
+                  <td data-label="Receita">{formatMoney(row.revenueCents)}</td>
+                  <td data-label="CMV">{moneyOrUnavailable(row.costCents)}</td>
+                  <td data-label="Taxas">{moneyOrUnavailable(row.feeCents)}</td>
+                  <td data-label="Margem bruta">{moneyOrUnavailable(row.grossMarginCents)}</td>
+                  <td data-label="Margem após taxas">
+                    {moneyOrUnavailable(row.netMarginAfterFeesCents)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
+        ) : (
+          <EmptyState
+            icon="◇"
+            title="Sem vendas fechadas"
+            description="A margem por canal será calculada quando houver contas fechadas no período."
+          />
+        )}
+      </Card>
       <Card className="reports-section-card">
         <div className="reports-section-heading">
           <div>

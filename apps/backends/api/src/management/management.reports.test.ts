@@ -109,6 +109,19 @@ describe("management sales reports", () => {
         lowStockItems: 3,
         currentInventoryValueCents: null,
       },
+      countVariance: [
+        {
+          key: "item-1:location-1",
+          label: "Batata",
+          locationLabel: "Câmara fria",
+          plannedConsumptionQuantity: 4,
+          expectedQuantity: 10,
+          countedQuantity: 8,
+          differenceQuantity: -2,
+          lossQuantity: 2,
+          lossValueCents: 600,
+        },
+      ],
       purchasing: {
         orderCount: 2,
         orderedCents: 10_000,
@@ -125,6 +138,19 @@ describe("management sales reports", () => {
     assert.equal(result.operations.averageGuestsPerTab, 2);
     assert.equal(result.profitability.grossMarginPercent, 30);
     assert.equal(result.profitability.productProfitabilityCoverage, "complete");
+    assert.deepEqual(result.inventory.countVariance, [
+      {
+        key: "item-1:location-1",
+        label: "Batata",
+        locationLabel: "Câmara fria",
+        plannedConsumptionQuantity: 4,
+        expectedQuantity: 10,
+        countedQuantity: 8,
+        differenceQuantity: -2,
+        lossQuantity: 2,
+        lossValueCents: 600,
+      },
+    ]);
     assert.deepEqual(reportMetricComparison(125, 100), {
       current: 125,
       previous: 100,

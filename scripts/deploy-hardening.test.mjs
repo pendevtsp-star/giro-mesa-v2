@@ -504,6 +504,64 @@ test("deploy invokes the complete backup before migration and never snapshots cl
   assert.match(deploy, /fiscal-production-smoke\.sql/);
 });
 
+test("deploy rejects insufficient Docker bytes or inodes before any recovery pull or service stop", () => {
+  const deploy = readFileSync(deployScript, "utf8");
+  const gateCall = deploy.search(/release_disk_gate "\$\{target_image_candidates\[@\]\}"/);
+  const recoveryPull = deploy.search(/"\$\{recovery_compose\[@\]\}" pull/);
+  const stopCall = deploy.indexOf("docker stop --timeout");
+  assert.ok(gateCall >= 0, "deploy must gate image capacity before pulling");
+  assert.ok(recoveryPull > gateCall, "recovery images must not pull before the disk gate");
+  assert.ok(stopCall > gateCall, "mutators must not stop before the disk gate");
+  assert.match(deploy, /docker manifest inspect --verbose/);
+  assert.match(deploy, /docker info --format '\{\{\.DockerRootDir\}\}'/);
+  assert.match(deploy, /docker image inspect "\$current_image_id" --format '\{\{\.Size\}\}'/);
+  assert.match(deploy, /df -PB1 "\$docker_root"/);
+  assert.match(deploy, /df -Pi "\$docker_root"/);
+  assert.match(deploy, /DISK_SPACE_INSUFFICIENT/);
+  assert.match(deploy, /DISK_INODES_INSUFFICIENT/);
+  assert.match(deploy, /DISK_IMAGE_ESTIMATE_UNAVAILABLE/);
+  assert.match(deploy, /config --format json/);
+});
+
+test("disk gate preserves headroom, deduplicates images and fails closed on unavailable estimates", () => {
+  const source = readFileSync(deployScript, "utf8").match(
+    /release_disk_gate\(\) \{[\s\S]*?\n\}/,
+  )?.[0];
+  assert.ok(source);
+  const image = `repo/image@sha256:${"a".repeat(64)}`;
+  for (const [bytes, inodes, estimateFails, expected] of [
+    [5999, 100, false, "DISK_SPACE_INSUFFICIENT"],
+    [6000, 99, false, "DISK_INODES_INSUFFICIENT"],
+    [6000, 100, false, "GATE_PASSED"],
+    [6000, 100, true, "DISK_IMAGE_ESTIMATE_UNAVAILABLE"],
+  ]) {
+    const script = `set -Eeuo pipefail
+${source}
+docker() {
+  case "$1 $2" in
+    'info --format') if [[ $3 == *DockerRootDir* ]]; then printf '/tmp\\n'; else printf 'x86_64\\n'; fi ;;
+    'image inspect') return 1 ;;
+    'ps --filter') return 0 ;;
+    'manifest inspect') ${estimateFails ? "return 1" : "printf '{}\\n'"} ;;
+    *) return 2 ;;
+  esac
+}
+python3() { while IFS= read -r line; do :; done; printf '1000\\n'; }
+df() { printf 'header\\n'; if [[ $1 == -PB1 ]]; then printf 'disk 1 1 ${bytes} path\\n'; else printf 'disk 1 1 ${inodes} path\\n'; fi; }
+GIROMESA_DEPLOY_DISK_RESERVE_BYTES=1000
+GIROMESA_DEPLOY_DISK_RESERVE_INODES=100
+release_disk_gate $'api\\t${image}' $'migrate\\t${image}'
+printf 'GATE_PASSED\\n'
+`;
+    const result = spawnSync(bash, ["-c", script], {
+      encoding: "utf8",
+      env: { ...process.env, MSYS_NO_PATHCONV: "1" },
+    });
+    assert.match(output(result), new RegExp(expected));
+    assert.equal(result.status === 0, expected === "GATE_PASSED");
+  }
+});
+
 test("deploy fiscal gate accepts blocked homologation and rejects unhomologated production", () => {
   const deploy = readFileSync(deployScript, "utf8");
   const source = deploy.match(

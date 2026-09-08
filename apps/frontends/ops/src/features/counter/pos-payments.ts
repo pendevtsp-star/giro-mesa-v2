@@ -77,6 +77,40 @@ function nullableText(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
+export function paymentBlockReason(reason: string | null | undefined): string | null {
+  if (!reason) return null;
+  const messages: Record<string, string> = {
+    PAYMENT_DEVICE_NOT_ENROLLED: "Vincule esta maquininha à unidade usando um código de ativação.",
+    PAYMENT_DEVICE_REVOKED:
+      "O acesso desta maquininha foi revogado. Procure o responsável pela unidade.",
+    PAYMENT_DEVICE_CREDENTIAL_MISSING:
+      "A ativação da maquininha está incompleta. Solicite um novo código de ativação.",
+    PAYMENT_TERMINAL_NOT_CONFIGURED:
+      "Configure o provedor e as formas de pagamento desta maquininha.",
+    PAYMENT_CERTIFICATION_MISSING: "A homologação desta maquininha ainda não foi registrada.",
+    PAYMENT_PROVIDER_CERTIFICATION_MISMATCH:
+      "O provedor configurado difere do aprovado na homologação.",
+    PAYMENT_TERMINAL_KILL_SWITCHED:
+      "A cobrança foi bloqueada preventivamente. Procure o responsável pela unidade.",
+    PAYMENT_CERTIFICATION_SUSPENDED:
+      "A homologação está suspensa. Confirme a liberação com o suporte.",
+    PAYMENT_REPORTED_DIAGNOSTICS_MISMATCH:
+      "O equipamento ou aplicativo difere da versão homologada. Confirme a instalação com o suporte.",
+    PAYMENT_TERMINAL_DISABLED: "A cobrança integrada está desativada nesta maquininha.",
+    PAYMENT_TERMINAL_PENDING: "A configuração aguarda homologação antes de receber pagamentos.",
+    PAYMENT_TERMINAL_SUSPENDED:
+      "A cobrança está suspensa nesta maquininha. Procure o responsável pela unidade.",
+    PAYMENT_TERMINAL_CONFIGURATION_INCOMPLETE:
+      "Confira o provedor e as formas de pagamento; a configuração está incompleta.",
+  };
+  return (
+    messages[reason] ??
+    (/^[A-Z][A-Z0-9_]+$/.test(reason)
+      ? "A cobrança não foi liberada. Solicite ao suporte a conferência desta maquininha."
+      : reason)
+  );
+}
+
 function provider(value: unknown): PaymentProvider {
   if (!providers.includes(value as PaymentProvider))
     throw new Error("Provedor de pagamento inválido.");

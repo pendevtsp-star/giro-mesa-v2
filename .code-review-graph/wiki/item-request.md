@@ -4,8 +4,8 @@
 
 Directory-based community: packages/api-client-csharp
 
-- **Size**: 22309 nodes
-- **Cohesion**: 0.1640
+- **Size**: 22461 nodes
+- **Cohesion**: 0.1641
 - **Dominant Language**: csharp
 
 ## Members
@@ -63,7 +63,7 @@ Directory-based community: packages/api-client-csharp
 | DisablePostRequestBody | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/api-client-csharp/Generated/Api/V1/Auth/Mfa/Disable/DisablePostRequestBody.cs | 10-73 |
 | DisablePostRequestBody | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/api-client-csharp/Generated/Api/V1/Auth/Mfa/Disable/DisablePostRequestBody.cs | 36-39 |
 
-*... and 22241 more members.*
+*... and 22411 more members.*
 
 ## Execution Flows
 
@@ -73,21 +73,21 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `ReferenceEquals` (6478 edge(s))
-- `nameof` (6478 edge(s))
-- `IParsable` (3681 edge(s))
-- `WriteStringValue` (2620 edge(s))
-- `GetStringValue` (2445 edge(s))
-- `IAdditionalDataHolder` (2152 edge(s))
-- `WriteAdditionalData` (1970 edge(s))
-- `WriteIntValue` (1460 edge(s))
-- `GetIntValue` (1383 edge(s))
-- `WriteGuidValue` (1326 edge(s))
-- `GetGuidValue` (1190 edge(s))
-- `MergeDeserializersForIntersectionWrapper` (883 edge(s))
-- `IComposedTypeWrapper` (811 edge(s))
-- `WriteDateTimeOffsetValue` (724 edge(s))
-- `WriteBoolValue` (686 edge(s))
+- `ReferenceEquals` (6525 edge(s))
+- `nameof` (6525 edge(s))
+- `IParsable` (3714 edge(s))
+- `WriteStringValue` (2638 edge(s))
+- `GetStringValue` (2464 edge(s))
+- `IAdditionalDataHolder` (2162 edge(s))
+- `WriteAdditionalData` (1978 edge(s))
+- `WriteIntValue` (1462 edge(s))
+- `GetIntValue` (1385 edge(s))
+- `WriteGuidValue` (1336 edge(s))
+- `GetGuidValue` (1200 edge(s))
+- `MergeDeserializersForIntersectionWrapper` (887 edge(s))
+- `IComposedTypeWrapper` (817 edge(s))
+- `WriteDateTimeOffsetValue` (726 edge(s))
+- `WriteBoolValue` (688 edge(s))
 
 ### Incoming
 

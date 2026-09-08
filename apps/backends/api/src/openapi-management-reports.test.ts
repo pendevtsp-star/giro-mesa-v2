@@ -98,6 +98,10 @@ describe("management reports OpenAPI contract", () => {
       "meta",
       "budget",
       "capabilities",
+      "countVariance",
+      "plannedConsumptionQuantity",
+      "netMarginAfterFeesCents",
+      "feeCoverage",
     ]) {
       assert.match(serialized, new RegExp(`\\"${field}\\"`));
     }

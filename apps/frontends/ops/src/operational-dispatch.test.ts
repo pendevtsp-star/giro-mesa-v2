@@ -69,6 +69,73 @@ describe("fila idempotente das mutações POS", () => {
     );
   });
 
+  it("reutiliza a mesma chave após timeout, replay e novo envio manual", async () => {
+    const scope = { organizationId: "org-1", unitId: "unit-1", actorId: "actor-1" };
+    const runtime = {
+      embedded: false,
+      deviceId: "device-1",
+      deviceName: "Browser",
+      platform: "web",
+    };
+    const payload = pilotMutation("create-order", {
+      tabId: "tab-1",
+      body: { items: [{ productId: "product-1", quantity: 1, modifierOptionIds: [] }] },
+    });
+    const command = createCommand("device-1", "pos.order.create_requested", payload);
+    const timeout = vi
+      .fn()
+      .mockRejectedValue(new ApiClientError("timeout", 0, "API_UNREACHABLE", true));
+
+    await expect(
+      dispatchOperationalMutation({
+        scope,
+        runtime,
+        type: command.type,
+        payload,
+        execute: timeout,
+        command,
+      }),
+    ).rejects.toMatchObject({ persisted: true });
+    await expect(
+      dispatchOperationalMutation({
+        scope,
+        runtime,
+        type: command.type,
+        payload,
+        execute: timeout,
+        command,
+      }),
+    ).rejects.toMatchObject({ persisted: true });
+    expect(queuedCommands(scope)).toHaveLength(1);
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ order: { id: "order-1" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    await replayOperationalQueue(scope, runtime);
+    expect(queuedCommands(scope)).toHaveLength(0);
+
+    const confirmed = vi.fn().mockResolvedValue({ order: { id: "order-1" } });
+    await dispatchOperationalMutation({
+      scope,
+      runtime,
+      type: command.type,
+      payload,
+      execute: confirmed,
+      command,
+    });
+    expect(confirmed).toHaveBeenCalledWith(command.idempotencyKey);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/pilot/tabs/tab-1/orders"),
+      expect.objectContaining({
+        headers: expect.objectContaining({ "idempotency-key": command.idempotencyKey }),
+      }),
+    );
+  });
+
   it("usa o Hub como fronteira única no aplicativo e devolve a projeção local", async () => {
     const invoke = vi.fn().mockResolvedValue({
       Success: true,

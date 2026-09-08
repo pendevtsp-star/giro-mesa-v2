@@ -132,7 +132,7 @@ export function ManagementReportFamilyView({
           {units.length ? (
             <DataTable
               caption="Ranking e desempenho comparável por unidade"
-              className="reports-multiunit-table"
+              className="reports-responsive-table"
             >
               <thead>
                 <tr>

@@ -95,5 +95,6 @@ describe("growth persistence contract", () => {
     assert.ok(marketingCampaigns.attributionWindowDays);
     assert.ok(marketingCampaigns.holdoutPercentage);
     assert.ok(campaignDeliveries.experimentVariant);
+    assert.ok(campaignDeliveries.attributedCostCents);
   });
 });

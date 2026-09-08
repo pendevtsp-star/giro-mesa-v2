@@ -38,8 +38,6 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Verify production baseline manifest
-        run: pnpm production:baseline
       - run: pnpm audit --audit-level=high
       - name: Prepare integration databases
         run: |
@@ -86,6 +84,8 @@ jobs:
           git diff --exit-code -- apps/backends/api/openapi packages/contracts/src/generated-api.ts
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - name: Verify production baseline manifest
+        run: pnpm production:baseline
 
   dotnet:
     runs-on: windows-latest

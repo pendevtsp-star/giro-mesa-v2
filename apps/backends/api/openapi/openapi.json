@@ -11492,6 +11492,41 @@
                       "required": [
                         "state"
                       ]
+                    },
+                    "setup": {
+                      "type": "object",
+                      "properties": {
+                        "activeProducts": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activeTables": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activePeople": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activePrinters": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "completedService": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "activeProducts",
+                        "activeTables",
+                        "activePeople",
+                        "activePrinters",
+                        "completedService"
+                      ]
                     }
                   },
                   "required": [
@@ -11638,6 +11673,41 @@
                       },
                       "required": [
                         "state"
+                      ]
+                    },
+                    "setup": {
+                      "type": "object",
+                      "properties": {
+                        "activeProducts": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activeTables": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activePeople": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "activePrinters": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "completedService": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "activeProducts",
+                        "activeTables",
+                        "activePeople",
+                        "activePrinters",
+                        "completedService"
                       ]
                     }
                   },
@@ -121535,6 +121605,7 @@
                   "lowStockItems",
                   "currentInventoryValueCents",
                   "analysis",
+                  "countVariance",
                   "comparison"
                 ],
                 "properties": {
@@ -121573,6 +121644,54 @@
                     "type": "integer",
                     "format": "int64",
                     "nullable": true
+                  },
+                  "countVariance": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "key",
+                        "label",
+                        "locationLabel",
+                        "plannedConsumptionQuantity",
+                        "expectedQuantity",
+                        "countedQuantity",
+                        "differenceQuantity",
+                        "lossQuantity",
+                        "lossValueCents"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "locationLabel": {
+                          "type": "string"
+                        },
+                        "plannedConsumptionQuantity": {
+                          "type": "number"
+                        },
+                        "expectedQuantity": {
+                          "type": "number"
+                        },
+                        "countedQuantity": {
+                          "type": "number"
+                        },
+                        "differenceQuantity": {
+                          "type": "number"
+                        },
+                        "lossQuantity": {
+                          "type": "number"
+                        },
+                        "lossValueCents": {
+                          "type": "integer",
+                          "format": "int64",
+                          "nullable": true
+                        }
+                      }
+                    }
                   },
                   "analysis": {
                     "type": "array",
@@ -121925,6 +122044,7 @@
                   "grossMarginPercent",
                   "productProfitabilityCoverage",
                   "products",
+                  "channels",
                   "comparison"
                 ],
                 "properties": {
@@ -121947,6 +122067,76 @@
                       "partial",
                       "unavailable"
                     ]
+                  },
+                  "channels": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "key",
+                        "label",
+                        "revenueCents",
+                        "costCents",
+                        "feeCents",
+                        "grossMarginCents",
+                        "netMarginAfterFeesCents",
+                        "costCoverage",
+                        "feeCoverage"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "enum": [
+                            "dine_in",
+                            "pickup",
+                            "delivery"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "revenueCents": {
+                          "type": "integer",
+                          "format": "int64"
+                        },
+                        "costCents": {
+                          "type": "integer",
+                          "format": "int64",
+                          "nullable": true
+                        },
+                        "feeCents": {
+                          "type": "integer",
+                          "format": "int64",
+                          "nullable": true
+                        },
+                        "grossMarginCents": {
+                          "type": "integer",
+                          "format": "int64",
+                          "nullable": true
+                        },
+                        "netMarginAfterFeesCents": {
+                          "type": "integer",
+                          "format": "int64",
+                          "nullable": true
+                        },
+                        "costCoverage": {
+                          "type": "string",
+                          "enum": [
+                            "complete",
+                            "partial",
+                            "unavailable"
+                          ]
+                        },
+                        "feeCoverage": {
+                          "type": "string",
+                          "enum": [
+                            "complete",
+                            "partial",
+                            "unavailable"
+                          ]
+                        }
+                      }
+                    }
                   },
                   "products": {
                     "type": "array",

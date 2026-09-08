@@ -4,29 +4,14 @@
 
 Directory-based community: scripts
 
-- **Size**: 80 nodes
-- **Cohesion**: 0.1829
+- **Size**: 58 nodes
+- **Cohesion**: 0.2509
 - **Dominant Language**: javascript
 
 ## Members
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| cleanup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-production.sh | 189-200 |
-| run | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore-linux.integration.test.mjs | 23-35 |
-| waitForPostgres | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore-linux.integration.test.mjs | 37-44 |
-| path | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore-linux.integration.test.mjs | 65-65 |
-| shellPath | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.integration.test.mjs | 23-23 |
-| run | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.integration.test.mjs | 25-37 |
-| waitForPostgres | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.integration.test.mjs | 39-48 |
-| powershell | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 26-36 |
-| output | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 38-40 |
-| backupArgs | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 42-62 |
-| restoreArgs | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 64-84 |
-| crc32 | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 86-95 |
-| createStoredZip | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 97-137 |
-| writeSignedBackup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 139-187 |
-| addFile | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs | 141-149 |
 | mount_source | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 19-21 |
 | assert_mount | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 23-31 |
 | cleanup | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh | 38-44 |
@@ -62,8 +47,23 @@ Directory-based community: scripts
 | validateWorkflowBuildArgs | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 10-51 |
 | indentation | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 67-67 |
 | validateWorkflowActionPins | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 53-62 |
+| validateWorkflowCheckoutCredentials | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 64-83 |
+| validateCosignImageSignatures | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 85-127 |
+| actionExpression | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 99-99 |
+| validateSupplyChain | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 129-386 |
+| main | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.mjs | 388-392 |
+| dockerBuildWorkflow | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.test.mjs | 70-81 |
+| argument | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.test.mjs | 84-84 |
+| digest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.test.mjs | 24-24 |
+| isRecord | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 14-14 |
+| hasText | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 15-15 |
+| immutableReference | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 16-18 |
+| validEncryptionKey | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 20-29 |
+| validateFiscalReleaseManifest | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 31-91 |
+| validateFiscalEnvironment | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 93-132 |
+| nonEmpty | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 134-140 |
 
-*... and 26 more members.*
+*... and 8 more members.*
 
 ## Execution Flows
 
@@ -73,31 +73,28 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `push` (89 edge(s))
+- `push` (86 edge(s))
 - `test` (26 edge(s))
-- `docker` (24 edge(s))
-- `join` (13 edge(s))
-- `writeUInt32LE` (13 edge(s))
 - `includes` (12 edge(s))
-- `trim` (9 edge(s))
-- `true` (8 edge(s))
+- `join` (10 edge(s))
 - `match` (8 edge(s))
-- `return` (8 edge(s))
-- `spawnSync` (7 edge(s))
-- `writeUInt16LE` (7 edge(s))
 - `then` (7 edge(s))
-- `printf` (7 edge(s))
+- `trim` (7 edge(s))
 - `isArray` (6 edge(s))
+- `every` (5 edge(s))
+- `Boolean` (4 edge(s))
+- `log` (4 edge(s))
+- `readFile` (4 edge(s))
+- `parse` (4 edge(s))
+- `replace` (4 edge(s))
+- `split` (4 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.test.mjs` (47 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/deploy-hardening.test.mjs` (58 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.test.mjs` (19 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore-linux.integration.test.mjs` (17 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-restore.integration.test.mjs` (16 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs` (14 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.test.mjs` (14 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/validate-recovery-candidate.sh` (14 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-integrations.mjs` (13 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-production-baseline.mjs` (13 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs` (12 edge(s))
@@ -105,4 +102,3 @@ No execution flows pass through this community.
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-production-baseline.test.mjs` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.test.mjs` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-storage.sh` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/backup-production.sh` (1 edge(s))

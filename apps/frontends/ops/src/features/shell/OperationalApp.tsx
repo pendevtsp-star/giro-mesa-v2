@@ -709,7 +709,7 @@ export function OperationalApp({
   }, [queuedCommands, runtime, session]);
 
   const dispatchPilot = useCallback<PilotDispatcher>(
-    async (type, payload, execute) => {
+    async (type, payload, execute, command) => {
       try {
         const result = await dispatchOperationalMutation({
           scope: {
@@ -721,6 +721,7 @@ export function OperationalApp({
           type,
           payload,
           execute,
+          command,
         });
         setRuntimeError(null);
         return result;

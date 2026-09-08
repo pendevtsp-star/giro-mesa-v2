@@ -449,6 +449,15 @@ export const establishmentSpecializedSettingsSummarySchema = z
     fiscal: z.object({ configured: z.boolean() }),
     devices: z.object({ activeCount: z.number().int().nonnegative() }),
     billing: z.object({ state: z.string().trim().min(1).max(40) }),
+    setup: z
+      .object({
+        activeProducts: z.number().int().nonnegative(),
+        activeTables: z.number().int().nonnegative(),
+        activePeople: z.number().int().nonnegative(),
+        activePrinters: z.number().int().nonnegative(),
+        completedService: z.boolean(),
+      })
+      .optional(),
   })
   .strict();
 

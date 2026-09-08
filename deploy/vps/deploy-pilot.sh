@@ -37,7 +37,7 @@ provenance_script="$release_dir/deploy/vps/verify-image-provenance.sh"
 for file in "$compose_file" "$images_file" "$observability_file" "$backup_script" "$fiscal_storage_check" "$fiscal_schema_check" "$fiscal_release_manifest" "$release_package" "$provenance_script"; do
   if [[ ! -f $file ]]; then echo "DEPLOY_FILE_REQUIRED:$file" >&2; exit 1; fi
 done
-for tool in docker python3 tar sha256sum curl readlink awk; do
+for tool in docker python3 tar sha256sum curl readlink awk df; do
   if ! command -v "$tool" >/dev/null 2>&1; then echo "DEPLOY_TOOL_REQUIRED:$tool" >&2; exit 1; fi
 done
 
@@ -55,6 +55,76 @@ if len(value) >= 2 and value[0] == value[-1] == '"': value = json.loads(value)
 if "\n" in value or "\r" in value: raise SystemExit(1)
 print(value, end="")
 PY
+}
+
+release_disk_gate() {
+  local docker_root architecture entry service image container_id current_image_id current_size baseline=0
+  local estimate_bytes unpacked_bytes available_bytes available_inodes
+  local required_bytes=${GIROMESA_DEPLOY_DISK_RESERVE_BYTES:-2147483648}
+  local required_inodes=${GIROMESA_DEPLOY_DISK_RESERVE_INODES:-100000}
+  [[ $required_bytes =~ ^[1-9][0-9]{0,12}$ && $required_inodes =~ ^[1-9][0-9]{0,9}$ ]] || { echo "DISK_RESERVE_INVALID" >&2; return 1; }
+  (( $# > 0 )) || { echo "DISK_IMAGE_SET_EMPTY" >&2; return 1; }
+  declare -A seen_images=()
+  declare -A service_baselines=()
+
+  docker_root=$(docker info --format '{{.DockerRootDir}}')
+  [[ -n $docker_root && -d $docker_root && ! -L $docker_root ]] || { echo "DISK_DOCKER_ROOT_INVALID" >&2; return 1; }
+  architecture=$(docker info --format '{{.Architecture}}')
+  case $architecture in x86_64) architecture=amd64 ;; aarch64) architecture=arm64 ;; esac
+
+  for entry in "$@"; do
+    service=${entry%%$'\t'*}
+    image=${entry#*$'\t'}
+    [[ $service != "$entry" && -n $service && $image == *@sha256:* ]] || { echo "DISK_IMAGE_REFERENCE_INVALID:$service" >&2; return 1; }
+    [[ $service == migrate ]] && service=api
+    [[ -z ${seen_images[$image]+x} ]] || continue
+    seen_images[$image]=1
+    docker image inspect "$image" >/dev/null 2>&1 && continue
+
+    if [[ -z ${service_baselines[$service]+x} ]]; then
+      container_id=$(docker ps --filter label=com.docker.compose.project=giromesa-v2-pilot \
+        --filter "label=com.docker.compose.service=$service" --format '{{.ID}}' --no-trunc)
+      if [[ $container_id =~ ^[0-9a-f]{64}$ ]]; then
+        current_image_id=$(docker inspect --format '{{.Image}}' "$container_id")
+        current_size=$(docker image inspect "$current_image_id" --format '{{.Size}}')
+        [[ $current_size =~ ^[0-9]+$ ]] || { echo "DISK_CURRENT_IMAGE_SIZE_INVALID:$service" >&2; return 1; }
+        service_baselines[$service]=$current_size
+      else
+        service_baselines[$service]=0
+      fi
+    fi
+    baseline=${service_baselines[$service]}
+    estimate_bytes=$(docker manifest inspect --verbose "$image" | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+if isinstance(payload, list):
+    matches = [entry for entry in payload if entry.get("Descriptor", {}).get("platform", {}).get("os") == "linux" and entry.get("Descriptor", {}).get("platform", {}).get("architecture") == sys.argv[1]]
+    if len(matches) != 1:
+        raise SystemExit(1)
+    payload = matches[0]
+manifest = payload.get("SchemaV2Manifest", payload)
+layers = manifest.get("layers")
+if not isinstance(layers, list) or not layers:
+    raise SystemExit(1)
+sizes = [layer.get("size") for layer in layers]
+if not all(isinstance(size, int) and size >= 0 for size in sizes):
+    raise SystemExit(1)
+print(sum(sizes))
+' "$architecture") || { echo "DISK_IMAGE_ESTIMATE_UNAVAILABLE:$service" >&2; return 1; }
+    [[ $estimate_bytes =~ ^[0-9]{1,12}$ ]] || { echo "DISK_IMAGE_ESTIMATE_INVALID:$service" >&2; return 1; }
+    # ponytail: OCI has no remote unpacked-size guarantee. Budget compressed bytes plus a 4x unpacking estimate (or the larger running image), and keep the reserve for runtime/backups. Exact sizing requires a disposable pre-pull host.
+    unpacked_bytes=$(( estimate_bytes * 4 ))
+    (( baseline > unpacked_bytes )) && unpacked_bytes=$baseline
+    required_bytes=$(( required_bytes + estimate_bytes + unpacked_bytes ))
+  done
+
+  available_bytes=$(df -PB1 "$docker_root" | awk 'NR == 2 { print $4 }')
+  available_inodes=$(df -Pi "$docker_root" | awk 'NR == 2 { print $4 }')
+  [[ $available_bytes =~ ^[0-9]+$ ]] || { echo "DISK_AVAILABLE_BYTES_INVALID" >&2; return 1; }
+  [[ $available_inodes =~ ^[0-9]+$ ]] || { echo "DISK_AVAILABLE_INODES_INVALID" >&2; return 1; }
+  (( available_bytes >= required_bytes )) || { echo "DISK_SPACE_INSUFFICIENT:available=$available_bytes required=$required_bytes" >&2; return 1; }
+  # Layer count is not file count: enforce a free-inode reserve rather than claiming exact remote inode sizing.
+  (( available_inodes >= required_inodes )) || { echo "DISK_INODES_INSUFFICIENT:available=$available_inodes required=$required_inodes" >&2; return 1; }
 }
 
 installer_host_path=$(read_env_key EDGE_HUB_INSTALLER_HOST_PATH)
@@ -283,6 +353,21 @@ recovery_compose=(docker compose --project-name giromesa-v2-pilot --env-file "$e
 export COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT:-1}
 "${recovery_compose[@]}" config --quiet
 GIROMESA_PROVENANCE_REQUIRE_LOCAL_IMAGE=false "$provenance_script"
+target_image_candidate_text=$("${compose[@]}" config --format json | python3 -c '
+import json, sys
+for service, definition in json.load(sys.stdin).get("services", {}).items():
+    image = definition.get("image")
+    if isinstance(image, str): print(f"{service}\t{image}")
+')
+mapfile -t target_image_candidates <<<"$target_image_candidate_text"
+recovery_image_candidate_text=$("${recovery_compose[@]}" config --format json | python3 -c '
+import json, sys
+for service, definition in json.load(sys.stdin).get("services", {}).items():
+    image = definition.get("image")
+    if isinstance(image, str): print(f"{service}\t{image}")
+')
+mapfile -t recovery_image_candidates <<<"$recovery_image_candidate_text"
+release_disk_gate "${target_image_candidates[@]}" "${recovery_image_candidates[@]}"
 "${recovery_compose[@]}" pull
 "$provenance_script"
 export GIROMESA_RELEASE_ARTIFACT_SHA=$artifact_sha GIROMESA_IMAGE_ATTESTATION_FILE=$attestation

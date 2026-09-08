@@ -4,8 +4,8 @@
 
 Directory-based community: apps/backends
 
-- **Size**: 3959 nodes
-- **Cohesion**: 0.2180
+- **Size**: 4006 nodes
+- **Cohesion**: 0.2163
 - **Dominant Language**: typescript
 
 ## Members
@@ -63,7 +63,7 @@ Directory-based community: apps/backends
 | verifyStepUp | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 529-591 |
 | revoke | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 593-605 |
 
-*... and 3290 more members.*
+*... and 3956 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (4253 edge(s))
-- `where` (1802 edge(s))
-- `and` (1408 edge(s))
-- `from` (1386 edge(s))
-- `equal` (1343 edge(s))
-- `Param` (1171 edge(s))
-- `select` (1162 edge(s))
-- `ParseUUIDPipe` (1148 edge(s))
-- `values` (963 edge(s))
-- `insert` (877 edge(s))
-- `limit` (727 edge(s))
-- `map` (579 edge(s))
-- `returning` (561 edge(s))
-- `Req` (536 edge(s))
-- `set` (452 edge(s))
+- `eq` (6209 edge(s))
+- `where` (2517 edge(s))
+- `and` (2008 edge(s))
+- `from` (1923 edge(s))
+- `select` (1615 edge(s))
+- `equal` (1474 edge(s))
+- `Param` (1200 edge(s))
+- `values` (1198 edge(s))
+- `ParseUUIDPipe` (1177 edge(s))
+- `insert` (1075 edge(s))
+- `limit` (1033 edge(s))
+- `map` (868 edge(s))
+- `returning` (701 edge(s))
+- `set` (635 edge(s))
+- `update` (553 edge(s))
 
 ### Incoming
 
-- `equal` (1338 edge(s))
-- `eq` (441 edge(s))
-- `ok` (417 edge(s))
-- `values` (368 edge(s))
-- `insert` (368 edge(s))
-- `where` (312 edge(s))
-- `returning` (266 edge(s))
-- `from` (231 edge(s))
-- `deepEqual` (228 edge(s))
-- `randomUUID` (219 edge(s))
-- `select` (211 edge(s))
-- `safeParse` (176 edge(s))
-- `rejects` (166 edge(s))
+- `equal` (1469 edge(s))
+- `eq` (497 edge(s))
+- `ok` (473 edge(s))
+- `values` (430 edge(s))
+- `insert` (430 edge(s))
+- `where` (361 edge(s))
+- `returning` (305 edge(s))
+- `from` (259 edge(s))
+- `deepEqual` (255 edge(s))
+- `randomUUID` (252 edge(s))
+- `select` (238 edge(s))
+- `safeParse` (217 edge(s))
+- `rejects` (185 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-schemas.ts` (119 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-pos.controller.ts` (92 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/management/management.schemas.ts` (118 edge(s))

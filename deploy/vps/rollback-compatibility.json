@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0079_realtime_outbox_notify",
+  "requiredAppliedMigration": "0080_campaign_attribution_cost",
   "transitions": [],
   "fullRestore": {
     "required": true,

@@ -651,6 +651,10 @@ export class ManagementReportService {
                 consumedValueCents: null,
                 abcClass: null,
               })),
+              countVariance: report.reportFamilies.inventory.countVariance.map((row) => ({
+                ...row,
+                lossValueCents: null,
+              })),
               comparison: {
                 lossQuantity: report.reportFamilies.inventory.comparison.lossQuantity,
               },
@@ -679,6 +683,15 @@ export class ManagementReportService {
                 costCents: null,
                 grossMarginCents: null,
                 grossMarginPercent: null,
+              })),
+              channels: report.reportFamilies.profitability.channels.map((channel) => ({
+                ...channel,
+                costCents: null,
+                feeCents: null,
+                grossMarginCents: null,
+                netMarginAfterFeesCents: null,
+                costCoverage: "unavailable" as const,
+                feeCoverage: "unavailable" as const,
               })),
               comparison: {},
             },
@@ -2133,6 +2146,15 @@ export class ManagementReportService {
         quantity: row.consumedQuantity,
         value: row.abcClass ?? "",
       });
+    for (const row of families.inventory.countVariance)
+      rows.push({
+        section: "inventory",
+        key: `count:${row.key}`,
+        label: `${row.label} — ${row.locationLabel}`,
+        amountCents: row.lossValueCents,
+        quantity: row.lossQuantity,
+        value: `previsto ${row.plannedConsumptionQuantity}; sistema ${row.expectedQuantity}; contado ${row.countedQuantity}; diferença ${row.differenceQuantity}`,
+      });
     for (const row of families.purchasing.supplierPerformance)
       rows.push({
         section: "purchasing",
@@ -2158,6 +2180,15 @@ export class ManagementReportService {
         amountCents: row.grossMarginCents,
         quantity: row.quantity,
         value: row.grossMarginPercent,
+      });
+    for (const row of families.profitability.channels)
+      rows.push({
+        section: "profitability",
+        key: `channel:${row.key}`,
+        label: `${row.label} — margem após taxas`,
+        amountCents: row.netMarginAfterFeesCents,
+        quantity: row.revenueCents,
+        value: `CMV ${row.costCents ?? "indisponível"}; taxas ${row.feeCents ?? "indisponível"}; custo ${row.costCoverage}; taxa ${row.feeCoverage}`,
       });
     for (const row of families.multiunit.units)
       rows.push({

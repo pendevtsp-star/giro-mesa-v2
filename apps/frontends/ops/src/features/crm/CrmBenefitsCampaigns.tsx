@@ -932,10 +932,37 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                       <dd>{deliveries.attribution.coupons}</dd>
                     </div>
                     <div>
-                      <dt>Receita atribuída</dt>
+                      <dt>Receita atribuída líquida</dt>
                       <dd>{crmCurrency.format(deliveries.attribution.revenueCents / 100)}</dd>
                     </div>
+                    <div>
+                      <dt>Custo histórico</dt>
+                      <dd>
+                        {deliveries.attribution.costCents === null
+                          ? "—"
+                          : crmCurrency.format(deliveries.attribution.costCents / 100)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Margem bruta atribuída</dt>
+                      <dd>
+                        {deliveries.attribution.grossMarginCents === null
+                          ? "—"
+                          : crmCurrency.format(deliveries.attribution.grossMarginCents / 100)}
+                      </dd>
+                    </div>
                   </dl>
+                ) : null}
+                {deliveries?.attribution.incompleteCostOrders ? (
+                  <Callout tone="warning">
+                    Margem indisponível em {deliveries.attribution.incompleteCostOrders} pedido(s):
+                    falta custo histórico ou o recebimento não concilia com os itens.
+                  </Callout>
+                ) : deliveries?.attribution.costedOrders ? (
+                  <Callout tone="info">
+                    Margem bruta usa o custo histórico proporcional ao recebimento líquido; não
+                    inclui custo do canal ou da criação da campanha.
+                  </Callout>
                 ) : null}
                 {deliveries?.experiments.length ? (
                   <fieldset className="crm-experiment-grid">

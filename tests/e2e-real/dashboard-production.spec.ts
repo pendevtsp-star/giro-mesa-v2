@@ -15,7 +15,7 @@ const profiles = [
   { role: "delivery", profileId: "delivery", route: "delivery", roleLabel: "Delivery" },
 ] as const;
 
-async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) {
+async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], extended = false) {
   await page.route("**/health", (route) =>
     route.fulfill({
       json: {
@@ -146,6 +146,27 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number]) 
                   goal: { label: "Dentro da meta", tone: "success" },
                 })),
                 priorities: [
+                  ...(extended
+                    ? Array.from({ length: 6 }, (_, index) => ({
+                        id: `extra-${index}`,
+                        title: `Pendência adicional ${index + 1}`,
+                        detail: "Conferir no módulo responsável",
+                        tone: "warning",
+                        route: profile.route,
+                        actionLabel: "Conferir",
+                        source: "operations",
+                        occurrenceKey: String(index).repeat(64),
+                        status: index < 3 ? "claimed" : "open",
+                        assignedTo:
+                          index < 3
+                            ? {
+                                id: index === 1 ? "other-person" : "identity-dashboard",
+                                name: index === 1 ? "Outra pessoa" : "Usuário Gerente",
+                                isMe: index !== 1,
+                              }
+                            : null,
+                      }))
+                    : []),
                   {
                     id: "later",
                     title: "Prioridade informativa",
@@ -510,6 +531,56 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
+});
+
+test("prioridades mostram a fila completa e filtram responsáveis em claro, escuro e celular", async ({
+  page,
+}, testInfo) => {
+  await mockDashboardApi(page, profiles[1], true);
+  await page.goto("/#/dashboard");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await expect(page.locator(".dashboard-priority")).toHaveCount(5);
+  await expect(page.getByRole("link", { name: "Preparar a unidade" })).toHaveAttribute(
+    "href",
+    "#/settings?section=setup",
+  );
+  await expect(page.getByText("8 pendências", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Ver todas as 8 pendências" }).click();
+  await expect(page.locator(".dashboard-priority")).toHaveCount(8);
+  await expect(page.locator(".dashboard-priority").first()).toContainText("Prioridade urgente");
+  const filters = page.getByRole("group", { name: "Filtrar prioridades por responsável" });
+  await filters.getByRole("button", { name: "Comigo 2" }).click();
+  await expect(page.locator(".dashboard-priority")).toHaveCount(2);
+  await expect(filters.getByRole("button", { name: "Comigo 2" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await filters.getByRole("button", { name: "Sem responsável 5" }).click();
+  await expect(page.locator(".dashboard-priority")).toHaveCount(5);
+  await filters.getByRole("button", { name: "Todas 8" }).click();
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((value) => {
+      document.documentElement.dataset.theme = value;
+    }, theme);
+    for (const width of [1440, 768, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expect(filters).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      expect(
+        (
+          await new AxeBuilder({ page })
+            .include(".dashboard-priorities")
+            .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+            .analyze()
+        ).violations,
+      ).toEqual([]);
+      await page
+        .locator(".dashboard-priorities")
+        .screenshot({ path: testInfo.outputPath(`priorities-${theme}-${width}.png`) });
+    }
+  }
 });
 
 test("prioridades e preferências usam mutações auditáveis", async ({ page }) => {

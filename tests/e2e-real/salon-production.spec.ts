@@ -1982,6 +1982,103 @@ test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", 
   await expectWcagAa(page);
 });
 
+test("Diagnóstico da maquininha atualiza após ativação e permite recuperar uma falha", async ({
+  page,
+}, testInfo) => {
+  let unavailable = false;
+  await page.addInitScript(() => {
+    let paired = false;
+    window.HybridWebView = {
+      SendRawMessage: () =>
+        window.dispatchEvent(
+          new CustomEvent("HybridWebViewMessageReceived", {
+            detail: {
+              message: JSON.stringify({
+                type: "shell.context",
+                payload: {
+                  DeviceId: "00000000-0000-4000-8000-000000000111",
+                  DeviceName: "Maquininha de teste",
+                  Platform: "android",
+                },
+              }),
+            },
+          }),
+        ),
+      InvokeDotNet: async (method: string) => {
+        if (method === "RedeemPaymentPairingAsync") {
+          paired = true;
+          return {
+            Success: true,
+            Available: false,
+            InstallationId: "00000000-0000-4000-8000-000000000111",
+            Provider: "rede",
+          };
+        }
+        if (method === "GetPaymentCapabilitiesAsync")
+          return {
+            Available: paired,
+            Configured: paired,
+            Homologated: paired,
+            Provider: "rede",
+            Methods: ["debit_card"],
+            CanStart: paired,
+          };
+        return { Success: false, Available: false, ErrorCode: "TEST_NOT_AVAILABLE" };
+      },
+    };
+  });
+  await mockProductionApi(page);
+  await page.route("**/pilot/installations/*/payment-capabilities", (route) =>
+    route.fulfill(
+      unavailable
+        ? { status: 503, json: { message: "Diagnóstico temporariamente indisponível" } }
+        : {
+            json: {
+              installationId: "00000000-0000-4000-8000-000000000111",
+              available: true,
+              status: "homologated",
+              provider: "rede",
+              methods: ["debit_card"],
+              maxInstallments: 1,
+              supports: { cancel: true, recover: true, reversal: false },
+              reason: null,
+            },
+          },
+    ),
+  );
+  await page.goto("/#/device");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const diagnostic = page
+    .locator(".device-setup__card")
+    .filter({ has: page.getByRole("heading", { name: "Maquininha integrada", exact: true }) });
+  await expect(diagnostic).toContainText("Não disponível");
+  await page.getByLabel("Código temporário", { exact: true }).fill("AB12CD34");
+  await page.getByRole("button", { name: "Ativar neste terminal" }).click();
+  await expect(diagnostic.locator(".gm-badge")).toHaveText("Homologada");
+  unavailable = true;
+  await diagnostic.getByRole("button", { name: "Conferir maquininha novamente" }).click();
+  await expect(diagnostic).toContainText("Diagnóstico indisponível");
+  unavailable = false;
+  await diagnostic.getByRole("button", { name: "Conferir maquininha novamente" }).click();
+  await expect(diagnostic.locator(".gm-badge")).toHaveText("Homologada");
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((value) => {
+      document.documentElement.dataset.theme = value;
+    }, theme);
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      await expectNoHorizontalOverflow(page);
+      await expect(
+        new AxeBuilder({ page })
+          .include(".device-setup__grid")
+          .withTags(["wcag2a", "wcag2aa"])
+          .analyze(),
+      ).resolves.toMatchObject({ violations: [] });
+      await diagnostic.screenshot({ path: testInfo.outputPath(`device-${theme}-${width}.png`) });
+    }
+  }
+});
+
 test("Recepção senta em mesa compatível e abre a comanda na mesma requisição", async ({ page }) => {
   const seatedRequests: unknown[] = [];
   const reservation = {

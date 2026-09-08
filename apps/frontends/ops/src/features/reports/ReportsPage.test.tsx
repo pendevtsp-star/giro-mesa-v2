@@ -106,6 +106,7 @@ const emptyReport: ReportData = {
       lowStockItems: 0,
       currentInventoryValueCents: null,
       analysis: [],
+      countVariance: [],
       comparison: {},
     },
     purchasing: {
@@ -135,6 +136,7 @@ const emptyReport: ReportData = {
       grossMarginPercent: null,
       productProfitabilityCoverage: "unavailable",
       products: [],
+      channels: [],
       comparison: {},
     },
     multiunit: { coverage: "unavailable", units: [] },
@@ -229,6 +231,47 @@ describe("relatórios operacionais", () => {
     expect(labor).toContain("Indisponível");
     expect(reconciliation).toContain("Fiscal e pagamentos");
     expect(forecast).toContain("Histórico insuficiente para prever");
+  });
+
+  it("exibe a perda física e preserva margem líquida indisponível sem conciliação", () => {
+    const data = structuredClone(emptyReport);
+    data.reportFamilies.inventory.countVariance = [
+      {
+        key: "rice:main",
+        label: "Arroz",
+        locationLabel: "Estoque principal",
+        plannedConsumptionQuantity: 2,
+        expectedQuantity: 8,
+        countedQuantity: 6,
+        differenceQuantity: -2,
+        lossQuantity: 2,
+        lossValueCents: 500,
+      },
+    ];
+    data.reportFamilies.profitability.channels = [
+      {
+        key: "delivery",
+        label: "Delivery",
+        revenueCents: 2_000,
+        costCents: 800,
+        feeCents: null,
+        grossMarginCents: 1_200,
+        netMarginAfterFeesCents: null,
+        costCoverage: "complete",
+        feeCoverage: "partial",
+      },
+    ];
+    const inventory = renderToStaticMarkup(
+      <ReportFamilyView data={data} family="inventory" onDrillDown={() => undefined} />,
+    );
+    const profitability = renderToStaticMarkup(
+      <ReportFamilyView data={data} family="profitability" onDrillDown={() => undefined} />,
+    );
+    expect(inventory).toContain("Conferência física mais recente");
+    expect(inventory).toContain("5,00");
+    expect(profitability).toContain("Margem por canal");
+    expect(profitability).toContain("Margem por canal parcialmente indisponível");
+    expect(profitability).toContain("Indisponível");
   });
 
   it("persiste filtros e escopo antes do hash e restaura apenas o escopo correspondente", () => {

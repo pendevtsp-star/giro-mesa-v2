@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   identities,
   managementInventoryClosings,
+  managementInventoryMovements,
   managementNfeImportLines,
   managementPeople,
   managementProductReturnableClassifications,
@@ -19,7 +20,7 @@ import {
   roleBindings,
   units,
 } from "@giromesa/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
@@ -894,6 +895,36 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       { reason: "Amostra liberada apó inspeção de qualidade." },
     );
 
+    const balancesBeforeBlindCount = await database.db
+      .select({
+        id: managementStockBalances.id,
+        inventoryItemId: managementStockBalances.inventoryItemId,
+        quantity: managementStockBalances.quantity,
+        averageCostCents: managementStockBalances.averageCostCents,
+      })
+      .from(managementStockBalances)
+      .where(
+        and(
+          eq(managementStockBalances.organizationId, organization.id),
+          eq(managementStockBalances.unitId, unit.id),
+          eq(managementStockBalances.locationId, destination.id),
+        ),
+      );
+    const zeroCostBalance = balancesBeforeBlindCount.find(
+      (balance) => balance.averageCostCents !== null && Number(balance.quantity) > 0,
+    );
+    assert.ok(zeroCostBalance);
+    await database.db
+      .update(managementStockBalances)
+      .set({ averageCostCents: 0 })
+      .where(eq(managementStockBalances.id, zeroCostBalance.id));
+    const costsBeforeBlindCount = new Map(
+      balancesBeforeBlindCount.map((balance) => [
+        balance.inventoryItemId,
+        balance.id === zeroCostBalance.id ? 0 : balance.averageCostCents,
+      ]),
+    );
+
     const blindCount = await management.startBlindInventoryCount(
       identity.id,
       organization.id,
@@ -936,6 +967,33 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
       { decision: "approved", note: "Contagem conferida por gerente distinto." },
     );
     assert.equal(approvedCount.status, "approved");
+    const countMovements = await database.db
+      .select({
+        inventoryItemId: managementInventoryMovements.inventoryItemId,
+        sourceId: managementInventoryMovements.sourceId,
+        unitCostCents: managementInventoryMovements.unitCostCents,
+      })
+      .from(managementInventoryMovements)
+      .where(
+        and(
+          eq(managementInventoryMovements.organizationId, organization.id),
+          eq(managementInventoryMovements.unitId, unit.id),
+          eq(managementInventoryMovements.type, "blind_count"),
+          inArray(
+            managementInventoryMovements.sourceId,
+            blindCount.lines.map((line) => line.id),
+          ),
+        ),
+      );
+    assert.ok(countMovements.length > 0);
+    assert.equal(
+      countMovements.find(
+        (movement) => movement.inventoryItemId === zeroCostBalance.inventoryItemId,
+      )?.unitCostCents,
+      0,
+    );
+    for (const movement of countMovements)
+      assert.equal(movement.unitCostCents, costsBeforeBlindCount.get(movement.inventoryItemId));
     const controls = await management.inventoryControlsDashboard(
       reviewerIdentity.id,
       organization.id,

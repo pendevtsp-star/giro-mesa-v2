@@ -2,6 +2,7 @@ import type { OperationalCommandInput } from "@giromesa/contracts";
 import { ApiClientError, api } from "./api";
 import { type DeviceContext, loadShellOperationalState, sendShellCommand } from "./bridge";
 import {
+  CommandQueuePersistenceError,
   createCommand,
   enqueueCommand,
   quarantineQueuedCommand,
@@ -74,6 +75,7 @@ export type PilotDispatcher = <T>(
   type: string,
   payload: PilotMutationPayload,
   execute: (idempotencyKey: string) => Promise<T>,
+  command?: OperationalCommandInput,
 ) => Promise<T>;
 
 export type OperationalResource = "catalog" | "floor" | "tabs" | "tab" | "kds" | "reconciliation";
@@ -85,9 +87,16 @@ export type PilotLoader = <T>(
 ) => Promise<T>;
 
 export class QueuedOperationalMutationError extends Error {
-  constructor() {
-    super("A ação não foi confirmada e ficou salva neste dispositivo para nova tentativa.");
+  readonly persisted: boolean;
+
+  constructor(persisted = true) {
+    super(
+      persisted
+        ? "A ação não foi confirmada e ficou salva neste dispositivo para nova tentativa."
+        : "A ação não foi confirmada e este dispositivo não conseguiu preservá-la. Mantenha esta tela aberta antes de tentar novamente.",
+    );
     this.name = "QueuedOperationalMutationError";
+    this.persisted = persisted;
   }
 }
 
@@ -119,8 +128,9 @@ export async function dispatchOperationalMutation<T>(input: {
   type: string;
   payload: PilotMutationPayload;
   execute: (idempotencyKey: string) => Promise<T>;
+  command?: OperationalCommandInput;
 }): Promise<T> {
-  const command = createCommand(input.runtime.deviceId, input.type, input.payload);
+  const command = input.command ?? createCommand(input.runtime.deviceId, input.type, input.payload);
   if (isCloudOnlyMutation(input.payload)) {
     return input.execute(command.idempotencyKey);
   }
@@ -134,24 +144,45 @@ export async function dispatchOperationalMutation<T>(input: {
     if (!acknowledgement?.success) {
       const errorCode = acknowledgement?.errorCode ?? "SHELL_BRIDGE_UNAVAILABLE";
       if (isRetryableHubError(errorCode)) {
-        enqueueCommand(command, input.scope);
-        throw new QueuedOperationalMutationError();
+        queueRetryableCommand(command, input.scope);
       }
       throw new RejectedOperationalMutationError(errorCode);
     }
     if (acknowledgement.result === undefined) {
       throw new RejectedOperationalMutationError("HUB_RESULT_MISSING");
     }
+    removeConfirmedCommand(command, input.scope);
     return acknowledgement.result as T;
   }
   try {
-    return await input.execute(command.idempotencyKey);
+    const result = await input.execute(command.idempotencyKey);
+    removeConfirmedCommand(command, input.scope);
+    return result;
   } catch (error) {
     if (error instanceof ApiClientError && error.retryable) {
-      enqueueCommand(command, input.scope);
-      throw new QueuedOperationalMutationError();
+      queueRetryableCommand(command, input.scope);
     }
     throw error;
+  }
+}
+
+function queueRetryableCommand(command: OperationalCommandInput, scope: OperationalScope): never {
+  try {
+    enqueueCommand(command, scope);
+  } catch (error) {
+    if (error instanceof CommandQueuePersistenceError) {
+      throw new QueuedOperationalMutationError(false);
+    }
+    throw error;
+  }
+  throw new QueuedOperationalMutationError();
+}
+
+function removeConfirmedCommand(command: OperationalCommandInput, scope: OperationalScope): void {
+  try {
+    removeQueuedCommand(command.id, scope);
+  } catch (error) {
+    if (!(error instanceof CommandQueuePersistenceError)) throw error;
   }
 }
 
