@@ -39,20 +39,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:a713efdda47799904c9593404793629292e12c77",
+    "artifact": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370",
     "migration": {
-      "id": "0079_realtime_outbox_notify",
-      "status": "applied",
-      "evidence": "git:a713efdda47799904c9593404793629292e12c77"
+      "id": "0080_campaign_attribution_cost",
+      "status": "verified",
+      "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:a713efdda47799904c9593404793629292e12c77"
+        "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:a713efdda47799904c9593404793629292e12c77"
+        "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
       }
     }
   },
