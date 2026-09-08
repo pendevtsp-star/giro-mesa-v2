@@ -1,6 +1,6 @@
 {
   "name": "giromesa-v2",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "packageManager": "pnpm@11.7.0",
   "engines": {
@@ -39,20 +39,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370",
+    "artifact": "git:437608f035f98f2c0965242a08a41172d65f879a",
     "migration": {
       "id": "0080_campaign_attribution_cost",
-      "status": "verified",
-      "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
+      "status": "applied",
+      "evidence": "git:437608f035f98f2c0965242a08a41172d65f879a"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
+        "evidence": "git:437608f035f98f2c0965242a08a41172d65f879a"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:354f08c1515a9116f0fde9eda5fb5df0d1983370"
+        "evidence": "git:437608f035f98f2c0965242a08a41172d65f879a"
       }
     }
   },

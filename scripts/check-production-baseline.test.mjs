@@ -13,6 +13,17 @@ const gitSha = "0123456789abcdef0123456789abcdef01234567";
 const digest = `sha256:${"a".repeat(64)}`;
 const immutableEvidence = `git:${gitSha}`;
 
+test("API health schema version matches the latest journaled migration", () => {
+  const root = process.cwd();
+  const journal = JSON.parse(
+    readFileSync(join(root, "packages/db/drizzle/meta/_journal.json"), "utf8"),
+  );
+  const health = readFileSync(join(root, "apps/backends/api/src/health/health.module.ts"), "utf8");
+  const declared = health.match(/export const RELEASE_SCHEMA_VERSION = (\d+);/)?.[1];
+  assert.ok(declared, "health must declare its release schema version");
+  assert.equal(Number(declared), Number(journal.entries.at(-1).tag.split("_", 1)[0]));
+});
+
 const validBaseline = {
   level: "software-ready",
   artifact: immutableEvidence,
