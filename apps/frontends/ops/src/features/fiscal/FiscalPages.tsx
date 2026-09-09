@@ -18,6 +18,7 @@ import { formatMoney } from "../../rules";
 import {
   type AccountantRequestFilter,
   accountantRequestHref,
+  accountantRequestNextAction,
   accountantRequestStatusLabel,
   accountantRequestViewFromHash,
   canResolveAccountantRequest,
@@ -38,6 +39,10 @@ import "./fiscal.css";
 
 const fiscalOrigins = ["0", "1", "2", "3", "4", "5", "6", "7", "8"] as const;
 type FiscalSection = "overview" | "setup" | "products" | "documents" | "closing";
+type FiscalActionDialog =
+  | { kind: "period"; period: FiscalPeriod; action: "close" | "reopen" }
+  | { kind: "cancel-document"; documentId: string }
+  | null;
 
 const fiscalSections: Array<{ id: FiscalSection; label: string }> = [
   { id: "overview", label: "Resumo" },
@@ -72,6 +77,7 @@ export function RealFiscalPage({
     search?: string;
   }>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [actionDialog, setActionDialog] = useState<FiscalActionDialog>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "danger"; text: string } | null>(
     null,
   );
@@ -151,18 +157,8 @@ export function RealFiscalPage({
     }
   }
 
-  async function changePeriod(period: FiscalPeriod, action: "close" | "reopen") {
+  async function changePeriod(period: FiscalPeriod, action: "close" | "reopen", reason?: string) {
     if (action === "close" && period.blockers.length) return;
-    const confirmation =
-      action === "close"
-        ? `Fechar a competência ${competenceLabel(period.competence)}?`
-        : `Reabrir a competência ${competenceLabel(period.competence)}?`;
-    if (!window.confirm(confirmation)) return;
-    const reason =
-      action === "reopen"
-        ? window.prompt("Informe o motivo da reabertura para a auditoria:")?.trim()
-        : undefined;
-    if (action === "reopen" && !reason) return;
     if (action === "reopen" && (reason?.length ?? 0) < 10) {
       setFeedback({ tone: "danger", text: "Informe um motivo com pelo menos 10 caracteres." });
       return;
@@ -184,6 +180,7 @@ export function RealFiscalPage({
         tone: "success",
         text: action === "close" ? "Competência fechada." : "Competência reaberta.",
       });
+      setActionDialog(null);
       setRefresh((value) => value + 1);
     } catch (error) {
       setFeedback({
@@ -212,11 +209,11 @@ export function RealFiscalPage({
     }
   }
 
-  async function changeDocument(documentId: string, action: "reconcile" | "cancel") {
-    const justification =
-      action === "cancel"
-        ? window.prompt("Justificativa fiscal do cancelamento (15 a 255 caracteres):")?.trim()
-        : undefined;
+  async function changeDocument(
+    documentId: string,
+    action: "reconcile" | "cancel",
+    justification?: string,
+  ) {
     if (action === "cancel" && (!justification || justification.length < 15)) {
       setFeedback({
         tone: "danger",
@@ -242,6 +239,7 @@ export function RealFiscalPage({
         tone: "success",
         text: action === "cancel" ? "Cancelamento confirmado." : "Situação da nota atualizada.",
       });
+      if (action === "cancel") setActionDialog(null);
       setRefresh((value) => value + 1);
     } catch (error) {
       setFeedback({
@@ -401,7 +399,10 @@ export function RealFiscalPage({
                           </Badge>
                           <div>
                             <strong>{item.title}</strong>
-                            <p>{item.detail}</p>
+                            <small>Causa: {item.cause}</small>
+                            <p>
+                              <strong>Próxima ação:</strong> {item.nextAction}
+                            </p>
                           </div>
                           {target !== "setup" || canConfigure ? (
                             <Button
@@ -470,7 +471,7 @@ export function RealFiscalPage({
                                   busy !== null ||
                                   (action === "close" && period.blockers.length > 0)
                                 }
-                                onClick={() => void changePeriod(period, action)}
+                                onClick={() => setActionDialog({ kind: "period", period, action })}
                                 size="sm"
                                 variant={action === "reopen" ? "danger" : "secondary"}
                               >
@@ -634,7 +635,12 @@ export function RealFiscalPage({
                           {document.status === "authorized" && canCancelDocuments && (
                             <Button
                               disabled={busy !== null}
-                              onClick={() => void changeDocument(document.id, "cancel")}
+                              onClick={() =>
+                                setActionDialog({
+                                  kind: "cancel-document",
+                                  documentId: document.id,
+                                })
+                              }
                               size="sm"
                               variant="danger"
                             >
@@ -667,9 +673,103 @@ export function RealFiscalPage({
             scope={scope}
             state={documentDetail}
           />
+          <FiscalActionModal
+            busy={busy !== null}
+            key={
+              actionDialog?.kind === "period"
+                ? `${actionDialog.period.competence}:${actionDialog.action}`
+                : (actionDialog?.documentId ?? "closed")
+            }
+            onClose={() => setActionDialog(null)}
+            onConfirm={(reason) => {
+              if (!actionDialog) return;
+              if (actionDialog.kind === "period") {
+                void changePeriod(actionDialog.period, actionDialog.action, reason);
+                return;
+              }
+              void changeDocument(actionDialog.documentId, "cancel", reason);
+            }}
+            state={actionDialog}
+          />
         </div>
       )}
     </RemoteGate>
+  );
+}
+
+function FiscalActionModal({
+  busy,
+  onClose,
+  onConfirm,
+  state,
+}: {
+  busy: boolean;
+  onClose: () => void;
+  onConfirm: (reason?: string) => void;
+  state: FiscalActionDialog;
+}) {
+  const [reason, setReason] = useState("");
+  if (!state) return null;
+
+  const asksReason = state.kind === "cancel-document" || state.action === "reopen";
+  const minimum = state.kind === "cancel-document" ? 15 : 10;
+  const trimmedReason = reason.trim();
+  const isClose = state.kind === "period" && state.action === "close";
+  const title =
+    state.kind === "cancel-document"
+      ? "Cancelar nota fiscal"
+      : isClose
+        ? "Fechar competência"
+        : "Reabrir competência";
+  const description =
+    state.kind === "cancel-document"
+      ? "O cancelamento será enviado ao provedor fiscal e ficará registrado na auditoria."
+      : isClose
+        ? `A competência ${competenceLabel(state.period.competence)} ficará bloqueada para novas alterações.`
+        : `A competência ${competenceLabel(state.period.competence)} voltará a aceitar alterações e o motivo ficará registrado.`;
+
+  return (
+    <Modal description={description} isOpen onClose={onClose} size="sm" title={title}>
+      <form
+        className="gm-form-stack"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onConfirm(asksReason ? trimmedReason : undefined);
+        }}
+      >
+        {asksReason && (
+          <label className="gm-form-field">
+            <span>{state.kind === "cancel-document" ? "Justificativa fiscal" : "Motivo"}</span>
+            <Textarea
+              autoFocus
+              maxLength={255}
+              minLength={minimum}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder={
+                state.kind === "cancel-document"
+                  ? "Explique por que esta nota deve ser cancelada"
+                  : "Explique por que a competência deve ser reaberta"
+              }
+              required
+              value={reason}
+            />
+            <small>Mínimo de {minimum} caracteres. Esta informação ficará na auditoria.</small>
+          </label>
+        )}
+        <div className="fiscal-form-actions">
+          <Button disabled={busy} onClick={onClose} type="button" variant="ghost">
+            Voltar
+          </Button>
+          <Button
+            disabled={busy || (asksReason && trimmedReason.length < minimum)}
+            type="submit"
+            variant={isClose ? "secondary" : "danger"}
+          >
+            {busy ? "Salvando…" : isClose ? "Fechar competência" : "Confirmar"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -1164,6 +1264,7 @@ function FiscalConfiguration({
   const [draft, setDraft] = useState(profile);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [confirmProduction, setConfirmProduction] = useState(false);
 
   if (!draft) {
     return (
@@ -1266,13 +1367,8 @@ function FiscalConfiguration({
               className="gm-control"
               onChange={(event) => {
                 const environment = event.target.value as FiscalProfile["environment"];
-                if (
-                  environment === "production" &&
-                  !window.confirm(
-                    "Mudar para produção? As próximas notas emitidas terão validade fiscal.",
-                  )
-                ) {
-                  event.target.value = draft.environment;
+                if (environment === "production" && draft.environment !== "production") {
+                  setConfirmProduction(true);
                   return;
                 }
                 update("environment", environment);
@@ -1341,6 +1437,35 @@ function FiscalConfiguration({
           {busy ? "Salvando…" : "Salvar dados fiscais"}
         </Button>
       </form>
+      <Modal
+        description="As próximas notas emitidas terão validade fiscal. Confirme depois de revisar cadastro, certificado, CSC e séries."
+        isOpen={confirmProduction}
+        onClose={() => setConfirmProduction(false)}
+        size="sm"
+        title="Ativar emissão em produção"
+      >
+        <div className="gm-form-stack">
+          <p className="fiscal-preventive-alert" role="alert">
+            <Icon name="alert-circle" size={16} />
+            Esta mudança afeta documentos fiscais reais da unidade.
+          </p>
+          <div className="fiscal-form-actions">
+            <Button onClick={() => setConfirmProduction(false)} type="button" variant="ghost">
+              Manter ambiente de testes
+            </Button>
+            <Button
+              onClick={() => {
+                update("environment", "production");
+                setConfirmProduction(false);
+              }}
+              type="button"
+              variant="danger"
+            >
+              Ativar produção
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </Card>
   );
 }
@@ -2516,7 +2641,13 @@ export function RealAccountantPage({
                   <article className="accountant-request-row" key={request.id}>
                     <div className="accountant-request-row__content">
                       <strong>{request.title}</strong>
-                      <p>{request.detail}</p>
+                      <p>
+                        <strong>Causa ou pedido:</strong> {request.detail}
+                      </p>
+                      <p>
+                        <strong>Próxima ação:</strong>{" "}
+                        {accountantRequestNextAction(request, audience)}
+                      </p>
                       <small>
                         {competenceLabel(request.competence)} · {dateLabel(request.createdAt)}
                         {request.dueAt ? ` · prazo ${dateLabel(request.dueAt)}` : ""}

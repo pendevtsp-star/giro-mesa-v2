@@ -737,7 +737,12 @@ export interface FinancialEntry {
   supplierName: string | null;
   installmentNumber: number | null;
   installmentCount: number | null;
-  attachments: Array<{ name: string; url: string }>;
+  attachments: Array<{
+    id: string | null;
+    name: string;
+    url: string | null;
+    mimeType: string | null;
+  }>;
   version: number;
   payments: FinancialPayment[];
 }
@@ -783,6 +788,13 @@ export interface FinanceData {
   reconciliationImports: Row[];
   reconciliationEntries: FinanceReconciliationEntry[];
   approvals: FinanceApproval[];
+  operationalShifts: Array<{
+    id: string;
+    label: string;
+    status: string;
+    startsAt: string;
+    closedAt: string | null;
+  }>;
   settings: {
     paymentApprovalThresholdCents: number | null;
     requireDistinctApprover: boolean;
@@ -1426,6 +1438,7 @@ export interface CashHistoryItem {
   id: string;
   cashRegisterId: string;
   cashRegisterName: string;
+  unitName: string;
   status: string;
   openingCents: number;
   expectedCents: number | null;
@@ -1464,6 +1477,14 @@ export interface CashShiftDetail {
 export interface CashClosureResult {
   cashShiftId: string;
   status: string;
+  unitName: string;
+  cashRegisterName: string;
+  operatorName: string;
+  responsibleName: string;
+  closedByName: string;
+  openingCents: number;
+  openedAt: string;
+  closedAt: string;
   expectedCents: number;
   countedCents: number;
   differenceCents: number;
@@ -1698,6 +1719,8 @@ export interface TimeTrackingClosure {
 }
 
 export interface PeopleData {
+  timezone: string;
+  today: string;
   people: Person[];
   schedules: Schedule[];
   timeEntries: TimeEntry[];
@@ -1835,6 +1858,12 @@ export interface OverviewPriority {
   occurrenceKey: string;
   status: "open" | "claimed";
   assignedTo: { id: string; name: string; isMe: boolean } | null;
+  target?: {
+    tableId?: string;
+    tabId?: string;
+    ticketId?: string;
+    deliveryOrderId?: string;
+  };
 }
 
 export interface OverviewPulseItem {
@@ -3003,8 +3032,10 @@ export function parseFinance(value: unknown): FinanceData {
     const direction = entry.direction === "receivable" ? "receivable" : "payable";
     const attachments = Array.isArray(entry.attachments)
       ? records(entry.attachments).map((attachment) => ({
+          id: optionalString(attachment.id),
           name: requiredString(attachment.name),
-          url: requiredString(attachment.url),
+          url: optionalString(attachment.url),
+          mimeType: optionalString(attachment.mimeType),
         }))
       : [];
     return {
@@ -3041,6 +3072,13 @@ export function parseFinance(value: unknown): FinanceData {
   return {
     entries,
     reconciliationImports: rows(payload, "reconciliationImports"),
+    operationalShifts: optionalRows(payload, "operationalShifts").map((shift) => ({
+      id: requiredString(shift.id),
+      label: requiredString(shift.label),
+      status: requiredString(shift.status),
+      startsAt: requiredString(shift.startsAt),
+      closedAt: optionalString(shift.closedAt),
+    })),
     reconciliationEntries: rows(payload, "reconciliationEntries").map((entry) => ({
       id: requiredString(entry.id),
       externalKey: requiredString(entry.externalKey),
@@ -3933,6 +3971,7 @@ function parseCashHistoryItem(value: unknown): CashHistoryItem {
     id: requiredString(shift.id),
     cashRegisterId: requiredString(shift.cashRegisterId),
     cashRegisterName: requiredString(shift.cashRegisterName),
+    unitName: requiredString(shift.unitName),
     status: requiredString(shift.status),
     openingCents: numeric(shift.openingCents) ?? 0,
     expectedCents: numeric(shift.expectedCents, true),
@@ -4011,6 +4050,14 @@ export function parseCashClosure(value: unknown): CashClosureResult {
   return {
     cashShiftId: requiredString(payload.cashShiftId),
     status: requiredString(payload.status),
+    unitName: requiredString(payload.unitName),
+    cashRegisterName: requiredString(payload.cashRegisterName),
+    operatorName: requiredString(payload.operatorName),
+    responsibleName: requiredString(payload.responsibleName),
+    closedByName: requiredString(payload.closedByName),
+    openingCents: numeric(payload.openingCents) ?? 0,
+    openedAt: requiredString(payload.openedAt),
+    closedAt: requiredString(payload.closedAt),
     expectedCents: numeric(payload.expectedCents) ?? 0,
     countedCents: numeric(payload.countedCents) ?? 0,
     differenceCents: numeric(payload.differenceCents) ?? 0,
@@ -4328,6 +4375,8 @@ export function parsePeople(value: unknown): PeopleData {
     requiresSpecialApproval: correction.requiresSpecialApproval === true,
   });
   return {
+    timezone: optionalString(payload.timezone) ?? "America/Sao_Paulo",
+    today: optionalString(payload.today) ?? new Date().toISOString().slice(0, 10),
     people: rows(payload, "people").map(parsePerson),
     schedules: rows(payload, "schedules").map((schedule) => ({
       id: requiredString(schedule.id),
@@ -4782,6 +4831,19 @@ export function parseOverview(value: unknown): OverviewData {
                 name: requiredString(assigned.name),
                 isMe: boolean(assigned.isMe),
               };
+            })(),
+      target:
+        item.target === undefined || item.target === null
+          ? undefined
+          : (() => {
+              const target = record(item.target);
+              const result = {
+                tableId: optionalString(target.tableId) ?? undefined,
+                tabId: optionalString(target.tabId) ?? undefined,
+                ticketId: optionalString(target.ticketId) ?? undefined,
+                deliveryOrderId: optionalString(target.deliveryOrderId) ?? undefined,
+              };
+              return Object.values(result).some(Boolean) ? result : undefined;
             })(),
     })),
     pulse: rows(payload, "pulse").map((item) => ({

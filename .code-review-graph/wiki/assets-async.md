@@ -63,7 +63,7 @@ Directory-based community: apps/native
 | PairingPayload | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 551-551 |
 | HubCommandResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 552-552 |
 
-*... and 3366 more members.*
+*... and 563 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/native
 
 ### Outgoing
 
-- `map` (464 edge(s))
-- `trim` (241 edge(s))
-- `Error` (228 edge(s))
-- `filter` (215 edge(s))
-- `push` (176 edge(s))
-- `find` (143 edge(s))
-- `slice` (133 edge(s))
-- `preventDefault` (128 edge(s))
-- `includes` (127 edge(s))
-- `isArray` (119 edge(s))
-- `join` (101 edge(s))
-- `retry` (100 edge(s))
-- `Number` (97 edge(s))
-- `replace` (97 edge(s))
-- `some` (83 edge(s))
+- `FromResult` (37 edge(s))
+- `push` (36 edge(s))
+- `IsNullOrWhiteSpace` (31 edge(s))
+- `Append` (24 edge(s))
+- `ToString` (23 edge(s))
+- `Equals` (22 edge(s))
+- `Error` (21 edge(s))
+- `call` (19 edge(s))
+- `slice` (18 edge(s))
+- `map` (15 edge(s))
+- `forEach` (13 edge(s))
+- `indexOf` (13 edge(s))
+- `Add` (12 edge(s))
+- `isArray` (12 edge(s))
+- `GetAsync` (11 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-ACMiPTB1.js` (1389 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/jspdf-es-min-ygtBMvKY.js` (610 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-C9dEankR.js` (474 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/html2canvas-DCcDvdvP.js` (212 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/SalonPage-DSESa1Pm.js` (126 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-CxXekqSC.js` (116 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/ReportsPage-8iFH4Gkx.js` (114 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/FiscalPages-BR7O7m5A.js` (105 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/KdsPage-n-hQsy0H.js` (105 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/InventoryPage-CVSELU_Q.js` (81 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/platform-DvZdafF7.js` (79 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/PeoplePage-g7IU7LTl.js` (73 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/purify-es-ChwZkWde.js` (69 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/DeviceSetupPage-CqAcrZtt.js` (67 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CounterWorkspace-4XEGgLW4.js` (63 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/browser-Cpc4qo6y.js` (46 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/Program.cs` (46 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/settings-gFJVDQd3.js` (24 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceApiClient.cs` (18 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs` (15 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPayments.cs` (12 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosResultOutbox.cs` (9 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-B1r1QY-I.js::e` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-DQQ_NYFW.js` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/AndroidStubs.cs` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceSecurity.cs` (7 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPaymentContracts.cs` (7 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-B1r1QY-I.js::Rn` (6 edge(s))

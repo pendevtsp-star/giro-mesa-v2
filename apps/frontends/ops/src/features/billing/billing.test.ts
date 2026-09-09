@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { sessionForScope } from "../../app/access";
 import {
+  billingChargeDueLabel,
+  billingDocumentHref,
+  billingDocumentLabel,
   outstandingCharge,
   parseBillingCheckout,
   parseBillingSummary,
@@ -67,6 +70,19 @@ describe("assinatura e cobrança", () => {
     expect(summary.plans[0]?.monthlyPriceCents).toBe(14900);
     expect(outstandingCharge(summary)?.id).toBe("charge-1");
     expect(summary.missingSections).toEqual([]);
+  });
+
+  it("expõe vencimento relativo e documento seguro conforme o estado real", () => {
+    const now = new Date("2026-09-09T12:00:00-03:00");
+    expect(billingChargeDueLabel("2026-09-09T20:00:00-03:00", now)).toBe("Vence hoje");
+    expect(billingChargeDueLabel("2026-09-10T12:00:00-03:00", now)).toBe("Vence amanhã");
+    expect(billingChargeDueLabel("2026-09-07T12:00:00-03:00", now)).toBe("Vencida há 2 dias");
+    expect(billingDocumentHref("https://billing.example/receipt/1")).toBe(
+      "https://billing.example/receipt/1",
+    );
+    expect(billingDocumentHref("javascript:alert(1)")).toBeNull();
+    expect(billingDocumentLabel("paid")).toBe("Consultar pagamento no provedor");
+    expect(billingDocumentLabel("pending")).toBe("Abrir cobrança");
   });
 
   it("mantém a conta visível quando uma seção agregada está indisponível", () => {

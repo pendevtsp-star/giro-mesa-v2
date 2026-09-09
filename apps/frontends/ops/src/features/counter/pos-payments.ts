@@ -47,6 +47,17 @@ export interface PaymentAction {
   provider: PaymentProvider;
 }
 
+export function paymentAttemptContextError(
+  attempt: Pick<PaymentAttempt, "tabId" | "installationId">,
+  tabId: string,
+  installationId: string,
+) {
+  if (attempt.tabId !== tabId) return "Esta tentativa pertence a outra comanda.";
+  if (attempt.installationId !== installationId)
+    return "Esta tentativa pertence a outra maquininha.";
+  return null;
+}
+
 type AttemptActionResponse = { attempt: PaymentAttempt; action: PaymentAction | null };
 
 const methods: IntegratedPaymentMethod[] = ["credit_card", "debit_card", "pix"];

@@ -2,6 +2,30 @@
   min-width: 0;
 }
 
+.crm-page-navigation,
+.crm-page-navigation nav,
+.crm-thread-heading {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.crm-page-navigation > div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.crm-page-navigation :is(h2, p),
+.crm-thread-heading h3 {
+  margin: 0;
+}
+
+.crm-page-navigation nav {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .crm-observability,
 .crm-observability > div,
 .crm-directory__header,
@@ -429,7 +453,7 @@
 }
 
 .crm-inbox-filters {
-  grid-template-columns: minmax(0, 1fr) repeat(2, minmax(7rem, auto));
+  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(7rem, auto));
 }
 
 .crm-conversation-controls {
@@ -579,6 +603,18 @@
 }
 
 @media (max-width: 760px) {
+  .crm-page-navigation,
+  .crm-thread-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .crm-page-navigation nav,
+  .crm-page-navigation nav > * {
+    justify-content: stretch;
+    width: 100%;
+  }
+
   .crm-workspace,
   .crm-action-grid,
   .crm-whatsapp-grid,

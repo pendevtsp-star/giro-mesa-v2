@@ -38,7 +38,7 @@ async function mockCounterApi(page: Page, behavior: CreateBehavior, calls: Count
         status: "ok",
         version: "2.0.0",
         buildSha: "counter-continuity-e2e",
-        schemaVersion: 79,
+        schemaVersion: 82,
         database: "up",
         integrations: {},
         capabilities: [

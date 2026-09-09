@@ -4,9 +4,9 @@ import { type CartItem, cartTotal, formatMoney } from "../../lib/menu";
 import type { TableOrder } from "../../lib/table-session";
 
 export type TableOrderState =
-  | { status: "idle" | "submitting" }
+  | { status: "idle" | "submitting" | "restoring" }
   | { status: "error"; message: string }
-  | { status: "tracking"; order: TableOrder };
+  | { status: "tracking"; order: TableOrder; updatedAt?: number; connectionError?: boolean };
 
 const orderStatus: Record<TableOrder["status"], { title: string; copy: string; tone: string }> = {
   draft: {
@@ -50,27 +50,49 @@ export function TableOrderFlow({
   state: TableOrderState;
   onPlace: () => void;
 }) {
+  if (state.status === "restoring")
+    return (
+      <p role="status">
+        Consultando seu pedido anterior. Aguarde a recuperação antes de repetir a solicitação.
+      </p>
+    );
   if (state.status === "tracking") {
     const status = orderStatus[state.order.status];
     return (
-      <section className={`table-order-receipt ${status.tone}`} aria-live="polite">
+      <section className={`table-order-receipt ${status.tone}`}>
         <p>Pedido na mesa</p>
-        <h3>{status.title}</h3>
+        <h3 aria-live="polite">{status.title}</h3>
         <span>{status.copy}</span>
         <ul>
           {state.order.items.map((item) => (
             <li key={`${item.name}-${item.quantity}-${item.totalCents}`}>
               <span>
                 {item.quantity}× {item.name}
+                {item.allergyNote && <small>Alergia: {item.allergyNote}</small>}
               </span>
               <strong>{formatMoney(item.totalCents)}</strong>
             </li>
           ))}
         </ul>
         <div>
-          <span>Total confirmado</span>
+          <span>
+            {state.order.status === "draft"
+              ? "Total solicitado"
+              : state.order.status === "canceled"
+                ? "Total cancelado"
+                : "Total confirmado"}
+          </span>
           <strong>{formatMoney(state.order.totalCents)}</strong>
         </div>
+        {state.connectionError && (
+          <p role="status">
+            Sem atualização no momento. Exibindo o último estado confirmado; tentaremos novamente
+            automaticamente.
+          </p>
+        )}
+        {state.updatedAt && (
+          <small>Última consulta: {new Date(state.updatedAt).toLocaleTimeString("pt-BR")}</small>
+        )}
       </section>
     );
   }

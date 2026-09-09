@@ -168,7 +168,13 @@ function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
   );
 }
 
-export function CrmCustomerWorkspace({ scope }: { scope: GrowthScope }) {
+export function CrmCustomerWorkspace({
+  scope,
+  focusedCustomerId,
+}: {
+  scope: GrowthScope;
+  focusedCustomerId?: string;
+}) {
   const [query, setQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [offset, setOffset] = useState(0);
@@ -213,20 +219,26 @@ export function CrmCustomerWorkspace({ scope }: { scope: GrowthScope }) {
   const [consentChannel, setConsentChannel] = useState<"email" | "whatsapp" | "all">("all");
   const [policyVersion, setPolicyVersion] = useState("");
   const rows = customers.state.status === "ready" ? customers.state.data.items : [];
-  const selected = rows.find((customer) => customer.id === selectedId) ?? null;
   const selectedDetail =
     detail.state.status === "ready" && detail.state.data?.customer.id === selectedId
       ? detail.state.data
       : null;
 
   useEffect(() => {
+    if (!focusedCustomerId) return;
+    setSelectedId(focusedCustomerId);
+    setConsentCustomerId(focusedCustomerId);
+  }, [focusedCustomerId]);
+
+  useEffect(() => {
     if (customers.state.status !== "ready") return;
+    if (focusedCustomerId && selectedId === focusedCustomerId) return;
     const firstId = customers.state.data.items[0]?.id ?? "";
     if (!customers.state.data.items.some((customer) => customer.id === selectedId)) {
       setSelectedId(firstId);
       setConsentCustomerId(firstId);
     }
-  }, [customers.state, selectedId]);
+  }, [customers.state, selectedId, focusedCustomerId]);
   useEffect(() => {
     if (!selectedDetail) return;
     setEditName(selectedDetail.customer.name);
@@ -527,9 +539,9 @@ export function CrmCustomerWorkspace({ scope }: { scope: GrowthScope }) {
             }
           </RemoteGate>
         </Card>
-        {selected && selectedDetail ? (
+        {selectedDetail ? (
           <CustomerProfile detail={selectedDetail} />
-        ) : selected ? (
+        ) : selectedId ? (
           <Card className="crm-profile" role={detail.refreshError ? "alert" : "status"}>
             {detail.refreshError ? (
               <EmptyState

@@ -108,7 +108,7 @@ export function readTableConsumption(payload: unknown): TableConsumption | null 
 export type TableOrder = {
   orderId: string;
   status: "draft" | "sent" | "canceled" | "preparing" | "ready" | "served";
-  items: Array<{ name: string; quantity: number; totalCents: number }>;
+  items: Array<{ name: string; quantity: number; totalCents: number; allergyNote?: string }>;
   totalCents: number;
 };
 
@@ -133,8 +133,16 @@ export function readTableOrder(payload: unknown): TableOrder | null {
     const name = text(item?.name);
     const quantity = item?.quantity;
     const totalCents = cents(item?.totalCents);
+    const allergyNote = text(item?.allergyNote);
     return name && Number.isSafeInteger(quantity) && (quantity as number) > 0 && totalCents !== null
-      ? [{ name, quantity: quantity as number, totalCents }]
+      ? [
+          {
+            name,
+            quantity: quantity as number,
+            totalCents,
+            ...(allergyNote ? { allergyNote } : {}),
+          },
+        ]
       : [];
   });
   const totalCents = cents(value.totalCents);
@@ -153,6 +161,7 @@ export function tableOrderLines(cart: CartItem[]) {
     quantity: line.quantity,
     modifierOptionIds: line.modifiers.map((modifier) => modifier.id),
     ...(line.notes ? { notes: line.notes } : {}),
+    ...(line.allergyNote ? { allergyNote: line.allergyNote } : {}),
   }));
 }
 

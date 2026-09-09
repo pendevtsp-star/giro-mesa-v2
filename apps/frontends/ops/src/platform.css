@@ -216,6 +216,26 @@
   gap: var(--gm-space-2);
 }
 
+.platform-saved-view {
+  background: var(--gm-surface-subtle);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-sm);
+  display: grid;
+  gap: var(--gm-space-1);
+  padding: var(--gm-space-3);
+}
+
+.platform-saved-view > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.platform-saved-view > span,
+.platform-saved-view > small {
+  color: var(--gm-ink-muted);
+}
+
 .platform-search > label,
 .platform-action-form > label:not(.platform-confirm) {
   font-size: var(--gm-font-sm);

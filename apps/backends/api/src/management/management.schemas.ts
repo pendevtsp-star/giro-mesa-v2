@@ -610,6 +610,7 @@ export const purchaseListQuerySchema = z.object({
     .optional(),
   from: date.optional(),
   to: date.optional(),
+  arrival: z.enum(["today", "overdue"]).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
@@ -712,11 +713,36 @@ export const purchaseInvoiceConfirmSchema = z
     path: ["reason"],
   });
 
-const financialAttachmentSchema = z.object({
-  name: z.string().trim().min(1).max(160),
-  url: z.string().trim().url().max(2_000),
-  mimeType: z.string().trim().min(1).max(120).optional(),
-});
+const financialAttachmentSchema = z.union([
+  z.object({ id, name: z.string().trim().min(1).max(160) }).strict(),
+  z
+    .object({
+      name: z.string().trim().min(1).max(160),
+      url: z.string().trim().url().max(2_000),
+      mimeType: z.string().trim().min(1).max(120).optional(),
+    })
+    .strict(),
+]);
+
+export const financeAttachmentUploadSchema = z
+  .object({
+    fileName: z
+      .string()
+      .trim()
+      .min(1)
+      .max(180)
+      .regex(/^[^\\/:*?"<>|]+$/),
+    contentType: z.enum([
+      "application/pdf",
+      "application/xml",
+      "text/xml",
+      "text/csv",
+      "image/jpeg",
+      "image/png",
+    ]),
+    contentBase64: z.string().min(4).max(4_194_304),
+  })
+  .strict();
 
 const financialClassificationSchema = z.object({
   category: z.string().trim().min(1).max(80).optional(),
@@ -790,6 +816,8 @@ export const financeListQuerySchema = z.object({
   search: z.string().trim().max(160).default(""),
   from: date.optional(),
   to: date.optional(),
+  operationalShiftId: id.optional(),
+  reconciliationStatus: z.enum(["unmatched", "divergent", "resolved"]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(10).max(100).default(25),
 });
@@ -1631,6 +1659,7 @@ export type FinancialPaymentInput = z.infer<typeof financialPaymentSchema>;
 export type ReceivableInput = z.infer<typeof receivableSchema>;
 export type ReceivablePaymentInput = z.infer<typeof receivablePaymentSchema>;
 export type FinanceListQuery = z.infer<typeof financeListQuerySchema>;
+export type FinanceAttachmentUploadInput = z.infer<typeof financeAttachmentUploadSchema>;
 export type FinanceEntryUpdateInput = z.infer<typeof financeEntryUpdateSchema>;
 export type FinanceEntryCancelInput = z.infer<typeof financeEntryCancelSchema>;
 export type FinancePaymentReversalInput = z.infer<typeof financePaymentReversalSchema>;

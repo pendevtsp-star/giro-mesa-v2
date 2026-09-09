@@ -73,6 +73,16 @@ export async function requestEvolutionQr(
   return parseCrmEvolutionQr(await load());
 }
 
+export function conversationNeedsReply(conversation: CrmWhatsappConversation) {
+  return (
+    ["open", "pending"].includes(conversation.status) &&
+    conversation.lastInboundAt !== null &&
+    (conversation.lastOutboundAt === null ||
+      new Date(conversation.lastInboundAt).getTime() >
+        new Date(conversation.lastOutboundAt).getTime())
+  );
+}
+
 function AutomationEditor({
   scope,
   trigger,
@@ -177,9 +187,16 @@ function AutomationEditor({
   );
 }
 
-export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
+export function CrmWhatsappWorkspace({
+  scope,
+  onOpenCustomer,
+}: {
+  scope: GrowthScope;
+  onOpenCustomer?: (customerId: string) => void;
+}) {
   const [inboxStatus, setInboxStatus] = useState<"open" | "pending" | "closed">("open");
   const [assignmentFilter, setAssignmentFilter] = useState<"any" | "me" | "unassigned">("any");
+  const [needsReply, setNeedsReply] = useState(false);
   const [search, setSearch] = useState("");
   const integration = useRemote(
     scope,
@@ -190,12 +207,13 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
     scope,
     () =>
       api.growth.whatsappInbox(scope.organizationId, scope.unitId, {
-        status: inboxStatus,
+        status: needsReply ? undefined : inboxStatus,
         assignedTo: assignmentFilter,
         search: search.trim() || undefined,
+        needsReply: needsReply || undefined,
       }),
     parseCrmWhatsappInbox,
-    `${inboxStatus}:${assignmentFilter}:${search.trim()}`,
+    `${inboxStatus}:${assignmentFilter}:${search.trim()}:${needsReply}`,
   );
   const automations = useRemote(
     scope,
@@ -428,9 +446,10 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
     try {
       const page = parseCrmWhatsappInbox(
         await api.growth.whatsappInbox(scope.organizationId, scope.unitId, {
-          status: inboxStatus,
+          status: needsReply ? undefined : inboxStatus,
           assignedTo: assignmentFilter,
           search: search.trim() || undefined,
+          needsReply: needsReply || undefined,
           cursorAt: inbox.state.data.nextCursor.at,
           cursorId: inbox.state.data.nextCursor.id,
         }),
@@ -678,8 +697,17 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            <Button
+              aria-pressed={needsReply}
+              onClick={() => setNeedsReply((current) => !current)}
+              size="sm"
+              variant={needsReply ? "primary" : "secondary"}
+            >
+              Precisa responder
+            </Button>
             <NativeSelect
               aria-label="Status da conversa"
+              disabled={needsReply}
               value={inboxStatus}
               onChange={(event) =>
                 setInboxStatus(event.target.value as "open" | "pending" | "closed")
@@ -738,6 +766,9 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
                         {conversation.unreadCount > 0 ? (
                           <Badge tone="info">{conversation.unreadCount}</Badge>
                         ) : null}
+                        {conversationNeedsReply(conversation) ? (
+                          <Badge tone="warning">Responder</Badge>
+                        ) : null}
                       </span>
                     </button>
                   ))}
@@ -757,9 +788,22 @@ export function CrmWhatsappWorkspace({ scope }: { scope: GrowthScope }) {
           </RemoteGate>
         </Card>
         <Card className="crm-thread-card">
-          <h3>
-            {selected ? (selected.customerName ?? `+${selected.phone}`) : "Selecione uma conversa"}
-          </h3>
+          <div className="crm-thread-heading">
+            <h3>
+              {selected
+                ? (selected.customerName ?? `+${selected.phone}`)
+                : "Selecione uma conversa"}
+            </h3>
+            {selected?.customerId && onOpenCustomer ? (
+              <Button
+                onClick={() => onOpenCustomer(selected.customerId as string)}
+                size="sm"
+                variant="secondary"
+              >
+                Abrir Cliente 360
+              </Button>
+            ) : null}
+          </div>
           {busy === "messages" ? (
             <p role="status">Carregando mensagens…</p>
           ) : selected ? (

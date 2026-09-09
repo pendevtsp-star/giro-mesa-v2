@@ -466,6 +466,7 @@ export class PublicOrderService {
             ...prepared.amounts,
             status: "queued",
             notes: prepared.input.notes,
+            allergyNote: prepared.input.allergyNote,
           })
           .returning({ id: posOrderItems.id });
         if (!created) throw new Error("PUBLIC_ORDER_ITEM_INSERT_FAILED");

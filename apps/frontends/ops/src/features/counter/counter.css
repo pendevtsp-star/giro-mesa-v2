@@ -584,17 +584,17 @@
   }
 
   .attendance-cockpit {
-    gap: 8px;
+    gap: 6px;
   }
 
   .tab-workspace.attendance-cockpit .workspace-heading--compact {
     align-items: start;
     border-bottom: 1px solid var(--gm-border);
     display: grid;
-    gap: 12px;
+    gap: 8px;
     grid-template-columns: minmax(0, 1fr) auto;
     margin: 0 2px;
-    padding: 0 0 10px;
+    padding: 0 0 6px;
   }
 
   .tab-workspace.attendance-cockpit .workspace-heading__identity {
@@ -682,7 +682,7 @@
     gap: 3px;
     margin: 0 2px;
     overflow: visible;
-    padding: 3px;
+    padding: 2px;
   }
 
   .tab-workspace.attendance-cockpit .workspace-tabs--primary > button,
@@ -789,7 +789,7 @@
   .order-composer {
     align-items: start;
     display: grid;
-    gap: 10px 12px;
+    gap: 7px 10px;
     grid-template-columns: minmax(0, 1fr) minmax(270px, 34%);
   }
 
@@ -816,7 +816,7 @@
   }
 
   .order-composer .real-product-picker {
-    max-height: min(52dvh, 520px);
+    max-height: min(58dvh, 580px);
   }
 
   .order-composer__heading-actions {
@@ -825,6 +825,87 @@
     flex-wrap: wrap;
     gap: 8px;
     justify-content: flex-end;
+  }
+
+  .repeat-round-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .repeat-round-list > p {
+    color: var(--gm-muted);
+    margin: 0;
+  }
+
+  .repeat-round-item {
+    align-items: center;
+    border: 1px solid var(--gm-border);
+    border-radius: 10px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: auto minmax(0, 1fr) 76px;
+    min-height: 48px;
+    padding: 8px 10px;
+  }
+
+  .repeat-round-item > span {
+    display: grid;
+    min-width: 0;
+  }
+
+  .repeat-round-item small {
+    color: var(--gm-muted);
+  }
+
+  .repeat-round-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .rupture-assistant {
+    display: grid;
+    gap: 10px;
+  }
+
+  .rupture-assistant > p {
+    margin: 0;
+  }
+
+  .rupture-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .rupture-difference {
+    background: var(--gm-surface-soft);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .production-course-actions {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .production-course-actions > span {
+    align-items: center;
+    border-top: 1px solid var(--gm-border);
+    display: grid;
+    gap: 8px;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    padding-top: 8px;
+  }
+
+  .production-course-actions > span > span {
+    display: grid;
+  }
+
+  .production-course-actions small {
+    color: var(--gm-muted);
   }
 
   .dose-club-modal .gm-modal {

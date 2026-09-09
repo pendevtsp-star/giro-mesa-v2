@@ -128,6 +128,16 @@ export function salonTableIdFromHash(hash: string): string | null {
   return tableId || null;
 }
 
+export function compareSalonTableLabels(
+  left: Pick<PilotFloor["tables"][number], "id" | "label">,
+  right: Pick<PilotFloor["tables"][number], "id" | "label">,
+) {
+  return (
+    left.label.localeCompare(right.label, "pt-BR", { numeric: true, sensitivity: "base" }) ||
+    left.id.localeCompare(right.id)
+  );
+}
+
 export function requiredOperationalRevision(value: number | null, resource: "planta" | "turno") {
   if (value === null || !Number.isSafeInteger(value) || value < 1) {
     const resourceLabel = resource === "planta" ? "da planta" : "do turno";
@@ -347,6 +357,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
   const [sectionFilter, setSectionFilter] = useState(restoredViewContext.sectionFilter);
   const [query, setQuery] = useState(restoredViewContext.query);
   const [view, setView] = useState<"map" | "list">(restoredViewContext.view);
+  const [tableSort, setTableSort] = useState<"number" | "urgency">("number");
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
@@ -863,48 +874,80 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             })
           : "";
         const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
-        const filteredTables = activeTables.filter((item) => {
-          const status = displayStatus(item);
-          if (
-            filterStatus !== "all" &&
-            (filterStatus === "turnover"
-              ? status !== "needs_cleaning" && status !== "cleaning"
-              : status !== filterStatus)
-          ) {
-            return false;
-          }
-          if (roomFilter !== "all" && item.roomId !== roomFilter) return false;
-          const assignment = operationalAssignmentForTable(item.id);
-          if (
-            sectionFilter === "mine" &&
-            data.activeShift &&
-            !data.shiftSectionStaff.some(
-              (row) =>
-                row.shiftSectionId === assignment?.section.id &&
-                row.identityId === scope.identityId,
-            )
-          ) {
-            return false;
-          }
-          if (
-            sectionFilter !== "all" &&
-            sectionFilter !== "mine" &&
-            assignment?.section.id !== sectionFilter
-          ) {
-            return false;
-          }
-          if (!normalizedQuery) return true;
-          const room = data.rooms.find((candidate) => candidate.id === item.roomId)?.name ?? "";
-          const group = groupForTable(item.id);
-          const memberLabels = group
-            ? groupMembers(group.id)
-                .flatMap((id) => data.tables.find((candidate) => candidate.id === id)?.label ?? [])
-                .join(" ")
-            : "";
-          return `${item.label} ${memberLabels} ${room} ${assignment?.section.name ?? ""} ${assignment?.primary?.displayName ?? ""}`
-            .toLocaleLowerCase("pt-BR")
-            .includes(normalizedQuery);
-        });
+        const filteredTables = activeTables
+          .filter((item) => {
+            const status = displayStatus(item);
+            if (
+              filterStatus !== "all" &&
+              (filterStatus === "turnover"
+                ? status !== "needs_cleaning" && status !== "cleaning"
+                : status !== filterStatus)
+            ) {
+              return false;
+            }
+            if (roomFilter !== "all" && item.roomId !== roomFilter) return false;
+            const assignment = operationalAssignmentForTable(item.id);
+            if (
+              sectionFilter === "mine" &&
+              data.activeShift &&
+              !data.shiftSectionStaff.some(
+                (row) =>
+                  row.shiftSectionId === assignment?.section.id &&
+                  row.identityId === scope.identityId,
+              )
+            ) {
+              return false;
+            }
+            if (
+              sectionFilter !== "all" &&
+              sectionFilter !== "mine" &&
+              assignment?.section.id !== sectionFilter
+            ) {
+              return false;
+            }
+            if (!normalizedQuery) return true;
+            const room = data.rooms.find((candidate) => candidate.id === item.roomId)?.name ?? "";
+            const group = groupForTable(item.id);
+            const memberLabels = group
+              ? groupMembers(group.id)
+                  .flatMap(
+                    (id) => data.tables.find((candidate) => candidate.id === id)?.label ?? [],
+                  )
+                  .join(" ")
+              : "";
+            return `${item.label} ${memberLabels} ${room} ${assignment?.section.name ?? ""} ${assignment?.primary?.displayName ?? ""}`
+              .toLocaleLowerCase("pt-BR")
+              .includes(normalizedQuery);
+          })
+          .sort((left, right) => {
+            if (tableSort === "urgency") {
+              const priority = (item: (typeof activeTables)[number]) => {
+                const status = displayStatus(item);
+                const rank = {
+                  attention: 0,
+                  closing: 1,
+                  needs_cleaning: 2,
+                  cleaning: 3,
+                  occupied: 4,
+                  reserved: 5,
+                  available: 6,
+                }[status];
+                const call = serviceCallForTable(item.id);
+                const phase = servicePhaseForTable(item.id);
+                const since = call?.createdAt ?? phase?.since ?? item.openedAt ?? "";
+                return {
+                  rank,
+                  since: since ? new Date(since).getTime() : Number.POSITIVE_INFINITY,
+                };
+              };
+              const leftPriority = priority(left);
+              const rightPriority = priority(right);
+              const result =
+                leftPriority.rank - rightPriority.rank || leftPriority.since - rightPriority.since;
+              if (result) return result;
+            }
+            return compareSalonTableLabels(left, right);
+          });
         const counts = {
           all: activeTables.length,
           available: activeTables.filter((item) => displayStatus(item) === "available").length,
@@ -2533,7 +2576,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <summary>
                     <span>
                       <small>Fazer agora</small>
-                      <strong>Prioridades da operação</strong>
+                      <strong>Prioridades neste salão</strong>
                     </span>
                     <span className="service-priority-queue__count">
                       <strong>{priorityCount}</strong>
@@ -2900,6 +2943,27 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   >
                     <Icon name="list" size={14} />
                     <span>Lista</span>
+                  </Button>
+                </fieldset>
+                <fieldset className="salon-view-toggle salon-sort-toggle">
+                  <legend className="gm-sr-only">Ordenar mesas</legend>
+                  <Button
+                    aria-pressed={tableSort === "number"}
+                    className="gm-pill"
+                    onClick={() => setTableSort("number")}
+                    type="button"
+                    title="Ordenar pelo número ou nome da mesa"
+                  >
+                    Número
+                  </Button>
+                  <Button
+                    aria-pressed={tableSort === "urgency"}
+                    className="gm-pill"
+                    onClick={() => setTableSort("urgency")}
+                    type="button"
+                    title="Mostrar primeiro chamados, contas e limpeza"
+                  >
+                    Urgência
                   </Button>
                 </fieldset>
                 <Button

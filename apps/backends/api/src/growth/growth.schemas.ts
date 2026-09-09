@@ -36,7 +36,16 @@ const dateTime = z
   .datetime({ offset: true })
   .transform((value) => new Date(value));
 const publicGuestName = z.string().trim().min(2).max(160);
-const publicGuestPhone = z.string().trim().min(8).max(40);
+const guestPhone = z
+  .string()
+  .trim()
+  .min(8)
+  .max(40)
+  .refine((value) => {
+    const digits = value.replace(/\D/g, "");
+    return digits.length >= 10 && digits.length <= 13;
+  }, "Telefone inválido.");
+const publicGuestPhone = guestPhone;
 const publicPolicyVersion = z.string().trim().min(1).max(40);
 const couponCode = z
   .string()
@@ -246,17 +255,27 @@ export const campaignCancelSchema = z.object({
 });
 export type CampaignCancelInput = z.infer<typeof campaignCancelSchema>;
 
-export const reservationSchema = z.object({
-  unitId: id,
-  customerId: id.nullable().optional(),
-  guestName: z.string().trim().min(2).max(160),
-  guestPhone: z.string().trim().min(8).max(40).nullable().optional(),
-  partySize: z.number().int().positive().max(100),
-  scheduledAt: dateTime,
-  durationMinutes: z.number().int().min(15).max(720).default(120),
-  notes: z.string().trim().max(500).nullable().optional(),
-  idempotencyKey,
-});
+export const reservationSchema = z
+  .object({
+    unitId: id,
+    customerId: id.nullable().optional(),
+    guestName: z.string().trim().min(2).max(160),
+    guestPhone: guestPhone.nullable().optional(),
+    partySize: z.number().int().positive().max(100),
+    scheduledAt: dateTime,
+    durationMinutes: z.number().int().min(15).max(720).default(120),
+    notes: z.string().trim().max(500).nullable().optional(),
+    retroactiveReason: z.string().trim().min(10).max(500).optional(),
+    idempotencyKey,
+  })
+  .superRefine((value, context) => {
+    if (value.scheduledAt.getTime() <= Date.now() && !value.retroactiveReason)
+      context.addIssue({
+        code: "custom",
+        path: ["retroactiveReason"],
+        message: "Informe a justificativa para registrar uma reserva no passado.",
+      });
+  });
 export type ReservationInput = z.infer<typeof reservationSchema>;
 
 export const reservationListQuerySchema = z
@@ -311,7 +330,7 @@ export const waitlistSchema = z.object({
   unitId: id,
   customerId: id.nullable().optional(),
   guestName: z.string().trim().min(2).max(160),
-  guestPhone: z.string().trim().min(8).max(40).nullable().optional(),
+  guestPhone: guestPhone.nullable().optional(),
   partySize: z.number().int().positive().max(100),
   quotedWaitMinutes: z.number().int().nonnegative().max(720).nullable().optional(),
   idempotencyKey,
@@ -389,6 +408,8 @@ const deliveryOrderStatus = z.enum([
   "preparing",
   "ready",
   "dispatched",
+  "delivery_failed",
+  "returned",
   "completed",
   "canceled",
 ]);
@@ -421,9 +442,12 @@ export const deliveryOrderSchema = z.object({
 });
 export type DeliveryOrderInput = z.infer<typeof deliveryOrderSchema>;
 
-export const deliveryTransitionSchema = z.object({
-  status: deliveryOrderStatus.exclude(["draft", "dispatched"]),
-});
+export const deliveryTransitionSchema = z
+  .object({
+    status: deliveryOrderStatus.exclude(["draft", "dispatched"]),
+    reason: z.string().trim().min(10).max(500).optional(),
+  })
+  .strict();
 export type DeliveryTransitionInput = z.infer<typeof deliveryTransitionSchema>;
 
 export const dispatchSchema = z.object({
@@ -560,6 +584,9 @@ export const whatsappInboxQuerySchema = z
     status: z.enum(["open", "pending", "closed"]).optional(),
     priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
     assignedTo: z.enum(["me", "unassigned", "any"]).default("any"),
+    needsReply: z
+      .union([z.boolean(), z.enum(["true", "false"]).transform((value) => value === "true")])
+      .optional(),
     search: z.string().trim().max(120).optional(),
   })
   .refine((value) => Boolean(value.cursorAt) === Boolean(value.cursorId), {

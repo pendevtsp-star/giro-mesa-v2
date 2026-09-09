@@ -60,6 +60,13 @@ async function sha256(file: File) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+async function fileBase64(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export function RealFinancePage({ scope }: { scope: ManagementScope }) {
   const [filters, setFilters] = useState<FinanceFilters>({ page: 1, pageSize: 25 });
   const loader = useMemo(
@@ -104,7 +111,8 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
     const form = new FormData(target);
     const amountCents = currencyToCents(formText(form, "amount"));
     const installments = Number(formText(form, "installments") || 1);
-    const attachmentUrl = formText(form, "attachmentUrl");
+    const attachmentFile = form.get("attachmentFile");
+    const file = attachmentFile instanceof File && attachmentFile.size > 0 ? attachmentFile : null;
     const body = {
       description: formText(form, "description"),
       amountCents,
@@ -114,9 +122,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
       costCenter: formText(form, "costCenter") || undefined,
       documentNumber: formText(form, "documentNumber") || undefined,
       notes: formText(form, "notes") || undefined,
-      attachments: attachmentUrl
-        ? [{ name: formText(form, "attachmentName") || "Anexo", url: attachmentUrl }]
-        : [],
+      attachments: [] as Array<{ id: string; name: string }>,
       recurrence:
         installments > 1
           ? { installments, intervalMonths: Number(formText(form, "intervalMonths") || 1) }
@@ -126,8 +132,24 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
     try {
       await run(
         "create",
-        () =>
-          createDirection === "payable"
+        async () => {
+          if (file) {
+            const uploaded = (await api.management.uploadFinanceAttachment(
+              scope.organizationId,
+              scope.unitId,
+              {
+                fileName: file.name,
+                contentType: file.type,
+                contentBase64: await fileBase64(file),
+              },
+              operationalKey("finance-attachment"),
+            )) as { attachment?: { id?: string; name?: string } };
+            if (!uploaded.attachment?.id) throw new Error("O comprovante não foi armazenado.");
+            body.attachments = [
+              { id: uploaded.attachment.id, name: uploaded.attachment.name ?? file.name },
+            ];
+          }
+          return createDirection === "payable"
             ? api.management.createPayable(
                 scope.organizationId,
                 scope.unitId,
@@ -139,7 +161,8 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                 scope.unitId,
                 body,
                 operationalKey("receivable"),
-              ),
+              );
+        },
         installments > 1 ? `${installments} parcelas registradas.` : "Lançamento registrado.",
       );
       target.reset();
@@ -157,6 +180,10 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
       search: formText(form, "search"),
       from: formText(form, "from") || undefined,
       to: formText(form, "to") || undefined,
+      operationalShiftId: formText(form, "operationalShiftId") || undefined,
+      reconciliationStatus:
+        (formText(form, "reconciliationStatus") as FinanceFilters["reconciliationStatus"]) ||
+        undefined,
       page: 1,
       pageSize: 25,
     });
@@ -446,6 +473,32 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                       Até
                       <Input defaultValue={filters.to} name="to" type="date" />
                     </label>
+                    <label>
+                      Turno operacional
+                      <NativeSelect
+                        defaultValue={filters.operationalShiftId ?? ""}
+                        name="operationalShiftId"
+                      >
+                        <option value="">Todos</option>
+                        {data.operationalShifts.map((shift) => (
+                          <option key={shift.id} value={shift.id}>
+                            {shift.label} · {dateLabel(shift.startsAt)}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </label>
+                    <label>
+                      Conciliação
+                      <NativeSelect
+                        defaultValue={filters.reconciliationStatus ?? ""}
+                        name="reconciliationStatus"
+                      >
+                        <option value="">Todas</option>
+                        <option value="unmatched">Sem vínculo</option>
+                        <option value="divergent">Com divergência</option>
+                        <option value="resolved">Resolvidas</option>
+                      </NativeSelect>
+                    </label>
                     <Button size="sm" type="submit">
                       Filtrar
                     </Button>
@@ -643,13 +696,13 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                               Observações
                               <Input name="notes" />
                             </label>
-                            <label>
-                              Nome do anexo
-                              <Input name="attachmentName" placeholder="Ex.: nota fiscal" />
-                            </label>
-                            <label>
-                              URL do anexo
-                              <Input name="attachmentUrl" type="url" />
+                            <label className="finance-wide">
+                              Comprovante privado
+                              <Input
+                                accept=".pdf,.xml,.csv,.jpg,.jpeg,.png"
+                                name="attachmentFile"
+                                type="file"
+                              />
                             </label>
                           </div>
                         </details>
@@ -725,6 +778,22 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                       )}
                       reversalReason={reversalReason}
                       settlementAmount={settlementAmount}
+                      onDownloadAttachment={(attachment) => {
+                        if (attachment.id) {
+                          void api.management
+                            .financeAttachment(scope.organizationId, scope.unitId, attachment.id)
+                            .then((file) => {
+                              const url = URL.createObjectURL(file.blob);
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = file.filename ?? attachment.name;
+                              link.click();
+                              URL.revokeObjectURL(url);
+                            })
+                            .catch((error: unknown) => setFeedback(errorMessage(error)));
+                        } else if (attachment.url)
+                          window.open(attachment.url, "_blank", "noopener,noreferrer");
+                      }}
                     />
                   ) : (
                     <Card className="finance-selection">
@@ -982,6 +1051,7 @@ function EntryPanel({
   approvalNote,
   onApprovalNote,
   onDecision,
+  onDownloadAttachment,
 }: {
   entry: FinancialEntry;
   busy: string | null;
@@ -1003,6 +1073,7 @@ function EntryPanel({
   approvalNote: string;
   onApprovalNote: (value: string) => void;
   onDecision: (approvalId: string, decision: "approve" | "reject") => void;
+  onDownloadAttachment: (attachment: FinancialEntry["attachments"][number]) => void;
 }) {
   const [cashMethod, setCashMethod] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -1039,9 +1110,15 @@ function EntryPanel({
       {entry.attachments.length > 0 && (
         <div className="finance-attachments">
           {entry.attachments.map((attachment) => (
-            <a href={attachment.url} key={attachment.url} rel="noreferrer" target="_blank">
+            <Button
+              key={attachment.id ?? attachment.url ?? attachment.name}
+              onClick={() => onDownloadAttachment(attachment)}
+              size="sm"
+              type="button"
+              variant="ghost"
+            >
               {attachment.name}
-            </a>
+            </Button>
           ))}
         </div>
       )}

@@ -84,4 +84,17 @@ describe("compatibilidade e erros do serviço", () => {
       }),
     ).toBeNull();
   });
+  it("bloqueia schema anterior aos vínculos financeiros e estados de entrega", () => {
+    expect(
+      apiCompatibilityError({
+        status: "ok",
+        version: "2.0.0",
+        buildSha: "previous",
+        schemaVersion: 81,
+        capabilities: OPS_REQUIRED_API_CAPABILITIES,
+        database: "up",
+        integrations: {},
+      }),
+    ).not.toBeNull();
+  });
 });

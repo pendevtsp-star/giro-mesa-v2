@@ -462,6 +462,26 @@ export const establishmentSpecializedSettingsSummarySchema = z
   .strict();
 
 export type BusinessHoursPeriod = z.infer<typeof businessHoursPeriodSchema>;
+export const channelCheckInputSchema = z
+  .object({
+    channel: z.enum(["qr", "cash", "fiscal", "printing", "smartpos", "delivery"]),
+    status: z.enum(["passed", "failed"]),
+    evidenceReference: z.string().trim().min(10).max(500),
+    note: z.string().trim().min(10).max(1_000),
+  })
+  .strict();
+export const channelCheckSchema = z.object({
+  channel: channelCheckInputSchema.shape.channel,
+  status: z.enum(["not_tested", "passed", "failed"]),
+  evidenceReference: z.string().nullable(),
+  note: z.string().nullable(),
+  actorIdentityId: idSchema.nullable(),
+  actorDisplayName: z.string().nullable(),
+  checkedAt: z.iso.datetime({ offset: true }).nullable(),
+});
+export const channelChecksResponseSchema = z.object({ checks: z.array(channelCheckSchema) });
+export type ChannelCheckInput = z.infer<typeof channelCheckInputSchema>;
+export type ChannelCheck = z.infer<typeof channelCheckSchema>;
 export type BusinessHoursDay = z.infer<typeof businessHoursDaySchema>;
 export type BusinessHoursException = z.infer<typeof businessHoursExceptionSchema>;
 export type BusinessHours = z.infer<typeof businessHoursSchema>;
@@ -1697,6 +1717,7 @@ export const publicTableOrderSchema = z
             quantity: z.number().int().min(1).max(99),
             modifierOptionIds: z.array(z.string().uuid()).max(20).default([]),
             notes: z.string().trim().max(180).optional(),
+            allergyNote: z.string().trim().max(500).optional(),
           })
           .strict(),
       )
@@ -1704,6 +1725,40 @@ export const publicTableOrderSchema = z
       .max(50),
   })
   .strict();
+
+export const shiftHandoverSnapshotSchema = z.object({
+  capturedAt: z.string().datetime(),
+  tabs: z.array(z.object({ id: z.string().uuid(), number: z.number().int().nullable() })),
+  orders: z.array(
+    z.object({ id: z.string().uuid(), tabId: z.string().uuid(), status: z.string() }),
+  ),
+  calls: z.array(
+    z.object({
+      id: z.string().uuid(),
+      tableId: z.string().uuid(),
+      tabId: z.string().uuid().nullable(),
+    }),
+  ),
+  prints: z.array(
+    z.object({ id: z.string().uuid(), tabId: z.string().uuid().nullable(), status: z.string() }),
+  ),
+  cash: z.array(z.object({ id: z.string().uuid(), cashRegisterId: z.string().uuid() })),
+});
+export const shiftHandoverResponseSchema = z.object({
+  current: shiftHandoverSnapshotSchema,
+  lastHandover: z
+    .object({
+      id: z.string().uuid(),
+      shiftId: z.string().uuid(),
+      closedAt: z.string().datetime(),
+      closedBy: z.string().nullable(),
+      snapshot: shiftHandoverSnapshotSchema,
+      receipt: z
+        .object({ acknowledgedAt: z.string().datetime(), acknowledgedBy: z.string().nullable() })
+        .nullable(),
+    })
+    .nullable(),
+});
 
 export const publicTableSessionStatusSchema = z.enum(["awaiting_tab", "active"]);
 
@@ -1915,6 +1970,7 @@ export const publicTableOrderResponseSchema = z
           name: z.string().min(1).max(160),
           quantity: z.number().int().positive(),
           totalCents: z.number().int().nonnegative(),
+          allergyNote: z.string().max(500).optional(),
         })
         .strict(),
     ),
@@ -2033,6 +2089,7 @@ export const publicOrderSchema = z
             quantity: z.number().int().min(1).max(99),
             modifierOptionIds: z.array(z.string().uuid()).max(20).default([]),
             notes: z.string().trim().max(180).optional(),
+            allergyNote: z.string().trim().max(500).optional(),
           })
           .strict(),
       )

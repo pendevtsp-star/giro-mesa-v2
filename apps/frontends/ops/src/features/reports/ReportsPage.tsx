@@ -15,6 +15,7 @@ import { ApiClientError, api } from "../../api";
 import {
   dateLabel,
   type ManagementScope,
+  parseOverview,
   parseReportBudgets,
   parseReportDrillDown,
   parseReportExport,
@@ -87,11 +88,13 @@ function inputDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function defaultReportPeriod(now = new Date()): ReportPeriod {
-  return {
-    from: inputDate(new Date(now.getFullYear(), now.getMonth(), 1)),
-    to: inputDate(now),
-  };
+export function defaultReportPeriod(
+  now = new Date(),
+  profileId: ManagementScope["profileId"] = "finance",
+  timezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
+): ReportPeriod {
+  const today = todayInTimezone(timezone, now);
+  return { from: profileId === "finance" ? `${today.slice(0, 7)}-01` : today, to: today };
 }
 
 function shiftDate(value: string, days: number): string {
@@ -100,18 +103,18 @@ function shiftDate(value: string, days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-function todayInTimezone(timezone: string): string {
+function todayInTimezone(timezone: string, now = new Date()): string {
   try {
     const parts = new Intl.DateTimeFormat("en-CA", {
       day: "2-digit",
       month: "2-digit",
       timeZone: timezone,
       year: "numeric",
-    }).formatToParts(new Date());
+    }).formatToParts(now);
     const part = (type: string) => parts.find((entry) => entry.type === type)?.value ?? "";
     return `${part("year")}-${part("month")}-${part("day")}`;
   } catch {
-    return inputDate(new Date());
+    return inputDate(now);
   }
 }
 
@@ -266,13 +269,20 @@ function favoriteLabel(filter: ReportFilters & Partial<SavedReportFilter>): stri
 }
 
 export function RealReportsPage({ scope }: { scope: ManagementScope }) {
+  const alignDefaultTimezone = useRef(
+    typeof window === "undefined" || !reportFiltersFromUrl(new URL(window.location.href), scope),
+  );
+  const [shiftOpen, setShiftOpen] = useState(false);
   const initial = (() => {
     if (typeof window === "undefined") {
-      return { period: defaultReportPeriod(), comparisonMode: "previous_period" } as ReportFilters;
+      return {
+        period: defaultReportPeriod(new Date(), scope.profileId),
+        comparisonMode: "previous_period",
+      } as ReportFilters;
     }
     return (
       reportFiltersFromUrl(new URL(window.location.href), scope) ?? {
-        period: defaultReportPeriod(),
+        period: defaultReportPeriod(new Date(), scope.profileId),
         comparisonMode: "previous_period",
       }
     );
@@ -282,6 +292,18 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
   const [draftComparisonMode, setDraftComparisonMode] = useState(initial.comparisonMode);
   const [comparisonMode, setComparisonMode] = useState(initial.comparisonMode);
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const receiveTimezone = useCallback(
+    (unitTimezone: string) => {
+      setTimezone(unitTimezone);
+      if (alignDefaultTimezone.current) {
+        alignDefaultTimezone.current = false;
+        const next = defaultReportPeriod(new Date(), scope.profileId, unitTimezone);
+        setPeriod(next);
+        setDraftPeriod(next);
+      }
+    },
+    [scope.profileId],
+  );
   const [refreshToken, setRefreshToken] = useState(0);
   const favoritesStorageKey = `gm:reports:favorites:${scope.organizationId}:${scope.unitId}:${scope.profileId}`;
   const [savedFilters, setSavedFilters] = useState<SavedReportFilter[]>(() =>
@@ -346,6 +368,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
   }, [scope]);
 
   function commit(next: ReportFilters) {
+    alignDefaultTimezone.current = false;
     setPeriod(next.period);
     setDraftPeriod(next.period);
     setComparisonMode(next.comparisonMode);
@@ -401,7 +424,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
 
   function clearFilters() {
     const next = {
-      period: defaultReportPeriod(),
+      period: defaultReportPeriod(new Date(), scope.profileId, timezone),
       comparisonMode: "previous_period",
       family: "overview",
       analysis: "overview-managerial",
@@ -429,6 +452,11 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
         <fieldset className="reports-presets">
           <legend>Atalhos de período</legend>
           <div className="reports-presets__items">
+            {["owner", "manager"].includes(scope.profileId) && (
+              <Button onClick={() => setShiftOpen(true)} size="sm" variant="secondary">
+                Turno atual
+              </Button>
+            )}
             {(
               [
                 ["today", "Hoje"],
@@ -543,7 +571,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
         </section>
         <section aria-label="Filtros salvos" className="reports-saved-filters">
           <div className="reports-saved-filters__heading">
-            <strong>Filtros salvos</strong>
+            <strong>Favoritos deste navegador</strong>
             <small>Neste navegador</small>
           </div>
           <div className="reports-saved-filters__items">
@@ -596,7 +624,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
             type="button"
             variant="secondary"
           >
-            Salvar filtro atual
+            Favoritar neste navegador
           </Button>
           <span aria-live="polite" className="reports-favorite-status">
             {favoriteStatus}
@@ -613,12 +641,70 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
         onApplyFilters={commit}
         onFamilyChange={setActiveFamily}
         onAnalysisChange={setActiveAnalysis}
-        onTimezone={setTimezone}
+        onTimezone={receiveTimezone}
         period={period}
         refreshToken={refreshToken}
         scope={scope}
       />
+      <Modal
+        isOpen={shiftOpen}
+        onClose={() => setShiftOpen(false)}
+        title="Resumo do turno atual"
+        size="lg"
+      >
+        {shiftOpen && <ReportShiftSummary scope={scope} />}
+      </Modal>
     </div>
+  );
+}
+
+function ReportShiftSummary({ scope }: { scope: ManagementScope }) {
+  const remote = useRemote(scope, api.management.overview, parseOverview);
+  return (
+    <RemoteGate remote={remote}>
+      {(data) => (
+        <div className="growth-stack">
+          {data.activeShift ? (
+            <p>
+              <strong>{data.activeShift.label}</strong> · iniciado em{" "}
+              {new Date(data.activeShift.startsAt).toLocaleString("pt-BR")}
+            </p>
+          ) : (
+            <Callout tone="warning">
+              Sem turno operacional aberto. Os indicadores abaixo usam o período diário definido
+              pela unidade.
+            </Callout>
+          )}
+          <p>
+            Vendas desde a abertura e pendências atuais, com os mesmos critérios da Visão geral.
+            Este resumo não altera os filtros do relatório por data.
+          </p>
+          {data.unavailableSources.length > 0 && (
+            <Callout tone="warning">
+              Há fontes indisponíveis. Confira a descrição de cada indicador antes de concluir a
+              análise.
+            </Callout>
+          )}
+          {data.metrics
+            .filter((metric) => metric.source === "operations")
+            .map((metric) => (
+              <Card key={metric.id}>
+                <strong>
+                  {metric.label}: {metric.value}
+                </strong>
+                <p>{metric.detail}</p>
+              </Card>
+            ))}
+          <p>Consultado em {new Date(data.generatedAt).toLocaleString("pt-BR")}</p>
+          <div className="gm-toolbar">
+            <Button onClick={remote.retry} variant="secondary">
+              Atualizar resumo
+            </Button>
+            <a href={routeHref("dashboard")}>Abrir pendências e pré-fechamento</a>
+          </div>
+        </div>
+      )}
+    </RemoteGate>
   );
 }
 

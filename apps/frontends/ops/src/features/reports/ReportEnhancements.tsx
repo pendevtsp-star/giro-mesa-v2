@@ -970,10 +970,14 @@ export function ReportViewManager({
   return (
     <>
       <Button onClick={() => setOpen(true)} size="sm" variant="ghost">
-        Visões compartilhadas
+        Visões salvas na conta
       </Button>
-      <Modal isOpen={open} onClose={() => setOpen(false)} size="lg" title="Visões salvas">
+      <Modal isOpen={open} onClose={() => setOpen(false)} size="lg" title="Visões salvas na conta">
         <div aria-busy={busy} className="reports-enhancement-stack">
+          <p>
+            Disponíveis em outros dispositivos após entrar na conta. A visibilidade define se a
+            visão é privada ou compartilhada com a unidade ou organização.
+          </p>
           <section className="reports-view-picker">
             <label className="gm-field" htmlFor="reports-view-select">
               Visão disponível

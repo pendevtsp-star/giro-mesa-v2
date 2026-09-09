@@ -774,10 +774,20 @@ export function SettingsPage({
       )}
 
       <SetupChecklist
+        organizationId={organizationId}
         summary={specializedSummary}
         status={summaryStatus}
+        unitId={unitId}
         onRefresh={() => setSummaryRevision((value) => value + 1)}
       />
+
+      <nav aria-label="Seções das configurações" className="settings-section-nav">
+        <a href="#settings-organization">Organização</a>
+        <a href="#settings-unit">Unidade</a>
+        <a href="#settings-brand">Marca e cardápio</a>
+        <a href="#settings-hours">Horários</a>
+        <a href="#settings-specialized">Operação especializada</a>
+      </nav>
 
       <section id="settings-organization" aria-labelledby="settings-organization-title">
         <Card className="settings-card">
@@ -1494,7 +1504,7 @@ export function SettingsPage({
         </Card>
       )}
 
-      <section aria-labelledby="settings-specialized-title">
+      <section id="settings-specialized" aria-labelledby="settings-specialized-title">
         <div className="settings-section-heading">
           <h2 id="settings-specialized-title">Configurações especializadas</h2>
           <p>Cada área mantém suas regras e permissões próprias.</p>

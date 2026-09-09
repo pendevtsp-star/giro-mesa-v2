@@ -84,6 +84,8 @@ jobs:
           git diff --exit-code -- apps/backends/api/openapi packages/contracts/src/generated-api.ts
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+      - name: Verify customer order tracking
+        run: pnpm exec playwright test --config=tests/customer-tracking.config.ts
       - name: Verify production baseline manifest
         run: pnpm production:baseline
 

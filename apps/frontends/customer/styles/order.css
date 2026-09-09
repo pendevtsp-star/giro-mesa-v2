@@ -167,6 +167,7 @@ fieldset label input {
   cursor: not-allowed;
 }
 .cart-dialog {
+  margin-inline: auto;
   margin-bottom: 12px;
   align-self: end;
 }
@@ -602,6 +603,19 @@ fieldset label input {
   margin-top: 5px;
   border: 0;
   font-size: 14px;
+}
+.table-order-receipt li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.table-order-receipt li > strong {
+  white-space: nowrap;
+}
+.table-order-receipt li small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
 }
 .dialog-error {
   margin: 10px 0;

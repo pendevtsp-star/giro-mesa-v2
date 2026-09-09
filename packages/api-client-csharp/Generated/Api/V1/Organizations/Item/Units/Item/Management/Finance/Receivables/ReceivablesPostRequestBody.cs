@@ -19,10 +19,10 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         /// <summary>The attachments property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachments>? Attachments { get; set; }
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments>? Attachments { get; set; }
 #nullable restore
 #else
-        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachments> Attachments { get; set; }
+        public List<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments> Attachments { get; set; }
 #endif
         /// <summary>The category property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
@@ -124,7 +124,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "amountCents", n => { AmountCents = n.GetIntValue(); } },
-                { "attachments", n => { Attachments = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachments>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachments.CreateFromDiscriminatorValue)?.AsList(); } },
+                { "attachments", n => { Attachments = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "category", n => { Category = n.GetStringValue(); } },
                 { "competenceDate", n => { CompetenceDate = n.GetStringValue(); } },
                 { "costCenter", n => { CostCenter = n.GetStringValue(); } },
@@ -145,7 +145,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteIntValue("amountCents", AmountCents);
-            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachments>("attachments", Attachments);
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments>("attachments", Attachments);
             writer.WriteStringValue("category", Category);
             writer.WriteStringValue("competenceDate", CompetenceDate);
             writer.WriteStringValue("costCenter", CostCenter);
@@ -157,6 +157,63 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Fin
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_recurrence>("recurrence", Recurrence);
             writer.WriteGuidValue("sourceOrderId", SourceOrderId);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1"/>, <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class ReceivablesPostRequestBody_attachments : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1? ReceivablesPostRequestBodyAttachmentsMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1 ReceivablesPostRequestBodyAttachmentsMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember2? ReceivablesPostRequestBodyAttachmentsMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember2 ReceivablesPostRequestBodyAttachmentsMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody.ReceivablesPostRequestBody_attachments();
+                result.ReceivablesPostRequestBodyAttachmentsMember1 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1();
+                result.ReceivablesPostRequestBodyAttachmentsMember2 = new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(ReceivablesPostRequestBodyAttachmentsMember1 != null || ReceivablesPostRequestBodyAttachmentsMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(ReceivablesPostRequestBodyAttachmentsMember1, ReceivablesPostRequestBodyAttachmentsMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Management.Finance.Receivables.ReceivablesPostRequestBody_attachmentsMember1>(null, ReceivablesPostRequestBodyAttachmentsMember1, ReceivablesPostRequestBodyAttachmentsMember2);
+            }
         }
     }
 }

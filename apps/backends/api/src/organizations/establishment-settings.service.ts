@@ -1,5 +1,7 @@
 import type {
   BusinessHours,
+  ChannelCheck,
+  ChannelCheckInput,
   CopyUnitSettingsInput,
   EstablishmentPresentation,
   EstablishmentSettings,
@@ -49,6 +51,14 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 type StoredBranding = Record<string, unknown>;
 type SettingsSection = "unit" | "brand" | "contacts" | "hours" | "timezone";
 type PublicSettingsSection = Exclude<SettingsSection, "unit">;
+const SETTINGS_CHANNELS: ChannelCheck["channel"][] = [
+  "qr",
+  "cash",
+  "fiscal",
+  "printing",
+  "smartpos",
+  "delivery",
+];
 type HistorySnapshot = {
   unit: { name: string; timezone: string };
   presentation: Omit<EstablishmentPresentation, "wifi">;
@@ -850,6 +860,145 @@ export class EstablishmentSettingsService {
         completedService: completedService.length > 0,
       },
     };
+  }
+
+  async channelChecks(identityId: string, organizationId: string, unitId: string) {
+    await this.requireManager(identityId, organizationId, unitId);
+    const rows = await this.database.db
+      .select({
+        actorIdentityId: auditEvents.actorIdentityId,
+        actorDisplayName: identities.displayName,
+        metadata: auditEvents.metadata,
+        occurredAt: auditEvents.occurredAt,
+      })
+      .from(auditEvents)
+      .leftJoin(identities, eq(identities.id, auditEvents.actorIdentityId))
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationId),
+          eq(auditEvents.unitId, unitId),
+          eq(auditEvents.action, "settings.channel_check.recorded"),
+        ),
+      )
+      .orderBy(desc(auditEvents.occurredAt));
+    const latest = new Map<ChannelCheck["channel"], ChannelCheck>();
+    for (const row of rows) {
+      const metadata = row.metadata as Record<string, unknown>;
+      const channel = metadata.channel;
+      const status = metadata.status;
+      if (
+        !SETTINGS_CHANNELS.includes(channel as ChannelCheck["channel"]) ||
+        (status !== "passed" && status !== "failed") ||
+        latest.has(channel as ChannelCheck["channel"])
+      ) {
+        continue;
+      }
+      latest.set(channel as ChannelCheck["channel"], {
+        channel: channel as ChannelCheck["channel"],
+        status,
+        evidenceReference:
+          typeof metadata.evidenceReference === "string" ? metadata.evidenceReference : null,
+        note: typeof metadata.note === "string" ? metadata.note : null,
+        actorIdentityId: row.actorIdentityId,
+        actorDisplayName: row.actorDisplayName,
+        checkedAt: row.occurredAt.toISOString(),
+      });
+    }
+    return {
+      checks: SETTINGS_CHANNELS.map(
+        (channel): ChannelCheck =>
+          latest.get(channel) ?? {
+            channel,
+            status: "not_tested",
+            evidenceReference: null,
+            note: null,
+            actorIdentityId: null,
+            actorDisplayName: null,
+            checkedAt: null,
+          },
+      ),
+    };
+  }
+
+  async recordChannelCheck(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: ChannelCheckInput,
+  ) {
+    await this.requireManager(identityId, organizationId, unitId);
+    const key = this.requireIdempotencyKey(idempotencyKey);
+    const operation = "settings.channel_check.record";
+    const hash = requestHash(operation, { identityId, organizationId, unitId, ...input });
+    return this.database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`settings-channel-check:${organizationId}:${unitId}:${key}`}))`,
+      );
+      const [existing] = await tx
+        .select({
+          actorIdentityId: posIdempotencyReceipts.actorIdentityId,
+          operation: posIdempotencyReceipts.operation,
+          requestHash: posIdempotencyReceipts.requestHash,
+          response: posIdempotencyReceipts.response,
+        })
+        .from(posIdempotencyReceipts)
+        .where(
+          and(
+            eq(posIdempotencyReceipts.organizationId, organizationId),
+            eq(posIdempotencyReceipts.unitId, unitId),
+            eq(posIdempotencyReceipts.key, key),
+          ),
+        )
+        .limit(1);
+      const replay = replayResult<ChannelCheck>(existing, operation, hash, identityId);
+      if (replay) {
+        const { idempotentReplay: _idempotentReplay, ...response } = replay as ChannelCheck & {
+          idempotentReplay?: boolean;
+        };
+        return response;
+      }
+      const [actor] = await tx
+        .select({ displayName: identities.displayName })
+        .from(identities)
+        .where(eq(identities.id, identityId))
+        .limit(1);
+      const now = new Date();
+      const response: ChannelCheck = {
+        channel: input.channel,
+        status: input.status,
+        evidenceReference: input.evidenceReference,
+        note: input.note,
+        actorIdentityId: identityId,
+        actorDisplayName: actor?.displayName ?? null,
+        checkedAt: now.toISOString(),
+      };
+      await tx.insert(auditEvents).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        action: "settings.channel_check.recorded",
+        entityType: "settings_channel_check",
+        entityId: input.channel,
+        metadata: {
+          channel: input.channel,
+          status: input.status,
+          evidenceReference: input.evidenceReference,
+          note: input.note,
+        },
+        occurredAt: now,
+      });
+      await tx.insert(posIdempotencyReceipts).values({
+        organizationId,
+        unitId,
+        actorIdentityId: identityId,
+        key,
+        operation,
+        requestHash: hash,
+        response,
+      });
+      return response;
+    });
   }
 
   async history(identityId: string, organizationId: string, unitId: string) {

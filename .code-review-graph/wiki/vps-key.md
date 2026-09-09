@@ -21,9 +21,6 @@ Directory-based community: deploy/vps
 | recover_previous_release | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/rollback-app.sh | 211-219 |
 | views | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 6-13 |
 | valid | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/validate-buildkit-attestations.py | 16-57 |
-| read_env_key | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 44-58 |
-| release_disk_gate | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 60-128 |
-| recover_mutators | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh | 408-477 |
 
 ## Execution Flows
 
@@ -33,25 +30,24 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `docker` (25 edge(s))
-- `return` (23 edge(s))
-- `echo` (22 edge(s))
 - `isinstance` (18 edge(s))
 - `get` (13 edge(s))
-- `true` (7 edge(s))
-- `sleep` (7 edge(s))
+- `docker` (8 edge(s))
 - `bool` (7 edge(s))
-- `python3` (5 edge(s))
-- `seq` (5 edge(s))
-- `break` (5 edge(s))
-- `"${recovery_compose[@]}"` (5 edge(s))
+- `return` (6 edge(s))
+- `echo` (5 edge(s))
+- `true` (4 edge(s))
 - `"${current_compose[@]}"` (4 edge(s))
-- `ln` (3 edge(s))
-- `continue` (3 edge(s))
+- `printf` (3 edge(s))
+- `sleep` (3 edge(s))
+- `grep` (2 edge(s))
+- `ln` (2 edge(s))
+- `python3` (2 edge(s))
+- `seq` (2 edge(s))
+- `break` (2 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/deploy-pilot.sh` (12 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/rollback-app.sh` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/preserve-legacy-providers.sh` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/deploy/vps/ensure-cloudflare-dns.sh` (3 edge(s))

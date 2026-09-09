@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
   identities,
+  managementAccountsPayable,
+  managementPayablePayments,
   managementPeople,
+  managementWaiterSettlements,
   memberships,
   organizations,
   posOperationalShifts,
@@ -15,6 +18,7 @@ import {
 import { eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { ManagementService } from "./management.service.js";
 import { defaultSettlementConfig } from "./management-settlements.rules.js";
 import { ManagementSettlementsService } from "./management-settlements.service.js";
 
@@ -34,7 +38,9 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
   process.env.DATABASE_URL = databaseUrl;
   const database = new DatabaseService();
   try {
-    const service = new ManagementSettlementsService(database, new ScopeService(database));
+    const scope = new ScopeService(database);
+    const management = new ManagementService(database, scope);
+    const service = new ManagementSettlementsService(database, scope, management);
     const [organization] = await database.db
       .insert(organizations)
       .values({
@@ -145,6 +151,16 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
       .update(posTabs)
       .set({ status: "closed", closedAt: new Date("2032-04-10T23:00:00.000Z") })
       .where(eq(posTabs.id, tab.id));
+    const blocked = await service.preview(owner.id, organization.id, unit.id, {
+      from: "2032-04-10",
+      to: "2032-04-10",
+      operationalShiftId: shift.id,
+    });
+    assert.equal(blocked.blockers[0]?.code, "OPERATIONAL_SHIFT_STILL_ACTIVE");
+    await database.db
+      .update(posOperationalShifts)
+      .set({ status: "closed", closedAt: new Date("2032-04-10T23:30:00.000Z") })
+      .where(eq(posOperationalShifts.id, shift.id));
     const period = { from: "2032-04-10", to: "2032-04-10", operationalShiftId: shift.id };
     const preview = await service.preview(owner.id, organization.id, unit.id, period);
     assert.equal(preview.operationalLossCents, 6_000);
@@ -174,6 +190,117 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
       period,
     );
     assert.notEqual(replacement.id, first.id);
+    const approved = await service.transition(
+      owner.id,
+      organization.id,
+      unit.id,
+      replacement.id,
+      `approve-${randomUUID()}`,
+      { action: "approve", note: "Valores conferidos" },
+    );
+    assert.ok(approved.financePayableId);
+    await assert.rejects(
+      management.payPayable(
+        owner.id,
+        organization.id,
+        unit.id,
+        approved.financePayableId,
+        `generic-pay-${randomUUID()}`,
+        { amountCents: 1_000, method: "pix" },
+      ),
+      (error) => errorCode(error) === "WAITER_SETTLEMENT_PAYABLE_MANAGED",
+    );
+    await assert.rejects(
+      management.cancelPayable(
+        owner.id,
+        organization.id,
+        unit.id,
+        approved.financePayableId,
+        `generic-cancel-${randomUUID()}`,
+        { reason: "Tentativa fora da apuração", version: 1 },
+      ),
+      (error) => errorCode(error) === "WAITER_SETTLEMENT_PAYABLE_MANAGED",
+    );
+    await database.db.transaction((tx) =>
+      management.payPayableInTransaction(
+        tx,
+        owner.id,
+        organization.id,
+        unit.id,
+        approved.financePayableId as string,
+        `partial-pay-${randomUUID()}`,
+        { amountCents: 400, method: "pix", reference: "PARCIAL-INTERNO" },
+      ),
+    );
+    await assert.rejects(
+      service.transition(
+        owner.id,
+        organization.id,
+        unit.id,
+        replacement.id,
+        `cancel-partial-${randomUUID()}`,
+        { action: "cancel", note: "Não deve cancelar após pagamento" },
+      ),
+      (error) => errorCode(error) === "WAITER_SETTLEMENT_PAYABLE_ALREADY_USED",
+    );
+    const paid = await service.transition(
+      owner.id,
+      organization.id,
+      unit.id,
+      replacement.id,
+      `pay-${randomUUID()}`,
+      {
+        action: "pay",
+        note: "Pix confirmado",
+        paymentMethod: "pix",
+        paymentReference: "PIX-2032-04-10",
+      },
+    );
+    assert.equal(paid.paymentMethod, "pix");
+    const [persistedSettlement] = await database.db
+      .select()
+      .from(managementWaiterSettlements)
+      .where(eq(managementWaiterSettlements.id, replacement.id));
+    assert.ok(persistedSettlement?.financePayableId);
+    const [payable] = await database.db
+      .select()
+      .from(managementAccountsPayable)
+      .where(eq(managementAccountsPayable.id, persistedSettlement.financePayableId));
+    assert.equal(payable?.status, "paid");
+    assert.equal(payable?.amountCents, 1_000);
+    const [payment] = await database.db
+      .select()
+      .from(managementPayablePayments)
+      .where(eq(managementPayablePayments.id, persistedSettlement.financePaymentId as string));
+    assert.equal(payment?.reference, "PIX-2032-04-10");
+
+    await database.db
+      .update(managementWaiterSettlements)
+      .set({
+        status: "approved",
+        approvedAt: new Date("2032-04-11T00:00:00.000Z"),
+        approvedByIdentityId: owner.id,
+        approvalNote: "Apuração aprovada antes do vínculo financeiro",
+        canceledAt: null,
+        canceledByIdentityId: null,
+        cancellationNote: null,
+      })
+      .where(eq(managementWaiterSettlements.id, first.id));
+    const legacyPaid = await service.transition(
+      owner.id,
+      organization.id,
+      unit.id,
+      first.id,
+      `legacy-pay-${randomUUID()}`,
+      {
+        action: "pay",
+        note: "Liquidação de apuração legada",
+        paymentMethod: "bank_transfer",
+        paymentReference: "LEGADO-2032-04-10",
+      },
+    );
+    assert.ok(legacyPaid.financePayableId);
+    assert.ok(legacyPaid.financePaymentId);
   } finally {
     await database.onModuleDestroy();
   }

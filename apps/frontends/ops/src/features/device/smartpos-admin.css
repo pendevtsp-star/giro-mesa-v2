@@ -217,6 +217,12 @@
   overflow-wrap: anywhere;
 }
 
+.smartpos-incident-actions {
+  align-items: flex-end;
+  gap: var(--gm-space-2);
+  justify-items: end;
+}
+
 .smartpos-device-list > article {
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
@@ -350,6 +356,20 @@
   .smartpos-run-list > li,
   .smartpos-device-list > article > header {
     align-items: flex-start;
+  }
+
+  .smartpos-incident-list > li {
+    flex-direction: column;
+  }
+
+  .smartpos-incident-actions {
+    align-items: flex-start;
+    justify-items: start;
+    width: 100%;
+  }
+
+  .smartpos-incident-actions .gm-button {
+    width: 100%;
   }
 
   .smartpos-admin-card {

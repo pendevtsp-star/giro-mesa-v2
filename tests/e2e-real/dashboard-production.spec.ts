@@ -22,7 +22,7 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
         status: "ok",
         version: "2.0.0",
         buildSha: "dashboard-e2e",
-        schemaVersion: 79,
+        schemaVersion: 82,
         database: "up",
         integrations: {},
         capabilities: [
@@ -226,7 +226,7 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
         status: "ok",
         version: "2.0.0",
         buildSha: "platform-e2e",
-        schemaVersion: 79,
+        schemaVersion: 82,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -309,6 +309,8 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
       resolvedAt: null,
       reason: null,
       ageMinutes: 30,
+      impact: "billing",
+      criterion: "tópico billing.sync",
     };
     const payload =
       pathname === "/v1/auth/me"
@@ -628,6 +630,80 @@ test("topbar mantém o relógio alinhado à virada do minuto e à retomada da ab
   await page.clock.setSystemTime(new Date("2026-08-21T20:45:15.000Z"));
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(clock).toHaveText("17:45");
+});
+
+test("passagem de turno preserva ciência após falha e mostra todas as pendências em 375 px", async ({
+  page,
+}, testInfo) => {
+  await mockDashboardApi(page, profiles[0]);
+  const id = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const snapshot = {
+    capturedAt: "2026-09-09T18:00:00.000Z",
+    tabs: [{ id, number: 123 }],
+    orders: [{ id, tabId: id, status: "ready" }],
+    calls: [{ id, tableId: id, tabId: id }],
+    prints: [{ id, tabId: id, status: "confirmation_required" }],
+    cash: [{ id, cashRegisterId: id }],
+  };
+  let receipt: { acknowledgedAt: string; acknowledgedBy: string } | null = null;
+  const keys: string[] = [];
+  await page.route("**/pilot/shift-handover", (route) =>
+    route.fulfill({
+      json: {
+        current: snapshot,
+        lastHandover: {
+          id,
+          shiftId: id,
+          closedAt: snapshot.capturedAt,
+          closedBy: "Gestora anterior",
+          snapshot,
+          receipt,
+        },
+      },
+    }),
+  );
+  await page.route("**/pilot/shift-handover/*/acknowledge", async (route) => {
+    keys.push(route.request().headers()["idempotency-key"] ?? "");
+    if (keys.length === 1)
+      return route.fulfill({ status: 503, json: { message: "Resposta indisponível" } });
+    receipt = { acknowledgedAt: "2026-09-09T18:10:00.000Z", acknowledgedBy: "Gestora atual" };
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/#/dashboard");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.getByText("Pré-fechamento e passagem de turno", { exact: true }).click();
+  await page.getByText("Conferir pendências registradas", { exact: true }).click();
+  await expect(page.getByRole("link", { name: "Comanda 123" })).toHaveAttribute(
+    "href",
+    `#/counter?tab=${id}`,
+  );
+  await expect(page.getByRole("link", { name: "Impressão aaaaaaaa a conferir" })).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Divergência no fechamento aaaaaaaa" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar minha ciência" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Não foi possível confirmar a ciência" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Confirmar minha ciência" }).click();
+  await expect(page.getByText(/Ciência de Gestora atual/)).toBeVisible();
+  expect(keys).toHaveLength(2);
+  expect(keys[0]).not.toBe("");
+  expect(keys[1]).toBe(keys[0]);
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute("data-theme", value),
+      theme,
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`handover-375-${theme}.png`),
+      fullPage: true,
+    });
+  }
 });
 
 for (const profile of profiles) {

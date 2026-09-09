@@ -28,6 +28,7 @@ import {
 import { formatMoney } from "../../rules";
 
 import { TabWorkspace } from "./CounterWorkspace";
+import { isValidOperationalPhone } from "./contact";
 import { quickOrderPromisedAtToIso } from "./promisedAt";
 
 export type CounterQueueStage =
@@ -50,7 +51,6 @@ const counterQueueLabels: Record<CounterQueueStage, string> = {
 };
 
 const counterQueueStages = ["new", "production", "ready", "waiting", "delivered", "late"] as const;
-const counterPhonePattern = /^\+?[0-9 ()-]{8,30}$/;
 const counterStageOrder: CounterQueueStage[] = [
   "all",
   "late",
@@ -121,13 +121,19 @@ export interface CounterQueueResponse {
 }
 
 export function isValidCounterPhone(value: string) {
-  return value.trim().length === 0 || counterPhonePattern.test(value.trim());
+  return isValidOperationalPhone(value);
 }
 
 export function counterTabIdFromHash(hash: string): string | null {
   const query = hash.split("?")[1];
   const tabId = query ? new URLSearchParams(query).get("tab")?.trim() : undefined;
   return tabId || null;
+}
+
+export function counterPaymentAttemptIdFromHash(hash: string): string | null {
+  const query = hash.split("?")[1];
+  const attemptId = query ? new URLSearchParams(query).get("paymentAttempt")?.trim() : undefined;
+  return attemptId || null;
 }
 
 export function counterCustomerOptionValue(customer: Pick<Customer, "name" | "phone" | "email">) {
@@ -189,6 +195,9 @@ export function RealCounterPage({
   const [selected, setSelected] = useState<string | null>(() =>
     typeof window === "undefined" ? null : counterTabIdFromHash(window.location.hash),
   );
+  const [paymentAttemptId, setPaymentAttemptId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : counterPaymentAttemptIdFromHash(window.location.hash),
+  );
   const panelRef = useRef<HTMLElement>(null);
   const overviewRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -208,9 +217,11 @@ export function RealCounterPage({
     const params = new URLSearchParams(query);
     if (tabId) params.set("tab", tabId);
     else params.delete("tab");
+    params.delete("paymentAttempt");
     url.hash = params.size ? `${route}?${params}` : route;
     window.history.replaceState(window.history.state, "", url);
     setSelected(tabId);
+    setPaymentAttemptId(null);
   }
 
   const [label, setLabel] = useState("");
@@ -253,6 +264,7 @@ export function RealCounterPage({
     const syncSelectedTab = () => {
       const tabId = counterTabIdFromHash(window.location.hash);
       setSelected(tabId);
+      setPaymentAttemptId(counterPaymentAttemptIdFromHash(window.location.hash));
     };
     window.addEventListener("hashchange", syncSelectedTab);
     return () => window.removeEventListener("hashchange", syncSelectedTab);
@@ -959,6 +971,7 @@ export function RealCounterPage({
                     <Icon name="x" size={16} /> Voltar para a fila
                   </Button>
                   <TabWorkspace
+                    initialPaymentAttemptId={paymentAttemptId}
                     key={selected}
                     scope={scope}
                     tabId={selected}

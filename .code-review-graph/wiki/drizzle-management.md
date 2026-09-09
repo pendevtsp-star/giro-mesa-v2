@@ -63,7 +63,7 @@ Directory-based community: packages/db
 | growth_webhook_endpoints | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0004_complete-product.sql | 316-326 |
 | growth_webhook_publications | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0004_complete-product.sql | 328-337 |
 
-*... and 272 more members.*
+*... and 271 more members.*
 
 ## Execution Flows
 

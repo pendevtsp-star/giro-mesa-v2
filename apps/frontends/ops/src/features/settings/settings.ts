@@ -2,7 +2,9 @@ import type {
   BusinessHours,
   BusinessHoursDay,
   BusinessHoursException,
+  ChannelCheck,
   EstablishmentSettings,
+  EstablishmentSpecializedSettingsSummary,
   UpdateUnitSettingsInput,
 } from "@giromesa/contracts";
 
@@ -313,6 +315,67 @@ function imageFileError(file: Pick<File, "size" | "type">, label: string): strin
 export const logoFileError = (file: Pick<File, "size" | "type">) => imageFileError(file, "A logo");
 export const coverFileError = (file: Pick<File, "size" | "type">) =>
   imageFileError(file, "A foto de capa");
+
+export function setupChannelChecks(summary: EstablishmentSpecializedSettingsSummary): Array<{
+  id: ChannelCheck["channel"];
+  label: string;
+  ready: boolean | null;
+  detail: string;
+  href: "table-qrs" | "cash" | "fiscal" | "device" | "delivery";
+}> {
+  const setup = summary.setup;
+  return [
+    {
+      id: "qr",
+      label: "Cardápio público e QR",
+      ready: summary.catalog.active,
+      detail: summary.catalog.active
+        ? `Cardápio publicado${summary.catalog.publishedVersion ? ` na versão ${summary.catalog.publishedVersion}` : ""}. Confira a jornada no celular do cliente.`
+        : "Publique depois de conferir produtos, preços e disponibilidade.",
+      href: "table-qrs",
+    },
+    {
+      id: "cash",
+      label: "Caixa e recebimentos",
+      ready: summary.cash.configured,
+      detail: summary.cash.configured
+        ? "Configuração de caixa registrada. Faça uma venda e uma conferência reais antes do turno."
+        : "Conclua a configuração de caixa e meios aceitos nesta unidade.",
+      href: "cash",
+    },
+    {
+      id: "fiscal",
+      label: "Emissão fiscal",
+      ready: summary.fiscal.configured,
+      detail: summary.fiscal.configured
+        ? "Configuração fiscal registrada. A autorização do provedor ainda precisa ser testada."
+        : "Defina a operação fiscal antes de emitir documentos.",
+      href: "fiscal",
+    },
+    {
+      id: "printing",
+      label: "Impressão e continuidade",
+      ready: Boolean(setup && setup.activePrinters > 0),
+      detail: `${setup?.activePrinters ?? 0} impressora(s) configurada(s). Teste papel, corte e operação sem internet no equipamento da casa.`,
+      href: "device",
+    },
+    {
+      id: "smartpos",
+      label: "SmartPOS",
+      ready: summary.devices.activeCount > 0,
+      detail: `${summary.devices.activeCount} dispositivo(s) ativo(s). Cadastro não confirma pareamento ou comunicação no balcão.`,
+      href: "device",
+    },
+    {
+      id: "delivery",
+      label: "Delivery",
+      ready: null,
+      detail:
+        "A conferência manual registra pedido, expedição, entrega e cobrança testados ponta a ponta.",
+      href: "delivery",
+    },
+  ];
+}
 
 export async function mediaPayload(file: File) {
   const dataUrl = await new Promise<string>((resolve, reject) => {

@@ -58,6 +58,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations
 #endif
         /// <summary>The partySize property</summary>
         public int? PartySize { get; set; }
+        /// <summary>The retroactiveReason property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? RetroactiveReason { get; set; }
+#nullable restore
+#else
+        public string RetroactiveReason { get; set; }
+#endif
         /// <summary>The scheduledAt property</summary>
         public DateTimeOffset? ScheduledAt { get; set; }
         /// <summary>The unitId property</summary>
@@ -95,6 +103,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations
                 { "idempotencyKey", n => { IdempotencyKey = n.GetStringValue(); } },
                 { "notes", n => { Notes = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations.ReservationsPostRequestBody.ReservationsPostRequestBody_notes>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations.ReservationsPostRequestBody.ReservationsPostRequestBody_notes.CreateFromDiscriminatorValue); } },
                 { "partySize", n => { PartySize = n.GetIntValue(); } },
+                { "retroactiveReason", n => { RetroactiveReason = n.GetStringValue(); } },
                 { "scheduledAt", n => { ScheduledAt = n.GetDateTimeOffsetValue(); } },
                 { "unitId", n => { UnitId = n.GetGuidValue(); } },
             };
@@ -113,6 +122,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations
             writer.WriteStringValue("idempotencyKey", IdempotencyKey);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations.ReservationsPostRequestBody.ReservationsPostRequestBody_notes>("notes", Notes);
             writer.WriteIntValue("partySize", PartySize);
+            writer.WriteStringValue("retroactiveReason", RetroactiveReason);
             writer.WriteDateTimeOffsetValue("scheduledAt", ScheduledAt);
             writer.WriteGuidValue("unitId", UnitId);
             writer.WriteAdditionalData(AdditionalData);

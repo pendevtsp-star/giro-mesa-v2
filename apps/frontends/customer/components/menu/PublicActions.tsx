@@ -23,6 +23,7 @@ export function PublicActions({
   onToggleConsumption,
   onRefreshConsumption,
   onOpenTableOrder,
+  trackingTableOrder = false,
   onPresenceCodeChange,
   onConfirmPresence,
 }: {
@@ -46,6 +47,7 @@ export function PublicActions({
   onToggleConsumption: () => void;
   onRefreshConsumption: () => void;
   onOpenTableOrder: () => void;
+  trackingTableOrder?: boolean;
   onPresenceCodeChange: (value: string) => void;
   onConfirmPresence: () => void;
 }) {
@@ -134,7 +136,7 @@ export function PublicActions({
               </Button>
               <Button type="button" disabled={!capabilities.placeOrder} onClick={onOpenTableOrder}>
                 <span aria-hidden="true">＋</span>
-                Pedir na mesa
+                {trackingTableOrder ? "Acompanhar pedido" : "Pedir na mesa"}
               </Button>
             </div>
             {!activeTab && (

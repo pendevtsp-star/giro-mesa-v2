@@ -226,3 +226,31 @@ export function outstandingCharge(summary: BillingSummary) {
   const settled = new Set(["paid", "received", "confirmed", "refunded", "canceled"]);
   return summary.charges.find((charge) => !settled.has(charge.status.toLowerCase())) ?? null;
 }
+
+export function billingChargeDueLabel(dueAt: string, now: Date = new Date()) {
+  const due = new Date(dueAt);
+  if (Number.isNaN(due.getTime())) return "Vencimento inválido";
+  const localDay = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const days = Math.round((localDay(due) - localDay(now)) / 86_400_000);
+  if (days === 0) return "Vence hoje";
+  if (days === 1) return "Vence amanhã";
+  if (days > 1) return `Vence em ${days} dias`;
+  if (days === -1) return "Venceu ontem";
+  return `Vencida há ${Math.abs(days)} dias`;
+}
+
+export function billingDocumentHref(paymentUrl: string | null) {
+  if (!paymentUrl) return null;
+  try {
+    const url = new URL(paymentUrl);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function billingDocumentLabel(status: string) {
+  return ["paid", "received", "confirmed", "refunded"].includes(status.toLowerCase())
+    ? "Consultar pagamento no provedor"
+    : "Abrir cobrança";
+}

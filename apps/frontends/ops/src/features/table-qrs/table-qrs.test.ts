@@ -5,6 +5,7 @@ import {
   selectedTableQrs,
   tableQrContrast,
   tableQrFilename,
+  tableQrReplacementWarning,
   tableQrTestMessage,
 } from "./table-qrs";
 import { buildTableQrPrintHtml, createTableQrPdf, tableQrLayout } from "./table-qrs.print";
@@ -143,6 +144,19 @@ describe("QR das mesas", () => {
       }),
     ).toBe(false);
     expect(tableQrFilename("Mesa São João", "png")).toBe("qr-mesa-sao-joao.png");
+  });
+
+  it("explica o impacto operacional antes de substituir um código ativo", () => {
+    const warning = tableQrReplacementWarning({
+      label: "Mesa 12",
+      tokenVersion: 7,
+      scanCount: 31,
+    });
+    expect(warning).toContain("Mesa 12");
+    expect(warning).toContain("versão 7");
+    expect(warning).toContain("31 leitura(s)");
+    expect(warning).toContain("deixará de funcionar imediatamente");
+    expect(warning).toContain("gerar, conferir e imprimir");
   });
 
   it("falha explicitamente ao gerar PDF sem mesas", async () => {

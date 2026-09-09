@@ -26,12 +26,18 @@ import {
   inventoryTransfers,
   loyaltyLedger,
   loyaltyPrograms,
+  managementCashRegisters,
+  managementCashShifts,
   marketingCampaigns,
   marketingOptOutTokens,
   memberships,
   operationalCommands,
   outboxEvents,
+  posKdsTickets,
   posPaymentReversals,
+  posProductAvailability,
+  posProductionStations,
+  posProducts,
   posTabCustomerLinks,
   posTabPayments,
   posTabs,
@@ -2776,6 +2782,7 @@ export class GrowthService {
           metadata: {
             partySize: row.partySize,
             scheduledAt: row.scheduledAt.toISOString(),
+            ...(input.retroactiveReason ? { retroactiveReason: input.retroactiveReason } : {}),
             ...(publicContext ?? {}),
           },
         });
@@ -3509,9 +3516,17 @@ export class GrowthService {
       .select({
         order: deliveryOrders,
         zoneName: deliveryZones.name,
-        courierReference: sql<
-          string | null
-        >`coalesce(${deliveryCouriers.reference}, ${deliveryDispatches.courierReference})`,
+        courierReference: sql<string | null>`coalesce(
+          ${deliveryCouriers.reference},
+          (
+            select dispatch.courier_reference
+            from growth_delivery_dispatches dispatch
+            where dispatch.organization_id = ${deliveryOrders.organizationId}
+              and dispatch.delivery_order_id = ${deliveryOrders.id}
+            order by dispatch.assigned_at desc, dispatch.id desc
+            limit 1
+          )
+        )`,
         courierStatus: deliveryCouriers.status,
         lastLatitude: deliveryCouriers.lastLatitude,
         lastLongitude: deliveryCouriers.lastLongitude,
@@ -3530,13 +3545,6 @@ export class GrowthService {
         and(
           eq(deliveryCouriers.organizationId, deliveryOrders.organizationId),
           eq(deliveryCouriers.id, deliveryOrders.courierId),
-        ),
-      )
-      .leftJoin(
-        deliveryDispatches,
-        and(
-          eq(deliveryDispatches.organizationId, deliveryOrders.organizationId),
-          eq(deliveryDispatches.deliveryOrderId, deliveryOrders.id),
         ),
       )
       .where(
@@ -3574,12 +3582,14 @@ export class GrowthService {
       .orderBy(
         sql`case ${deliveryOrders.status}
           when 'placed' then 0
-          when 'confirmed' then 1
-          when 'preparing' then 2
-          when 'ready' then 3
-          when 'dispatched' then 4
-          when 'draft' then 5
-          when 'completed' then 6
+          when 'delivery_failed' then 1
+          when 'confirmed' then 2
+          when 'preparing' then 3
+          when 'ready' then 4
+          when 'dispatched' then 5
+          when 'draft' then 6
+          when 'completed' then 7
+          when 'returned' then 8
           else 7
         end`,
         asc(sql`case
@@ -4095,20 +4105,48 @@ export class GrowthService {
         code: "DELIVERY_DISPATCH_ENDPOINT_REQUIRED",
         message: "Use o endpoint de despacho para iniciar a entrega.",
       });
-    if (!canTransition(deliveryTransitions, current.status, input.status))
-      throw new ConflictException({
-        code: "INVALID_DELIVERY_TRANSITION",
-        message: "Transição inválida.",
-      });
     return this.database.db.transaction(async (tx) => {
+      const [locked] = await tx
+        .select()
+        .from(deliveryOrders)
+        .where(
+          and(eq(deliveryOrders.organizationId, organizationId), eq(deliveryOrders.id, orderId)),
+        )
+        .for("update")
+        .limit(1);
+      if (!locked)
+        throw new NotFoundException({
+          code: "DELIVERY_ORDER_NOT_FOUND",
+          message: "Pedido não encontrado.",
+        });
+      if (!canTransition(deliveryTransitions, locked.status, input.status))
+        throw new ConflictException({
+          code: "INVALID_DELIVERY_TRANSITION",
+          message: "Transição inválida.",
+        });
+      const reason = input.reason?.trim() || null;
+      const exceptionalTransition =
+        input.status === "delivery_failed" ||
+        (locked.status === "delivery_failed" && ["ready", "returned"].includes(input.status));
+      if (exceptionalTransition && !reason)
+        throw new BadRequestException({
+          code: "DELIVERY_TRANSITION_REASON_REQUIRED",
+          message: "Informe o motivo da falha, nova tentativa ou devolução.",
+        });
+      const returnsToDispatchQueue =
+        locked.status === "delivery_failed" && input.status === "ready";
       const [updated] = await tx
         .update(deliveryOrders)
-        .set({ status: input.status, updatedAt: new Date() })
+        .set({
+          status: input.status,
+          ...(returnsToDispatchQueue ? { courierId: null, courierAssignedAt: null } : {}),
+          updatedAt: new Date(),
+        })
         .where(
           and(
             eq(deliveryOrders.organizationId, organizationId),
             eq(deliveryOrders.id, orderId),
-            eq(deliveryOrders.status, current.status),
+            eq(deliveryOrders.status, locked.status),
           ),
         )
         .returning();
@@ -4119,39 +4157,67 @@ export class GrowthService {
         });
       await tx.insert(deliveryOrderStatusHistory).values({
         organizationId,
-        unitId: current.unitId,
+        unitId: locked.unitId,
         deliveryOrderId: orderId,
-        fromStatus: current.status,
+        fromStatus: locked.status,
         toStatus: input.status,
         actorIdentityId: identityId,
-        metadata: { source: "manual_transition" },
+        metadata: { source: "manual_transition", ...(reason ? { reason } : {}) },
       });
-      if (current.courierId && (input.status === "completed" || input.status === "canceled")) {
+      if (
+        locked.courierId &&
+        (["completed", "canceled", "returned"].includes(input.status) || returnsToDispatchQueue)
+      ) {
         await tx
           .update(deliveryCouriers)
           .set({ status: "available", updatedAt: new Date() })
           .where(
             and(
               eq(deliveryCouriers.organizationId, organizationId),
-              eq(deliveryCouriers.id, current.courierId),
+              eq(deliveryCouriers.id, locked.courierId),
               inArray(deliveryCouriers.status, ["assigned", "delivering"]),
+            ),
+          );
+      }
+      if (["completed", "delivery_failed", "returned"].includes(input.status)) {
+        const now = new Date();
+        await tx
+          .update(deliveryDispatches)
+          .set({
+            status: input.status,
+            ...(input.status === "completed" ? { completedAt: now } : {}),
+            updatedAt: now,
+          })
+          .where(
+            and(
+              eq(deliveryDispatches.organizationId, organizationId),
+              eq(deliveryDispatches.deliveryOrderId, orderId),
+              eq(deliveryDispatches.status, "assigned"),
             ),
           );
       }
       await this.audit(tx, {
         organizationId,
-        unitId: current.unitId,
+        unitId: locked.unitId,
         identityId,
         action: "growth.delivery_order.transitioned",
         entityType: "growth_delivery_order",
         entityId: orderId,
-        metadata: { from: current.status, to: input.status },
+        metadata: {
+          from: locked.status,
+          to: input.status,
+          paymentStatus: locked.paymentStatus,
+          paymentMethod: locked.paymentMethod,
+          totalCents: locked.totalCents,
+          ...(reason ? { reason } : {}),
+        },
       });
       await this.outbox(tx, "growth.delivery_order_changed", "growth_delivery_order", orderId, {
         organizationId,
-        unitId: current.unitId,
-        from: current.status,
+        unitId: locked.unitId,
+        from: locked.status,
         to: input.status,
+        ...(reason ? { reason } : {}),
       });
       return updated;
     });
@@ -4527,13 +4593,53 @@ export class GrowthService {
   }
 
   async consolidatedSummary(identityId: string, organizationId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, FINANCIAL_READERS);
+    const roleBindings = await this.scope.requireOrganizationRole(
+      identityId,
+      organizationId,
+      FINANCIAL_READERS,
+    );
+    const financialBindings = roleBindings.filter((binding) =>
+      FINANCIAL_READERS.includes(binding.role as (typeof FINANCIAL_READERS)[number]),
+    );
+    const hasOrganizationAccess = financialBindings.some((binding) => binding.unitId === null);
+    const permittedUnitIds = financialBindings.flatMap((binding) =>
+      binding.unitId ? [binding.unitId] : [],
+    );
     const organizationUnits = await this.database.db
-      .select({ id: units.id, name: units.name })
+      .select({ id: units.id, name: units.name, timezone: units.timezone })
       .from(units)
-      .where(and(eq(units.organizationId, organizationId), eq(units.active, true)))
+      .where(
+        and(
+          eq(units.organizationId, organizationId),
+          eq(units.active, true),
+          hasOrganizationAccess ? undefined : inArray(units.id, permittedUnitIds),
+        ),
+      )
       .orderBy(asc(units.name));
-    const [deliveryRows, reservationRows, waitlistRows, transferRows] = await Promise.all([
+    const authorizedUnitIds = organizationUnits.map((unit) => unit.id);
+    if (authorizedUnitIds.length === 0) {
+      return {
+        organizationId,
+        generatedAt: new Date(),
+        units: [],
+        transfersByStatus: {},
+        disclaimer:
+          "Resumo operacional baseado apenas em registros persistidos; não substitui conciliação financeira.",
+      };
+    }
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const [
+      deliveryRows,
+      reservationRows,
+      waitlistRows,
+      transferRows,
+      cashRegisterRows,
+      cashShiftRows,
+      productionCoverageRows,
+      delayRows,
+      availabilityRows,
+    ] = await Promise.all([
       this.database.db
         .select({
           unitId: deliveryOrders.unitId,
@@ -4543,6 +4649,7 @@ export class GrowthService {
         .where(
           and(
             eq(deliveryOrders.organizationId, organizationId),
+            inArray(deliveryOrders.unitId, authorizedUnitIds),
             eq(deliveryOrders.status, "completed"),
           ),
         )
@@ -4553,6 +4660,7 @@ export class GrowthService {
         .where(
           and(
             eq(reservations.organizationId, organizationId),
+            inArray(reservations.unitId, authorizedUnitIds),
             inArray(reservations.status, ["booked", "confirmed", "seated"]),
           ),
         )
@@ -4563,6 +4671,7 @@ export class GrowthService {
         .where(
           and(
             eq(waitlistEntries.organizationId, organizationId),
+            inArray(waitlistEntries.unitId, authorizedUnitIds),
             inArray(waitlistEntries.status, ["waiting", "notified"]),
           ),
         )
@@ -4570,24 +4679,173 @@ export class GrowthService {
       this.database.db
         .select({ status: inventoryTransfers.status, total: count() })
         .from(inventoryTransfers)
-        .where(eq(inventoryTransfers.organizationId, organizationId))
+        .where(
+          and(
+            eq(inventoryTransfers.organizationId, organizationId),
+            or(
+              inArray(inventoryTransfers.originUnitId, authorizedUnitIds),
+              inArray(inventoryTransfers.destinationUnitId, authorizedUnitIds),
+            ),
+          ),
+        )
         .groupBy(inventoryTransfers.status),
+      this.database.db
+        .select({ unitId: managementCashRegisters.unitId, total: count() })
+        .from(managementCashRegisters)
+        .where(
+          and(
+            eq(managementCashRegisters.organizationId, organizationId),
+            inArray(managementCashRegisters.unitId, authorizedUnitIds),
+            eq(managementCashRegisters.active, true),
+          ),
+        )
+        .groupBy(managementCashRegisters.unitId),
+      this.database.db
+        .select({
+          unitId: managementCashShifts.unitId,
+          openShifts:
+            sql<number>`count(*) filter (where ${managementCashShifts.status} = 'open')`.mapWith(
+              Number,
+            ),
+          openSince: sql<Date | null>`min(${managementCashShifts.openedAt}) filter (where ${managementCashShifts.status} = 'open')`,
+          lastDifferenceCents: sql<
+            number | null
+          >`(array_agg(${managementCashShifts.differenceCents} order by ${managementCashShifts.closedAt} desc) filter (where ${managementCashShifts.status} in ('closed', 'reviewed')))[1]`,
+        })
+        .from(managementCashShifts)
+        .where(
+          and(
+            eq(managementCashShifts.organizationId, organizationId),
+            inArray(managementCashShifts.unitId, authorizedUnitIds),
+          ),
+        )
+        .groupBy(managementCashShifts.unitId),
+      this.database.db
+        .select({ unitId: posProductionStations.unitId, total: count() })
+        .from(posProductionStations)
+        .where(
+          and(
+            eq(posProductionStations.organizationId, organizationId),
+            inArray(posProductionStations.unitId, authorizedUnitIds),
+            eq(posProductionStations.active, true),
+            inArray(posProductionStations.deliveryMode, ["kds_only", "both"]),
+          ),
+        )
+        .groupBy(posProductionStations.unitId),
+      this.database.db
+        .select({
+          unitId: posKdsTickets.unitId,
+          total:
+            sql<number>`count(*) filter (where coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + interval '15 minutes') < ${nowIso}::timestamptz)`.mapWith(
+              Number,
+            ),
+          oldestMinutes: sql<
+            number | null
+          >`max(floor(extract(epoch from (${nowIso}::timestamptz - coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + interval '15 minutes'))) / 60)) filter (where coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + interval '15 minutes') < ${nowIso}::timestamptz)`.mapWith(
+            Number,
+          ),
+        })
+        .from(posKdsTickets)
+        .where(
+          and(
+            eq(posKdsTickets.organizationId, organizationId),
+            inArray(posKdsTickets.unitId, authorizedUnitIds),
+            inArray(posKdsTickets.status, ["pending", "preparing"]),
+          ),
+        )
+        .groupBy(posKdsTickets.unitId),
+      this.database.db
+        .select({
+          unitId: posProductAvailability.unitId,
+          configured: count(),
+          total:
+            sql<number>`count(*) filter (where (not ${posProductAvailability.available} and (${posProductAvailability.operationalResetAt} is null or ${posProductAvailability.operationalResetAt} > ${nowIso}::timestamptz)) or (${posProductAvailability.dailyStock} is not null and ${posProductAvailability.stockDate} = timezone(${units.timezone}, ${nowIso}::timestamptz)::date and ${posProductAvailability.soldToday} >= ${posProductAvailability.dailyStock}))`.mapWith(
+              Number,
+            ),
+        })
+        .from(posProductAvailability)
+        .innerJoin(
+          posProducts,
+          and(
+            eq(posProducts.organizationId, posProductAvailability.organizationId),
+            eq(posProducts.id, posProductAvailability.productId),
+          ),
+        )
+        .innerJoin(
+          units,
+          and(
+            eq(units.organizationId, posProductAvailability.organizationId),
+            eq(units.id, posProductAvailability.unitId),
+          ),
+        )
+        .where(
+          and(
+            eq(posProductAvailability.organizationId, organizationId),
+            inArray(posProductAvailability.unitId, authorizedUnitIds),
+            eq(posProducts.active, true),
+          ),
+        )
+        .groupBy(posProductAvailability.unitId),
     ]);
     return {
       organizationId,
       generatedAt: new Date(),
-      units: organizationUnits.map((unit) => ({
-        ...unit,
-        completedDeliveryGrossCents: Number(
-          deliveryRows.find((row) => row.unitId === unit.id)?.completedDeliveryGrossCents ?? 0,
-        ),
-        activeReservations: Number(
-          reservationRows.find((row) => row.unitId === unit.id)?.activeReservations ?? 0,
-        ),
-        activeWaitlist: Number(
-          waitlistRows.find((row) => row.unitId === unit.id)?.activeWaitlist ?? 0,
-        ),
-      })),
+      units: organizationUnits.map((unit) => {
+        const cashRegisters = Number(
+          cashRegisterRows.find((row) => row.unitId === unit.id)?.total ?? 0,
+        );
+        const cashShift = cashShiftRows.find((row) => row.unitId === unit.id);
+        const productionCoverage = Number(
+          productionCoverageRows.find((row) => row.unitId === unit.id)?.total ?? 0,
+        );
+        const delays = delayRows.find((row) => row.unitId === unit.id);
+        const availability = availabilityRows.find((row) => row.unitId === unit.id);
+        return {
+          id: unit.id,
+          name: unit.name,
+          completedDeliveryGrossCents: Number(
+            deliveryRows.find((row) => row.unitId === unit.id)?.completedDeliveryGrossCents ?? 0,
+          ),
+          activeReservations: Number(
+            reservationRows.find((row) => row.unitId === unit.id)?.activeReservations ?? 0,
+          ),
+          activeWaitlist: Number(
+            waitlistRows.find((row) => row.unitId === unit.id)?.activeWaitlist ?? 0,
+          ),
+          cash:
+            cashRegisters === 0
+              ? { status: "unavailable" as const, openSince: null, varianceCents: null }
+              : cashShift?.openShifts
+                ? {
+                    status: "open" as const,
+                    openSince: cashShift.openSince
+                      ? cashShift.openSince instanceof Date
+                        ? cashShift.openSince.toISOString()
+                        : new Date(String(cashShift.openSince)).toISOString()
+                      : null,
+                    varianceCents: cashShift.lastDifferenceCents ?? null,
+                  }
+                : {
+                    status: "closed" as const,
+                    openSince: null,
+                    varianceCents: cashShift?.lastDifferenceCents ?? null,
+                  },
+          delays:
+            productionCoverage === 0
+              ? { total: null, oldestMinutes: null }
+              : {
+                  total: Number(delays?.total ?? 0),
+                  oldestMinutes:
+                    delays?.oldestMinutes === null || delays?.oldestMinutes === undefined
+                      ? null
+                      : Number(delays.oldestMinutes),
+                },
+          stockouts:
+            Number(availability?.configured ?? 0) === 0
+              ? { total: null }
+              : { total: Number(availability?.total ?? 0) },
+        };
+      }),
       transfersByStatus: Object.fromEntries(
         transferRows.map((row) => [row.status, Number(row.total)]),
       ),
@@ -5260,6 +5518,16 @@ export class GrowthService {
           eq(whatsappConversations.unitId, input.unitId),
           input.status ? eq(whatsappConversations.status, input.status) : undefined,
           input.priority ? eq(whatsappConversations.priority, input.priority) : undefined,
+          input.needsReply
+            ? and(
+                inArray(whatsappConversations.status, ["open", "pending"]),
+                isNotNull(whatsappConversations.lastInboundAt),
+                or(
+                  isNull(whatsappConversations.lastOutboundAt),
+                  gt(whatsappConversations.lastInboundAt, whatsappConversations.lastOutboundAt),
+                ),
+              )
+            : undefined,
           assigned,
           pattern
             ? or(ilike(growthCustomers.name, pattern), ilike(whatsappConversations.phone, pattern))

@@ -7,6 +7,9 @@ import { formatMoney } from "../../rules";
 import {
   type BillingCycle,
   type BillingSummary,
+  billingChargeDueLabel,
+  billingDocumentHref,
+  billingDocumentLabel,
   outstandingCharge,
   parseBillingCheckout,
   parseBillingSummary,
@@ -323,6 +326,10 @@ export function BillingContent({
               <dt>Unidades incluídas</dt>
               <dd>{summary.current.plan.includedUnits}</dd>
             </div>
+            <div>
+              <dt>Efeito atual do plano</dt>
+              <dd>{accessLabels[summary.access] ?? summary.access}</dd>
+            </div>
           </dl>
           <ul className="billing-entitlements" aria-label="Recursos incluídos no plano atual">
             {summary.current.plan.entitlements.map((item) => (
@@ -520,12 +527,16 @@ export function BillingContent({
                     <th scope="col">Valor</th>
                     <th scope="col">Situação</th>
                     <th scope="col">Pagamento</th>
+                    <th scope="col">Documento</th>
                   </tr>
                 </thead>
                 <tbody>
                   {summary.charges.map((charge) => (
                     <tr key={charge.id}>
-                      <td>{dateLabel(charge.dueAt)}</td>
+                      <td>
+                        {dateLabel(charge.dueAt)}
+                        <small>{billingChargeDueLabel(charge.dueAt)}</small>
+                      </td>
                       <td>{formatMoney(charge.amountCents)}</td>
                       <td>
                         <Badge tone={chargeTone(charge.status)}>
@@ -533,6 +544,23 @@ export function BillingContent({
                         </Badge>
                       </td>
                       <td>{charge.paidAt ? dateLabel(charge.paidAt) : "Não confirmado"}</td>
+                      <td>
+                        {billingDocumentHref(charge.paymentUrl) ? (
+                          <a
+                            href={billingDocumentHref(charge.paymentUrl) ?? undefined}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            {billingDocumentLabel(charge.status)}
+                          </a>
+                        ) : (
+                          <small>
+                            {charge.paidAt
+                              ? "Sem consulta no provedor"
+                              : "Cobrança sem link do provedor"}
+                          </small>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

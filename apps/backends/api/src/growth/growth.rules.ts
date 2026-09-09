@@ -24,7 +24,9 @@ export const deliveryTransitions = {
   confirmed: ["preparing", "canceled"],
   preparing: ["ready", "canceled"],
   ready: ["dispatched", "completed", "canceled"],
-  dispatched: ["completed", "canceled"],
+  dispatched: ["completed", "delivery_failed", "canceled"],
+  delivery_failed: ["ready", "returned"],
+  returned: [],
   completed: [],
   canceled: [],
 } as const;

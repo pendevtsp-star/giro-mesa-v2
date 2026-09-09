@@ -22,6 +22,7 @@ import {
   managementCommissionRules,
   managementCommissions,
   managementFinanceApprovalRequests,
+  managementFinanceAttachments,
   managementFinanceSettings,
   managementIdempotency,
   managementInterunitTransferLines,
@@ -90,11 +91,13 @@ import {
   managementTimeTrackingAssignments,
   managementTimeTrackingClosures,
   managementTimeTrackingSettings,
+  managementWaiterSettlements,
   membershipInvitations,
   memberships,
   organizations,
   outboxEvents,
   posCatalogCategories,
+  posOperationalShifts,
   posOrderItems,
   posOrders,
   posPaymentDeviceDiagnostics,
@@ -104,10 +107,12 @@ import {
   posTabPayments,
   posTabs,
   posTerminalProfiles,
+  readFiscalArtifact,
   roleBindings,
   terminalOperatorPins,
   terminalSessions,
   units,
+  writeFiscalArtifact,
 } from "@giromesa/db";
 import { encryptionKey, encryptSecret } from "@giromesa/domain";
 import {
@@ -139,6 +144,8 @@ import {
 import { AuthService } from "../auth/auth.service.js";
 import { hashTerminalPin, TerminalSessionService } from "../auth/terminal-session.service.js";
 import { DatabaseService } from "../database/database.module.js";
+import { scanAccountantAttachment } from "../fiscal/accountant-attachment-security.js";
+import { decodeAccountantAttachment } from "../fiscal/fiscal.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import {
   dynamicSectorReplenishment,
@@ -218,6 +225,7 @@ import type {
   CommissionTransitionInput,
   FinanceApprovalDecisionInput,
   FinanceApprovalRequestInput,
+  FinanceAttachmentUploadInput,
   FinanceEntryCancelInput,
   FinanceEntryUpdateInput,
   FinanceExportQuery,
@@ -13567,6 +13575,12 @@ export class ManagementService {
       roleRows.filter((row) => row.unitId === null || row.unitId === unitId).map((row) => row.role),
     );
     const managesPurchases = roles.has("owner") || roles.has("manager");
+    const [purchaseUnit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!purchaseUnit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
     const search = query.search ? `%${query.search}%` : undefined;
     const filter = and(
       eq(managementPurchaseOrders.organizationId, organizationId),
@@ -13578,6 +13592,15 @@ export class ManagementService {
         : undefined,
       query.to
         ? lte(managementPurchaseOrders.createdAt, new Date(`${query.to}T23:59:59.999Z`))
+        : undefined,
+      query.arrival
+        ? and(
+            inArray(managementPurchaseOrders.status, ["approved", "partially_received"]),
+            sql`${managementPurchaseOrders.expectedAt} is not null`,
+            query.arrival === "today"
+              ? sql`timezone(${purchaseUnit.timezone}, ${managementPurchaseOrders.expectedAt})::date = timezone(${purchaseUnit.timezone}, now())::date`
+              : sql`timezone(${purchaseUnit.timezone}, ${managementPurchaseOrders.expectedAt})::date < timezone(${purchaseUnit.timezone}, now())::date`,
+          )
         : undefined,
       search
         ? or(
@@ -13932,6 +13955,159 @@ export class ManagementService {
     return settings ?? DEFAULT_FINANCE_SETTINGS;
   }
 
+  private async verifiedFinanceAttachments(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    attachments: Array<
+      { id: string; name: string } | { name: string; url: string; mimeType?: string }
+    >,
+  ) {
+    if (attachments.some((attachment) => "url" in attachment))
+      throw new BadRequestException({
+        code: "LEGACY_FINANCE_ATTACHMENT_READ_ONLY",
+        message: "Envie o arquivo pelo upload privado antes de vinculá-lo ao lançamento.",
+      });
+    const references = attachments as Array<{ id: string; name: string }>;
+    if (references.length === 0) return [];
+    const rows = await tx
+      .select()
+      .from(managementFinanceAttachments)
+      .where(
+        and(
+          eq(managementFinanceAttachments.organizationId, organizationId),
+          eq(managementFinanceAttachments.unitId, unitId),
+          inArray(
+            managementFinanceAttachments.id,
+            references.map((attachment) => attachment.id),
+          ),
+        ),
+      );
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return references.map((reference) => {
+      const row = byId.get(reference.id);
+      if (!row)
+        throw new NotFoundException({
+          code: "FINANCE_ATTACHMENT_NOT_FOUND",
+          message: "Comprovante não encontrado nesta unidade.",
+        });
+      return { id: row.id, name: row.fileName, mimeType: row.contentType };
+    });
+  }
+
+  async uploadFinanceAttachment(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    idempotencyKey: string,
+    input: FinanceAttachmentUploadInput,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    const decoded = decodeAccountantAttachment(input);
+    await scanAccountantAttachment(decoded.content);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "finance-attachment-upload",
+      {
+        fileName: input.fileName,
+        contentType: input.contentType,
+        sha256: createHash("sha256").update(decoded.content).digest("hex"),
+      },
+      async (tx) => {
+        const attachmentId = randomUUID();
+        const stored = await writeFiscalArtifact({
+          root: process.env.MEDIA_ROOT,
+          organizationId,
+          unitId,
+          namespace: "packages",
+          entityId: attachmentId,
+          name: "finance_attachment",
+          extension: decoded.storageExtension,
+          content: decoded.content,
+        });
+        const [attachment] = await tx
+          .insert(managementFinanceAttachments)
+          .values({
+            id: attachmentId,
+            organizationId,
+            unitId,
+            fileName: input.fileName,
+            contentType: input.contentType,
+            sizeBytes: stored.bytes,
+            sha256: stored.sha256,
+            storageKey: stored.storageKey,
+            idempotencyKey: idempotencyKey.trim(),
+            uploadedByIdentityId: identityId,
+          })
+          .returning();
+        if (!attachment)
+          throw new ServiceUnavailableException({ code: "FINANCE_ATTACHMENT_NOT_PERSISTED" });
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.finance-attachment.uploaded",
+          "finance_attachment",
+          attachment.id,
+          {
+            fileName: attachment.fileName,
+            contentType: attachment.contentType,
+            sizeBytes: attachment.sizeBytes,
+            sha256: attachment.sha256,
+          },
+        );
+        return {
+          attachment: {
+            id: attachment.id,
+            name: attachment.fileName,
+            mimeType: attachment.contentType,
+            sizeBytes: attachment.sizeBytes,
+            sha256: attachment.sha256,
+          },
+        };
+      },
+    );
+  }
+
+  async financeAttachment(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    attachmentId: string,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
+    const [attachment] = await this.database.db
+      .select()
+      .from(managementFinanceAttachments)
+      .where(
+        and(
+          eq(managementFinanceAttachments.organizationId, organizationId),
+          eq(managementFinanceAttachments.unitId, unitId),
+          eq(managementFinanceAttachments.id, attachmentId),
+        ),
+      )
+      .limit(1);
+    if (!attachment) throw new NotFoundException({ code: "FINANCE_ATTACHMENT_NOT_FOUND" });
+    const content = await readFiscalArtifact(process.env.MEDIA_ROOT, attachment.storageKey).catch(
+      () => {
+        throw new ServiceUnavailableException({ code: "FINANCE_ATTACHMENT_UNAVAILABLE" });
+      },
+    );
+    if (createHash("sha256").update(content).digest("hex") !== attachment.sha256)
+      throw new ServiceUnavailableException({ code: "FINANCE_ATTACHMENT_INTEGRITY_FAILED" });
+    return {
+      filename: attachment.fileName,
+      content: content.toString("base64"),
+      contentEncoding: "base64" as const,
+      mimeType: attachment.contentType,
+      sha256: attachment.sha256,
+    };
+  }
+
   async financeSettings(identityId: string, organizationId: string, unitId: string) {
     await this.requireRole(identityId, organizationId, unitId, FINANCE_ROLES);
     return this.loadFinanceSettings(organizationId, unitId);
@@ -14221,6 +14397,12 @@ export class ManagementService {
       "payable-create",
       input,
       async (tx) => {
+        const attachments = await this.verifiedFinanceAttachments(
+          tx,
+          organizationId,
+          unitId,
+          input.attachments,
+        );
         if (input.supplierId) {
           const [supplier] = await tx
             .select({ id: managementSuppliers.id })
@@ -14253,6 +14435,7 @@ export class ManagementService {
           organizationId,
           unitId,
           ...entry,
+          attachments,
           ...installment,
           recurrenceGroupId,
           installmentCount: schedule.length,
@@ -14301,123 +14484,160 @@ export class ManagementService {
       "payable-payment",
       { payableId, ...input },
       async (tx) => {
-        await tx.execute(
-          sql`select id from management_accounts_payable where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${payableId}::uuid for update`,
-        );
-        const [payable] = await tx
-          .select()
-          .from(managementAccountsPayable)
-          .where(
-            and(
-              eq(managementAccountsPayable.organizationId, organizationId),
-              eq(managementAccountsPayable.unitId, unitId),
-              eq(managementAccountsPayable.id, payableId),
-            ),
-          )
-          .limit(1);
-        if (!payable)
-          throw new NotFoundException({
-            code: "PAYABLE_NOT_FOUND",
-            message: "Conta a pagar não encontrada.",
-          });
-        if (payable.status === "canceled" || payable.status === "paid")
-          throw new ConflictException({
-            code: "PAYABLE_NOT_OPEN",
-            message: "A conta não aceita pagamentos.",
-          });
-        const approval = await this.requireApprovedFinancePayment(
-          tx,
-          organizationId,
-          unitId,
-          "payable",
-          payable.id,
-          input,
-        );
-        const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
-          cashRegisterId: input.cashRegisterId,
-        });
-        if (input.method === "cash" && !cashShift)
-          throw new BadRequestException({
-            code: "CASH_SHIFT_REQUIRED",
-            message: "Pagamentos em dinheiro exigem um caixa aberto.",
-          });
-        if (cashShift && input.method === "cash") {
-          const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, cashShift.id);
-          assertCashDrawerDebit(
-            cashShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
-            input.amountCents,
-          );
-        }
-        const next = settlement(payable.amountCents, payable.paidCents, input.amountCents);
-        const paymentId = randomUUID();
-        const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
-        await tx.insert(managementPayablePayments).values({
-          id: paymentId,
-          organizationId,
-          unitId,
-          payableId,
-          amountCents: input.amountCents,
-          method: input.method,
-          reference: input.reference,
-          idempotencyKey,
-          paidByIdentityId: identityId,
-          paidAt: occurredAt,
-        });
-        if (cashShift)
-          await tx.insert(managementCashEntries).values({
-            organizationId,
-            unitId,
-            cashShiftId: cashShift.id,
-            direction: "out",
-            entryType: "payable_payment",
-            paymentMethod: input.method,
-            affectsDrawer: input.method === "cash",
-            amountCents: input.amountCents,
-            sourceType: "payable_payment",
-            sourceId: paymentId,
-            description: payable.description,
-            actorIdentityId: identityId,
-            occurredAt,
-          });
-        const status = next.status === "settled" ? "paid" : "partially_paid";
-        await tx
-          .update(managementAccountsPayable)
-          .set({
-            paidCents: next.settledCents,
-            status,
-            version: payable.version + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(managementAccountsPayable.id, payable.id));
-        if (approval)
-          await tx
-            .update(managementFinanceApprovalRequests)
-            .set({
-              status: "executed",
-              executedPaymentId: paymentId,
-              executedAt: occurredAt,
-              updatedAt: new Date(),
-            })
-            .where(eq(managementFinanceApprovalRequests.id, approval.id));
-        await this.record(
+        await this.assertPayableIsNotSettlementManaged(tx, organizationId, unitId, payableId);
+        return this.payPayableInTransaction(
           tx,
           identityId,
           organizationId,
           unitId,
-          "management.payable.paid",
-          "payable",
-          payable.id,
-          {
-            paymentId,
-            amountCents: input.amountCents,
-            method: input.method,
-            cashShiftId: cashShift?.id ?? null,
-            status,
-          },
+          payableId,
+          idempotencyKey,
+          input,
         );
-        return { payableId, paymentId, paidCents: next.settledCents, status };
       },
     );
+  }
+
+  private async assertPayableIsNotSettlementManaged(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    payableId: string,
+  ) {
+    const [settlement] = await tx
+      .select({ id: managementWaiterSettlements.id })
+      .from(managementWaiterSettlements)
+      .where(
+        and(
+          eq(managementWaiterSettlements.organizationId, organizationId),
+          eq(managementWaiterSettlements.unitId, unitId),
+          eq(managementWaiterSettlements.financePayableId, payableId),
+        ),
+      )
+      .limit(1);
+    if (settlement)
+      throw new ConflictException({
+        code: "WAITER_SETTLEMENT_PAYABLE_MANAGED",
+        message:
+          "Esta conta foi gerada pela apuração da equipe. Registre o pagamento ou cancelamento no módulo Apuração de garçons.",
+        settlementId: settlement.id,
+      });
+  }
+
+  async payPayableInTransaction(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    payableId: string,
+    idempotencyKey: string,
+    input: FinancialPaymentInput,
+  ) {
+    await tx.execute(
+      sql`select id from management_accounts_payable where organization_id=${organizationId}::uuid and unit_id=${unitId}::uuid and id=${payableId}::uuid for update`,
+    );
+    const [payable] = await tx
+      .select()
+      .from(managementAccountsPayable)
+      .where(
+        and(
+          eq(managementAccountsPayable.organizationId, organizationId),
+          eq(managementAccountsPayable.unitId, unitId),
+          eq(managementAccountsPayable.id, payableId),
+        ),
+      )
+      .limit(1);
+    if (!payable) throw new NotFoundException({ code: "PAYABLE_NOT_FOUND" });
+    if (payable.status === "canceled" || payable.status === "paid")
+      throw new ConflictException({ code: "PAYABLE_NOT_OPEN" });
+    const approval = await this.requireApprovedFinancePayment(
+      tx,
+      organizationId,
+      unitId,
+      "payable",
+      payable.id,
+      input,
+    );
+    const cashShift = await this.lockOpenCashShift(tx, organizationId, unitId, {
+      cashRegisterId: input.cashRegisterId,
+    });
+    if (input.method === "cash" && !cashShift)
+      throw new BadRequestException({ code: "CASH_SHIFT_REQUIRED" });
+    if (cashShift && input.method === "cash") {
+      const drawer = await this.cashDrawerTotals(tx, organizationId, unitId, cashShift.id);
+      assertCashDrawerDebit(
+        cashShift.openingCents + drawer.drawerInCents - drawer.drawerOutCents,
+        input.amountCents,
+      );
+    }
+    const next = settlement(payable.amountCents, payable.paidCents, input.amountCents);
+    const paymentId = randomUUID();
+    const occurredAt = input.occurredAt ? new Date(input.occurredAt) : new Date();
+    await tx.insert(managementPayablePayments).values({
+      id: paymentId,
+      organizationId,
+      unitId,
+      payableId,
+      amountCents: input.amountCents,
+      method: input.method,
+      reference: input.reference,
+      idempotencyKey,
+      paidByIdentityId: identityId,
+      paidAt: occurredAt,
+    });
+    if (cashShift)
+      await tx.insert(managementCashEntries).values({
+        organizationId,
+        unitId,
+        cashShiftId: cashShift.id,
+        direction: "out",
+        entryType: "payable_payment",
+        paymentMethod: input.method,
+        affectsDrawer: input.method === "cash",
+        amountCents: input.amountCents,
+        sourceType: "payable_payment",
+        sourceId: paymentId,
+        description: payable.description,
+        actorIdentityId: identityId,
+        occurredAt,
+      });
+    const status = next.status === "settled" ? "paid" : "partially_paid";
+    await tx
+      .update(managementAccountsPayable)
+      .set({
+        paidCents: next.settledCents,
+        status,
+        version: payable.version + 1,
+        updatedAt: new Date(),
+      })
+      .where(eq(managementAccountsPayable.id, payable.id));
+    if (approval)
+      await tx
+        .update(managementFinanceApprovalRequests)
+        .set({
+          status: "executed",
+          executedPaymentId: paymentId,
+          executedAt: occurredAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(managementFinanceApprovalRequests.id, approval.id));
+    await this.record(
+      tx,
+      identityId,
+      organizationId,
+      unitId,
+      "management.payable.paid",
+      "payable",
+      payable.id,
+      {
+        paymentId,
+        amountCents: input.amountCents,
+        method: input.method,
+        cashShiftId: cashShift?.id ?? null,
+        status,
+      },
+    );
+    return { payableId, paymentId, paidCents: next.settledCents, status };
   }
 
   async createReceivable(
@@ -14442,6 +14662,12 @@ export class ManagementService {
       "receivable-create",
       input,
       async (tx) => {
+        const attachments = await this.verifiedFinanceAttachments(
+          tx,
+          organizationId,
+          unitId,
+          input.attachments,
+        );
         if (input.sourceOrderId)
           await this.requireOrder(tx, organizationId, unitId, input.sourceOrderId);
         for (const line of input.lines)
@@ -14464,7 +14690,7 @@ export class ManagementService {
           costCenter: input.costCenter,
           documentNumber: input.documentNumber,
           notes: input.notes,
-          attachments: input.attachments,
+          attachments,
           amountCents: input.amountCents,
           ...installment,
           recurrenceGroupId,
@@ -14668,10 +14894,19 @@ export class ManagementService {
       "finance-payable-update",
       { payableId, ...input },
       async (tx) => {
+        await this.assertPayableIsNotSettlementManaged(tx, organizationId, unitId, payableId);
         const { version, ...changes } = input;
+        const verifiedAttachments = input.attachments
+          ? await this.verifiedFinanceAttachments(tx, organizationId, unitId, input.attachments)
+          : undefined;
         const [updated] = await tx
           .update(managementAccountsPayable)
-          .set({ ...changes, version: version + 1, updatedAt: new Date() })
+          .set({
+            ...changes,
+            attachments: verifiedAttachments,
+            version: version + 1,
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(managementAccountsPayable.organizationId, organizationId),
@@ -14721,9 +14956,17 @@ export class ManagementService {
       { receivableId, ...input },
       async (tx) => {
         const { version, supplierId: _supplierId, ...changes } = input;
+        const verifiedAttachments = input.attachments
+          ? await this.verifiedFinanceAttachments(tx, organizationId, unitId, input.attachments)
+          : undefined;
         const [updated] = await tx
           .update(managementAccountsReceivable)
-          .set({ ...changes, version: version + 1, updatedAt: new Date() })
+          .set({
+            ...changes,
+            attachments: verifiedAttachments,
+            version: version + 1,
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(managementAccountsReceivable.organizationId, organizationId),
@@ -14772,6 +15015,7 @@ export class ManagementService {
       "finance-payable-cancel",
       { payableId, ...input },
       async (tx) => {
+        await this.assertPayableIsNotSettlementManaged(tx, organizationId, unitId, payableId);
         const [updated] = await tx
           .update(managementAccountsPayable)
           .set({
@@ -15206,6 +15450,20 @@ export class ManagementService {
         : undefined,
       query.from ? gte(managementAccountsReceivable.dueDate, query.from) : undefined,
       query.to ? lte(managementAccountsReceivable.dueDate, query.to) : undefined,
+      query.operationalShiftId
+        ? sql`exists (
+            select 1
+              from pos_orders finance_filter_orders
+              join pos_tabs finance_filter_tabs
+                on finance_filter_tabs.organization_id = finance_filter_orders.organization_id
+               and finance_filter_tabs.unit_id = finance_filter_orders.unit_id
+               and finance_filter_tabs.id = finance_filter_orders.tab_id
+             where finance_filter_orders.organization_id = ${organizationId}::uuid
+               and finance_filter_orders.unit_id = ${unitId}::uuid
+               and finance_filter_orders.id = ${managementAccountsReceivable.sourceOrderId}
+               and finance_filter_tabs.operational_shift_id = ${query.operationalShiftId}::uuid
+          )`
+        : undefined,
       statusCondition(
         "receivable",
         managementAccountsReceivable.status,
@@ -15213,7 +15471,7 @@ export class ManagementService {
       ),
     );
     const fetchLimit = query.page * query.pageSize;
-    const includePayables = query.direction !== "receivable";
+    const includePayables = query.direction !== "receivable" && !query.operationalShiftId;
     const includeReceivables = query.direction !== "payable";
     const [payableRows, receivableRows, payableCountRows, receivableCountRows] = await Promise.all([
       includePayables
@@ -15335,6 +15593,9 @@ export class ManagementService {
           and(
             eq(managementReconciliationEntries.organizationId, organizationId),
             eq(managementReconciliationEntries.unitId, unitId),
+            query.reconciliationStatus
+              ? eq(managementReconciliationEntries.status, query.reconciliationStatus)
+              : undefined,
           ),
         )
         .orderBy(desc(managementReconciliationEntries.createdAt))
@@ -15432,6 +15693,23 @@ export class ManagementService {
         projectedBalanceCents += values.receivableCents - values.payableCents;
         return { date, ...values, balanceCents: projectedBalanceCents };
       });
+    const operationalShifts = await this.database.db
+      .select({
+        id: posOperationalShifts.id,
+        label: posOperationalShifts.label,
+        status: posOperationalShifts.status,
+        startsAt: posOperationalShifts.startsAt,
+        closedAt: posOperationalShifts.closedAt,
+      })
+      .from(posOperationalShifts)
+      .where(
+        and(
+          eq(posOperationalShifts.organizationId, organizationId),
+          eq(posOperationalShifts.unitId, unitId),
+        ),
+      )
+      .orderBy(desc(posOperationalShifts.startsAt))
+      .limit(30);
     const total =
       Number(payableCountRows[0]?.count ?? 0) + Number(receivableCountRows[0]?.count ?? 0);
     return {
@@ -15447,6 +15725,7 @@ export class ManagementService {
       reconciliationImports,
       reconciliationEntries,
       approvals,
+      operationalShifts,
       settings,
       summary: {
         payableCents: Number(payableSummary[0]?.pendingCents ?? 0),
@@ -16153,6 +16432,7 @@ export class ManagementService {
             recordedByIdentityId: identityId,
           })),
         );
+        const closedAt = new Date();
         await tx
           .update(managementCashShifts)
           .set({
@@ -16160,12 +16440,12 @@ export class ManagementService {
             expectedCents,
             countedCents,
             differenceCents,
-            closedAt: new Date(),
+            closedAt,
             closedByIdentityId: identityId,
             closeReason: input.closeReason,
             closeIdempotencyKey: idempotencyKey,
             version: shift.version + 1,
-            updatedAt: new Date(),
+            updatedAt: closedAt,
           })
           .where(eq(managementCashShifts.id, shift.id));
         await this.record(
@@ -16187,9 +16467,46 @@ export class ManagementService {
             reviewRequired,
           },
         );
+        const [[unitSnapshot], [registerSnapshot], identitySnapshots] = await Promise.all([
+          tx
+            .select({ name: units.name })
+            .from(units)
+            .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+            .limit(1),
+          tx
+            .select({ name: managementCashRegisters.name })
+            .from(managementCashRegisters)
+            .where(
+              and(
+                eq(managementCashRegisters.organizationId, organizationId),
+                eq(managementCashRegisters.unitId, unitId),
+                eq(managementCashRegisters.id, shift.cashRegisterId),
+              ),
+            )
+            .limit(1),
+          tx
+            .select({ id: identities.id, name: identities.displayName })
+            .from(identities)
+            .where(
+              inArray(identities.id, [
+                shift.operatorIdentityId,
+                shift.currentResponsibleIdentityId,
+                identityId,
+              ]),
+            ),
+        ]);
+        const identityNames = new Map(identitySnapshots.map((row) => [row.id, row.name]));
         return {
           cashShiftId,
           status: "closed",
+          unitName: unitSnapshot?.name ?? "Unidade",
+          cashRegisterName: registerSnapshot?.name ?? "Gaveta",
+          operatorName: identityNames.get(shift.operatorIdentityId) ?? "Usuário",
+          responsibleName: identityNames.get(shift.currentResponsibleIdentityId) ?? "Usuário",
+          closedByName: identityNames.get(identityId) ?? "Usuário",
+          openingCents: shift.openingCents,
+          openedAt: shift.openedAt.toISOString(),
+          closedAt: closedAt.toISOString(),
           expectedCents,
           countedCents,
           differenceCents,
@@ -17176,7 +17493,7 @@ export class ManagementService {
     const role = await this.requireRole(identityId, organizationId, unitId, CASH_READ_ROLES);
     const offset = reportPageOffset(query.cursor);
     const [unit] = await this.database.db
-      .select({ timezone: units.timezone })
+      .select({ timezone: units.timezone, name: units.name })
       .from(units)
       .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
       .limit(1);
@@ -17290,6 +17607,7 @@ export class ManagementService {
         id: shift.id,
         cashRegisterId: shift.cashRegisterId,
         cashRegisterName: registerNames.get(shift.cashRegisterId) ?? "Gaveta",
+        unitName: unit.name,
         status: shift.status,
         openingCents: shift.openingCents,
         expectedCents: canViewExpected
@@ -17346,57 +17664,64 @@ export class ManagementService {
         code: "CASH_SHIFT_NOT_FOUND",
         message: "Caixa não encontrado nesta unidade.",
       });
-    const [entries, tenderCounts, responsibilities, adjustments, register] = await Promise.all([
-      this.database.db
-        .select()
-        .from(managementCashEntries)
-        .where(
-          and(
-            eq(managementCashEntries.organizationId, organizationId),
-            eq(managementCashEntries.unitId, unitId),
-            eq(managementCashEntries.cashShiftId, cashShiftId),
+    const [entries, tenderCounts, responsibilities, adjustments, register, unitSnapshot] =
+      await Promise.all([
+        this.database.db
+          .select()
+          .from(managementCashEntries)
+          .where(
+            and(
+              eq(managementCashEntries.organizationId, organizationId),
+              eq(managementCashEntries.unitId, unitId),
+              eq(managementCashEntries.cashShiftId, cashShiftId),
+            ),
+          )
+          .orderBy(asc(managementCashEntries.occurredAt)),
+        this.database.db
+          .select()
+          .from(managementCashShiftTenderCounts)
+          .where(
+            and(
+              eq(managementCashShiftTenderCounts.organizationId, organizationId),
+              eq(managementCashShiftTenderCounts.unitId, unitId),
+              eq(managementCashShiftTenderCounts.cashShiftId, cashShiftId),
+            ),
           ),
-        )
-        .orderBy(asc(managementCashEntries.occurredAt)),
-      this.database.db
-        .select()
-        .from(managementCashShiftTenderCounts)
-        .where(
-          and(
-            eq(managementCashShiftTenderCounts.organizationId, organizationId),
-            eq(managementCashShiftTenderCounts.unitId, unitId),
-            eq(managementCashShiftTenderCounts.cashShiftId, cashShiftId),
-          ),
-        ),
-      this.database.db
-        .select()
-        .from(managementCashShiftResponsibilities)
-        .where(
-          and(
-            eq(managementCashShiftResponsibilities.organizationId, organizationId),
-            eq(managementCashShiftResponsibilities.unitId, unitId),
-            eq(managementCashShiftResponsibilities.cashShiftId, cashShiftId),
-          ),
-        )
-        .orderBy(asc(managementCashShiftResponsibilities.occurredAt)),
-      this.database.db
-        .select()
-        .from(managementCashAdjustments)
-        .where(
-          and(
-            eq(managementCashAdjustments.organizationId, organizationId),
-            eq(managementCashAdjustments.unitId, unitId),
-            eq(managementCashAdjustments.originalCashShiftId, cashShiftId),
-          ),
-        )
-        .orderBy(asc(managementCashAdjustments.occurredAt)),
-      this.database.db
-        .select({ name: managementCashRegisters.name })
-        .from(managementCashRegisters)
-        .where(eq(managementCashRegisters.id, shift.cashRegisterId))
-        .limit(1)
-        .then((rows) => rows[0]),
-    ]);
+        this.database.db
+          .select()
+          .from(managementCashShiftResponsibilities)
+          .where(
+            and(
+              eq(managementCashShiftResponsibilities.organizationId, organizationId),
+              eq(managementCashShiftResponsibilities.unitId, unitId),
+              eq(managementCashShiftResponsibilities.cashShiftId, cashShiftId),
+            ),
+          )
+          .orderBy(asc(managementCashShiftResponsibilities.occurredAt)),
+        this.database.db
+          .select()
+          .from(managementCashAdjustments)
+          .where(
+            and(
+              eq(managementCashAdjustments.organizationId, organizationId),
+              eq(managementCashAdjustments.unitId, unitId),
+              eq(managementCashAdjustments.originalCashShiftId, cashShiftId),
+            ),
+          )
+          .orderBy(asc(managementCashAdjustments.occurredAt)),
+        this.database.db
+          .select({ name: managementCashRegisters.name })
+          .from(managementCashRegisters)
+          .where(eq(managementCashRegisters.id, shift.cashRegisterId))
+          .limit(1)
+          .then((rows) => rows[0]),
+        this.database.db
+          .select({ name: units.name })
+          .from(units)
+          .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+          .limit(1)
+          .then((rows) => rows[0]),
+      ]);
     const identityIds = [
       shift.operatorIdentityId,
       shift.currentResponsibleIdentityId,
@@ -17428,6 +17753,7 @@ export class ManagementService {
         id: shift.id,
         cashRegisterId: shift.cashRegisterId,
         cashRegisterName: register?.name ?? "Gaveta",
+        unitName: unitSnapshot?.name ?? "Unidade",
         status: shift.status,
         openingCents: shift.openingCents,
         expectedCents: canViewExpected
@@ -19487,6 +19813,15 @@ export class ManagementService {
     );
     const canManage = role === "owner" || role === "manager";
     const canViewCommissions = canManage || role === "finance";
+    const [unitSnapshot] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!unitSnapshot) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: unitSnapshot.timezone,
+    }).format(new Date());
     const [
       people,
       schedules,
@@ -19653,6 +19988,8 @@ export class ManagementService {
       commissions: canViewCommissions ? commissions : [],
       settings: role === "owner" ? settings : timeTrackingSettingsWithoutCoordinates(settings),
       canManage,
+      timezone: unitSnapshot.timezone,
+      today,
     };
   }
 

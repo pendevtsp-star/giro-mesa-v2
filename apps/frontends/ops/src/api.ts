@@ -4,6 +4,8 @@ import type {
   ApiHealthResponse,
   ApiOperations,
   BillingCheckoutInput,
+  ChannelCheck,
+  ChannelCheckInput,
   CopyUnitSettingsInput,
   EstablishmentSettings,
   EstablishmentSettingsHistoryEntry,
@@ -31,7 +33,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 79;
+export const OPS_REQUIRED_SCHEMA_VERSION = 82;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -512,6 +514,7 @@ export interface CatalogBcgProduct {
 }
 
 export interface PurchaseListFilters {
+  arrival?: "today" | "overdue";
   page?: number;
   pageSize?: number;
   status?: string;
@@ -522,6 +525,8 @@ export interface PurchaseListFilters {
 }
 
 export interface FinanceFilters {
+  operationalShiftId?: string;
+  reconciliationStatus?: "unmatched" | "divergent" | "resolved";
   direction?: "all" | "payable" | "receivable";
   status?: "all" | "open" | "partial" | "settled" | "canceled" | "overdue" | "due_soon";
   search?: string;
@@ -540,7 +545,9 @@ export interface FinanceEntryInput {
   costCenter?: string;
   documentNumber?: string;
   notes?: string;
-  attachments?: Array<{ name: string; url: string; mimeType?: string }>;
+  attachments?: Array<
+    { id: string; name: string } | { name: string; url: string; mimeType?: string }
+  >;
   recurrence?: { installments: number; intervalMonths: number };
 }
 
@@ -928,6 +935,22 @@ export const api = {
       body: JSON.stringify(body),
     }),
   settings: {
+    channelChecks: (organizationId: string, unitId: string) =>
+      request<{ checks: ChannelCheck[] }>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings/channel-checks`,
+      ),
+    recordChannelCheck: (
+      organizationId: string,
+      unitId: string,
+      body: ChannelCheckInput,
+      idempotencyKey: string,
+    ) =>
+      idempotentRequest<ChannelCheck>(
+        `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings/channel-checks`,
+        "POST",
+        body,
+        idempotencyKey,
+      ),
     get: (organizationId: string, unitId: string) =>
       request<EstablishmentSettings>(
         `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/settings`,
@@ -1367,6 +1390,11 @@ export const api = {
         search?: string;
         status?: "active" | "all" | "open" | "claimed" | "snoozed" | "resolved";
         severity?: "critical" | "high" | "medium" | "low";
+        source?: "outbox" | "hub" | "fiscal" | "billing";
+        impact?: "billing" | "orders" | "messaging" | "fiscal" | "operations";
+        minAgeMinutes?: number;
+        maxAgeMinutes?: number;
+        activePilotOnly?: boolean;
         assignee?: string;
         cursor?: string;
         limit?: number;
@@ -1376,6 +1404,14 @@ export const api = {
       if (filters.search) query.set("search", filters.search);
       if (filters.status) query.set("status", filters.status);
       if (filters.severity) query.set("severity", filters.severity);
+      if (filters.source) query.set("source", filters.source);
+      if (filters.impact) query.set("impact", filters.impact);
+      if (filters.minAgeMinutes !== undefined)
+        query.set("minAgeMinutes", String(filters.minAgeMinutes));
+      if (filters.maxAgeMinutes !== undefined)
+        query.set("maxAgeMinutes", String(filters.maxAgeMinutes));
+      if (filters.activePilotOnly !== undefined)
+        query.set("activePilotOnly", String(filters.activePilotOnly));
       if (filters.assignee) query.set("assignee", filters.assignee);
       if (filters.cursor) query.set("cursor", filters.cursor);
       if (filters.limit !== undefined) query.set("limit", String(filters.limit));
@@ -2181,6 +2217,27 @@ export const api = {
     ) => request<unknown>(managementListPath(organizationId, unitId, "suppliers", filters)),
     finance: (organizationId: string, unitId: string, filters: FinanceFilters = {}) =>
       request<unknown>(managementListPath(organizationId, unitId, "finance", filters)),
+    uploadFinanceAttachment: (
+      organizationId: string,
+      unitId: string,
+      body: { fileName: string; contentType: string; contentBase64: string },
+      idempotencyKey?: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        "finance/attachments",
+        body,
+        idempotencyKey,
+      ),
+    financeAttachment: (organizationId: string, unitId: string, attachmentId: string) =>
+      requestDownload(
+        managementPath(
+          organizationId,
+          unitId,
+          `finance/attachments/${encodeURIComponent(attachmentId)}/content`,
+        ),
+      ),
     financeSettings: (organizationId: string, unitId: string) =>
       request<unknown>(managementPath(organizationId, unitId, "finance/settings")),
     exportFinance: (
@@ -2601,7 +2658,15 @@ export const api = {
       organizationId: string,
       unitId: string,
       settlementId: string,
-      body: { action: "approve" | "pay" | "cancel"; note: string },
+      body: {
+        action: "approve" | "pay" | "cancel";
+        note: string;
+        paymentMethod?: "cash" | "pix" | "credit_card" | "debit_card" | "bank_transfer" | "other";
+        paymentReference?: string;
+        attachmentId?: string;
+        cashRegisterId?: string;
+        approvalRequestId?: string;
+      },
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(
@@ -4088,6 +4153,35 @@ export const api = {
     },
   },
   pilot: {
+    shiftHandover: (organizationId: string, unitId: string) =>
+      request<unknown>(pilotPath(organizationId, unitId, "shift-handover")),
+    acknowledgeShiftHandover: (
+      organizationId: string,
+      unitId: string,
+      handoverId: string,
+      idempotencyKey: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(
+          organizationId,
+          unitId,
+          `shift-handover/${encodeURIComponent(handoverId)}/acknowledge`,
+        ),
+        "POST",
+        undefined,
+        idempotencyKey,
+      ),
+    deliveryProjectionStatus: (organizationId: string, unitId: string) =>
+      request<{
+        missing: Array<{
+          tabId: string;
+          orderId: string | null;
+          reference: string;
+          status: string;
+          reason: string;
+        }>;
+        totalMissing: number;
+      }>(pilotPath(organizationId, unitId, "delivery-projection-status")),
     catalog: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "catalog")),
     floor: (organizationId: string, unitId: string) =>
@@ -6348,10 +6442,12 @@ export const api = {
         priority?: "low" | "normal" | "high" | "urgent";
         assignedTo?: "me" | "unassigned" | "any";
         search?: string;
+        needsReply?: boolean;
       } = {},
     ) => {
       const query = new URLSearchParams({ unitId });
-      for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);
+      for (const [key, value] of Object.entries(filters))
+        if (value !== undefined && value !== "") query.set(key, String(value));
       return request<unknown>(
         growthPath(organizationId, `whatsapp/conversations?${query.toString()}`),
       );
@@ -6599,6 +6695,7 @@ export const api = {
         guestPhone?: string;
         partySize: number;
         scheduledAt: string;
+        retroactiveReason?: string;
         durationMinutes: number;
         notes?: string;
         idempotencyKey: string;
@@ -6659,11 +6756,32 @@ export const api = {
     transitionDelivery: (
       organizationId: string,
       orderId: string,
-      status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled",
+      input:
+        | "placed"
+        | "confirmed"
+        | "preparing"
+        | "ready"
+        | "completed"
+        | "canceled"
+        | {
+            status:
+              | "placed"
+              | "confirmed"
+              | "preparing"
+              | "ready"
+              | "completed"
+              | "canceled"
+              | "delivery_failed"
+              | "returned";
+            reason?: string;
+          },
     ) =>
       request<unknown>(
         growthPath(organizationId, `delivery-orders/${encodeURIComponent(orderId)}/status`),
-        { method: "PATCH", body: JSON.stringify({ status }) },
+        {
+          method: "PATCH",
+          body: JSON.stringify(typeof input === "string" ? { status: input } : input),
+        },
       ),
     dispatchDelivery: (
       organizationId: string,

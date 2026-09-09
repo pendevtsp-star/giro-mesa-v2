@@ -23,6 +23,21 @@ import {
 } from "../../management.shared";
 import { routeHref } from "../../router";
 import { canAccess } from "../../rules";
+import { ShiftHandoverPanel } from "./ShiftHandoverPanel";
+
+export function overviewPriorityHref(item: OverviewData["priorities"][number]): string {
+  const target = item.target;
+  const base = routeHref(item.route);
+  if (item.route === "salon" && target?.tableId)
+    return `${base}?table=${encodeURIComponent(target.tableId)}`;
+  if (item.route === "counter" && target?.tabId)
+    return `${base}?tab=${encodeURIComponent(target.tabId)}`;
+  if (item.route === "kds" && target?.ticketId)
+    return `${base}?ticket=${encodeURIComponent(target.ticketId)}`;
+  if (item.route === "delivery" && target?.deliveryOrderId)
+    return `${base}?order=${encodeURIComponent(target.deliveryOrderId)}`;
+  return base;
+}
 
 function metricIcon(metric: OverviewData["metrics"][number]): IconName {
   if (metric.route === "reports" || metric.id.includes("sales") || metric.id.includes("revenue")) {
@@ -387,7 +402,7 @@ export function RealDashboard({
                         className={`dashboard-status dashboard-status--${item.tone}`}
                         role="img"
                       />
-                      <a className="dashboard-priority__main" href={routeHref(item.route)}>
+                      <a className="dashboard-priority__main" href={overviewPriorityHref(item)}>
                         <strong>{item.title}</strong>
                         <small>{item.detail}</small>
                         {item.assignedTo && (
@@ -401,7 +416,7 @@ export function RealDashboard({
                       <div className="dashboard-priority__controls">
                         <a
                           className="dashboard-priority__action gm-button gm-button--secondary gm-button--sm"
-                          href={routeHref(item.route)}
+                          href={overviewPriorityHref(item)}
                         >
                           {item.actionLabel} <Icon name="chevron-right" size={14} />
                         </a>
@@ -586,6 +601,9 @@ export function RealDashboard({
             )}
 
             <div className="dashboard-secondary">
+              {["owner", "manager"].includes(overview.profileId) && (
+                <ShiftHandoverPanel scope={scope} />
+              )}
               <Card className="dashboard-pulse">
                 <div className="card-header">
                   <div>

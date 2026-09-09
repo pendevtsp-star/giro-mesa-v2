@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ProductionPrinter } from "../../api";
-import { firstIncompleteProductionStep, productionSetupReadiness } from "./production-setup";
+import {
+  firstIncompleteProductionStep,
+  productionMonitorInterval,
+  productionPrinterLabel,
+  productionSetupReadiness,
+} from "./production-setup";
 
 describe("production setup readiness", () => {
   it("keeps the flow on the first real incomplete step", () => {
@@ -35,5 +40,14 @@ describe("production setup readiness", () => {
     expect(readiness.computer).toBe(false);
     expect(readiness.printer).toBe(false);
     expect(firstIncompleteProductionStep(readiness)).toBe("computer");
+  });
+
+  it("acelera o monitor quando há atenção e mostra o nome operacional da impressora", () => {
+    expect(productionMonitorInterval(false)).toBe(30_000);
+    expect(productionMonitorInterval(true)).toBe(10_000);
+    expect(
+      productionPrinterLabel([{ id: "printer-1", label: "Cozinha quente" }], "printer-1"),
+    ).toBe("Cozinha quente");
+    expect(productionPrinterLabel([], "printer-abcdefghij")).toBe("Impressora printer-");
   });
 });

@@ -8,6 +8,7 @@ import {
   logoFileError,
   normalizeInstagram,
   readableForeground,
+  setupChannelChecks,
   sortBusinessHoursExceptions,
 } from "./settings";
 
@@ -63,5 +64,33 @@ describe("configurações do estabelecimento", () => {
       "2027-01-01",
       "2027-12-31",
     ]);
+  });
+
+  it("distingue configuração registrada de homologação dos canais", () => {
+    const checks = setupChannelChecks({
+      catalog: { active: true, publishedVersion: 8 },
+      cash: { configured: true },
+      people: { timeTrackingConfigured: false },
+      kds: { activeStations: 1 },
+      fiscal: { configured: true },
+      devices: { activeCount: 2 },
+      billing: { state: "active" },
+      setup: {
+        activeProducts: 4,
+        activeTables: 3,
+        activePeople: 2,
+        activePrinters: 0,
+        completedService: false,
+      },
+    });
+    expect(checks.find((item) => item.id === "qr")).toMatchObject({ ready: true });
+    expect(checks.find((item) => item.id === "printing")).toMatchObject({ ready: false });
+    expect(checks.find((item) => item.id === "fiscal")?.detail).toContain(
+      "autorização do provedor",
+    );
+    expect(checks.find((item) => item.id === "smartpos")?.detail).toContain(
+      "não confirma pareamento",
+    );
+    expect(checks.find((item) => item.id === "delivery")).toMatchObject({ ready: null });
   });
 });

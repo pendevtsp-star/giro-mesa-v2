@@ -408,6 +408,13 @@ it("serializes the cash ledger, close and dual-control review", async (context) 
     );
     assert.equal(closeB.expectedCents, 800);
     assert.equal(closeB.differenceCents, 0);
+    assert.equal(closeB.unitName, "Cash unit");
+    assert.equal(closeB.cashRegisterName, "Caixa B");
+    assert.equal(closeB.operatorName, "Cashier");
+    assert.equal(closeB.responsibleName, "Owner");
+    assert.equal(closeB.closedByName, "Owner");
+    assert.equal(closeB.openingCents, 500);
+    assert.ok(Date.parse(closeB.openedAt) < Date.parse(closeB.closedAt));
     assert.deepEqual(closeB.breakdown, [
       { method: "cash", amountCents: 800 },
       { method: "pix", amountCents: 300 },

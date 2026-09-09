@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { it } from "node:test";
 import { identities, memberships, organizations, roleBindings, units } from "@giromesa/db";
 import { DatabaseService } from "../database/database.module.js";
@@ -13,6 +16,11 @@ it("persists the finance lifecycle with approval, reversal and reconciliation", 
     return;
   }
   process.env.DATABASE_URL = databaseUrl;
+  const mediaRoot = await mkdtemp(join(tmpdir(), "giromesa-finance-"));
+  const previousMediaRoot = process.env.MEDIA_ROOT;
+  const previousScanMode = process.env.ACCOUNTANT_ATTACHMENT_SCAN_MODE;
+  process.env.MEDIA_ROOT = mediaRoot;
+  process.env.ACCOUNTANT_ATTACHMENT_SCAN_MODE = "disabled";
   const database = new DatabaseService();
   try {
     const suffix = randomUUID();
@@ -55,6 +63,26 @@ it("persists the finance lifecycle with approval, reversal and reconciliation", 
       );
 
     const management = new ManagementService(database, new ScopeService(database));
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const uploaded = await management.uploadFinanceAttachment(
+      people[0].id,
+      organizationId,
+      unit.id,
+      `finance-attachment-${suffix}`,
+      {
+        fileName: "comprovante.png",
+        contentType: "image/png",
+        contentBase64: png.toString("base64"),
+      },
+    );
+    assert.ok(uploaded.attachment.id);
+    const downloaded = await management.financeAttachment(
+      people[0].id,
+      organizationId,
+      unit.id,
+      uploaded.attachment.id,
+    );
+    assert.deepEqual(Buffer.from(downloaded.content, "base64"), png);
     await management.updateFinanceSettings(
       people[0].id,
       organizationId,
@@ -76,7 +104,7 @@ it("persists the finance lifecycle with approval, reversal and reconciliation", 
         amountCents: 20_000,
         competenceDate: "2026-01-31",
         dueDate: "2026-01-31",
-        attachments: [],
+        attachments: [{ id: uploaded.attachment.id, name: uploaded.attachment.name }],
         recurrence: { installments: 2, intervalMonths: 1 },
       },
     );
@@ -200,5 +228,10 @@ it("persists the finance lifecycle with approval, reversal and reconciliation", 
     assert.equal(dashboard.payablePayments[0]?.status, "reversed");
   } finally {
     await database.onModuleDestroy();
+    await rm(mediaRoot, { force: true, recursive: true });
+    if (previousMediaRoot === undefined) delete process.env.MEDIA_ROOT;
+    else process.env.MEDIA_ROOT = previousMediaRoot;
+    if (previousScanMode === undefined) delete process.env.ACCOUNTANT_ATTACHMENT_SCAN_MODE;
+    else process.env.ACCOUNTANT_ATTACHMENT_SCAN_MODE = previousScanMode;
   }
 });

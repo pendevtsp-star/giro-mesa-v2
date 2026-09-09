@@ -2,12 +2,58 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCourierWhatsAppLink,
   buildDeliveryWhatsAppLink,
+  deliveryCourierStatusLabel,
+  deliveryNotificationTypeLabel,
+  deliveryOrderIdFromHash,
+  deliveryPaymentMethodLabel,
+  deliveryPaymentStatusLabel,
+  deliveryStatusLabel,
+  groupDeliveryProjectionGaps,
+  parseDeliveryProjectionStatus,
   refreshAuthoritativeDeliveryState,
   requiresDeliveryCoverageOverride,
   stableDeliveryDispatchAttempt,
 } from "./DeliveryPage";
 
 describe("integração operacional de mensageria WhatsApp no Delivery", () => {
+  it("traduz estados operacionais e financeiros sem expor enums", () => {
+    expect(deliveryStatusLabel("delivery_failed")).toBe("Tentativa sem sucesso");
+    expect(deliveryStatusLabel("returned")).toBe("Devolvido à loja");
+    expect(deliveryCourierStatusLabel("delivering")).toBe("Em entrega");
+    expect(deliveryNotificationTypeLabel("courier_arriving")).toBe("Entregador chegando");
+    expect(deliveryPaymentMethodLabel("pay_on_fulfillment")).toBe("Cobrança na entrega/retirada");
+    expect(deliveryPaymentStatusLabel("awaiting_payment")).toBe("Cobrança pendente");
+  });
+
+  it("agrupa o diagnóstico POS para não contar a mesma comanda duas vezes", () => {
+    const status = parseDeliveryProjectionStatus({
+      totalMissing: 1,
+      missing: [
+        {
+          tabId: "tab-1",
+          orderId: "order-1",
+          reference: "Comanda 12",
+          status: "open",
+          reason: "projection_missing",
+        },
+        {
+          tabId: "tab-1",
+          orderId: "order-2",
+          reference: "Comanda 12",
+          status: "open",
+          reason: "projection_missing",
+        },
+      ],
+    });
+    expect(groupDeliveryProjectionGaps(status)).toHaveLength(1);
+    expect(() => parseDeliveryProjectionStatus({ missing: [] })).toThrow();
+  });
+
+  it("abre o pedido exato recebido por deep link", () => {
+    expect(deliveryOrderIdFromHash("#/delivery?order=delivery-42")).toBe("delivery-42");
+    expect(deliveryOrderIdFromHash("#/delivery")).toBeNull();
+  });
+
   it("monta o link direto do cliente com DDI 55 e mensagem amigável", () => {
     const link = buildDeliveryWhatsAppLink("11987654321", "Carlos Lima", "PED-8812");
     expect(link).not.toBeNull();

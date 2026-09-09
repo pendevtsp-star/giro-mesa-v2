@@ -5,6 +5,7 @@ import {
   parseSmartPosHomologationRuns,
   parseSmartPosPairing,
   parseSmartPosReconciliation,
+  smartPosIncidentHref,
 } from "./smartpos-admin";
 
 const diagnostics = {
@@ -92,26 +93,36 @@ describe("contratos gerenciais SmartPOS", () => {
   });
 
   it("lê saúde e conciliação sem transformar divergência em confirmação", () => {
-    expect(
-      parseSmartPosHealth({
-        generatedAt: "2026-08-21T17:05:00.000Z",
-        summary: {
-          unknownAttempts: 1,
-          staleProcessingAttempts: 2,
-          offlineDevices: 1,
-          reconciliationDivergences: 3,
+    const health = parseSmartPosHealth({
+      generatedAt: "2026-08-21T17:05:00.000Z",
+      summary: {
+        unknownAttempts: 1,
+        staleProcessingAttempts: 2,
+        offlineDevices: 1,
+        reconciliationDivergences: 3,
+      },
+      incidents: [
+        {
+          kind: "unknown_attempt",
+          severity: "critical",
+          entityId: "attempt-1",
+          label: "Cobrança da comanda 12",
+          occurredAt: "2026-08-21T16:55:00.000Z",
+          tabId: "tab-12",
+          amountCents: 6480,
+          method: "credit_card",
+          provider: "rede",
+          installationId: "installation-1",
+          paymentAttemptId: "attempt-1",
         },
-        incidents: [
-          {
-            kind: "unknown_attempt",
-            severity: "critical",
-            entityId: "attempt-1",
-            label: "Cobrança da comanda 12",
-            occurredAt: "2026-08-21T16:55:00.000Z",
-          },
-        ],
-      }).summary,
-    ).toMatchObject({ unknownAttempts: 1, reconciliationDivergences: 3 });
+      ],
+    });
+    expect(health.summary).toMatchObject({ unknownAttempts: 1, reconciliationDivergences: 3 });
+    const incident = health.incidents[0];
+    expect(incident).toMatchObject({ tabId: "tab-12", amountCents: 6480 });
+    if (!incident) return;
+    expect(smartPosIncidentHref(incident)).toBe("#/counter?tab=tab-12&paymentAttempt=attempt-1");
+    expect(smartPosIncidentHref({ tabId: "tab-12" })).toBeNull();
 
     expect(
       parseSmartPosReconciliation({

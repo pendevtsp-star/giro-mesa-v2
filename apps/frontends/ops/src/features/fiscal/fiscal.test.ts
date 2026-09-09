@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accountantOpenRequestTitle,
   accountantRequestHref,
+  accountantRequestNextAction,
   accountantRequestStatusLabel,
   accountantRequestViewFromHash,
   canResolveAccountantRequest,
@@ -239,6 +240,9 @@ describe("contrato fiscal do Ops", () => {
     }).requests[0];
 
     expect(request && accountantRequestStatusLabel(request)).toBe("Aguardando empresa");
+    expect(request && accountantRequestNextAction(request, "establishment")).toContain(
+      "registre a resposta",
+    );
     expect(request && canResolveAccountantRequest(request, "establishment")).toBe(true);
     expect(request && canResolveAccountantRequest(request, "accountant")).toBe(false);
     expect(accountantOpenRequestTitle(2)).toBe("2 solicitações do contador abertas");

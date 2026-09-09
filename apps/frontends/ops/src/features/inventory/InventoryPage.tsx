@@ -1,4 +1,4 @@
-import { Toast } from "@giromesa/ui";
+import { Button, Label, Modal, Textarea, Toast } from "@giromesa/ui";
 import { useEffect, useState } from "react";
 import { api } from "../../api";
 import {
@@ -57,13 +57,21 @@ import {
 } from "./inventory-offline";
 import { RecipeManager } from "./RecipeManager";
 import { ReturnablesWorkspace } from "./ReturnablesWorkspace";
+import "./inventory.css";
 
 interface Feedback {
   message: string;
   tone: "success" | "danger";
 }
 
+type InventoryConfirmation =
+  | { kind: "archive-item"; item: InventoryItem }
+  | { kind: "archive-location"; location: StockLocation }
+  | { kind: "cancel-production"; batchId: string }
+  | { kind: "cancel-transfer"; transferId: string };
+
 const inventoryViews = new Set<InventoryView>([
+  "shift",
   "overview",
   "pending",
   "planning",
@@ -86,7 +94,7 @@ export function inventoryViewFromUrl(search: string, hash: string): InventoryVie
     new URLSearchParams(search).get("inventoryView");
   return requested && inventoryViews.has(requested as InventoryView)
     ? (requested as InventoryView)
-    : "overview";
+    : "shift";
 }
 
 function mergeReturnables(inventory: InventoryData, returnables: ReturnablesData | null) {
@@ -132,6 +140,8 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
   const [scannedCode, setScannedCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [confirmation, setConfirmation] = useState<InventoryConfirmation | null>(null);
+  const [confirmationReason, setConfirmationReason] = useState("");
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
 
   useEffect(
@@ -221,6 +231,61 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
     }
   }
 
+  async function submitConfirmation() {
+    if (!confirmation) return;
+    const reason = confirmationReason.trim();
+    let completed = false;
+    if (confirmation.kind === "archive-item") {
+      completed = await run(
+        () =>
+          api.management.archiveInventoryItem(
+            scope.organizationId,
+            scope.unitId,
+            confirmation.item.id,
+          ),
+        "Item inativado.",
+      );
+    } else if (confirmation.kind === "archive-location") {
+      completed = await run(
+        () =>
+          api.management.archiveStockLocation(
+            scope.organizationId,
+            scope.unitId,
+            confirmation.location.id,
+          ),
+        "Local inativado.",
+      );
+    } else if (reason.length >= 3 && confirmation.kind === "cancel-production") {
+      completed = await run(
+        () =>
+          api.management.cancelProductionBatch(
+            scope.organizationId,
+            scope.unitId,
+            confirmation.batchId,
+            { reason },
+            operationalKey("production-cancel"),
+          ),
+        "Produção cancelada e insumos liberados.",
+      );
+    } else if (reason.length >= 3 && confirmation.kind === "cancel-transfer") {
+      completed = await run(
+        () =>
+          api.management.cancelInterunitTransfer(
+            scope.organizationId,
+            scope.unitId,
+            confirmation.transferId,
+            { reason },
+            operationalKey("interunit-transfer-cancel"),
+          ),
+        "Transferência cancelada e saldo em trânsito devolvido.",
+      );
+    }
+    if (completed) {
+      setConfirmation(null);
+      setConfirmationReason("");
+    }
+  }
+
   function queueOffline(action: InventoryOfflineInput, success: string) {
     enqueueInventoryAction(scope, action);
     setFeedback({ message: success, tone: "success" });
@@ -278,29 +343,12 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 />
               }
               onArchiveItem={(item) => {
-                if (!window.confirm(`Inativar ${item.name}? O saldo deve estar zerado.`)) return;
-                void run(
-                  () =>
-                    api.management.archiveInventoryItem(
-                      scope.organizationId,
-                      scope.unitId,
-                      item.id,
-                    ),
-                  "Item inativado.",
-                );
+                setConfirmation({ kind: "archive-item", item });
+                setConfirmationReason("");
               }}
               onArchiveLocation={(location) => {
-                if (!window.confirm(`Inativar ${location.name}? O local deve estar sem saldo.`))
-                  return;
-                void run(
-                  () =>
-                    api.management.archiveStockLocation(
-                      scope.organizationId,
-                      scope.unitId,
-                      location.id,
-                    ),
-                  "Local inativado.",
-                );
+                setConfirmation({ kind: "archive-location", location });
+                setConfirmationReason("");
               }}
               onEditItem={(item) => {
                 setSelectedItem(item);
@@ -328,19 +376,8 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 setDialog("production-complete");
               }}
               onCancelProduction={(batchId) => {
-                const reason = window.prompt("Motivo do cancelamento da produção:");
-                if (!reason || reason.trim().length < 3) return;
-                void run(
-                  () =>
-                    api.management.cancelProductionBatch(
-                      scope.organizationId,
-                      scope.unitId,
-                      batchId,
-                      { reason: reason.trim() },
-                      operationalKey("production-cancel"),
-                    ),
-                  "Produção cancelada e insumos liberados.",
-                );
+                setConfirmation({ kind: "cancel-production", batchId });
+                setConfirmationReason("");
               }}
               onReceiveInterunitTransfer={(transferId) => {
                 setSelectedInterunitTransfer(
@@ -349,19 +386,8 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 setDialog("interunit-receive");
               }}
               onCancelInterunitTransfer={(transferId) => {
-                const reason = window.prompt("Motivo do cancelamento da transferência:");
-                if (!reason || reason.trim().length < 3) return;
-                void run(
-                  () =>
-                    api.management.cancelInterunitTransfer(
-                      scope.organizationId,
-                      scope.unitId,
-                      transferId,
-                      { reason: reason.trim() },
-                      operationalKey("interunit-transfer-cancel"),
-                    ),
-                  "Transferência cancelada e saldo em trânsito devolvido.",
-                );
+                setConfirmation({ kind: "cancel-transfer", transferId });
+                setConfirmationReason("");
               }}
               onGenerateCyclePlan={() => {
                 void run(
@@ -1014,6 +1040,82 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
           </>
         )}
       </RemoteGate>
+      <Modal
+        isOpen={confirmation !== null}
+        onClose={() => {
+          if (busy) return;
+          setConfirmation(null);
+          setConfirmationReason("");
+        }}
+        size="sm"
+        title={
+          confirmation?.kind === "archive-item"
+            ? "Inativar item"
+            : confirmation?.kind === "archive-location"
+              ? "Inativar local"
+              : confirmation?.kind === "cancel-production"
+                ? "Cancelar produção"
+                : "Cancelar transferência"
+        }
+      >
+        {confirmation && (
+          <form
+            className="gm-form-stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitConfirmation();
+            }}
+          >
+            <p>
+              {confirmation.kind === "archive-item"
+                ? `${confirmation.item.name} só pode ser inativado quando o saldo estiver zerado.`
+                : confirmation.kind === "archive-location"
+                  ? `${confirmation.location.name} só pode ser inativado quando não houver saldo no local.`
+                  : confirmation.kind === "cancel-production"
+                    ? "O cancelamento libera os insumos reservados desta produção."
+                    : "O cancelamento devolve o saldo em trânsito para a unidade de origem."}
+            </p>
+            {(confirmation.kind === "cancel-production" ||
+              confirmation.kind === "cancel-transfer") && (
+              <Label>
+                <span>Motivo</span>
+                <Textarea
+                  autoFocus
+                  minLength={3}
+                  required
+                  value={confirmationReason}
+                  onChange={(event) => setConfirmationReason(event.target.value)}
+                />
+              </Label>
+            )}
+            {feedback?.tone === "danger" && <p role="alert">{feedback.message}</p>}
+            <div className="inventory-command-bar__actions">
+              <Button
+                disabled={
+                  busy ||
+                  ((confirmation.kind === "cancel-production" ||
+                    confirmation.kind === "cancel-transfer") &&
+                    confirmationReason.trim().length < 3)
+                }
+                type="submit"
+              >
+                {busy ? "Processando…" : "Confirmar"}
+              </Button>
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setConfirmation(null);
+                  setConfirmationReason("");
+                }}
+                type="button"
+                variant="secondary"
+              >
+                Voltar
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
       {feedback && (
         <Toast
           message={feedback.message}

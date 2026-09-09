@@ -145,28 +145,6 @@ export function CashAdministrationPanels({
   const pendingApprovals = data.approvals.filter((approval) => approval.status === "pending");
   return (
     <>
-      {data.alerts.length > 0 && (
-        <Card className="cash-alerts">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Atenção operacional</p>
-              <h2>Alertas do caixa</h2>
-            </div>
-            <Badge tone="warning">{data.alerts.length}</Badge>
-          </div>
-          <div className="cash-alert-list">
-            {data.alerts.map((alert) => (
-              <p key={`${alert.code}:${alert.cashShiftId ?? alert.installationId ?? "unit"}`}>
-                <Badge tone={alert.severity === "critical" ? "danger" : "warning"}>
-                  {alert.severity === "critical" ? "Crítico" : "Atenção"}
-                </Badge>
-                <span>{alert.message}</span>
-              </p>
-            ))}
-          </div>
-        </Card>
-      )}
-
       {openShift && data.capabilities.canHandover && (
         <details className="action-panel">
           <summary>

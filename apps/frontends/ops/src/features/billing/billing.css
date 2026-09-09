@@ -296,6 +296,14 @@
   text-align: left;
 }
 
+.billing-charges td > small {
+  color: var(--gm-muted);
+  display: block;
+  font-size: var(--gm-font-xs);
+  margin-top: var(--gm-space-1);
+  white-space: normal;
+}
+
 .billing-charges th {
   color: var(--gm-muted);
   font-size: var(--gm-font-xs);

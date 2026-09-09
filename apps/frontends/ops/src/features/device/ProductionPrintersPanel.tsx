@@ -47,6 +47,8 @@ import { productionPrintJobAction } from "./production-print-job-actions";
 import {
   firstIncompleteProductionStep,
   type ProductionSetupStep,
+  productionMonitorInterval,
+  productionPrinterLabel,
   productionSetupReadiness,
   productionSetupSteps,
 } from "./production-setup";
@@ -163,6 +165,7 @@ export function ProductionPrintersPanel({
   const [pilotExperience, setPilotExperience] = useState<EdgeHubPilotExperience>("easy");
   const [pilotComment, setPilotComment] = useState("");
   const [pilotFeedbackSent, setPilotFeedbackSent] = useState(false);
+  const [lastMonitorRefreshAt, setLastMonitorRefreshAt] = useState<string | null>(null);
   const inFlightRef = useRef(new Set<string>());
   const printerProbeRequestRef = useRef(0);
 
@@ -186,6 +189,7 @@ export function ProductionPrintersPanel({
           jobs,
           hubs: printerResponse.hubs,
         });
+        setLastMonitorRefreshAt(new Date().toISOString());
         setPolicyDrafts(
           Object.fromEntries(
             stationResponse.stations.map((station) => [
@@ -213,36 +217,41 @@ export function ProductionPrintersPanel({
     [canManage, organizationId, unitId],
   );
 
-  const loadEdge = useCallback(async () => {
-    if (!runtime.embedded) {
-      setEdge({ status: "unavailable" });
-      return;
-    }
-    setEdge({ status: "loading" });
-    try {
-      const [diagnostics, queue] = await Promise.all([
-        loadShellPrinterDiagnostics(),
-        loadShellLocalPrintQueue(undefined, 40),
-      ]);
-      if (!diagnostics?.success) {
-        setEdge({
-          status: "error",
-          message: "O computador não entregou a conferência das impressoras.",
-        });
+  const loadEdge = useCallback(
+    async (silent = false) => {
+      if (!runtime.embedded) {
+        setEdge({ status: "unavailable" });
         return;
       }
-      setEdge({
-        status: "ready",
-        printers: parsePrinterDiagnostics(diagnostics.payload),
-        jobs: queue?.success ? parseLocalPrintQueue(queue.payload) : [],
-      });
-    } catch (error) {
-      setEdge({
-        status: "error",
-        message: errorMessage(error, "Não foi possível consultar este computador."),
-      });
-    }
-  }, [runtime.embedded]);
+      if (!silent) setEdge({ status: "loading" });
+      try {
+        const [diagnostics, queue] = await Promise.all([
+          loadShellPrinterDiagnostics(),
+          loadShellLocalPrintQueue(undefined, 40),
+        ]);
+        if (!diagnostics?.success) {
+          if (!silent)
+            setEdge({
+              status: "error",
+              message: "O computador não entregou a conferência das impressoras.",
+            });
+          return;
+        }
+        setEdge({
+          status: "ready",
+          printers: parsePrinterDiagnostics(diagnostics.payload),
+          jobs: queue?.success ? parseLocalPrintQueue(queue.payload) : [],
+        });
+      } catch (error) {
+        if (!silent)
+          setEdge({
+            status: "error",
+            message: errorMessage(error, "Não foi possível consultar este computador."),
+          });
+      }
+    },
+    [runtime.embedded],
+  );
 
   useEffect(() => {
     void loadCloud();
@@ -272,6 +281,20 @@ export function ProductionPrintersPanel({
         : 0,
     [cloud],
   );
+  useEffect(() => {
+    if (!canManage) return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void loadCloud(true);
+      if (runtime.embedded) void loadEdge(true);
+    };
+    const interval = window.setInterval(refresh, productionMonitorInterval(failedJobs > 0));
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [canManage, failedJobs, loadCloud, loadEdge, runtime.embedded]);
   const setupReadiness = useMemo(
     () =>
       cloud.status === "ready"
@@ -283,6 +306,7 @@ export function ProductionPrintersPanel({
     cloud.status === "ready"
       ? cloud.printers.find((printer) => Boolean(printer.lastTestAt))
       : undefined;
+  const operationalPrinters = cloud.status === "ready" ? cloud.printers : [];
   const pilotDeviceId =
     testedPrinter?.hubId ??
     (cloud.status === "ready"
@@ -683,6 +707,9 @@ export function ProductionPrintersPanel({
           <p>Conecte os equipamentos e escolha para onde cada pedido deve ir.</p>
         </div>
         <div className="production-printers__header-actions">
+          {lastMonitorRefreshAt && (
+            <small>Monitor automático · atualizado {dateTime(lastMonitorRefreshAt)}</small>
+          )}
           {cloud.status === "ready" && (
             <Badge tone={failedJobs > 0 ? "danger" : "success"}>
               {failedJobs > 0 ? `${failedJobs} falha(s) pendente(s)` : "Fila sem falhas"}
@@ -1135,7 +1162,9 @@ export function ProductionPrintersPanel({
                         return (
                           <tr key={job.id}>
                             <td>{job.stationName ?? job.stationId ?? "Roteamento automático"}</td>
-                            <td>{job.printerId ?? "Automática"}</td>
+                            <td title={job.printerId ?? undefined}>
+                              {productionPrinterLabel(operationalPrinters, job.printerId)}
+                            </td>
                             <td>
                               <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
                               {job.lastError && <small>{job.lastError}</small>}
@@ -1256,8 +1285,9 @@ export function ProductionPrintersPanel({
                   <ul>
                     {edge.printers.map((printer) => (
                       <li key={printer.id}>
-                        <span>
-                          {printer.id} · {printer.paperWidthMm} mm
+                        <span title={printer.id}>
+                          {productionPrinterLabel(operationalPrinters, printer.id)} ·{" "}
+                          {printer.paperWidthMm} mm
                         </span>
                         <Badge tone={printer.available ? "success" : "danger"}>
                           {printer.available ? "Disponível" : (printer.errorCode ?? "Indisponível")}
@@ -1275,7 +1305,10 @@ export function ProductionPrintersPanel({
                   <ul>
                     {edge.jobs.slice(0, 12).map((job) => (
                       <li key={job.id}>
-                        <span>{job.stationName ?? job.printerId ?? job.documentType}</span>
+                        <span title={job.printerId ?? undefined}>
+                          {job.stationName ??
+                            productionPrinterLabel(operationalPrinters, job.printerId)}
+                        </span>
                         <Badge tone={statusTone(job.status)}>{statusLabel(job.status)}</Badge>
                       </li>
                     ))}

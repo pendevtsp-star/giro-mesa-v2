@@ -22,7 +22,21 @@ import {
 } from "@giromesa/db";
 import { includesDoseClubEntitlement, missingActivationItems } from "@giromesa/domain";
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import type {
   PlatformIncidentAction,
@@ -34,6 +48,7 @@ import type { PlatformAccess } from "./platform-access.js";
 
 type IncidentSeverity = "critical" | "high" | "medium" | "low";
 type IncidentState = "open" | "claimed" | "snoozed" | "resolved";
+type IncidentImpact = "billing" | "orders" | "messaging" | "fiscal" | "operations";
 type PlatformIncident = {
   fingerprint: string;
   source: "outbox" | "hub" | "fiscal" | "billing";
@@ -47,6 +62,27 @@ type PlatformIncident = {
   detail: Record<string, unknown>;
   occurredAt: Date;
 };
+
+export function platformIncidentImpact(incident: Pick<PlatformIncident, "source" | "detail">): {
+  impact: IncidentImpact;
+  criterion: string;
+} {
+  if (incident.source === "billing") return { impact: "billing", criterion: "origem cobrança" };
+  if (incident.source === "fiscal") return { impact: "fiscal", criterion: "origem fiscal" };
+  if (incident.source === "hub")
+    return { impact: "operations", criterion: "conectividade da unidade" };
+  const topic =
+    typeof incident.detail.topic === "string" ? incident.detail.topic.toLowerCase() : "";
+  if (/(billing|charge|subscription|payment)/.test(topic))
+    return { impact: "billing", criterion: `tópico ${topic}` };
+  if (/(order|delivery|kds|tab|command)/.test(topic))
+    return { impact: "orders", criterion: `tópico ${topic}` };
+  if (/(message|whatsapp|campaign|notification|email)/.test(topic))
+    return { impact: "messaging", criterion: `tópico ${topic}` };
+  if (/(fiscal|document|invoice|receipt)/.test(topic))
+    return { impact: "fiscal", criterion: `tópico ${topic}` };
+  return { impact: "operations", criterion: topic ? `tópico ${topic}` : "job operacional" };
+}
 export type PilotAccessGrant = {
   organizationId: string;
   trialId: string;
@@ -643,6 +679,29 @@ export class PlatformControlService {
     const requestedState = query.status ?? query.state;
     const page = query.cursor ?? 1;
     const projected = await this.projectIncidents(now);
+    const incidentOrganizationIds = [
+      ...new Set(
+        projected
+          .map((incident) => incident.organizationId)
+          .filter((organizationId): organizationId is string => organizationId !== null),
+      ),
+    ];
+    const activePilotRows =
+      query.activePilotOnly && incidentOrganizationIds.length
+        ? await this.database.db
+            .select({ organizationId: trials.organizationId })
+            .from(trials)
+            .innerJoin(organizations, eq(organizations.id, trials.organizationId))
+            .where(
+              and(
+                inArray(trials.organizationId, incidentOrganizationIds),
+                eq(organizations.billingState, "trial_active"),
+                lte(trials.startsAt, now),
+                gt(trials.endsAt, now),
+              ),
+            )
+        : [];
+    const activePilotOrganizationIds = new Set(activePilotRows.map((row) => row.organizationId));
     const stateRows = projected.length
       ? await this.database.db
           .select()
@@ -662,8 +721,10 @@ export class PlatformControlService {
           persisted?.status === "snoozed" && persisted.snoozedUntil && persisted.snoozedUntil <= now
             ? "open"
             : (persisted?.status ?? "open");
+        const impact = platformIncidentImpact(incident);
         return {
           ...incident,
+          ...impact,
           state,
           claimedByIdentityId: persisted?.claimedByIdentityId ?? null,
           claimedAt: persisted?.claimedAt ?? null,
@@ -677,9 +738,25 @@ export class PlatformControlService {
         };
       })
       .filter(
+        (incident) =>
+          !query.activePilotOnly ||
+          (incident.organizationId !== null &&
+            activePilotOrganizationIds.has(incident.organizationId)),
+      )
+      .filter(
         (incident) => !query.organizationId || incident.organizationId === query.organizationId,
       )
       .filter((incident) => !query.severity || incident.severity === query.severity)
+      .filter((incident) => !query.source || incident.source === query.source)
+      .filter((incident) => !query.impact || incident.impact === query.impact)
+      .filter(
+        (incident) =>
+          query.minAgeMinutes === undefined || incident.ageMinutes >= query.minAgeMinutes,
+      )
+      .filter(
+        (incident) =>
+          query.maxAgeMinutes === undefined || incident.ageMinutes <= query.maxAgeMinutes,
+      )
       .filter((incident) => !query.assignee || incident.claimedByIdentityId === query.assignee)
       .filter((incident) => {
         if (!query.search) return true;

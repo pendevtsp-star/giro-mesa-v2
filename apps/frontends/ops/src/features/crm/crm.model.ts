@@ -162,6 +162,8 @@ export interface CrmWhatsappConversation {
   updatedAt: string;
   unreadCount: number;
   lastMessageAt: string | null;
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
 }
 
 export interface CrmCursorPage<T> {
@@ -481,6 +483,8 @@ export function parseCrmWhatsappConversation(value: unknown): CrmWhatsappConvers
     updatedAt: text(row.updatedAt),
     unreadCount: number(row.unreadCount),
     lastMessageAt: optionalText(row.lastMessageAt),
+    lastInboundAt: optionalText(row.lastInboundAt),
+    lastOutboundAt: optionalText(row.lastOutboundAt),
   };
 }
 

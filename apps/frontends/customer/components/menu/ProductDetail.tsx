@@ -7,6 +7,7 @@ export function ProductDetail({
   selected,
   selection,
   notes,
+  allergyNote,
   quantity,
   unitPrice,
   error,
@@ -14,6 +15,7 @@ export function ProductDetail({
   onDismiss,
   onToggleModifier,
   onNotes,
+  onAllergyNote,
   onQuantity,
   onAdd,
 }: {
@@ -21,6 +23,7 @@ export function ProductDetail({
   selected: MenuItem | null;
   selection: Record<string, Modifier[]>;
   notes: string;
+  allergyNote: string;
   quantity: number;
   unitPrice: number;
   error?: string;
@@ -28,6 +31,7 @@ export function ProductDetail({
   onDismiss: () => void;
   onToggleModifier: (group: ModifierGroup, modifier: Modifier) => void;
   onNotes: (notes: string) => void;
+  onAllergyNote: (note: string) => void;
   onQuantity: (quantity: number) => void;
   onAdd: () => void;
 }) {
@@ -87,6 +91,21 @@ export function ProductDetail({
                 onChange={(event) => onNotes(event.target.value)}
                 placeholder="Ex.: sem cebola"
               />
+            </Label>
+            <Label className="notes">
+              Alergia alimentar
+              <Textarea
+                rows={2}
+                maxLength={500}
+                value={allergyNote}
+                onChange={(event) => onAllergyNote(event.target.value)}
+                placeholder="Informe o ingrediente que causa alergia"
+                aria-describedby="product-allergy-help"
+              />
+              <small id="product-allergy-help">
+                O alerta será enviado à equipe. Confirme com o atendimento se o preparo atende à sua
+                restrição.
+              </small>
             </Label>
             {error && (
               <p className="dialog-error" role="alert">

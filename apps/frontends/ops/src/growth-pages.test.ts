@@ -55,12 +55,17 @@ describe("contratos de crescimento reais", () => {
           completedDeliveryGrossCents: 10_000,
           activeReservations: 2,
           activeWaitlist: 1,
+          cash: { status: "open", openSince: "2026-08-09T18:00:00.000Z", varianceCents: 0 },
+          delays: { total: 2, oldestMinutes: 17 },
+          stockouts: { total: null },
         },
       ],
       transfersByStatus: { requested: 2 },
       disclaimer: "Baseado em registros persistidos.",
     });
     expect(summary.units[0]?.completedDeliveryGrossCents).toBe(10_000);
+    expect(summary.units[0]?.delays).toEqual({ total: 2, oldestMinutes: 17 });
+    expect(summary.units[0]?.stockouts.total).toBeNull();
     expect(summary.disclaimer).toContain("persistidos");
   });
 

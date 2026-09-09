@@ -35,6 +35,8 @@ import {
 import { ConflictException } from "@nestjs/common";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { ManagementService } from "../management/management.service.js";
+import { ManagementOverviewService } from "../management/management-overview.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 import { kdsAttentionRevision } from "./pilot-rules.js";
@@ -408,10 +410,15 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       table.id,
       tabId,
       "qr-table-order-0001",
-      { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
+      {
+        items: [
+          { productId: product.id, quantity: 1, modifierOptionIds: [], allergyNote: "Amendoim" },
+        ],
+      },
     );
     assert.equal(qrDraft.order.source, "qr_table");
     assert.equal(qrDraft.order.status, "draft");
+    assert.equal(qrDraft.items[0]?.allergyNote, "Amendoim");
     const [[stockWithQrDraft], [tabWithQrDraft]] = await Promise.all([
       database.db
         .select({ soldToday: posProductAvailability.soldToday })
@@ -2519,6 +2526,32 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     const queueOrderId = (queueOrder.order as { id: string }).id;
     const queueItemId = (queueOrder.items as { id: string }[])[0]?.id;
     assert.ok(queueItemId);
+    await pos.requestApproval(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTabId,
+      "overview-approval-target",
+      { itemId: queueItemId, action: "cancel", reason: "Revisar item da comanda correta" },
+    );
+    const overviewService = new ManagementOverviewService(
+      database,
+      scope,
+      new ManagementService(database, scope),
+    );
+    const actionableOverview = await overviewService.overview(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      "operations",
+    );
+    assert.deepEqual(
+      actionableOverview.priorities.find((priority) => priority.id === "pending-approvals")?.target,
+      { tabId: queueTabId },
+    );
+    await assert.rejects(() =>
+      overviewService.overview(identity.id, organizationA.id, unitB.id, "operations"),
+    );
     const queueSent = await pos.sendOrder(
       identity.id,
       organizationA.id,
@@ -2528,6 +2561,90 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     );
     const queueTicketId = (queueSent.ticketIds as string[])[0];
     assert.ok(queueTicketId);
+    await pos.setKdsCourseState(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      "queue-course-hold",
+      { course: "anytime", state: "held" },
+    );
+    const heldCourse = await pos.getTab(identity.id, organizationA.id, unitA.id, queueTabId);
+    assert.equal(
+      heldCourse.productionCourses.find((course) => course.ticketId === queueTicketId)?.state,
+      "held",
+    );
+    await database.db
+      .update(posTabs)
+      .set({ responsibleIdentityId: supportIdentity.id })
+      .where(eq(posTabs.id, queueTabId));
+    await pos.setKdsCourseState(
+      supportIdentity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      "queue-course-fire",
+      { course: "anytime", state: "fired" },
+    );
+    const firedCourse = await pos.getTab(identity.id, organizationA.id, unitA.id, queueTabId);
+    assert.equal(
+      firedCourse.productionCourses.find((course) => course.ticketId === queueTicketId)?.state,
+      "fired",
+    );
+    await database.db
+      .update(posKdsTicketItems)
+      .set({ dependencyHeld: true, held: true })
+      .where(eq(posKdsTicketItems.ticketId, queueTicketId));
+    await pos.setKdsCourseState(
+      supportIdentity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      "queue-course-hold-with-dependency",
+      { course: "anytime", state: "held" },
+    );
+    await pos.setKdsCourseState(
+      supportIdentity.id,
+      organizationA.id,
+      unitA.id,
+      queueTicketId,
+      "queue-course-release-with-dependency",
+      { course: "anytime", state: "fired" },
+    );
+    const [dependencyAssignment] = await database.db
+      .select()
+      .from(posKdsTicketItems)
+      .where(eq(posKdsTicketItems.ticketId, queueTicketId));
+    assert.equal(dependencyAssignment?.courseHeld, false);
+    assert.equal(dependencyAssignment?.held, true);
+    await database.db
+      .update(posKdsTicketItems)
+      .set({ dependencyHeld: false, held: false })
+      .where(eq(posKdsTicketItems.ticketId, queueTicketId));
+    await database.db
+      .update(posTabs)
+      .set({ responsibleIdentityId: identity.id })
+      .where(eq(posTabs.id, queueTabId));
+    await assert.rejects(() =>
+      pos.setKdsCourseState(
+        supportIdentity.id,
+        organizationA.id,
+        unitA.id,
+        queueTicketId,
+        "queue-course-other-responsible",
+        { course: "anytime", state: "held" },
+      ),
+    );
+    await assert.rejects(() =>
+      pos.setKdsCourseState(
+        supportIdentity.id,
+        organizationA.id,
+        unitB.id,
+        queueTicketId,
+        "queue-course-other-unit",
+        { course: "anytime", state: "held" },
+      ),
+    );
     const productionQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
       ...queueQuery,
       stage: "production",
@@ -2644,8 +2761,18 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       table.id,
       tabId,
       "qr-table-order-approval-0001",
-      { items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }] },
+      {
+        items: [
+          { productId: product.id, quantity: 1, modifierOptionIds: [], allergyNote: "Amendoim" },
+        ],
+      },
     );
+    const [qrAllergy] = await database.db
+      .select({ allergyNote: posOrderItems.allergyNote })
+      .from(posOrderItems)
+      .where(eq(posOrderItems.orderId, (qrApproval.order as { id: string }).id))
+      .limit(1);
+    assert.equal(qrAllergy?.allergyNote, "Amendoim");
     const [stockWhileQrPending] = await database.db
       .select({ soldToday: posProductAvailability.soldToday })
       .from(posProductAvailability)
@@ -2922,6 +3049,40 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     assert.ok(closedShift.handover.openTabs > 0);
     assert.equal(closedShift.handover.returnableCustodyHandoffs, 2);
     assert.equal(closedShift.handover.pendingReturnableCustodies, 0);
+    const handover = await pos.shiftHandover(identity.id, organizationA.id, unitA.id);
+    assert.equal(handover.lastHandover?.shiftId, shift.id);
+    assert.ok(handover.lastHandover);
+    const handoverId = handover.lastHandover.id;
+    const handoverReceipt = await pos.acknowledgeShiftHandover(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      handover.lastHandover.id,
+      "shift-handover-receipt-001",
+    );
+    const handoverReplay = await pos.acknowledgeShiftHandover(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      handover.lastHandover.id,
+      "shift-handover-receipt-001",
+    );
+    assert.equal(
+      (handoverReceipt.receipt as { id: string }).id,
+      (handoverReplay.receipt as { id: string }).id,
+    );
+    await assert.rejects(() =>
+      pos.acknowledgeShiftHandover(
+        identity.id,
+        organizationA.id,
+        unitB.id,
+        handoverId,
+        "shift-handover-other-unit",
+      ),
+    );
+    const readHandover = await pos.shiftHandover(identity.id, organizationA.id, unitA.id);
+    assert.deepEqual(readHandover.lastHandover?.snapshot, handover.lastHandover.snapshot);
+    assert.ok(readHandover.lastHandover?.receipt);
     const [returnableCustodyHandoff] = await database.db
       .select()
       .from(managementReturnableCustodyHandoffs)

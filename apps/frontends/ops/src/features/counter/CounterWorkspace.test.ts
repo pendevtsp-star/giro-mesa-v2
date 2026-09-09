@@ -5,6 +5,7 @@ import {
   createPendingOrderSubmission,
   type DraftCartItem,
   parsePendingOrderSubmission,
+  repeatRoundItemAvailability,
 } from "./CounterWorkspace";
 
 const scope = {
@@ -33,6 +34,32 @@ const items: DraftCartItem[] = [
 ];
 
 describe("continuidade do pedido no balcão", () => {
+  it("revalida disponibilidade, preço, rota e estoque ao repor uma rodada", () => {
+    const firstItem = items[0] as DraftCartItem;
+    const product = {
+      active: true,
+      available: true,
+      dailyStockRemaining: 2,
+      priceCents: 1590,
+      stationIds: ["bar"],
+    };
+    expect(repeatRoundItemAvailability(firstItem, product, new Set(["bar"]))).toEqual({
+      available: true,
+      reason: null,
+      priceCents: 1590,
+    });
+    expect(
+      repeatRoundItemAvailability(
+        { productId: "product-1", quantity: 3 },
+        product,
+        new Set(["bar"]),
+      ),
+    ).toMatchObject({ available: false, reason: expect.stringContaining("Restam 2") });
+    expect(repeatRoundItemAvailability(firstItem, product, new Set())).toMatchObject({
+      available: false,
+      reason: "Produto sem estação ativa.",
+    });
+  });
   it("preserva comandos por etapa para retomar o mesmo pedido após recarga", () => {
     vi.stubGlobal("crypto", {
       randomUUID: vi.fn().mockReturnValueOnce("command-1").mockReturnValueOnce("command-2"),

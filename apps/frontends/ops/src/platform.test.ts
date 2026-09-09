@@ -15,11 +15,48 @@ import {
   parsePlatformOverview,
   parsePlatformTenant,
   parsePlatformTenants,
+  parseSavedIncidentFilters,
   parseTenantPii,
   toggleCommercialEntitlement,
 } from "./platform";
 
 describe("painel real da plataforma", () => {
+  it("restaura somente filtros locais válidos da visão de incidentes", () => {
+    expect(
+      parseSavedIncidentFilters(
+        JSON.stringify({
+          status: "open",
+          severity: "critical",
+          source: "outbox",
+          impact: "orders",
+          age: "over_240",
+          activePilotOnly: true,
+        }),
+      ),
+    ).toEqual({
+      status: "open",
+      severity: "critical",
+      source: "outbox",
+      impact: "orders",
+      age: "over_240",
+      activePilotOnly: true,
+    });
+    expect(parseSavedIncidentFilters("invalid-json")).toBeNull();
+    expect(
+      parseSavedIncidentFilters(
+        JSON.stringify({
+          status: "open",
+          severity: "critical",
+          source: "outbox",
+          impact: "orders",
+          age: "over_240",
+          activePilotOnly: true,
+          tenantSnapshot: ["org-1"],
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it("valida contadores e filas comerciais persistidas", () => {
     const overview = parsePlatformOverview({
       counts: { organizations: 3, units: 5, activeTrials: 2 },
@@ -209,6 +246,8 @@ describe("painel real da plataforma", () => {
           claimedByIdentityId: null,
           snoozedUntil: null,
           ageMinutes: 90,
+          impact: "operations",
+          criterion: "conectividade da unidade",
         },
       ],
       timeline: [
@@ -253,6 +292,8 @@ describe("painel real da plataforma", () => {
           claimedByIdentityId: null,
           snoozedUntil: null,
           ageMinutes: 125,
+          impact: "fiscal",
+          criterion: "tópico fiscal.issue",
         },
       ],
       nextCursor: "3",

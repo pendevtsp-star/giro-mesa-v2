@@ -109,6 +109,10 @@ export interface WaiterSettlement {
   operationalLossCents: number;
   createdAt: string | null;
   warnings: string[];
+  blockers: Array<{ code: string; message: string }>;
+  paymentMethod: string | null;
+  paymentReference: string | null;
+  financePayableId: string | null;
   lines: SettlementLine[];
 }
 
@@ -264,6 +268,13 @@ export function parseSettlement(value: unknown, preview = false): WaiterSettleme
     warnings: Array.isArray(item.warnings)
       ? item.warnings.filter((warning): warning is string => typeof warning === "string")
       : [],
+    blockers: optionalRows(item, "blockers").map((blocker) => ({
+      code: requiredString(blocker.code),
+      message: requiredString(blocker.message),
+    })),
+    paymentMethod: optionalString(item.paymentMethod),
+    paymentReference: optionalString(item.paymentReference),
+    financePayableId: optionalString(item.financePayableId),
     lines: optionalRows(item, "lines").map(parseSettlementLine),
   };
 }

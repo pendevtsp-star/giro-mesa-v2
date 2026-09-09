@@ -2,8 +2,12 @@ import { createReadStream } from "node:fs";
 import {
   type AcceptMembershipInviteInput,
   acceptMembershipInviteSchema,
+  type ChannelCheckInput,
   type CopyUnitSettingsInput,
   type CreateOrganizationInput,
+  channelCheckInputSchema,
+  channelCheckSchema,
+  channelChecksResponseSchema,
   copyUnitSettingsSchema,
   createOrganizationSchema,
   type EdgeHubPairingCreateInput,
@@ -163,6 +167,44 @@ export class OrganizationsController {
       request.auth.identityId,
       organizationId,
       unitId,
+    );
+  }
+
+  @ApiOkResponse({ schema: toOpenApiSchema(channelChecksResponseSchema) })
+  @Get(":organizationId/units/:unitId/settings/channel-checks")
+  channelChecks(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.establishmentSettings.channelChecks(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+    );
+  }
+
+  @ApiHeader({
+    name: "Idempotency-Key",
+    required: true,
+    schema: { type: "string", minLength: 8, maxLength: 160 },
+  })
+  @ApiBody({ schema: toOpenApiSchema(channelCheckInputSchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(channelCheckSchema) })
+  @Post(":organizationId/units/:unitId/settings/channel-checks")
+  recordChannelCheck(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(channelCheckInputSchema)) body: ChannelCheckInput,
+  ) {
+    return this.establishmentSettings.recordChannelCheck(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
     );
   }
 

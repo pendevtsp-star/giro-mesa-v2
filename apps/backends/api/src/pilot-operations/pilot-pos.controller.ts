@@ -6,6 +6,7 @@ import {
   type RejectPublicTableOrderInput,
   rejectPublicTableOrderResponseSchema,
   rejectPublicTableOrderSchema,
+  shiftHandoverResponseSchema,
   tableQrPresenceSchema,
 } from "@giromesa/contracts";
 import {
@@ -53,6 +54,7 @@ import {
   counterQueueQuerySchema,
   type DetachTableGroupInput,
   type DiscountInput,
+  deliveryProjectionStatusSchema,
   detachTableGroupSchema,
   discountSchema,
   type FloorLayoutInput,
@@ -622,6 +624,44 @@ export class PilotPosController {
     @Query(new ZodPipe(counterQueueQuerySchema)) query: CounterQueueQueryInput,
   ) {
     return this.pos.listCounterQueue(request.auth.identityId, organizationId, unitId, query);
+  }
+
+  @Get("delivery-projection-status")
+  @ApiOkResponse({ schema: toOpenApiSchema(deliveryProjectionStatusSchema) })
+  deliveryProjectionStatus(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.pos.deliveryProjectionStatus(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Get("shift-handover")
+  @ApiOkResponse({ schema: toOpenApiSchema(shiftHandoverResponseSchema) })
+  shiftHandover(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.pos.shiftHandover(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("shift-handover/:handoverId/acknowledge")
+  @ApiHeader({ name: "idempotency-key", required: true })
+  acknowledgeShiftHandover(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("handoverId", ParseUUIDPipe) handoverId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.pos.acknowledgeShiftHandover(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      handoverId,
+      new ZodPipe(idempotencyKeySchema).transform(idempotencyKey) as string,
+    );
   }
 
   @Get("tabs/:tabId")

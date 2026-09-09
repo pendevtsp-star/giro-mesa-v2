@@ -13,6 +13,7 @@ import {
   type IntegratedPaymentMethod,
   type PaymentAttempt,
   type PaymentCapabilities,
+  paymentAttemptContextError,
   paymentBlockReason,
   posPayments,
 } from "./pos-payments";
@@ -41,6 +42,7 @@ function statusLabel(status: PaymentAttempt["status"]) {
 
 export function SmartPosPaymentModal({
   embedded,
+  initialAttemptId,
   installationId,
   isOpen,
   onApproved,
@@ -52,6 +54,7 @@ export function SmartPosPaymentModal({
   unitId,
 }: {
   embedded: boolean;
+  initialAttemptId?: string | null;
   installationId: string;
   isOpen: boolean;
   onApproved: () => void;
@@ -64,6 +67,8 @@ export function SmartPosPaymentModal({
 }) {
   const [capabilities, setCapabilities] = useState<PaymentCapabilities | null>(null);
   const [loading, setLoading] = useState(false);
+  const [attemptLoading, setAttemptLoading] = useState(false);
+  const [attemptLoadError, setAttemptLoadError] = useState("");
   const [shellLoading, setShellLoading] = useState(false);
   const [shellCapabilities, setShellCapabilities] = useState<ShellPaymentCapabilities | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,6 +91,39 @@ export function SmartPosPaymentModal({
     },
     [onApproved, onAttemptChange],
   );
+
+  useEffect(() => {
+    if (!isOpen || !initialAttemptId) {
+      setAttemptLoadError("");
+      return;
+    }
+    let active = true;
+    setAttemptLoading(true);
+    setAttemptLoadError("");
+    void posPayments
+      .get(organizationId, unitId, initialAttemptId)
+      .then((next) => {
+        if (!active) return;
+        const contextError = paymentAttemptContextError(next, tabId, installationId);
+        if (contextError) throw new Error(contextError);
+        updateAttempt(next);
+      })
+      .catch((failure: unknown) => {
+        if (!active) return;
+        updateAttempt(null);
+        setAttemptLoadError(
+          failure instanceof Error
+            ? failure.message
+            : "Não foi possível carregar a tentativa de pagamento.",
+        );
+      })
+      .finally(() => {
+        if (active) setAttemptLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [initialAttemptId, installationId, isOpen, organizationId, tabId, unitId, updateAttempt]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -304,10 +342,16 @@ export function SmartPosPaymentModal({
       size="sm"
       title="Cobrar na maquininha"
     >
-      {loading || shellLoading ? (
+      {loading || shellLoading || attemptLoading ? (
         <p className="smart-pos-payment__loading" role="status">
           Verificando esta maquininha…
         </p>
+      ) : attemptLoadError ? (
+        <Callout tone="danger">
+          <strong>Tentativa não aberta</strong>
+          <p>{attemptLoadError}</p>
+          <p>Nenhuma nova cobrança foi criada.</p>
+        </Callout>
       ) : !capabilities?.available || !bridgeReady ? (
         <Callout tone="warning">
           <strong>Pagamento direto indisponível</strong>

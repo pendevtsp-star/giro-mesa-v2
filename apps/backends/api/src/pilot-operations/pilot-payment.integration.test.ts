@@ -229,7 +229,7 @@ it("posts one trusted payment from the enrolled SmartPOS result", async (context
     const smartPos = new PilotSmartPosService(database, scope);
     const service = new PilotPosService(database, scope, smartPos);
     const management = new ManagementService(database, scope);
-    const settlements = new ManagementSettlementsService(database, scope);
+    const settlements = new ManagementSettlementsService(database, scope, management);
     const overview = new ManagementOverviewService(database, scope, management);
     const reports = new ManagementReportService(database, scope, management, new MetricsService());
     const organizationService = new OrganizationsService(database, scope);

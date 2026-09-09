@@ -40,6 +40,7 @@ import {
   useRemote,
 } from "../../management.shared";
 import { accessRolesRequireStepUp, toggleAccessRole } from "./people-access";
+import { isOnUnitDay } from "./people-date";
 import { TimeTrackingAuditPanel } from "./TimeTrackingAuditPanel";
 import { TimeTrackingLocationControls } from "./TimeTrackingLocationControls";
 
@@ -482,6 +483,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const [commissionAmount, setCommissionAmount] = useState("");
   const [indicatorsRevision, setIndicatorsRevision] = useState(0);
   const indicatorsMounted = useRef(false);
+  const unitDateInitialized = useRef(false);
   const indicators = useRemote(
     { ...scope, refreshToken: indicatorsRevision },
     (organizationId, unitId) =>
@@ -508,6 +510,11 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
   const accessOverviewRequest = useRef(0);
   useEffect(() => {
     if (remote.state.status !== "ready") return;
+    if (!unitDateInitialized.current) {
+      unitDateInitialized.current = true;
+      setReportTo(remote.state.data.today);
+      setReportFrom(`${remote.state.data.today.slice(0, 7)}-01`);
+    }
     const settings = remote.state.data.settings;
     setTrackingMode(settings.mode);
     setGeofenceEnabled(settings.geofenceEnabled);
@@ -1644,6 +1651,52 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </div>
             </section>
           </Card>
+          {section === "today" &&
+            (() => {
+              const scheduledToday = data.schedules.filter((schedule) =>
+                isOnUnitDay(schedule.startsAt, data.today, data.timezone),
+              );
+              const activePersonIds = new Set(
+                data.timeEntries
+                  .filter((entry) => !entry.clockedOutAt)
+                  .map((entry) => entry.personId),
+              );
+              return (
+                <Card className="people-list-card">
+                  <div className="card-header">
+                    <div>
+                      <p className="eyebrow">Hoje · {data.today}</p>
+                      <h2>Equipe do turno</h2>
+                    </div>
+                    <Badge tone={data.corrections.length ? "warning" : "success"}>
+                      {data.corrections.length} correção(ões)
+                    </Badge>
+                  </div>
+                  <div className="people-indicator-grid">
+                    <div>
+                      <span>Escalados</span>
+                      <strong>{scheduledToday.length}</strong>
+                    </div>
+                    <div>
+                      <span>Em atividade</span>
+                      <strong>{activePersonIds.size}</strong>
+                    </div>
+                    <div>
+                      <span>Pendências</span>
+                      <strong>{data.alerts.length + data.corrections.length}</strong>
+                    </div>
+                  </div>
+                  <div className="people-form-actions">
+                    <Button onClick={() => setSection("schedules")} size="sm" variant="secondary">
+                      Ver escala de hoje
+                    </Button>
+                    <Button onClick={() => setSection("time")} size="sm" variant="secondary">
+                      Revisar ponto e correções
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })()}
           {section === "today" && indicators.state.status === "ready" && (
             <Card className="people-list-card people-indicators-card">
               <div className="card-header">
@@ -2653,10 +2706,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                 </div>
                 <div className="management-list">
                   {data.schedules
-                    .filter(
-                      (schedule) =>
-                        new Date(schedule.startsAt).toDateString() === new Date().toDateString(),
-                    )
+                    .filter((schedule) => isOnUnitDay(schedule.startsAt, data.today, data.timezone))
                     .slice(0, 12)
                     .map((schedule) => {
                       const startsAt = new Date(schedule.startsAt).getTime();
@@ -2692,9 +2742,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                         </div>
                       );
                     })}
-                  {!data.schedules.some(
-                    (schedule) =>
-                      new Date(schedule.startsAt).toDateString() === new Date().toDateString(),
+                  {!data.schedules.some((schedule) =>
+                    isOnUnitDay(schedule.startsAt, data.today, data.timezone),
                   ) && (
                     <EmptyState
                       description="Cadastre uma escala para orientar o turno de hoje."

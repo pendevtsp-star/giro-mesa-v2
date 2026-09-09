@@ -58,6 +58,7 @@ import {
   commissionTransitionSchema,
   type FinanceApprovalDecisionInput,
   type FinanceApprovalRequestInput,
+  type FinanceAttachmentUploadInput,
   type FinanceEntryCancelInput,
   type FinanceEntryUpdateInput,
   type FinanceExportQuery,
@@ -68,6 +69,7 @@ import {
   type FinancialPaymentInput,
   financeApprovalDecisionSchema,
   financeApprovalRequestSchema,
+  financeAttachmentUploadSchema,
   financeEntryCancelSchema,
   financeEntryUpdateSchema,
   financeExportQuerySchema,
@@ -1447,6 +1449,38 @@ export class ManagementController {
     @Param("unitId", ParseUUIDPipe) unitId: string,
   ) {
     return this.management.financeSettings(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Post("finance/attachments")
+  uploadFinanceAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(financeAttachmentUploadSchema)) body: FinanceAttachmentUploadInput,
+  ) {
+    return this.management.uploadFinanceAttachment(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Get("finance/attachments/:attachmentId/content")
+  financeAttachment(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("attachmentId", ParseUUIDPipe) attachmentId: string,
+  ) {
+    return this.management.financeAttachment(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      attachmentId,
+    );
   }
 
   @Put("finance/settings")

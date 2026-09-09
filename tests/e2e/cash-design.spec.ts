@@ -70,6 +70,14 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
       return json({
         cashShiftId: shiftId,
         status: "closed",
+        unitName: "Unidade Centro",
+        cashRegisterName: "Caixa principal",
+        operatorName: "Operador",
+        responsibleName: "Operador",
+        closedByName: "Operador",
+        openingCents: 10_000,
+        openedAt: "2026-08-21T15:00:00.000Z",
+        closedAt: "2026-08-21T21:30:00.000Z",
         expectedCents: 15_000,
         countedCents: 14_900,
         differenceCents: -100,
@@ -225,6 +233,12 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     ).toBeVisible();
     await page.getByRole("button", { name: "Confirmar fechamento" }).click();
     await expect(page.getByRole("heading", { name: "Resultado da conferência" })).toBeVisible();
+    await page.getByRole("button", { name: "Imprimir Comprovante" }).click();
+    await expect(page.getByRole("heading", { name: "Unidade Centro" })).toBeVisible();
+    await expect(page.getByText("Gaveta: Caixa principal", { exact: true })).toBeVisible();
+    await expect(page.locator(".cash-slip-receipt")).toContainText("Encerramento: 21/08/2026");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("Revisão necessária", { exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

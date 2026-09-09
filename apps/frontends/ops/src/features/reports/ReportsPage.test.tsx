@@ -10,11 +10,28 @@ import { ReportFamilyView } from "./families/StandardReportFamilies";
 import { EnhancedReportFamilyView } from "./ReportEnhancements";
 import {
   csvCell,
+  defaultReportPeriod,
   parseSavedReportFilters,
   ReportContent,
   reportFiltersFromUrl,
   reportUrl,
 } from "./ReportsPage";
+
+it("abre Hoje para gestão e mês para financeiro usando o dia da unidade", () => {
+  const now = new Date("2026-09-10T01:30:00.000Z");
+  expect(defaultReportPeriod(now, "manager", "America/Sao_Paulo")).toEqual({
+    from: "2026-09-09",
+    to: "2026-09-09",
+  });
+  expect(defaultReportPeriod(now, "owner", "Asia/Tokyo")).toEqual({
+    from: "2026-09-10",
+    to: "2026-09-10",
+  });
+  expect(defaultReportPeriod(now, "finance", "America/Sao_Paulo")).toEqual({
+    from: "2026-09-01",
+    to: "2026-09-09",
+  });
+});
 
 const emptyReport: ReportData = {
   period: { from: "2026-08-01", to: "2026-08-16" },

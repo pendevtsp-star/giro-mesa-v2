@@ -335,6 +335,7 @@ export class PublicTableService {
         name: item.productName,
         quantity: item.quantity,
         totalCents: item.netCents,
+        ...(item.allergyNote ? { allergyNote: item.allergyNote } : {}),
       })),
       totalCents: items.reduce((total, item) => total + item.netCents, 0),
       ...(idempotentReplay ? { idempotentReplay: true } : {}),

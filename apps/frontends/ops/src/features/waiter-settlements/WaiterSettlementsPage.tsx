@@ -25,12 +25,14 @@ import {
   Textarea,
 } from "@giromesa/ui";
 import { type FormEvent, useState } from "react";
-import { api } from "../../api";
+import { ApiClientError, api } from "../../api";
 import {
   currencyToCents,
   dateLabel,
   type ManagementScope,
   operationalKey,
+  parseCash,
+  parseFinance,
   RemoteGate,
   useRemote,
 } from "../../management.shared";
@@ -55,12 +57,32 @@ type Area = "settlements" | "losses" | "partnership" | "settings";
 type SettlementAction = "approve" | "pay" | "cancel";
 type LossAction = "approve" | "reject" | "reverse";
 
+async function attachmentBase64(file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 const areaItems = [
   { id: "settlements", label: "Apurações" },
   { id: "losses", label: "Perdas" },
   { id: "partnership", label: "Partnership" },
   { id: "settings", label: "Regras" },
 ] satisfies Array<{ id: Area; label: string }>;
+
+function paymentMethodLabel(method: string) {
+  return (
+    {
+      cash: "dinheiro",
+      pix: "Pix",
+      credit_card: "cartão de crédito",
+      debit_card: "cartão de débito",
+      bank_transfer: "transferência bancária",
+      other: "outro meio",
+    }[method] ?? method
+  );
+}
 
 export function RealWaiterSettlementsPage({ scope }: { scope: ManagementScope }) {
   const remote = useRemote(scope, api.management.waiterSettlements, parseWaiterSettlementsOverview);
@@ -114,6 +136,7 @@ function SettlementsArea({
     settlement: WaiterSettlement;
     action: SettlementAction;
   } | null>(null);
+  const cashRemote = useRemote(scope, api.management.cashShifts, parseCash);
 
   async function loadPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -241,17 +264,29 @@ function SettlementsArea({
       )}
 
       {preview && (
-        <SettlementCard
-          actions={
-            data.capabilities.canGenerate ? (
-              <Button disabled={busy} onClick={() => void createSettlement()} size="sm">
-                Gerar fechamento
-              </Button>
-            ) : null
-          }
-          settlement={preview}
-          title="Prévia não persistida"
-        />
+        <>
+          {preview.blockers.map((blocker) => (
+            <Alert key={blocker.code} variant="destructive">
+              <AlertTitle>Apuração bloqueada</AlertTitle>
+              <AlertDescription>{blocker.message}</AlertDescription>
+            </Alert>
+          ))}
+          <SettlementCard
+            actions={
+              data.capabilities.canGenerate ? (
+                <Button
+                  disabled={busy || preview.blockers.length > 0}
+                  onClick={() => void createSettlement()}
+                  size="sm"
+                >
+                  Gerar fechamento
+                </Button>
+              ) : null
+            }
+            settlement={preview}
+            title="Prévia não persistida"
+          />
+        </>
       )}
 
       <Card>
@@ -325,32 +360,165 @@ function SettlementsArea({
         </CardContent>
       </Card>
 
-      <TransitionModal
-        action={transition?.action ?? null}
-        isOpen={transition !== null}
-        onClose={() => setTransition(null)}
-        onConfirm={async (note) => {
-          if (!transition?.settlement.id) return;
-          setBusy(true);
-          try {
-            await api.management.transitionWaiterSettlement(
-              scope.organizationId,
-              scope.unitId,
-              transition.settlement.id,
-              { action: transition.action, note },
-              operationalKey(`waiter-settlement-${transition.action}`),
-            );
-            setFeedback("Situação do fechamento atualizada.");
-            setTransition(null);
-            onRefresh();
-          } catch (error) {
-            setFeedback(errorMessage(error));
-          } finally {
-            setBusy(false);
+      {transition?.action === "pay" ? (
+        <PaymentTransitionModal
+          isOpen
+          openCashRegisters={
+            cashRemote.state.status === "ready"
+              ? cashRemote.state.data.shifts
+                  .filter((shift) => shift.status === "open")
+                  .map((shift) => ({ id: shift.cashRegisterId, name: shift.cashRegisterName }))
+              : []
           }
-        }}
-        target="fechamento"
-      />
+          onClose={() => setTransition(null)}
+          onConfirm={async ({ note, paymentMethod, paymentReference, cashRegisterId, file }) => {
+            if (!transition.settlement.id) return;
+            setBusy(true);
+            try {
+              if (!transition.settlement.financePayableId)
+                throw new Error("A conta financeira desta apuração não foi encontrada.");
+              const payableCents = transition.settlement.lines.reduce(
+                (total, line) => total + line.payableCents,
+                0,
+              );
+              const finance = parseFinance(
+                await api.management.finance(scope.organizationId, scope.unitId, {
+                  direction: "payable",
+                  status: "all",
+                  page: 1,
+                  pageSize: 100,
+                }),
+              );
+              const approvalRequestId = finance.approvals.find(
+                (approval) =>
+                  approval.status === "approved" &&
+                  approval.entryId === transition.settlement.financePayableId &&
+                  approval.amountCents === payableCents &&
+                  approval.method === paymentMethod &&
+                  (approval.reference ?? undefined) === paymentReference &&
+                  (approval.cashRegisterId ?? undefined) === cashRegisterId,
+              )?.id;
+              const approvalThreshold = finance.settings.paymentApprovalThresholdCents;
+              if (
+                !approvalRequestId &&
+                approvalThreshold !== null &&
+                payableCents >= approvalThreshold
+              ) {
+                await api.management.requestFinanceApproval(
+                  scope.organizationId,
+                  scope.unitId,
+                  {
+                    direction: "payable",
+                    entryId: transition.settlement.financePayableId,
+                    amountCents: payableCents,
+                    method: paymentMethod,
+                    reference: paymentReference,
+                    cashRegisterId,
+                  },
+                  operationalKey("waiter-settlement-payment-approval"),
+                );
+                setFeedback(
+                  "Pagamento acima do limite enviado para aprovação. Outro responsável deve aprová-lo em Financeiro; depois, registre o pagamento novamente.",
+                );
+                setTransition(null);
+                onRefresh();
+                return;
+              }
+              let attachmentId: string | undefined;
+              if (file) {
+                const uploaded = (await api.management.uploadFinanceAttachment(
+                  scope.organizationId,
+                  scope.unitId,
+                  {
+                    fileName: file.name,
+                    contentType: file.type,
+                    contentBase64: await attachmentBase64(file),
+                  },
+                  operationalKey("waiter-settlement-payment-attachment"),
+                )) as { attachment?: { id?: string } };
+                attachmentId = uploaded.attachment?.id;
+                if (!attachmentId) throw new Error("O comprovante não foi armazenado.");
+              }
+              await api.management.transitionWaiterSettlement(
+                scope.organizationId,
+                scope.unitId,
+                transition.settlement.id,
+                {
+                  action: "pay",
+                  note,
+                  paymentMethod,
+                  paymentReference,
+                  attachmentId,
+                  cashRegisterId,
+                  approvalRequestId,
+                },
+                operationalKey("waiter-settlement-pay"),
+              );
+              setFeedback("Pagamento registrado na apuração e na agenda financeira.");
+              setTransition(null);
+              onRefresh();
+            } catch (error) {
+              if (
+                error instanceof ApiClientError &&
+                error.code === "FINANCE_APPROVAL_REQUIRED" &&
+                transition.settlement.financePayableId
+              ) {
+                const payableCents = transition.settlement.lines.reduce(
+                  (total, line) => total + line.payableCents,
+                  0,
+                );
+                await api.management.requestFinanceApproval(
+                  scope.organizationId,
+                  scope.unitId,
+                  {
+                    direction: "payable",
+                    entryId: transition.settlement.financePayableId,
+                    amountCents: payableCents,
+                    method: paymentMethod,
+                    reference: paymentReference,
+                    cashRegisterId,
+                  },
+                  operationalKey("waiter-settlement-payment-approval"),
+                );
+                setFeedback(
+                  "Pagamento acima do limite enviado para aprovação. Outro responsável deve aprová-lo em Financeiro; depois, registre o pagamento novamente.",
+                );
+                setTransition(null);
+                onRefresh();
+              } else setFeedback(errorMessage(error));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      ) : (
+        <TransitionModal
+          action={transition?.action ?? null}
+          isOpen={transition !== null}
+          onClose={() => setTransition(null)}
+          onConfirm={async (note) => {
+            if (!transition?.settlement.id) return;
+            setBusy(true);
+            try {
+              await api.management.transitionWaiterSettlement(
+                scope.organizationId,
+                scope.unitId,
+                transition.settlement.id,
+                { action: transition.action, note },
+                operationalKey(`waiter-settlement-${transition.action}`),
+              );
+              setFeedback("Situação do fechamento atualizada.");
+              setTransition(null);
+              onRefresh();
+            } catch (error) {
+              setFeedback(errorMessage(error));
+            } finally {
+              setBusy(false);
+            }
+          }}
+          target="fechamento"
+        />
+      )}
     </div>
   );
 }
@@ -375,6 +543,12 @@ function SettlementCard({
           <CardDescription>
             {settlement.lines.length} profissional(is) · Total {formatMoney(payable)}
           </CardDescription>
+          {settlement.status === "paid" && settlement.paymentMethod && (
+            <CardDescription>
+              Pago via {paymentMethodLabel(settlement.paymentMethod)}
+              {settlement.paymentReference ? ` · ${settlement.paymentReference}` : ""}
+            </CardDescription>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SettlementStatusBadge status={settlement.status} />
@@ -1307,6 +1481,135 @@ function TransitionModal({
             }
           >
             {actionLabel(action)}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+type SettlementPaymentMethod =
+  | "cash"
+  | "pix"
+  | "credit_card"
+  | "debit_card"
+  | "bank_transfer"
+  | "other";
+
+function PaymentTransitionModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  openCashRegisters,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: (input: {
+    note: string;
+    paymentMethod: SettlementPaymentMethod;
+    paymentReference?: string;
+    cashRegisterId?: string;
+    file: File | null;
+  }) => Promise<void>;
+  openCashRegisters: Array<{ id: string; name: string }>;
+}) {
+  const [note, setNote] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<SettlementPaymentMethod>("pix");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [cashRegisterId, setCashRegisterId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const close = () => {
+    setNote("");
+    setPaymentReference("");
+    setCashRegisterId("");
+    setFile(null);
+    onClose();
+  };
+  return (
+    <Modal
+      description="Registre como a equipe foi paga. O valor será lançado e liquidado na agenda financeira."
+      isOpen={isOpen}
+      onClose={close}
+      title="Registrar pagamento do fechamento"
+    >
+      <form
+        className="grid gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setBusy(true);
+          void onConfirm({
+            note: note.trim(),
+            paymentMethod,
+            paymentReference: paymentReference.trim() || undefined,
+            cashRegisterId: cashRegisterId || undefined,
+            file,
+          }).finally(() => setBusy(false));
+        }}
+      >
+        <FormField htmlFor="settlement-payment-method" label="Meio de pagamento" required>
+          <NativeSelect
+            id="settlement-payment-method"
+            onChange={(event) => setPaymentMethod(event.target.value as SettlementPaymentMethod)}
+            value={paymentMethod}
+          >
+            <option value="pix">Pix</option>
+            <option value="cash">Dinheiro</option>
+            <option value="credit_card">Cartão de crédito</option>
+            <option value="debit_card">Cartão de débito</option>
+            <option value="bank_transfer">Transferência bancária</option>
+            <option value="other">Outro</option>
+          </NativeSelect>
+        </FormField>
+        {paymentMethod === "cash" && (
+          <FormField htmlFor="settlement-payment-register" label="Gaveta aberta" required>
+            <NativeSelect
+              id="settlement-payment-register"
+              onChange={(event) => setCashRegisterId(event.target.value)}
+              required
+              value={cashRegisterId}
+            >
+              <option value="">Selecione</option>
+              {openCashRegisters.map((register) => (
+                <option key={register.id} value={register.id}>
+                  {register.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+        )}
+        <FormField htmlFor="settlement-payment-reference" label="Referência">
+          <Input
+            id="settlement-payment-reference"
+            maxLength={160}
+            onChange={(event) => setPaymentReference(event.target.value)}
+            placeholder="Ex.: ID do Pix ou comprovante bancário"
+            value={paymentReference}
+          />
+        </FormField>
+        <FormField htmlFor="settlement-payment-file" label="Comprovante privado">
+          <Input
+            accept=".pdf,.xml,.csv,.jpg,.jpeg,.png"
+            id="settlement-payment-file"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            type="file"
+          />
+        </FormField>
+        <FormField htmlFor="settlement-payment-note" label="Observação" required>
+          <Textarea
+            id="settlement-payment-note"
+            minLength={2}
+            onChange={(event) => setNote(event.target.value)}
+            required
+            value={note}
+          />
+        </FormField>
+        <div className="flex justify-end gap-2">
+          <Button onClick={close} type="button" variant="ghost">
+            Cancelar
+          </Button>
+          <Button disabled={busy || note.trim().length < 2} type="submit">
+            {busy ? "Registrando…" : "Registrar pagamento"}
           </Button>
         </div>
       </form>

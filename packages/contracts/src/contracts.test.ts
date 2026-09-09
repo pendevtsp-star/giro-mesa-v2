@@ -7,6 +7,7 @@ import {
   billingSummarySchema,
   billingUpgradeQuoteSchema,
   businessHoursSchema,
+  channelCheckInputSchema,
   contactRequestSchema,
   copyUnitSettingsSchema,
   createOrganizationSchema,
@@ -38,6 +39,27 @@ import {
 } from "./index.js";
 
 describe("public contracts", () => {
+  it("exige evidência e observação para registrar conferência de canal", () => {
+    const input = {
+      channel: "printing",
+      status: "passed",
+      evidenceReference: "Job de impressão 123",
+      note: "Papel, corte e conteúdo conferidos no balcão",
+    };
+    assert.equal(channelCheckInputSchema.safeParse(input).success, true);
+    assert.equal(
+      channelCheckInputSchema.safeParse({ ...input, evidenceReference: "" }).success,
+      false,
+    );
+    assert.equal(
+      channelCheckInputSchema.safeParse({ ...input, status: "not_tested" }).success,
+      false,
+    );
+    assert.equal(
+      channelCheckInputSchema.safeParse({ ...input, actorIdentityId: "forged" }).success,
+      false,
+    );
+  });
   it("validates structured establishment hours and IANA timezones", () => {
     const weekly: BusinessHours["weekly"] = Array.from({ length: 7 }, (_, index) => ({
       weekday: index + 1,
@@ -530,6 +552,16 @@ describe("public contracts", () => {
       false,
     );
     assert.equal(publicTableOrderSchema.safeParse({ items: [item] }).success, true);
+    assert.equal(
+      publicTableOrderSchema.parse({ items: [{ ...item, allergyNote: "  Amendoim  " }] }).items[0]
+        ?.allergyNote,
+      "Amendoim",
+    );
+    assert.equal(
+      publicTableOrderSchema.safeParse({ items: [{ ...item, allergyNote: "x".repeat(501) }] })
+        .success,
+      false,
+    );
     assert.equal(
       publicTableOrderSchema.safeParse({ items: [item], tabId: crypto.randomUUID() }).success,
       false,

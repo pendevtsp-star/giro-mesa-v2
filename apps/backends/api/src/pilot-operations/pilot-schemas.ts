@@ -36,6 +36,18 @@ const slug = z
 const clockTime = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
 const floorCoordinate = z.number().int().min(-1_000_000).max(1_000_000);
 const fulfillmentType = z.enum(["dine_in", "pickup", "delivery"]);
+export const deliveryProjectionStatusSchema = z.object({
+  missing: z.array(
+    z.object({
+      tabId: id,
+      orderId: id.nullable(),
+      reference: z.string(),
+      status: z.enum(["empty", "draft", "sent", "preparing", "ready", "served", "canceled"]),
+      reason: z.string(),
+    }),
+  ),
+  totalMissing: z.number().int().nonnegative(),
+});
 export const serviceModeSchema = z.enum(["full_service", "quick_service", "bar", "hybrid"]);
 const orderCourse = z.enum(["anytime", "starter", "main", "dessert"]);
 const optionalPhone = z
@@ -1909,6 +1921,12 @@ export const paymentOperationsHealthResponseSchema = z.object({
       ]),
       severity: z.enum(["warning", "critical"]),
       entityId: id,
+      tabId: id.optional(),
+      amountCents: z.number().int().positive().optional(),
+      method: z.string().optional(),
+      provider: z.string().optional(),
+      installationId: id.optional(),
+      paymentAttemptId: id.optional(),
       label: z.string(),
       occurredAt: responseDateTime,
     }),

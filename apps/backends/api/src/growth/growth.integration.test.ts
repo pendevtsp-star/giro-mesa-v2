@@ -6,19 +6,26 @@ import {
   deliveryOrderStatusHistory,
   deliveryOrders,
   identities,
+  managementCashRegisters,
+  managementCashShifts,
   memberships,
   organizations,
   outboxEvents,
+  posKdsTickets,
+  posOrders,
+  posProductionStations,
   posTabs,
   publicMenus,
   reservations,
   roleBindings,
   units,
   waitlistEntries,
+  whatsappConversations,
 } from "@giromesa/db";
 import { and, eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { PilotPosService } from "../pilot-operations/pilot-pos.service.js";
 import { GrowthService } from "./growth.service.js";
 
 function hasCode(expected: string) {
@@ -47,6 +54,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
   try {
     const scope = new ScopeService(database);
     const growth = new GrowthService(database, scope);
+    const pos = new PilotPosService(database, scope);
     const [organizationA, organizationB] = await database.db
       .insert(organizations)
       .values([
@@ -55,47 +63,59 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       ])
       .returning();
     assert.ok(organizationA && organizationB);
-    const [unitA, unitB] = await database.db
+    const [unitA, unitASecondary, unitB] = await database.db
       .insert(units)
       .values([
         { organizationId: organizationA.id, name: "Growth Unit A" },
+        { organizationId: organizationA.id, name: "Growth Unit A Secondary" },
         { organizationId: organizationB.id, name: "Growth Unit B" },
       ])
       .returning();
-    assert.ok(unitA && unitB);
-    const [identityA, identityB, deliveryIdentity, waiterIdentity] = await database.db
-      .insert(identities)
-      .values([
-        { email: `growth-a-${randomUUID()}@example.test`, displayName: "Owner A" },
-        { email: `growth-b-${randomUUID()}@example.test`, displayName: "Owner B" },
-        { email: `growth-delivery-${randomUUID()}@example.test`, displayName: "Delivery A" },
-        { email: `growth-waiter-${randomUUID()}@example.test`, displayName: "Waiter A" },
-      ])
-      .returning();
-    assert.ok(identityA && identityB && deliveryIdentity && waiterIdentity);
-    const [membershipA, membershipB, deliveryMembership, waiterMembership] = await database.db
-      .insert(memberships)
-      .values([
-        { identityId: identityA.id, organizationId: organizationA.id, status: "active" },
-        { identityId: identityB.id, organizationId: organizationB.id, status: "active" },
-        {
-          identityId: deliveryIdentity.id,
-          organizationId: organizationA.id,
-          status: "active",
-        },
-        {
-          identityId: waiterIdentity.id,
-          organizationId: organizationA.id,
-          status: "active",
-        },
-      ])
-      .returning();
-    assert.ok(membershipA && membershipB && deliveryMembership && waiterMembership);
+    assert.ok(unitA && unitASecondary && unitB);
+    const [identityA, identityB, deliveryIdentity, waiterIdentity, financeIdentity] =
+      await database.db
+        .insert(identities)
+        .values([
+          { email: `growth-a-${randomUUID()}@example.test`, displayName: "Owner A" },
+          { email: `growth-b-${randomUUID()}@example.test`, displayName: "Owner B" },
+          { email: `growth-delivery-${randomUUID()}@example.test`, displayName: "Delivery A" },
+          { email: `growth-waiter-${randomUUID()}@example.test`, displayName: "Waiter A" },
+          { email: `growth-finance-${randomUUID()}@example.test`, displayName: "Finance A" },
+        ])
+        .returning();
+    assert.ok(identityA && identityB && deliveryIdentity && waiterIdentity && financeIdentity);
+    const [membershipA, membershipB, deliveryMembership, waiterMembership, financeMembership] =
+      await database.db
+        .insert(memberships)
+        .values([
+          { identityId: identityA.id, organizationId: organizationA.id, status: "active" },
+          { identityId: identityB.id, organizationId: organizationB.id, status: "active" },
+          {
+            identityId: deliveryIdentity.id,
+            organizationId: organizationA.id,
+            status: "active",
+          },
+          {
+            identityId: waiterIdentity.id,
+            organizationId: organizationA.id,
+            status: "active",
+          },
+          {
+            identityId: financeIdentity.id,
+            organizationId: organizationA.id,
+            status: "active",
+          },
+        ])
+        .returning();
+    assert.ok(
+      membershipA && membershipB && deliveryMembership && waiterMembership && financeMembership,
+    );
     await database.db.insert(roleBindings).values([
       { membershipId: membershipA.id, role: "owner" },
       { membershipId: membershipB.id, role: "owner" },
       { membershipId: deliveryMembership.id, unitId: unitA.id, role: "delivery" },
       { membershipId: waiterMembership.id, unitId: unitA.id, role: "waiter" },
+      { membershipId: financeMembership.id, unitId: unitA.id, role: "finance" },
     ]);
 
     await assert.rejects(
@@ -130,6 +150,79 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     const customers = await growth.listCustomers(identityA.id, organizationA.id);
     assert.equal(customers.length, 1);
     assert.equal(customers[0]?.marketingOptIn, true);
+
+    const inboundAt = new Date("2026-09-09T15:00:00.000Z");
+    await database.db.insert(whatsappConversations).values([
+      {
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        customerId: customer.id,
+        phone: "5511999999999",
+        status: "open",
+        lastMessageAt: inboundAt,
+        lastInboundAt: inboundAt,
+        lastOutboundAt: new Date("2026-09-09T14:00:00.000Z"),
+      },
+      {
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        phone: "5511988888888",
+        status: "pending",
+        lastMessageAt: inboundAt,
+        lastInboundAt: new Date("2026-09-09T13:00:00.000Z"),
+        lastOutboundAt: inboundAt,
+      },
+      {
+        organizationId: organizationB.id,
+        unitId: unitB.id,
+        phone: "5511977777777",
+        status: "open",
+        lastMessageAt: inboundAt,
+        lastInboundAt: inboundAt,
+      },
+    ]);
+    const needsReply = await growth.listWhatsAppInbox(identityA.id, organizationA.id, {
+      unitId: unitA.id,
+      limit: 50,
+      assignedTo: "any",
+      needsReply: true,
+    });
+    assert.deepEqual(
+      needsReply.items.map((conversation) => conversation.phone),
+      ["5511999999999"],
+    );
+
+    const [cashRegister] = await database.db
+      .insert(managementCashRegisters)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        name: "Caixa integração",
+        active: true,
+      })
+      .returning();
+    assert.ok(cashRegister);
+    await database.db.insert(managementCashShifts).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      cashRegisterId: cashRegister.id,
+      operatorIdentityId: identityA.id,
+      currentResponsibleIdentityId: identityA.id,
+      openingCents: 10_000,
+      openIdempotencyKey: `growth-multiunit-${randomUUID()}`,
+    });
+    const ownerSummary = await growth.consolidatedSummary(identityA.id, organizationA.id);
+    assert.equal(ownerSummary.units.length, 2);
+    assert.equal(ownerSummary.units.find((unit) => unit.id === unitA.id)?.cash.status, "open");
+    assert.equal(
+      ownerSummary.units.find((unit) => unit.id === unitASecondary.id)?.cash.status,
+      "unavailable",
+    );
+    const scopedSummary = await growth.consolidatedSummary(financeIdentity.id, organizationA.id);
+    assert.deepEqual(
+      scopedSummary.units.map((unit) => unit.id),
+      [unitA.id],
+    );
 
     const publicMenuSlug = `growth-public-${randomUUID()}`;
     await database.db.insert(publicMenus).values({
@@ -313,6 +406,34 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       })
       .returning();
     assert.ok(tab);
+    const [deliveryPosOrder] = await database.db
+      .insert(posOrders)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tabId: tab.id,
+        createdByIdentityId: identityA.id,
+        status: "sent",
+        sentAt: new Date(),
+      })
+      .returning();
+    assert.ok(deliveryPosOrder);
+    const missingProjection = await pos.deliveryProjectionStatus(
+      identityA.id,
+      organizationA.id,
+      unitA.id,
+    );
+    assert.equal(missingProjection.totalMissing, 1);
+    assert.equal(missingProjection.missing[0]?.tabId, tab.id);
+    assert.equal(missingProjection.missing[0]?.orderId, deliveryPosOrder.id);
+    await assert.rejects(
+      () => pos.deliveryProjectionStatus(waiterIdentity.id, organizationA.id, unitA.id),
+      hasCode("POS_ROLE_DENIED"),
+    );
+    await assert.rejects(
+      () => pos.deliveryProjectionStatus(identityB.id, organizationA.id, unitA.id),
+      hasCode("UNIT_ACCESS_DENIED"),
+    );
     const deliveryInput = {
       unitId: unitA.id,
       customerId: customer.id,
@@ -370,6 +491,37 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     assert.ok(delivery.order.promisedAt);
     assert.ok(delivery.order.promisedAt.getTime() >= deliveryCreatedAt + 59 * 60_000);
     assert.ok(delivery.order.promisedAt.getTime() <= Date.now() + 61 * 60_000);
+    assert.equal(
+      (await pos.deliveryProjectionStatus(identityA.id, organizationA.id, unitA.id)).totalMissing,
+      0,
+    );
+    const [deliveryStation] = await database.db
+      .insert(posProductionStations)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        name: "Expedição delivery",
+        code: `delivery-${randomUUID().slice(0, 8)}`,
+        deliveryMode: "kds_only",
+      })
+      .returning();
+    assert.ok(deliveryStation);
+    await database.db.insert(posKdsTickets).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      orderId: deliveryPosOrder.id,
+      stationId: deliveryStation.id,
+      status: "ready",
+      readyAt: new Date(),
+    });
+    await database.db
+      .update(posOrders)
+      .set({ status: "ready", updatedAt: new Date() })
+      .where(eq(posOrders.id, deliveryPosOrder.id));
+    assert.equal(
+      (await pos.deliveryProjectionStatus(identityA.id, organizationA.id, unitA.id)).totalMissing,
+      0,
+    );
     for (const status of ["placed", "confirmed", "preparing", "ready"] as const) {
       const updated = await growth.transitionDelivery(
         identityA.id,
@@ -629,6 +781,50 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       );
     assert.equal(zoneAudit.length, 2);
     assert.equal(zoneOutbox.length, 2);
+    await assert.rejects(
+      () =>
+        growth.transitionDelivery(identityA.id, organizationA.id, delivery.order.id, {
+          status: "delivery_failed",
+        }),
+      hasCode("DELIVERY_TRANSITION_REASON_REQUIRED"),
+    );
+    const failureReason = "Cliente ausente após duas tentativas de contato.";
+    const failed = await growth.transitionDelivery(
+      identityA.id,
+      organizationA.id,
+      delivery.order.id,
+      { status: "delivery_failed", reason: failureReason },
+    );
+    assert.equal(failed.status, "delivery_failed");
+    const retry = await growth.transitionDelivery(
+      identityA.id,
+      organizationA.id,
+      delivery.order.id,
+      { status: "ready", reason: "Nova tentativa autorizada pelo atendimento." },
+    );
+    assert.equal(retry.status, "ready");
+    await growth.dispatchDelivery(identityA.id, organizationA.id, delivery.order.id, {
+      courierReference: "courier-42",
+      idempotencyKey: "delivery-dispatch-retry-0002",
+    });
+    const redispatched = await growth.listDeliveryOrders(
+      deliveryIdentity.id,
+      organizationA.id,
+      unitA.id,
+      { status: "dispatched", limit: 10 },
+    );
+    assert.equal(redispatched.filter((order) => order.id === delivery.order.id).length, 1);
+    const [failureHistory] = await database.db
+      .select({ metadata: deliveryOrderStatusHistory.metadata })
+      .from(deliveryOrderStatusHistory)
+      .where(
+        and(
+          eq(deliveryOrderStatusHistory.deliveryOrderId, delivery.order.id),
+          eq(deliveryOrderStatusHistory.toStatus, "delivery_failed"),
+        ),
+      )
+      .limit(1);
+    assert.equal((failureHistory?.metadata as { reason?: string }).reason, failureReason);
     const completed = await growth.transitionDelivery(
       identityA.id,
       organizationA.id,
@@ -636,6 +832,7 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
       { status: "completed" },
     );
     assert.equal(completed.status, "completed");
+    assert.equal(completed.paymentStatus, "awaiting_payment");
   } finally {
     await database.onModuleDestroy();
   }

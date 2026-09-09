@@ -2052,6 +2052,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/settings/channel-checks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_channelChecks[0]"];
+    put?: never;
+    post: operations["OrganizationsController_recordChannelCheck[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/settings/channel-checks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["OrganizationsController_channelChecks[1]"];
+    put?: never;
+    post: operations["OrganizationsController_recordChannelCheck[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/settings/history": {
     parameters: {
       query?: never;
@@ -5054,6 +5086,102 @@ export interface paths {
     get: operations["PilotPosController_counterQueue[1]"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/delivery-projection-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_deliveryProjectionStatus[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/delivery-projection-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_deliveryProjectionStatus[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shift-handover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_shiftHandover[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shift-handover": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["PilotPosController_shiftHandover[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/shift-handover/{handoverId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeShiftHandover[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/shift-handover/{handoverId}/acknowledge": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_acknowledgeShiftHandover[1]"];
     delete?: never;
     options?: never;
     head?: never;
@@ -10877,6 +11005,70 @@ export interface paths {
     };
     get: operations["ManagementController_financeSettings[1]"];
     put: operations["ManagementController_updateFinanceSettings[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_uploadFinanceAttachment[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/attachments": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_uploadFinanceAttachment[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/finance/attachments/{attachmentId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_financeAttachment[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/finance/attachments/{attachmentId}/content": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ManagementController_financeAttachment[1]"];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -22428,6 +22620,166 @@ export interface operations {
       };
     };
   };
+  "OrganizationsController_channelChecks[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            checks: {
+              /** @enum {string} */
+              channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+              /** @enum {string} */
+              status: "not_tested" | "passed" | "failed";
+              evidenceReference: string | null;
+              note: string | null;
+              actorIdentityId: string | null;
+              actorDisplayName: string | null;
+              checkedAt: string | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_recordChannelCheck[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+          /** @enum {string} */
+          status: "passed" | "failed";
+          evidenceReference: string;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+            /** @enum {string} */
+            status: "not_tested" | "passed" | "failed";
+            evidenceReference: string | null;
+            note: string | null;
+            actorIdentityId: string | null;
+            actorDisplayName: string | null;
+            checkedAt: string | null;
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_channelChecks[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            checks: {
+              /** @enum {string} */
+              channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+              /** @enum {string} */
+              status: "not_tested" | "passed" | "failed";
+              evidenceReference: string | null;
+              note: string | null;
+              actorIdentityId: string | null;
+              actorDisplayName: string | null;
+              checkedAt: string | null;
+            }[];
+          };
+        };
+      };
+    };
+  };
+  "OrganizationsController_recordChannelCheck[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+          /** @enum {string} */
+          status: "passed" | "failed";
+          evidenceReference: string;
+          note: string;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            channel: "qr" | "cash" | "fiscal" | "printing" | "smartpos" | "delivery";
+            /** @enum {string} */
+            status: "not_tested" | "passed" | "failed";
+            evidenceReference: string | null;
+            note: string | null;
+            actorIdentityId: string | null;
+            actorDisplayName: string | null;
+            checkedAt: string | null;
+          };
+        };
+      };
+    };
+  };
   "OrganizationsController_settingsHistory[0]": {
     parameters: {
       query?: never;
@@ -24467,6 +24819,7 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            allergyNote?: string;
           }[];
           deliveryZone?: string;
           address?: {
@@ -24522,6 +24875,7 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            allergyNote?: string;
           }[];
           deliveryZone?: string;
           address?: {
@@ -24865,6 +25219,7 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            allergyNote?: string;
           }[];
         };
       };
@@ -24886,6 +25241,7 @@ export interface operations {
               name: string;
               quantity: number;
               totalCents: number;
+              allergyNote?: string;
             }[];
             totalCents: number;
             idempotentReplay?: boolean;
@@ -24915,6 +25271,7 @@ export interface operations {
             /** @default [] */
             modifierOptionIds?: string[];
             notes?: string;
+            allergyNote?: string;
           }[];
         };
       };
@@ -24936,6 +25293,7 @@ export interface operations {
               name: string;
               quantity: number;
               totalCents: number;
+              allergyNote?: string;
             }[];
             totalCents: number;
             idempotentReplay?: boolean;
@@ -24972,6 +25330,7 @@ export interface operations {
               name: string;
               quantity: number;
               totalCents: number;
+              allergyNote?: string;
             }[];
             totalCents: number;
             idempotentReplay?: boolean;
@@ -25008,6 +25367,7 @@ export interface operations {
               name: string;
               quantity: number;
               totalCents: number;
+              allergyNote?: string;
             }[];
             totalCents: number;
             idempotentReplay?: boolean;
@@ -30000,6 +30360,332 @@ export interface operations {
       };
     };
   };
+  "PilotPosController_deliveryProjectionStatus[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            missing: {
+              /** Format: uuid */
+              tabId: string;
+              orderId: string | null;
+              reference: string;
+              /** @enum {string} */
+              status: "empty" | "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+              reason: string;
+            }[];
+            totalMissing: number;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_deliveryProjectionStatus[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            missing: {
+              /** Format: uuid */
+              tabId: string;
+              orderId: string | null;
+              reference: string;
+              /** @enum {string} */
+              status: "empty" | "draft" | "sent" | "preparing" | "ready" | "served" | "canceled";
+              reason: string;
+            }[];
+            totalMissing: number;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_shiftHandover[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            current: {
+              /** Format: date-time */
+              capturedAt: string;
+              tabs: {
+                /** Format: uuid */
+                id: string;
+                number: number | null;
+              }[];
+              orders: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                tabId: string;
+                status: string;
+              }[];
+              calls: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                tableId: string;
+                tabId: string | null;
+              }[];
+              prints: {
+                /** Format: uuid */
+                id: string;
+                tabId: string | null;
+                status: string;
+              }[];
+              cash: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                cashRegisterId: string;
+              }[];
+            };
+            lastHandover: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              shiftId: string;
+              /** Format: date-time */
+              closedAt: string;
+              closedBy: string | null;
+              snapshot: {
+                /** Format: date-time */
+                capturedAt: string;
+                tabs: {
+                  /** Format: uuid */
+                  id: string;
+                  number: number | null;
+                }[];
+                orders: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  tabId: string;
+                  status: string;
+                }[];
+                calls: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  tableId: string;
+                  tabId: string | null;
+                }[];
+                prints: {
+                  /** Format: uuid */
+                  id: string;
+                  tabId: string | null;
+                  status: string;
+                }[];
+                cash: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  cashRegisterId: string;
+                }[];
+              };
+              receipt: {
+                /** Format: date-time */
+                acknowledgedAt: string;
+                acknowledgedBy: string | null;
+              } | null;
+            } | null;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_shiftHandover[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            current: {
+              /** Format: date-time */
+              capturedAt: string;
+              tabs: {
+                /** Format: uuid */
+                id: string;
+                number: number | null;
+              }[];
+              orders: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                tabId: string;
+                status: string;
+              }[];
+              calls: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                tableId: string;
+                tabId: string | null;
+              }[];
+              prints: {
+                /** Format: uuid */
+                id: string;
+                tabId: string | null;
+                status: string;
+              }[];
+              cash: {
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                cashRegisterId: string;
+              }[];
+            };
+            lastHandover: {
+              /** Format: uuid */
+              id: string;
+              /** Format: uuid */
+              shiftId: string;
+              /** Format: date-time */
+              closedAt: string;
+              closedBy: string | null;
+              snapshot: {
+                /** Format: date-time */
+                capturedAt: string;
+                tabs: {
+                  /** Format: uuid */
+                  id: string;
+                  number: number | null;
+                }[];
+                orders: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  tabId: string;
+                  status: string;
+                }[];
+                calls: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  tableId: string;
+                  tabId: string | null;
+                }[];
+                prints: {
+                  /** Format: uuid */
+                  id: string;
+                  tabId: string | null;
+                  status: string;
+                }[];
+                cash: {
+                  /** Format: uuid */
+                  id: string;
+                  /** Format: uuid */
+                  cashRegisterId: string;
+                }[];
+              };
+              receipt: {
+                /** Format: date-time */
+                acknowledgedAt: string;
+                acknowledgedBy: string | null;
+              } | null;
+            } | null;
+          };
+        };
+      };
+    };
+  };
+  "PilotPosController_acknowledgeShiftHandover[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        handoverId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_acknowledgeShiftHandover[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        handoverId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "PilotPosController_getTab[0]": {
     parameters: {
       query?: never;
@@ -30825,6 +31511,15 @@ export interface operations {
               severity: "warning" | "critical";
               /** Format: uuid */
               entityId: string;
+              /** Format: uuid */
+              tabId?: string;
+              amountCents?: number;
+              method?: string;
+              provider?: string;
+              /** Format: uuid */
+              installationId?: string;
+              /** Format: uuid */
+              paymentAttemptId?: string;
               label: string;
               /** Format: date-time */
               occurredAt: string;
@@ -30871,6 +31566,15 @@ export interface operations {
               severity: "warning" | "critical";
               /** Format: uuid */
               entityId: string;
+              /** Format: uuid */
+              tabId?: string;
+              amountCents?: number;
+              method?: string;
+              provider?: string;
+              /** Format: uuid */
+              installationId?: string;
+              /** Format: uuid */
+              paymentAttemptId?: string;
               label: string;
               /** Format: date-time */
               occurredAt: string;
@@ -44410,7 +45114,14 @@ export interface operations {
   };
   "PlatformController_incidents[0]": {
     parameters: {
-      query?: never;
+      query?: {
+        activePilotOnly?: boolean;
+        maxAgeMinutes?: number;
+        minAgeMinutes?: number;
+        impact?: "billing" | "orders" | "messaging" | "fiscal" | "operations";
+        source?: "outbox" | "hub" | "fiscal" | "billing";
+        severity?: "critical" | "high" | "medium" | "low";
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -44427,7 +45138,14 @@ export interface operations {
   };
   "PlatformController_incidents[1]": {
     parameters: {
-      query?: never;
+      query?: {
+        activePilotOnly?: boolean;
+        maxAgeMinutes?: number;
+        minAgeMinutes?: number;
+        impact?: "billing" | "orders" | "messaging" | "fiscal" | "operations";
+        source?: "outbox" | "hub" | "fiscal" | "billing";
+        severity?: "critical" | "high" | "medium" | "low";
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -49148,6 +49866,122 @@ export interface operations {
       };
     };
   };
+  "ManagementController_uploadFinanceAttachment[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          contentType:
+            | "application/pdf"
+            | "application/xml"
+            | "text/xml"
+            | "text/csv"
+            | "image/jpeg"
+            | "image/png";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_uploadFinanceAttachment[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          fileName: string;
+          /** @enum {string} */
+          contentType:
+            | "application/pdf"
+            | "application/xml"
+            | "text/xml"
+            | "text/csv"
+            | "image/jpeg"
+            | "image/png";
+          contentBase64: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_financeAttachment[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_financeAttachment[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+        attachmentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_exportFinance[0]": {
     parameters: {
       query?: never;
@@ -49348,12 +50182,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           /** Format: uuid */
           supplierId?: string;
           description: string;
@@ -49398,12 +50239,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           /** Format: uuid */
           supplierId?: string;
           description: string;
@@ -49449,12 +50297,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           description?: string;
           amountCents?: number;
           competenceDate?: string;
@@ -49494,12 +50349,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           description?: string;
           amountCents?: number;
           competenceDate?: string;
@@ -49736,12 +50598,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           /** Format: uuid */
           sourceOrderId?: string;
           description: string;
@@ -49794,12 +50663,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           /** Format: uuid */
           sourceOrderId?: string;
           description: string;
@@ -49853,12 +50729,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           description?: string;
           amountCents?: number;
           competenceDate?: string;
@@ -49898,12 +50781,19 @@ export interface operations {
           documentNumber?: string;
           notes?: string;
           /** @default [] */
-          attachments?: {
-            name: string;
-            /** Format: uri */
-            url: string;
-            mimeType?: string;
-          }[];
+          attachments?: (
+            | {
+                /** Format: uuid */
+                id: string;
+                name: string;
+              }
+            | {
+                name: string;
+                /** Format: uri */
+                url: string;
+                mimeType?: string;
+              }
+          )[];
           description?: string;
           amountCents?: number;
           competenceDate?: string;
@@ -57299,11 +58189,37 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {string} */
-          action: "approve" | "pay" | "cancel";
-          note: string;
-        };
+        "application/json":
+          | {
+              /** @enum {string} */
+              action: "approve";
+              note: string;
+            }
+          | {
+              /** @enum {string} */
+              action: "cancel";
+              note: string;
+            }
+          | {
+              /** @enum {string} */
+              action: "pay";
+              note: string;
+              /** @enum {string} */
+              paymentMethod:
+                | "cash"
+                | "pix"
+                | "credit_card"
+                | "debit_card"
+                | "bank_transfer"
+                | "other";
+              paymentReference?: string;
+              /** Format: uuid */
+              attachmentId?: string;
+              /** Format: uuid */
+              cashRegisterId?: string;
+              /** Format: uuid */
+              approvalRequestId?: string;
+            };
       };
     };
     responses: {
@@ -57330,11 +58246,37 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": {
-          /** @enum {string} */
-          action: "approve" | "pay" | "cancel";
-          note: string;
-        };
+        "application/json":
+          | {
+              /** @enum {string} */
+              action: "approve";
+              note: string;
+            }
+          | {
+              /** @enum {string} */
+              action: "cancel";
+              note: string;
+            }
+          | {
+              /** @enum {string} */
+              action: "pay";
+              note: string;
+              /** @enum {string} */
+              paymentMethod:
+                | "cash"
+                | "pix"
+                | "credit_card"
+                | "debit_card"
+                | "bank_transfer"
+                | "other";
+              paymentReference?: string;
+              /** Format: uuid */
+              attachmentId?: string;
+              /** Format: uuid */
+              cashRegisterId?: string;
+              /** Format: uuid */
+              approvalRequestId?: string;
+            };
       };
     };
     responses: {
@@ -58951,6 +59893,7 @@ export interface operations {
           /** @default 120 */
           durationMinutes?: number;
           notes?: string | null;
+          retroactiveReason?: string;
           idempotencyKey: string;
         };
       };
@@ -58987,6 +59930,7 @@ export interface operations {
           /** @default 120 */
           durationMinutes?: number;
           notes?: string | null;
+          retroactiveReason?: string;
           idempotencyKey: string;
         };
       };
@@ -59976,7 +60920,16 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled";
+          status:
+            | "placed"
+            | "confirmed"
+            | "preparing"
+            | "ready"
+            | "delivery_failed"
+            | "returned"
+            | "completed"
+            | "canceled";
+          reason?: string;
         };
       };
     };
@@ -60003,7 +60956,16 @@ export interface operations {
       content: {
         "application/json": {
           /** @enum {string} */
-          status: "placed" | "confirmed" | "preparing" | "ready" | "completed" | "canceled";
+          status:
+            | "placed"
+            | "confirmed"
+            | "preparing"
+            | "ready"
+            | "delivery_failed"
+            | "returned"
+            | "completed"
+            | "canceled";
+          reason?: string;
         };
       };
     };

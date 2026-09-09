@@ -3046,6 +3046,47 @@ export const managementNfeImportLines = pgTable(
   ],
 );
 
+export type ManagementFinanceAttachmentReference =
+  | { id: string; name: string; mimeType?: string }
+  | { name: string; url: string; mimeType?: string };
+
+export const managementFinanceAttachments = pgTable(
+  "management_finance_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").notNull(),
+    fileName: varchar("file_name", { length: 180 }).notNull(),
+    contentType: varchar("content_type", { length: 120 }).notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sha256: varchar("sha256", { length: 64 }).notNull(),
+    storageKey: text("storage_key").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 160 }).notNull(),
+    uploadedByIdentityId: uuid("uploaded_by_identity_id")
+      .notNull()
+      .references(() => identities.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique("management_finance_attachments_scope_id_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.id,
+    ),
+    uniqueIndex("management_finance_attachments_idempotency_unique").on(
+      table.organizationId,
+      table.unitId,
+      table.idempotencyKey,
+    ),
+    foreignKey({
+      name: "management_finance_attachments_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    check("management_finance_attachments_size_check", sql`${table.sizeBytes} > 0`),
+  ],
+);
+
 export const managementAccountsPayable = pgTable(
   "management_accounts_payable",
   {
@@ -3061,7 +3102,7 @@ export const managementAccountsPayable = pgTable(
     documentNumber: varchar("document_number", { length: 80 }),
     notes: text("notes"),
     attachments: jsonb("attachments")
-      .$type<Array<{ name: string; url: string; mimeType?: string }>>()
+      .$type<ManagementFinanceAttachmentReference[]>()
       .notNull()
       .default([]),
     recurrenceGroupId: uuid("recurrence_group_id"),
@@ -3201,7 +3242,7 @@ export const managementAccountsReceivable = pgTable(
     documentNumber: varchar("document_number", { length: 80 }),
     notes: text("notes"),
     attachments: jsonb("attachments")
-      .$type<Array<{ name: string; url: string; mimeType?: string }>>()
+      .$type<ManagementFinanceAttachmentReference[]>()
       .notNull()
       .default([]),
     recurrenceGroupId: uuid("recurrence_group_id"),

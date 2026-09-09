@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parsePaymentAttempt, parsePaymentCapabilities, paymentBlockReason } from "./pos-payments";
+import {
+  parsePaymentAttempt,
+  parsePaymentCapabilities,
+  paymentAttemptContextError,
+  paymentBlockReason,
+} from "./pos-payments";
 
 const attempt = {
   id: "attempt-1",
@@ -21,6 +26,15 @@ const attempt = {
 };
 
 describe("contratos defensivos do pagamento SmartPOS", () => {
+  it("aceita somente a comanda e a maquininha do deep link", () => {
+    expect(paymentAttemptContextError(attempt, "tab-1", "installation-1")).toBeNull();
+    expect(paymentAttemptContextError(attempt, "tab-2", "installation-1")).toContain(
+      "outra comanda",
+    );
+    expect(paymentAttemptContextError(attempt, "tab-1", "installation-2")).toContain(
+      "outra maquininha",
+    );
+  });
   it("explica bloqueios sem expor códigos técnicos e preserva motivos do responsável", () => {
     expect(paymentBlockReason("PAYMENT_DEVICE_NOT_ENROLLED")).toContain("código de ativação");
     expect(paymentBlockReason("PAYMENT_FUTURE_REASON")).not.toContain("PAYMENT_");

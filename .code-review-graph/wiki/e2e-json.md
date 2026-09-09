@@ -15,9 +15,6 @@ Directory-based community: tests/e2e
 | expectWcagAa | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/accessibility.spec.ts | 4-9 |
 | test:commercial landing and login meet WCAG AA@L11 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/accessibility.spec.ts | 11-18 |
 | test:public menu entry point meets WCAG AA@L20 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/accessibility.spec.ts | 20-23 |
-| test:caixa mantém contagem cega e fechamento legível em 375 px@L12 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/cash-design.spec.ts | 12-239 |
-| test:A própria jornada cobre desktop e 375 px.@L14 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/cash-design.spec.ts | 14-14 |
-| json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/cash-design.spec.ts | 28-28 |
 | document | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/commercial-api-fixture.mjs | 3-11 |
 | mockFinance | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 8-184 |
 | json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 16-16 |
@@ -59,11 +56,14 @@ Directory-based community: tests/e2e
 | json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/inventory-controls-design.spec.ts | 34-34 |
 | test:controles do estoque permanecem operacionais em desktop e 375 px@L296 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/inventory-controls-design.spec.ts | 296-336 |
 | test:A jornada cobre os dois viewports diretamente.@L299 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/inventory-controls-design.spec.ts | 299-299 |
-| mockCompatibleApi | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/ops-release.ts | 24-28 |
 | test:admin convida a equipe no backoffice sem overflow em 375 px@L6 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 6-92 |
 | test:A largura mobile é validada no próprio cenário.@L7 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 7-7 |
+| json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 13-13 |
+| test:convidado aceita o acesso ao backoffice com token fora da query string@L94 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 94-114 |
+| test:O cenário de aceite é independente do projeto mobile.@L97 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 97-100 |
+| test:aceite direciona para verificação em duas etapas sem expor o código na URL@L116 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-team.spec.ts | 116-138 |
 
-*... and 10 more members.*
+*... and 3 more members.*
 
 ## Execution Flows
 
@@ -73,36 +73,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `expect` (229 edge(s))
-- `getByRole` (132 edge(s))
-- `toBeVisible` (125 edge(s))
-- `endsWith` (69 edge(s))
-- `getByText` (61 edge(s))
-- `click` (55 edge(s))
-- `fulfill` (39 edge(s))
-- `goto` (35 edge(s))
-- `evaluate` (34 edge(s))
-- `toBe` (31 edge(s))
-- `getByLabel` (31 edge(s))
-- `locator` (29 edge(s))
-- `route` (23 edge(s))
-- `toHaveAttribute` (22 edge(s))
-- `setViewportSize` (17 edge(s))
+- `expect` (185 edge(s))
+- `getByRole` (112 edge(s))
+- `toBeVisible` (102 edge(s))
+- `endsWith` (52 edge(s))
+- `getByText` (43 edge(s))
+- `click` (39 edge(s))
+- `goto` (33 edge(s))
+- `fulfill` (32 edge(s))
+- `evaluate` (26 edge(s))
+- `locator` (23 edge(s))
+- `toBe` (23 edge(s))
+- `route` (20 edge(s))
+- `getByLabel` (17 edge(s))
+- `toHaveAttribute` (16 edge(s))
+- `setViewportSize` (15 edge(s))
 
 ### Incoming
 
-- `expect` (228 edge(s))
-- `getByRole` (132 edge(s))
-- `toBeVisible` (125 edge(s))
-- `getByText` (61 edge(s))
-- `click` (55 edge(s))
-- `endsWith` (47 edge(s))
-- `goto` (35 edge(s))
-- `evaluate` (34 edge(s))
-- `toBe` (31 edge(s))
-- `getByLabel` (31 edge(s))
-- `locator` (29 edge(s))
-- `fulfill` (23 edge(s))
-- `toHaveAttribute` (22 edge(s))
-- `setViewportSize` (17 edge(s))
-- `route` (17 edge(s))
+- `expect` (184 edge(s))
+- `getByRole` (112 edge(s))
+- `toBeVisible` (102 edge(s))
+- `getByText` (43 edge(s))
+- `click` (39 edge(s))
+- `goto` (33 edge(s))
+- `endsWith` (30 edge(s))
+- `evaluate` (26 edge(s))
+- `locator` (23 edge(s))
+- `toBe` (23 edge(s))
+- `fulfill` (19 edge(s))
+- `getByLabel` (17 edge(s))
+- `toHaveAttribute` (16 edge(s))
+- `setViewportSize` (15 edge(s))
+- `route` (15 edge(s))

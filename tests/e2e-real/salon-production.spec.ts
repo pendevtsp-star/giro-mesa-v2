@@ -155,6 +155,8 @@ async function mockProductionApi(
   onTableTurnover?: (status: "cleaning" | "available") => void,
   onTableGroup?: (body: unknown) => number | undefined,
   actorRole: "owner" | "manager" | "waiter" | "cashier" | "receptionist" | "busser" = "manager",
+  tabDetailPayload?: unknown,
+  catalogPayload: unknown = catalog,
 ) {
   await page.route("**/health", (route) =>
     route.fulfill({
@@ -162,7 +164,7 @@ async function mockProductionApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "e2e-real",
-        schemaVersion: 79,
+        schemaVersion: 82,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -366,9 +368,9 @@ async function mockProductionApi(
                 : url.pathname.endsWith("/growth/units/unit-1/waitlist")
                   ? []
                   : path.endsWith("/pilot/catalog")
-                    ? catalog
+                    ? catalogPayload
                     : url.pathname.endsWith("/pilot/tabs/tab-3")
-                      ? {
+                      ? (tabDetailPayload ?? {
                           tab,
                           orders: [],
                           items: [
@@ -391,7 +393,7 @@ async function mockProductionApi(
                           payments: [],
                           events: [],
                           presence: [],
-                        }
+                        })
                       : url.pathname.endsWith("/pilot/tabs")
                         ? [tab]
                         : path.endsWith("/pilot/approval-requests?status=pending")
@@ -468,6 +470,118 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
   await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
   await inactiveStatusFilter.hover();
   await expectWcagAa(page);
+});
+
+test("comanda repõe rodada, assiste ruptura e libera etapa real da cozinha", async ({
+  page,
+}, testInfo) => {
+  const detail = {
+    tab,
+    orders: [
+      { id: "order-3", originTableId: null, status: "sent", createdAt: "2026-08-16T12:00:00.000Z" },
+    ],
+    items: [
+      {
+        id: "item-3",
+        productId: "product-1",
+        orderId: "order-3",
+        orderStatus: "sent",
+        productName: "Prato da casa",
+        quantity: 1,
+        grossCents: 4_900,
+        discountCents: 0,
+        netCents: 4_900,
+        status: "sent",
+        seatNumber: 1,
+        course: "main",
+        allergyNote: null,
+        notes: null,
+      },
+    ],
+    productionCourses: [
+      {
+        ticketId: "ticket-1",
+        course: "main",
+        state: "held",
+        itemCount: 1,
+        dependencyHeld: false,
+      },
+    ],
+    payments: [],
+    events: [],
+    presence: [],
+  };
+  const ruptureCatalog = {
+    ...catalog,
+    availability: catalog.availability.map((entry) =>
+      entry.productId === "product-1" ? { ...entry, available: false } : entry,
+    ),
+  };
+  await mockProductionApi(
+    page,
+    undefined,
+    undefined,
+    floor,
+    undefined,
+    undefined,
+    "manager",
+    detail,
+    ruptureCatalog,
+  );
+  const courseCalls: unknown[] = [];
+  await page.route("**/pilot/kds/ticket-1/course", async (route) => {
+    courseCalls.push(route.request().postDataJSON());
+    await route.fulfill({ json: { updated: true } });
+  });
+  await page.goto("/");
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "gm:attendance:last-order:unit-1:identity-1",
+      JSON.stringify([
+        {
+          id: "last-coffee",
+          productId: "product-2",
+          name: "Café Expresso",
+          quantity: 2,
+          modifierOptionIds: [],
+          course: "anytime",
+        },
+      ]),
+    );
+    window.location.hash = "#/salon";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.locator(".real-table").filter({ hasText: "Mesa 03" }).click();
+  const dialog = page.getByRole("dialog", { name: "Mesa 03" });
+  await dialog.getByRole("button", { name: /Pedido/ }).click();
+
+  await dialog.getByRole("button", { name: /Repor rodada/ }).click();
+  const roundModal = page.getByRole("dialog", { name: "Repor itens da última rodada" });
+  await expect(roundModal).toContainText("Preço, disponibilidade e estoque");
+  await roundModal.getByRole("checkbox").check();
+  await roundModal.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+  await expect(
+    dialog.getByText("2 item(ns) da rodada adicionados ao rascunho para revisão."),
+  ).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Liberar preparo" }).click();
+  await expect.poll(() => courseCalls.length).toBe(1);
+  expect(courseCalls[0]).toEqual({ course: "main", state: "fired" });
+  await expect(dialog.getByText("Principal liberada para preparo.")).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Conta" }).click();
+  await expect(dialog.getByText("1 item(ns) lançado(s) ficaram indisponíveis")).toBeVisible();
+  await dialog.getByRole("button", { name: "Resolver Prato da casa" }).click();
+  const ruptureModal = page.getByRole("dialog", { name: "Resolver falta de Prato da casa" });
+  await ruptureModal.getByLabel("Substituto disponível").selectOption("product-2");
+  await expect(ruptureModal.getByText("Diferença estimada no rascunho")).toBeVisible();
+  await ruptureModal.getByRole("button", { name: "Adicionar substituto ao rascunho" }).click();
+  await expect(
+    dialog.getByText(/Substituto adicionado ao rascunho.*cancelamento do item original/),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectNoHorizontalOverflow(page);
+  await dialog.screenshot({ path: testInfo.outputPath("comanda-round-rupture-course-mobile.png") });
 });
 
 test("Notificações do sistema desaparecem automaticamente", async ({ page }) => {
@@ -1857,6 +1971,12 @@ test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", 
             entityId: "attempt-1",
             label: "Comanda 18 sem resultado",
             occurredAt: "2026-08-21T16:55:00.000Z",
+            tabId: "tab-18",
+            amountCents: 10_000,
+            method: "credit_card",
+            provider: "stone",
+            installationId,
+            paymentAttemptId: "attempt-1",
           },
         ],
       },
@@ -1968,6 +2088,10 @@ test("Gestão conecta o computador, pareia SmartPOS e mantém a tela estreita", 
   await expect(page.getByRole("button", { name: "Salvar impressora" })).toBeEnabled();
   await page.getByRole("button", { name: "Cancelar" }).click();
   await expect(page.getByText("Comanda 18 sem resultado")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Abrir tentativa na conta" })).toHaveAttribute(
+    "href",
+    "#/counter?tab=tab-18&paymentAttempt=attempt-1",
+  );
   await expect(page.getByText("Bloqueio preventivo do suporte")).toBeVisible();
   await expect(page.getByRole("button", { name: /kill switch/i })).toHaveCount(0);
   await page.getByLabel("Nome operacional do terminal").fill("POS Caixa 02");
@@ -2147,15 +2271,15 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     window.location.hash = "#/catalog";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { name: "Gerenciar Cardápio" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cardápio operacional" })).toBeVisible();
   await expect(page.locator(".catalog-management-header")).toHaveCSS("flex-direction", "column");
   await expect(page.locator(".catalog-management-header__actions")).toHaveCSS(
     "justify-content",
     "flex-start",
   );
   for (const primaryAction of [
-    "Matriz BCG",
-    "Ver como Cliente & QR",
+    "Novo produto",
+    "Conferir como cliente",
     "Opcionais & Modificadores",
   ]) {
     await expect(page.getByText(primaryAction, { exact: false }).first()).toBeVisible();
@@ -2164,6 +2288,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
   for (const secondaryAction of [
     "Importar CSV",
+    "Matriz BCG",
     "Planilha CSV",
     "Identidade & Branding",
     "Gerar PDF / Imprimir",
@@ -2175,7 +2300,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   }
   for (const availableButton of [
     "Matriz BCG",
-    "Ver como Cliente & QR",
+    "Conferir como cliente",
     "Opcionais & Modificadores",
     "Planilha CSV",
     "Gerar PDF / Imprimir",
@@ -2236,5 +2361,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   });
   expect(requests[0]?.headers["idempotency-key"]).toMatch(/.{8,160}/);
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expectNoHorizontalOverflow(page);
 });

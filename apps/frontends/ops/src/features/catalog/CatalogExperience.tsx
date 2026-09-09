@@ -1613,6 +1613,36 @@ export function CatalogExperience({
 
   return (
     <div className="growth-stack">
+      <CatalogManagementHeader
+        availableProductCount={catalog.products.filter((product) => product.available).length}
+        brandingHref="#/settings?section=brand"
+        categoryCount={catalog.categories.length}
+        comboCount={catalog.combos.length}
+        groupCount={catalog.groups.length}
+        language={catalogLanguage}
+        onExportCsv={exportCatalogToCsv}
+        onImportCsv={handleCsvFileUpload}
+        onLanguageChange={setCatalogLanguage}
+        onOpenBulkAdjustment={() => setBulkModalOpen(true)}
+        onOpenNewProduct={() => {
+          const panel = document.getElementById("new-product-details");
+          if (panel instanceof HTMLDetailsElement) panel.open = true;
+          panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+          window.requestAnimationFrame(() => panel?.querySelector<HTMLElement>("input")?.focus());
+        }}
+        onOpenCustomerPreview={() => void openCustomerPreview()}
+        onOpenLabels={() => void openPrintableLabels()}
+        onOpenMatrix={() => void openBcgMatrix()}
+        onOpenModifiers={() => setModifiersManagerModalOpen(true)}
+        onOpenPdf={() => setPdfExportModalOpen(true)}
+        onOpenPromotions={() => setPromosAndCombosModalOpen(true)}
+        tableQrHref={routeHref("table-qrs")}
+        onOpenReorder={() => setReorderModalOpen(true)}
+        onOpenSpreadsheet={() => setCsvModalOpen(true)}
+        productCount={catalog.products.length}
+        production={catalog.categories.length > 0 && catalog.stations.length > 0}
+      />
+
       <CatalogSpreadsheetModal
         busy={busy === "csv-import"}
         catalog={catalog}
@@ -2750,30 +2780,6 @@ export function CatalogExperience({
           onDismiss={() => setFeedback("")}
         />
       )}
-
-      {/* Header com Título e Ações Principais */}
-      <CatalogManagementHeader
-        brandingHref="#/settings?section=brand"
-        categoryCount={catalog.categories.length}
-        comboCount={catalog.combos.length}
-        groupCount={catalog.groups.length}
-        language={catalogLanguage}
-        onExportCsv={exportCatalogToCsv}
-        onImportCsv={handleCsvFileUpload}
-        onLanguageChange={setCatalogLanguage}
-        onOpenBulkAdjustment={() => setBulkModalOpen(true)}
-        onOpenCustomerPreview={() => void openCustomerPreview()}
-        onOpenLabels={() => void openPrintableLabels()}
-        onOpenMatrix={() => void openBcgMatrix()}
-        onOpenModifiers={() => setModifiersManagerModalOpen(true)}
-        onOpenPdf={() => setPdfExportModalOpen(true)}
-        onOpenPromotions={() => setPromosAndCombosModalOpen(true)}
-        tableQrHref={routeHref("table-qrs")}
-        onOpenReorder={() => setReorderModalOpen(true)}
-        onOpenSpreadsheet={() => setCsvModalOpen(true)}
-        productCount={catalog.products.length}
-        production
-      />
 
       {/* Barra Integrada de Controle e Filtros */}
       <CatalogFilters

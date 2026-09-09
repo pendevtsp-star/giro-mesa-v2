@@ -84,6 +84,8 @@ export type DeliveryOrderStatus =
   | "preparing"
   | "ready"
   | "dispatched"
+  | "delivery_failed"
+  | "returned"
   | "completed"
   | "canceled";
 export type DeliveryAddressValidationStatus = "covered" | "unchecked" | "unavailable";
@@ -165,6 +167,8 @@ const deliveryOrderStatuses: ReadonlySet<string> = new Set([
   "preparing",
   "ready",
   "dispatched",
+  "delivery_failed",
+  "returned",
   "completed",
   "canceled",
 ]);
@@ -450,6 +454,13 @@ export interface MultiunitSummary {
     completedDeliveryGrossCents: number;
     activeReservations: number;
     activeWaitlist: number;
+    cash: {
+      status: "open" | "closed" | "unavailable";
+      openSince: string | null;
+      varianceCents: number | null;
+    };
+    delays: { total: number | null; oldestMinutes: number | null };
+    stockouts: { total: number | null };
   }>;
   transfersByStatus: Record<string, number>;
   disclaimer: string;
@@ -460,13 +471,33 @@ export function parseMultiunitSummary(value: unknown): MultiunitSummary {
   const transfers = record(payload.transfersByStatus);
   return {
     generatedAt: text(payload.generatedAt),
-    units: records(payload.units).map((row) => ({
-      id: text(row.id),
-      name: text(row.name),
-      completedDeliveryGrossCents: number(row.completedDeliveryGrossCents),
-      activeReservations: number(row.activeReservations),
-      activeWaitlist: number(row.activeWaitlist),
-    })),
+    units: records(payload.units).map((row) => {
+      const cash = record(row.cash);
+      const delays = record(row.delays);
+      const stockouts = record(row.stockouts);
+      return {
+        id: text(row.id),
+        name: text(row.name),
+        completedDeliveryGrossCents: number(row.completedDeliveryGrossCents),
+        activeReservations: number(row.activeReservations),
+        activeWaitlist: number(row.activeWaitlist),
+        cash: {
+          status: text(cash.status) as MultiunitSummary["units"][number]["cash"]["status"],
+          openSince: optionalText(cash.openSince),
+          varianceCents:
+            cash.varianceCents === null || cash.varianceCents === undefined
+              ? null
+              : number(cash.varianceCents),
+        },
+        delays: {
+          total: delays.total === null ? null : number(delays.total),
+          oldestMinutes: delays.oldestMinutes === null ? null : number(delays.oldestMinutes),
+        },
+        stockouts: {
+          total: stockouts.total === null ? null : number(stockouts.total),
+        },
+      };
+    }),
     transfersByStatus: Object.fromEntries(
       Object.entries(transfers).map(([key, value]) => [key, number(value)]),
     ),

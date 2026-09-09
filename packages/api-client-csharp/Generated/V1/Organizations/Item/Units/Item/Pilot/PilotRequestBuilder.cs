@@ -4,6 +4,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ApprovalRequests
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Calls;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Catalog;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.DeliveryProjectionStatus;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Installations;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Items;
@@ -23,6 +24,7 @@ using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ProductionPrinti
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Push;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Rooms;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ServiceSections;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ShiftHandover;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.TableGroups;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables;
@@ -61,6 +63,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue.CounterQueueRequestBuilder CounterQueue
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.CounterQueue.CounterQueueRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The deliveryProjectionStatus property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.DeliveryProjectionStatus.DeliveryProjectionStatusRequestBuilder DeliveryProjectionStatus
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.DeliveryProjectionStatus.DeliveryProjectionStatusRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The floor property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Floor.FloorRequestBuilder Floor
@@ -156,6 +163,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ServiceSections.ServiceSectionsRequestBuilder ServiceSections
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ServiceSections.ServiceSectionsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The shiftHandover property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ShiftHandover.ShiftHandoverRequestBuilder ShiftHandover
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.ShiftHandover.ShiftHandoverRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The shifts property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Shifts.ShiftsRequestBuilder Shifts

@@ -26,6 +26,7 @@ import {
 } from "../../management.shared";
 import { formatMoney } from "../../rules";
 import { CashAdministrationPanels } from "./CashAdministrationPanels";
+import { CashClosureReceipt } from "./CashClosureReceipt";
 import { CashHistoryPanel } from "./CashHistoryPanel";
 import { cashEntryLabel, paymentMethodLabel, summarizeCashEntries } from "./cash";
 import "./cash.css";
@@ -878,7 +879,11 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   <Card className="cash-action-card cash-closure-card" id="cash-closure-panel">
                     <div className="card-header">
                       <div>
-                        <p className="eyebrow">Conferência Cega do Turno</p>
+                        <p className="eyebrow">
+                          {data.capabilities.canViewExpected
+                            ? "Conferência assistida do turno"
+                            : "Conferência cega do turno"}
+                        </p>
                         <h2>Encerramento e Fechamento de Caixa</h2>
                         <p className="cash-card-desc">
                           Conte os valores físicos da gaveta e os totais das maquininhas de cartão e
@@ -1550,78 +1555,23 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 size="md"
                 title="Comprovante de Fechamento de Caixa"
               >
-                <div className="cash-slip-receipt" id="cash-closure-slip">
-                  <div className="cash-slip-receipt__header">
-                    <h3>GiroMesa Bistrô</h3>
-                    <p>Relatório de Encerramento de Turno</p>
-                    <small>Emissão: {dateLabel(new Date().toISOString())}</small>
-                  </div>
-
-                  <div className="cash-slip-receipt__section">
-                    <p>
-                      <strong>Gaveta:</strong> {selectedRegister?.name ?? "Gaveta Física"}
-                    </p>
-                    <p>
-                      <strong>Operador:</strong>{" "}
-                      {open?.responsibleName ?? open?.operatorName ?? "Operador identificado"}
-                    </p>
-                    {open?.openedAt && (
-                      <p>
-                        <strong>Abertura:</strong> {dateLabel(open.openedAt)}
-                      </p>
-                    )}
-                    <p>
-                      <strong>Encerramento:</strong> {dateLabel(new Date().toISOString())}
-                    </p>
-                  </div>
-
-                  <div className="cash-slip-receipt__divider" />
-
-                  <div className="cash-slip-receipt__values">
-                    <div className="cash-slip-row">
-                      <span>Fundo Inicial:</span>
-                      <strong>{open ? formatMoney(open.openingCents) : "—"}</strong>
-                    </div>
-                    <div className="cash-slip-row">
-                      <span>Total Contado:</span>
-                      <strong>{formatMoney(lastClosure.countedCents)}</strong>
-                    </div>
-                    <div className="cash-slip-row">
-                      <span>Total Esperado:</span>
-                      <strong>{formatMoney(lastClosure.expectedCents)}</strong>
-                    </div>
-                    <div className="cash-slip-row cash-slip-row--highlight">
-                      <span>Diferença Apurada:</span>
-                      <strong>{formatMoney(lastClosure.differenceCents)}</strong>
-                    </div>
-                  </div>
-
-                  {lastClosure.breakdown.length > 0 && (
-                    <>
-                      <div className="cash-slip-receipt__divider" />
-                      <div className="cash-slip-receipt__section">
-                        <strong>Lançamentos por Forma de Pagamento:</strong>
-                        {lastClosure.breakdown.map((item) => (
-                          <div className="cash-slip-row" key={item.method}>
-                            <span>{paymentMethodLabel(item.method)}:</span>
-                            <strong>{formatMoney(item.amountCents)}</strong>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  <div className="cash-slip-receipt__divider" />
-
-                  <div className="cash-slip-receipt__signatures">
-                    <div className="cash-slip-sign-line">
-                      <span>Assinatura do Operador de Caixa</span>
-                    </div>
-                    <div className="cash-slip-sign-line">
-                      <span>Assinatura do Gerente Responsável</span>
-                    </div>
-                  </div>
-                </div>
+                <CashClosureReceipt
+                  shift={{
+                    id: lastClosure.cashShiftId,
+                    unitName: lastClosure.unitName,
+                    cashRegisterName: lastClosure.cashRegisterName,
+                    operatorName: lastClosure.operatorName,
+                    responsibleName: lastClosure.responsibleName,
+                    closedByName: lastClosure.closedByName,
+                    openingCents: lastClosure.openingCents,
+                    expectedCents: lastClosure.expectedCents,
+                    countedCents: lastClosure.countedCents,
+                    differenceCents: lastClosure.differenceCents,
+                    openedAt: lastClosure.openedAt,
+                    closedAt: lastClosure.closedAt,
+                  }}
+                  breakdown={lastClosure.breakdown}
+                />
 
                 <div className="cash-slip-modal-actions">
                   <Button

@@ -1110,7 +1110,15 @@ export class PilotSmartPosService {
     const offlineAt = new Date(now.getTime() - 10 * 60 * 1_000);
     const [unknown, stale, offline, divergences] = await Promise.all([
       this.database.db
-        .select({ id: posPaymentAttempts.id, occurredAt: posPaymentAttempts.updatedAt })
+        .select({
+          id: posPaymentAttempts.id,
+          occurredAt: posPaymentAttempts.updatedAt,
+          tabId: posPaymentAttempts.tabId,
+          amountCents: posPaymentAttempts.amountCents,
+          method: posPaymentAttempts.method,
+          provider: posPaymentAttempts.provider,
+          installationId: posPaymentAttempts.installationId,
+        })
         .from(posPaymentAttempts)
         .where(
           and(
@@ -1120,7 +1128,15 @@ export class PilotSmartPosService {
           ),
         ),
       this.database.db
-        .select({ id: posPaymentAttempts.id, occurredAt: posPaymentAttempts.processingAt })
+        .select({
+          id: posPaymentAttempts.id,
+          occurredAt: posPaymentAttempts.processingAt,
+          tabId: posPaymentAttempts.tabId,
+          amountCents: posPaymentAttempts.amountCents,
+          method: posPaymentAttempts.method,
+          provider: posPaymentAttempts.provider,
+          installationId: posPaymentAttempts.installationId,
+        })
         .from(posPaymentAttempts)
         .where(
           and(
@@ -1177,6 +1193,12 @@ export class PilotSmartPosService {
       incidents: [
         ...unknown.map((row) => ({
           kind: "unknown_attempt" as const,
+          tabId: row.tabId,
+          amountCents: row.amountCents,
+          method: row.method,
+          provider: row.provider,
+          installationId: row.installationId,
+          paymentAttemptId: row.id,
           severity: "critical" as const,
           entityId: row.id,
           label: "Pagamento com resultado desconhecido",
@@ -1184,6 +1206,12 @@ export class PilotSmartPosService {
         })),
         ...stale.map((row) => ({
           kind: "stale_processing" as const,
+          tabId: row.tabId,
+          amountCents: row.amountCents,
+          method: row.method,
+          provider: row.provider,
+          installationId: row.installationId,
+          paymentAttemptId: row.id,
           severity: "critical" as const,
           entityId: row.id,
           label: "Pagamento processando há mais de 5 minutos",

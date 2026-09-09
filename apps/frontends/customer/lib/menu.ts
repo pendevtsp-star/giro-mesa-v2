@@ -25,6 +25,7 @@ export type CartItem = {
   quantity: number;
   modifiers: Modifier[];
   notes?: string;
+  allergyNote?: string;
 };
 
 export function formatMoney(cents: number): string {

@@ -22,6 +22,7 @@ import { dateLabel } from "../../management.shared";
 import { formatMoney } from "../../rules";
 
 export type InventoryView =
+  | "shift"
   | "overview"
   | "pending"
   | "planning"
@@ -185,7 +186,6 @@ export function InventoryWorkspace({
     setQuery(scannedCode);
     onViewChange("balances");
   }, [onViewChange, scannedCode]);
-  const returnableIncidents = data.returnableIncidents ?? [];
   const itemById = useMemo(() => new Map(data.items.map((item) => [item.id, item])), [data.items]);
   const locationById = useMemo(
     () => new Map(data.locations.map((location) => [location.id, location])),
@@ -275,32 +275,34 @@ export function InventoryWorkspace({
 
   return (
     <div className="inventory-workspace">
-      <section className="inventory-observability" aria-label="Resumo do estoque">
-        <StatCard
-          title="Valor em estoque"
-          value={formatMoney(Math.round(stockValue))}
-          icon="finance"
-          footer={`${summaries.length} item(ns)`}
-        />
-        <StatCard
-          title="Itens zerados"
-          value={zeroCount}
-          icon="alert-circle"
-          footer={zeroCount ? "Ação imediata" : "Operação normal"}
-        />
-        <StatCard
-          title="Abaixo do mínimo"
-          value={lowCount}
-          icon="arrow-down"
-          footer={lowCount ? "Revisar reposição" : "Sem rupturas previstas"}
-        />
-        <StatCard
-          title="Validades críticas"
-          value={expiringLots.length}
-          icon="clock"
-          footer="Próximos 7 dias"
-        />
-      </section>
+      {view !== "shift" && (
+        <section className="inventory-observability" aria-label="Resumo do estoque">
+          <StatCard
+            title="Valor em estoque"
+            value={formatMoney(Math.round(stockValue))}
+            icon="finance"
+            footer={`${summaries.length} item(ns)`}
+          />
+          <StatCard
+            title="Itens zerados"
+            value={zeroCount}
+            icon="alert-circle"
+            footer={zeroCount ? "Ação imediata" : "Operação normal"}
+          />
+          <StatCard
+            title="Abaixo do mínimo"
+            value={lowCount}
+            icon="arrow-down"
+            footer={lowCount ? "Revisar reposição" : "Sem rupturas previstas"}
+          />
+          <StatCard
+            title="Validades críticas"
+            value={expiringLots.length}
+            icon="clock"
+            footer="Próximos 7 dias"
+          />
+        </section>
+      )}
 
       <div className="inventory-command-bar gm-toolbar">
         <Badge tone={realtimeStatus === "live" ? "success" : "warning"}>
@@ -313,39 +315,43 @@ export function InventoryWorkspace({
         <SegmentedTabs
           active={view}
           items={[
-            { id: "overview", label: "Visão geral" },
-            {
-              id: "returnables",
-              label: "Vasilhames",
-              count:
-                (data.openCustodies?.length ?? 0) +
-                returnableIncidents.filter((incident) => incident.status === "pending").length,
-            },
+            { id: "shift", label: "Turno", count: zeroCount + lowCount },
             { id: "pending", label: "Pendências", count: data.pendingActions.length },
-            {
-              id: "planning",
-              label: "Planejamento",
-              count:
-                data.reservations.filter((item) => item.status === "active").length +
-                data.productionBatches.filter((item) => item.status === "planned").length,
-            },
             { id: "balances", label: "Saldos", count: summaries.length },
             { id: "counts", label: "Contagem" },
             { id: "movements", label: "Movimentações", count: data.recentMovements.length },
-            { id: "lots", label: "Lotes", count: data.lots.length },
-            {
-              id: "transfers",
-              label: "Transferências",
-              count: data.transfers.filter((transfer) => transfer.status === "in_transit").length,
-            },
-            { id: "assets", label: "Ativos", count: data.assets.length },
-            { id: "controls", label: "Controles", count: data.pendingActions.length },
-            { id: "recipes", label: "Fichas técnicas" },
-            { id: "settings", label: "Configurações" },
           ]}
           label="Seções do estoque"
           onChange={onViewChange}
         />
+        <details className="inventory-more-views">
+          <summary>Mais áreas do estoque</summary>
+          <div>
+            {(
+              [
+                ["overview", "Análise completa"],
+                ["planning", "Planejamento"],
+                ["lots", "Lotes e validades"],
+                ["transfers", "Transferências"],
+                ["returnables", "Vasilhames"],
+                ["assets", "Ativos"],
+                ["controls", "Controles"],
+                ["recipes", "Fichas técnicas"],
+                ["settings", "Configurações"],
+              ] as const
+            ).map(([id, label]) => (
+              <Button
+                aria-pressed={view === id}
+                key={id}
+                onClick={() => onViewChange(id)}
+                size="sm"
+                variant={view === id ? "secondary" : "ghost"}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </details>
         <div className="inventory-command-bar__actions">
           <Button onClick={() => onOpen("event")} size="sm">
             <Icon name="check" size={15} /> Contar / ajustar
@@ -370,7 +376,7 @@ export function InventoryWorkspace({
             <small>{data.automation.failed} evento(s) aguardando correção do processamento.</small>
           </span>
         </div>
-      ) : (
+      ) : view !== "shift" ? (
         <div className="inventory-system-status" role="status">
           <Icon name="check" size={18} />
           <span>
@@ -385,7 +391,7 @@ export function InventoryWorkspace({
             </small>
           </span>
         </div>
-      )}
+      ) : null}
 
       {(!data.locations.length || !data.items.length || !data.balances.length) && (
         <Card className="inventory-onboarding">
@@ -431,6 +437,132 @@ export function InventoryWorkspace({
             </li>
           </ol>
         </Card>
+      )}
+
+      {view === "shift" && (
+        <div className="inventory-shift-grid">
+          <Card className="inventory-priority-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Agora</p>
+                <h2>Rupturas</h2>
+              </div>
+              <Badge tone={zeroCount ? "danger" : "success"}>{zeroCount}</Badge>
+            </div>
+            {zeroCount ? (
+              <div className="inventory-priority-list">
+                {summaries
+                  .filter((summary) => summary.zero)
+                  .slice(0, 6)
+                  .map((summary) => (
+                    <article key={summary.item.id}>
+                      <span>
+                        <strong>{summary.item.name}</strong>
+                        <small>
+                          Disponível {summary.availableQuantity.toLocaleString("pt-BR")} · mínimo{" "}
+                          {summary.item.minimumQuantity.toLocaleString("pt-BR")} {summary.item.unit}
+                        </small>
+                      </span>
+                      <Button
+                        onClick={() => {
+                          setStatusFilter("zero");
+                          onViewChange("balances");
+                        }}
+                        size="sm"
+                        variant="secondary"
+                      >
+                        Ver saldo
+                      </Button>
+                    </article>
+                  ))}
+              </div>
+            ) : (
+              <EmptyState
+                description="Nenhum item ativo sem saldo disponível."
+                icon="✓"
+                title="Sem ruptura"
+              />
+            )}
+          </Card>
+          <Card className="inventory-priority-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Abastecer</p>
+                <h2>Reposição do turno</h2>
+              </div>
+              <Badge tone={lowCount ? "warning" : "success"}>{lowCount}</Badge>
+            </div>
+            {lowCount || data.sectorReplenishmentSuggestions.length ? (
+              <div className="inventory-shift-actions">
+                <p>
+                  {lowCount} item(ns) abaixo do mínimo e{" "}
+                  {data.sectorReplenishmentSuggestions.length} transferência(s) internas sugeridas.
+                </p>
+                <Button onClick={() => onOpen("transfer")} size="sm" variant="secondary">
+                  Repor entre setores
+                </Button>
+                <Button
+                  onClick={() => {
+                    window.location.hash = "/purchases";
+                  }}
+                  size="sm"
+                >
+                  Abrir compras
+                </Button>
+              </div>
+            ) : (
+              <EmptyState
+                description="Os mínimos cobertos estão atendidos."
+                icon="✓"
+                title="Reposição em dia"
+              />
+            )}
+          </Card>
+          <Card className="inventory-priority-card">
+            <div className="inventory-section-header">
+              <div>
+                <p className="eyebrow">Conferir</p>
+                <h2>Contagem crítica</h2>
+              </div>
+              <Badge
+                tone={
+                  data.pendingActions.some((action) => action.type === "cycle_count_due")
+                    ? "warning"
+                    : "success"
+                }
+              >
+                {data.pendingActions.filter((action) => action.type === "cycle_count_due").length}
+              </Badge>
+            </div>
+            {data.pendingActions.some((action) => action.type === "cycle_count_due") ? (
+              <>
+                <PendingActionList
+                  actions={data.pendingActions.filter(
+                    (action) => action.type === "cycle_count_due",
+                  )}
+                  canApproveInventoryRisk={canApproveInventoryRisk}
+                  canResolveTransfers={canResolveTransfers}
+                  limit={4}
+                  onOpenPurchases={() => {
+                    window.location.hash = "/purchases";
+                  }}
+                  onReviewInventoryRequest={onReviewInventoryRequest}
+                  onReviewReturnableIncident={onReviewReturnableIncident}
+                  onResolveTransfer={onResolveTransfer}
+                />
+                <Button onClick={() => onOpen("event")} size="sm">
+                  Iniciar contagem
+                </Button>
+              </>
+            ) : (
+              <EmptyState
+                description="Nenhuma contagem vencida foi retornada."
+                icon="✓"
+                title="Contagens em dia"
+              />
+            )}
+          </Card>
+        </div>
       )}
 
       {view === "overview" && (

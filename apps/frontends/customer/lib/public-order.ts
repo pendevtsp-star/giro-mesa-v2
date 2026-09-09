@@ -108,5 +108,6 @@ export function publicOrderLines(cart: CartItem[]) {
     quantity: line.quantity,
     modifierOptionIds: line.modifiers.map((modifier) => modifier.id),
     ...(line.notes ? { notes: line.notes } : {}),
+    ...(line.allergyNote ? { allergyNote: line.allergyNote } : {}),
   }));
 }

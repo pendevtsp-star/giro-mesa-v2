@@ -41,3 +41,18 @@ export function firstIncompleteProductionStep(
 ): ProductionSetupStep {
   return productionSetupSteps.find((step) => !readiness[step.id])?.id ?? "check";
 }
+
+export function productionMonitorInterval(hasPendingAttention: boolean) {
+  return hasPendingAttention ? 10_000 : 30_000;
+}
+
+export function productionPrinterLabel(
+  printers: Array<Pick<ProductionPrinter, "id" | "label">>,
+  printerId: string | null | undefined,
+) {
+  if (!printerId) return "Roteamento automático";
+  return (
+    printers.find((printer) => printer.id === printerId)?.label ??
+    `Impressora ${printerId.slice(0, 8)}`
+  );
+}

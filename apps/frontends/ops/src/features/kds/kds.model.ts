@@ -70,7 +70,51 @@ const channelLabels: Record<string, string> = {
 
 export function kdsChannelLabel(channel: string | null): string | null {
   if (!channel) return null;
-  return channelLabels[channel.toLowerCase()] ?? channel;
+  const normalized = channel
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  return channelLabels[normalized] ?? "Outro canal";
+}
+
+export const KDS_MIN_ETA_SAMPLE_SIZE = 10;
+
+export function kdsTicketIdFromHash(hash: string) {
+  const query = hash.split("?")[1] ?? "";
+  return new URLSearchParams(query).get("ticket")?.trim() || null;
+}
+
+export function kdsEtaPresentation(ticket: KdsTicket, now: number) {
+  const eta = ticket.eta;
+  if (!eta) return null;
+  const sampleSize = eta.sampleSize ?? 0;
+  if (sampleSize < KDS_MIN_ETA_SAMPLE_SIZE) {
+    return {
+      primary: "Estimativa em formação",
+      secondary:
+        sampleSize > 0
+          ? `${sampleSize}/${KDS_MIN_ETA_SAMPLE_SIZE} pedidos concluídos`
+          : "Aguardando histórico de preparo",
+    };
+  }
+
+  const predictedReadyAt = eta.predictedReadyAt ? Date.parse(eta.predictedReadyAt) : Number.NaN;
+  const remainingMinutes = Number.isFinite(predictedReadyAt)
+    ? Math.max(0, Math.ceil((predictedReadyAt - now) / 60_000))
+    : (eta.remainingMinutes ?? eta.p50Minutes);
+  const roundedRemaining =
+    remainingMinutes === null ? null : Math.max(1, Math.round(remainingMinutes));
+  const lower = eta.p50Minutes === null ? null : Math.max(1, Math.round(eta.p50Minutes));
+  const upper = eta.p90Minutes === null ? null : Math.max(lower ?? 1, Math.round(eta.p90Minutes));
+
+  if (roundedRemaining === null && (lower === null || upper === null)) return null;
+  return {
+    primary: roundedRemaining === null ? null : `Previsão em cerca de ${roundedRemaining} min`,
+    secondary:
+      lower === null || upper === null
+        ? `${sampleSize} pedidos concluídos`
+        : `Faixa estimada ${lower}–${upper} min · ${sampleSize} pedidos`,
+  };
 }
 
 export function kdsTicketReference(ticket: KdsTicket): string {

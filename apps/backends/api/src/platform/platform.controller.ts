@@ -15,7 +15,7 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse } from "@nestjs/swagger";
+import { ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiQuery } from "@nestjs/swagger";
 import { SessionGuard } from "../auth/session.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { ZodPipe } from "../common/zod.pipe.js";
@@ -456,6 +456,24 @@ export class PlatformController {
   }
 
   @Get("incidents")
+  @ApiQuery({ name: "severity", required: false, enum: ["critical", "high", "medium", "low"] })
+  @ApiQuery({ name: "source", required: false, enum: ["outbox", "hub", "fiscal", "billing"] })
+  @ApiQuery({
+    name: "impact",
+    required: false,
+    enum: ["billing", "orders", "messaging", "fiscal", "operations"],
+  })
+  @ApiQuery({
+    name: "minAgeMinutes",
+    required: false,
+    schema: { type: "integer", minimum: 0, maximum: 525600 },
+  })
+  @ApiQuery({
+    name: "maxAgeMinutes",
+    required: false,
+    schema: { type: "integer", minimum: 0, maximum: 525600 },
+  })
+  @ApiQuery({ name: "activePilotOnly", required: false, type: Boolean })
   incidents(
     @Req() request: PlatformRequest,
     @Query(new ZodPipe(platformIncidentQuerySchema)) query: PlatformIncidentQuery,

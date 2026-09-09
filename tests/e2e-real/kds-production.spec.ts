@@ -26,7 +26,7 @@ async function mockKdsApi(page: Page) {
         status: "ok",
         version: "2.0.0",
         buildSha: "kds-e2e",
-        schemaVersion: 79,
+        schemaVersion: 82,
         database: "up",
         integrations: {},
         capabilities: [
@@ -772,7 +772,7 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
   await expect(page.getByText("Sem cebola")).toBeVisible();
   await expect(page.getByText(/Alergia.*Amendoim/)).toBeVisible();
   await expect(page.getByText("Ponto bem passado")).toBeVisible();
-  await page.getByText("All-day", { exact: true }).click();
+  await page.getByText("Produção total", { exact: true }).click();
   await expect(page.getByText(/\d+ A produzir/, { exact: true }).first()).toBeVisible();
   await page.locator("details.kds-all-day").getByText("Ações", { exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Ver pedidos" })).toBeVisible();

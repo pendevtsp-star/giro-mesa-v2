@@ -19,6 +19,7 @@ import {
   publicReservationSchema,
   publicWaitlistSchema,
   reservationListQuerySchema,
+  reservationSchema,
   waitlistListQuerySchema,
   webhookEndpointSchema,
   whatsappInboxQuerySchema,
@@ -63,6 +64,26 @@ describe("growth API boundaries", () => {
       false,
     );
     assert.equal(waitlistListQuerySchema.safeParse({ limit: 201 }).success, false);
+    const pastReservation = {
+      unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+      guestName: "Maria Silva",
+      guestPhone: "(11) 99999-9999",
+      partySize: 2,
+      scheduledAt: "2020-01-01T12:00:00.000Z",
+      idempotencyKey: "reservation-retroactive-0001",
+    };
+    assert.equal(reservationSchema.safeParse(pastReservation).success, false);
+    assert.equal(
+      reservationSchema.safeParse({
+        ...pastReservation,
+        retroactiveReason: "Registro solicitado após atendimento presencial.",
+      }).success,
+      true,
+    );
+    assert.equal(
+      reservationSchema.safeParse({ ...pastReservation, guestPhone: "12345678" }).success,
+      false,
+    );
   });
 
   it("keeps delivery update and listing inputs strict and bounded", () => {
@@ -96,6 +117,13 @@ describe("growth API boundaries", () => {
     assert.equal(deliveryOrderQuerySchema.safeParse({ sla: "late" }).success, false);
     assert.equal(deliveryOrderQuerySchema.safeParse({ unknown: "value" }).success, false);
     assert.equal(deliveryTransitionSchema.safeParse({ status: "dispatched" }).success, false);
+    assert.deepEqual(
+      deliveryTransitionSchema.parse({
+        status: "delivery_failed",
+        reason: "Cliente ausente no endereço informado.",
+      }),
+      { status: "delivery_failed", reason: "Cliente ausente no endereço informado." },
+    );
     assert.equal(
       dispatchSchema.safeParse({
         courierReference: "moto-01",
@@ -262,6 +290,8 @@ describe("growth API boundaries", () => {
       }).success,
       false,
     );
+    assert.equal(whatsappInboxQuerySchema.parse({ unitId, needsReply: "true" }).needsReply, true);
+    assert.equal(whatsappInboxQuerySchema.parse({ unitId, needsReply: "false" }).needsReply, false);
     assert.equal(
       crmAutomationRuleSchema.safeParse({
         unitId,

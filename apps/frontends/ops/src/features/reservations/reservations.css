@@ -306,3 +306,13 @@
     }
   }
 }
+.seat-guest-empty {
+  display: grid;
+  gap: var(--gm-space-3);
+  justify-items: center;
+}
+
+.reservations-page .seat-guest-empty > a {
+  color: var(--gm-brand);
+  font-weight: 700;
+}

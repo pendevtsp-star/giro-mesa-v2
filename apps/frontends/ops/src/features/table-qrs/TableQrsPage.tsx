@@ -35,6 +35,7 @@ import {
   tableQrActorLabel,
   tableQrContrast,
   tableQrFilename,
+  tableQrReplacementWarning,
   tableQrTestMessage,
 } from "./table-qrs";
 import {
@@ -514,8 +515,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
 
   async function rotateQr(row: CatalogTableQr) {
     if (busy) return;
-    if (!window.confirm(`Rotacionar o QR de ${row.label}? A placa anterior deixará de funcionar.`))
-      return;
+    if (!window.confirm(tableQrReplacementWarning(row))) return;
     const operation = `rotate:${row.tableId}`;
     setBusy(operation);
     try {
@@ -635,6 +635,33 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
         </Button>
       </div>
 
+      <ol className="table-qrs-workflow" aria-label="Fluxo seguro para placas de QR">
+        <li data-complete={selectedRows.length > 0}>
+          <strong>1. Selecionar</strong>
+          <span>{selectedRows.length} mesa(s) escolhida(s)</span>
+        </li>
+        <li
+          data-complete={
+            selectedRows.length > 0 &&
+            selectedRows.every((row) => testResults[row.tableId]?.valid === true)
+          }
+        >
+          <strong>2. Conferir</strong>
+          <span>
+            {selectedRows.filter((row) => testResults[row.tableId]?.valid === true).length}/
+            {selectedRows.length} códigos validados
+          </span>
+        </li>
+        <li data-complete={lastGeneratedBatch?.status === "printed"}>
+          <strong>3. Imprimir</strong>
+          <span>
+            {lastGeneratedBatch?.status === "printed"
+              ? "Saída física confirmada"
+              : "Gere o lote e confirme a impressão"}
+          </span>
+        </li>
+      </ol>
+
       {feedback && (
         <div
           className={`table-qrs-feedback table-qrs-feedback--${feedback.tone}`}
@@ -719,7 +746,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                         size="sm"
                         variant="ghost"
                       >
-                        {busy === `rotate:${row.tableId}` ? "Rotacionando…" : "Rotacionar"}
+                        {busy === `rotate:${row.tableId}` ? "Substituindo…" : "Substituir código"}
                       </Button>
                     </div>
                     {result && (

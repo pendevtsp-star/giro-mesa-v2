@@ -447,6 +447,7 @@ export interface PosOrder {
 
 export interface PosItem {
   id: string;
+  productId?: string | null;
   orderId: string;
   orderStatus: string | null;
   productName: string;
@@ -475,6 +476,13 @@ export interface TabPayment {
 }
 
 export interface TabDetail {
+  productionCourses?: Array<{
+    ticketId: string;
+    course: "anytime" | "starter" | "main" | "dessert";
+    state: "held" | "fired";
+    itemCount: number;
+    dependencyHeld: boolean;
+  }>;
   tab: PosTab;
   orders: PosOrder[];
   items: PosItem[];
@@ -944,6 +952,7 @@ export function parseItem(row: Row): PosItem {
   }
   return {
     id: text(row.id),
+    productId: optionalText(row.productId),
     orderId: text(row.orderId),
     orderStatus: optionalText(row.orderStatus),
     productName: text(row.productName),
@@ -1517,6 +1526,22 @@ export function summarizeTabPayments(payments: TabPayment[]) {
 export function parseTabDetail(value: unknown): TabDetail {
   const payload = record(value);
   return {
+    productionCourses: records(payload.productionCourses ?? []).map((row) => {
+      const course = text(row.course);
+      const state = text(row.state);
+      if (
+        !["anytime", "starter", "main", "dessert"].includes(course) ||
+        !["held", "fired"].includes(state)
+      )
+        throw new InvalidPilotPayloadError();
+      return {
+        ticketId: text(row.ticketId),
+        course: course as "anytime" | "starter" | "main" | "dessert",
+        state: state as "held" | "fired",
+        itemCount: number(row.itemCount),
+        dependencyHeld: bool(row.dependencyHeld),
+      };
+    }),
     tab: parseTab(record(payload.tab)),
     orders: records(payload.orders).map((row) => ({
       id: text(row.id),

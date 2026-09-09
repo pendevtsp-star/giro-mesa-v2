@@ -5,8 +5,10 @@ import {
   EmptyState,
   Input,
   Label,
+  Modal,
   NativeSelect,
   StatCard,
+  Textarea,
   Toast,
 } from "@giromesa/ui";
 import { type FormEvent, useMemo, useState } from "react";
@@ -29,6 +31,17 @@ import {
   replayInventoryQueue,
 } from "./inventory-offline";
 
+type Run = (action: () => Promise<unknown>, success: string) => Promise<boolean>;
+
+interface ReasonAction {
+  confirmLabel: string;
+  description: string;
+  run: (reason: string) => Promise<boolean>;
+  title: string;
+}
+
+type RequestReason = (action: ReasonAction) => void;
+
 export function InventoryControls({
   inventory,
   scope,
@@ -40,6 +53,8 @@ export function InventoryControls({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "success" | "danger" } | null>(null);
   const [offline, setOffline] = useState(() => inventoryOfflineStatus(scope));
+  const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
+  const [actionReason, setActionReason] = useState("");
   const itemById = useMemo(
     () => new Map(inventory.items.map((item) => [item.id, item])),
     [inventory.items],
@@ -56,11 +71,13 @@ export function InventoryControls({
       await action();
       await remote.retry();
       setMessage({ text: success, tone: "success" });
+      return true;
     } catch (error) {
       setMessage({
         text: error instanceof Error ? error.message : "Não foi possível concluir.",
         tone: "danger",
       });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -127,6 +144,10 @@ export function InventoryControls({
                 setOffline(status);
                 setMessage({ text: "Contagem guardada para sincronização.", tone: "success" });
               }}
+              onRequestReason={(action) => {
+                setReasonAction(action);
+                setActionReason("");
+              }}
               scope={scope}
             />
             <SectorPolicyCard
@@ -144,7 +165,17 @@ export function InventoryControls({
               onRun={run}
               scope={scope}
             />
-            <LotHoldCard busy={busy} data={data} inventory={inventory} onRun={run} scope={scope} />
+            <LotHoldCard
+              busy={busy}
+              data={data}
+              inventory={inventory}
+              onRequestReason={(action) => {
+                setReasonAction(action);
+                setActionReason("");
+              }}
+              onRun={run}
+              scope={scope}
+            />
           </div>
 
           <div className="inventory-overview-grid">
@@ -217,7 +248,16 @@ export function InventoryControls({
                 </p>
               ))}
             </Card>
-            <DepositCard busy={busy} data={data} onRun={run} scope={scope} />
+            <DepositCard
+              busy={busy}
+              data={data}
+              onRequestReason={(action) => {
+                setReasonAction(action);
+                setActionReason("");
+              }}
+              onRun={run}
+              scope={scope}
+            />
           </div>
 
           <Card>
@@ -263,6 +303,59 @@ export function InventoryControls({
               </Button>
             </div>
           </Card>
+          <Modal
+            isOpen={reasonAction !== null}
+            onClose={() => {
+              if (busy) return;
+              setReasonAction(null);
+              setActionReason("");
+            }}
+            size="sm"
+            title={reasonAction?.title ?? "Confirmar ação"}
+          >
+            {reasonAction && (
+              <form
+                className="gm-form-stack"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void reasonAction.run(actionReason.trim()).then((completed) => {
+                    if (!completed) return;
+                    setReasonAction(null);
+                    setActionReason("");
+                  });
+                }}
+              >
+                <p>{reasonAction.description}</p>
+                <Label>
+                  <span>Justificativa</span>
+                  <Textarea
+                    autoFocus
+                    minLength={5}
+                    required
+                    value={actionReason}
+                    onChange={(event) => setActionReason(event.target.value)}
+                  />
+                </Label>
+                {message?.tone === "danger" && <p role="alert">{message.text}</p>}
+                <div className="inventory-command-bar__actions">
+                  <Button disabled={busy || actionReason.trim().length < 5} type="submit">
+                    {busy ? "Processando…" : reasonAction.confirmLabel}
+                  </Button>
+                  <Button
+                    disabled={busy}
+                    onClick={() => {
+                      setReasonAction(null);
+                      setActionReason("");
+                    }}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Voltar
+                  </Button>
+                </div>
+              </form>
+            )}
+          </Modal>
           {message && (
             <Toast message={message.text} onDismiss={() => setMessage(null)} tone={message.tone} />
           )}
@@ -271,8 +364,6 @@ export function InventoryControls({
     </RemoteGate>
   );
 }
-
-type Run = (action: () => Promise<unknown>, success: string) => Promise<void>;
 
 interface ControlCardProps {
   busy: boolean;
@@ -286,11 +377,13 @@ function BlindCountCard({
   busy,
   data,
   inventory,
+  onRequestReason,
   onRun,
   onQueued,
   scope,
 }: ControlCardProps & {
   onQueued: (status: ReturnType<typeof inventoryOfflineStatus>) => void;
+  onRequestReason: RequestReason;
 }) {
   const [locationId, setLocationId] = useState(inventory.locations[0]?.id ?? "");
   const [scheduleId, setScheduleId] = useState("");
@@ -453,13 +546,13 @@ function BlindCountCard({
             <div className="inventory-command-bar__actions">
               <Button
                 disabled={busy || !data.capabilities.canReviewCount}
-                onClick={() => reviewCount(onRun, scope, submitted.id, "approved")}
+                onClick={() => reviewCount(onRequestReason, onRun, scope, submitted.id, "approved")}
               >
                 Aprovar e aplicar
               </Button>
               <Button
                 disabled={busy || !data.capabilities.canReviewCount}
-                onClick={() => reviewCount(onRun, scope, submitted.id, "rejected")}
+                onClick={() => reviewCount(onRequestReason, onRun, scope, submitted.id, "rejected")}
                 variant="secondary"
               >
                 Rejeitar
@@ -473,24 +566,32 @@ function BlindCountCard({
 }
 
 function reviewCount(
+  onRequestReason: RequestReason,
   onRun: Run,
   scope: ManagementScope,
   sessionId: string,
   decision: "approved" | "rejected",
 ) {
-  const note = window.prompt("Justificativa da decisão (mínimo 5 caracteres):")?.trim();
-  if (!note || note.length < 5) return;
-  void onRun(
-    () =>
-      api.management.reviewBlindInventoryCount(
-        scope.organizationId,
-        scope.unitId,
-        sessionId,
-        { decision, note },
-        operationalKey("blind-count-review"),
+  onRequestReason({
+    title: decision === "approved" ? "Aprovar contagem" : "Rejeitar contagem",
+    description:
+      decision === "approved"
+        ? "O saldo será ajustado conforme a contagem conferida. Registre a justificativa da decisão."
+        : "A contagem voltará sem ajustar o saldo. Registre o motivo para a equipe corrigir.",
+    confirmLabel: decision === "approved" ? "Aprovar e aplicar" : "Rejeitar contagem",
+    run: (note) =>
+      onRun(
+        () =>
+          api.management.reviewBlindInventoryCount(
+            scope.organizationId,
+            scope.unitId,
+            sessionId,
+            { decision, note },
+            operationalKey("blind-count-review"),
+          ),
+        decision === "approved" ? "Contagem aprovada e saldo ajustado." : "Contagem rejeitada.",
       ),
-    decision === "approved" ? "Contagem aprovada e saldo ajustado." : "Contagem rejeitada.",
-  );
+  });
 }
 
 function SectorPolicyCard({ busy, data, inventory, onRun, scope }: ControlCardProps) {
@@ -683,7 +784,14 @@ function TemperatureCard({
   );
 }
 
-function LotHoldCard({ busy, data, inventory, onRun, scope }: ControlCardProps) {
+function LotHoldCard({
+  busy,
+  data,
+  inventory,
+  onRequestReason,
+  onRun,
+  scope,
+}: ControlCardProps & { onRequestReason: RequestReason }) {
   const [lotId, setLotId] = useState(inventory.lots[0]?.id ?? "");
   const [reason, setReason] = useState("");
   const active = data.lotHolds.filter((item) => item.status === "active");
@@ -743,22 +851,26 @@ function LotHoldCard({ busy, data, inventory, onRun, scope }: ControlCardProps) 
             <p>{hold.reason}</p>
             <Button
               disabled={busy || !data.capabilities.canReleaseLot}
-              onClick={() => {
-                const releaseReason = window.prompt("Motivo da liberação:")?.trim();
-                if (releaseReason && releaseReason.length >= 5)
-                  void onRun(
-                    () =>
-                      api.management.releaseInventoryLot(
-                        scope.organizationId,
-                        scope.unitId,
-                        hold.lotId,
-                        hold.id,
-                        { reason: releaseReason },
-                        operationalKey("inventory-lot-release"),
-                      ),
-                    "Lote liberado.",
-                  );
-              }}
+              onClick={() =>
+                onRequestReason({
+                  title: "Liberar lote",
+                  description: `${lotBy(inventory, hold.lotId)} voltará a ficar disponível para consumo.`,
+                  confirmLabel: "Liberar lote",
+                  run: (reason) =>
+                    onRun(
+                      () =>
+                        api.management.releaseInventoryLot(
+                          scope.organizationId,
+                          scope.unitId,
+                          hold.lotId,
+                          hold.id,
+                          { reason },
+                          operationalKey("inventory-lot-release"),
+                        ),
+                      "Lote liberado.",
+                    ),
+                })
+              }
               size="sm"
               variant="secondary"
             >
@@ -771,7 +883,13 @@ function LotHoldCard({ busy, data, inventory, onRun, scope }: ControlCardProps) 
   );
 }
 
-function DepositCard({ busy, data, onRun, scope }: Omit<ControlCardProps, "inventory">) {
+function DepositCard({
+  busy,
+  data,
+  onRequestReason,
+  onRun,
+  scope,
+}: Omit<ControlCardProps, "inventory"> & { onRequestReason: RequestReason }) {
   return (
     <Card>
       <div className="inventory-section-header">
@@ -801,21 +919,25 @@ function DepositCard({ busy, data, onRun, scope }: Omit<ControlCardProps, "inven
                 <Badge tone="success">Caução lançada</Badge>
                 <Button
                   disabled={busy || !data.capabilities.canChargeDeposit}
-                  onClick={() => {
-                    const reason = window.prompt("Motivo da reconciliação da caução:")?.trim();
-                    if (!reason || reason.length < 5) return;
-                    void onRun(
-                      () =>
-                        api.management.reconcileReturnableDepositCharge(
-                          scope.organizationId,
-                          scope.unitId,
-                          exposure.charge?.id ?? "",
-                          { reason },
-                          operationalKey("returnable-deposit-reconcile"),
+                  onClick={() =>
+                    onRequestReason({
+                      title: "Reconciliar retorno",
+                      description: `Pedido ${exposure.orderId.slice(0, 8)} · ${exposure.quantity.toLocaleString("pt-BR")} vasilhame(s). Se a caução já foi recebida, o estorno continua no Financeiro.`,
+                      confirmLabel: "Registrar reconciliação",
+                      run: (reason) =>
+                        onRun(
+                          () =>
+                            api.management.reconcileReturnableDepositCharge(
+                              scope.organizationId,
+                              scope.unitId,
+                              exposure.charge?.id ?? "",
+                              { reason },
+                              operationalKey("returnable-deposit-reconcile"),
+                            ),
+                          "Reconciliação registrada. Se a caução já foi recebida, conclua o estorno no Financeiro.",
                         ),
-                      "Reconciliação registrada. Se a caução já foi recebida, conclua o estorno no Financeiro.",
-                    );
-                  }}
+                    })
+                  }
                   size="sm"
                   variant="secondary"
                 >
@@ -823,21 +945,25 @@ function DepositCard({ busy, data, onRun, scope }: Omit<ControlCardProps, "inven
                 </Button>
                 <Button
                   disabled={busy || !data.capabilities.canChargeDeposit}
-                  onClick={() => {
-                    const reason = window.prompt("Motivo do cancelamento da caução:")?.trim();
-                    if (!reason || reason.length < 5) return;
-                    void onRun(
-                      () =>
-                        api.management.cancelReturnableDepositCharge(
-                          scope.organizationId,
-                          scope.unitId,
-                          exposure.charge?.id ?? "",
-                          { reason },
-                          operationalKey("returnable-deposit-cancel"),
+                  onClick={() =>
+                    onRequestReason({
+                      title: "Cancelar caução",
+                      description: `Pedido ${exposure.orderId.slice(0, 8)} · ${formatMoney(exposure.amountCents)}. O cancelamento ficará registrado no financeiro.`,
+                      confirmLabel: "Cancelar caução",
+                      run: (reason) =>
+                        onRun(
+                          () =>
+                            api.management.cancelReturnableDepositCharge(
+                              scope.organizationId,
+                              scope.unitId,
+                              exposure.charge?.id ?? "",
+                              { reason },
+                              operationalKey("returnable-deposit-cancel"),
+                            ),
+                          "Caução cancelada.",
                         ),
-                      "Caução cancelada.",
-                    );
-                  }}
+                    })
+                  }
                   size="sm"
                   variant="ghost"
                 >

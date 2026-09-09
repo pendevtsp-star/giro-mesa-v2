@@ -428,7 +428,7 @@ async function expectNoHorizontalOverflow(page: Page) {
 
 test("gerente cria pedido multilinha, aprova, recebe parcialmente e concilia fatura", async ({
   page,
-}) => {
+}, testInfo) => {
   const calls = emptyCalls();
   await openPurchases(page, calls);
 
@@ -454,8 +454,35 @@ test("gerente cria pedido multilinha, aprova, recebe parcialmente e concilia fat
   const receiptDialog = page.getByRole("dialog", { name: /Receber/ });
   await receiptDialog.getByLabel("Local de entrada").first().selectOption("location-1");
   await receiptDialog.getByLabel("Quantidade").first().fill("1");
+  await expect(receiptDialog.getByText("Parcial: ficam 1 pendentes")).toBeVisible();
+  await receiptDialog.getByLabel("Quantidade").first().fill("3");
+  await expect(receiptDialog.getByText("Excede o restante em 1")).toBeVisible();
+  await expect(receiptDialog.getByRole("button", { name: "Confirmar recebimento" })).toBeDisabled();
+  await receiptDialog.getByLabel("Quantidade").first().fill("1");
   await receiptDialog.getByLabel("Lote").first().fill("LT-2026");
   await receiptDialog.getByLabel("Validade").first().fill("2026-12-31");
+  for (const theme of ["light", "dark"] as const) {
+    await page.locator("html").evaluate((element, value) => {
+      element.setAttribute("data-theme", value);
+    }, theme);
+    for (const viewport of [
+      { name: "desktop", width: 1440, height: 900 },
+      { name: "mobile", width: 375, height: 812 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect
+        .poll(() =>
+          page
+            .locator(".workspace")
+            .evaluate((element) => Math.round(element.getBoundingClientRect().left)),
+        )
+        .toBe(viewport.width > 1180 ? 252 : 0);
+      await expectNoHorizontalOverflow(page);
+      await receiptDialog.screenshot({
+        path: testInfo.outputPath(`purchases-receipt-${theme}-${viewport.name}.png`),
+      });
+    }
+  }
   await receiptDialog.getByRole("button", { name: "Confirmar recebimento" }).click();
   await expect.poll(() => calls.receipt.length).toBe(1);
   expect((calls.receipt[0]?.lines as Record<string, unknown>[])[0]).toMatchObject({
@@ -525,6 +552,79 @@ test("gerente cria pedido multilinha, aprova, recebe parcialmente e concilia fat
 
   await page.setViewportSize({ width: 375, height: 812 });
   await expectNoHorizontalOverflow(page);
+});
+
+test("estoque abre no turno e usa confirmação contextual para inativar item", async ({
+  page,
+}, testInfo) => {
+  const calls = emptyCalls();
+  await mockPurchasesApi(page, calls);
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/inventory";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Estoque" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Rupturas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Reposição do turno" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Contagem crítica" })).toBeVisible();
+
+  for (const theme of ["light", "dark"] as const) {
+    await page.locator("html").evaluate((element, value) => {
+      element.setAttribute("data-theme", value);
+    }, theme);
+    for (const viewport of [
+      { name: "desktop", width: 1440, height: 900 },
+      { name: "mobile", width: 375, height: 812 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect
+        .poll(() =>
+          page
+            .locator(".workspace")
+            .evaluate((element) => Math.round(element.getBoundingClientRect().left)),
+        )
+        .toBe(viewport.width > 1180 ? 252 : 0);
+      await expectNoHorizontalOverflow(page);
+      const inventoryBounds = await page.evaluate(() => {
+        const shellWorkspace = document
+          .querySelector<HTMLElement>(".workspace")
+          ?.getBoundingClientRect();
+        const main = document.querySelector<HTMLElement>(".main-content")?.getBoundingClientRect();
+        const workspace = document
+          .querySelector<HTMLElement>(".inventory-workspace")
+          ?.getBoundingClientRect();
+        return {
+          mainLeft: main?.left ?? -1,
+          mainRight: main?.right ?? -1,
+          shellLeft: shellWorkspace?.left ?? -1,
+          workspaceLeft: workspace?.left ?? -2,
+          workspaceRight: workspace?.right ?? -2,
+        };
+      });
+      expect(inventoryBounds.mainLeft).toBeGreaterThanOrEqual(inventoryBounds.shellLeft - 1);
+      expect(inventoryBounds.workspaceLeft).toBeGreaterThanOrEqual(inventoryBounds.mainLeft - 1);
+      expect(inventoryBounds.workspaceRight).toBeLessThanOrEqual(inventoryBounds.mainRight + 1);
+      await page.screenshot({
+        fullPage: true,
+        path: testInfo.outputPath(`inventory-shift-${theme}-${viewport.name}.png`),
+      });
+    }
+  }
+
+  await page.getByText("Mais áreas do estoque").click();
+  await page.getByRole("button", { name: "Configurações" }).click();
+  const itemCard = page.locator(".inventory-data-card").filter({ hasText: "Itens de estoque" });
+  await itemCard.getByRole("button", { name: "Inativar" }).first().click();
+  const confirmation = page.getByRole("dialog", { name: "Inativar item" });
+  await expect(confirmation).toContainText(
+    "Arroz só pode ser inativado quando o saldo estiver zerado",
+  );
+  await expect(confirmation.getByRole("button", { name: "Confirmar" })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await confirmation.screenshot({
+    path: testInfo.outputPath("inventory-confirmation-dark-mobile.png"),
+  });
 });
 
 test("perfil de estoque vê conciliação e estorno sem ações financeiras", async ({ page }) => {

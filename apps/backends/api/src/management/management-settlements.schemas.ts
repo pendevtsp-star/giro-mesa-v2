@@ -108,12 +108,30 @@ export const settlementPeriodSchema = z
     }
   });
 
-export const settlementTransitionSchema = z
-  .object({
-    action: z.enum(["approve", "pay", "cancel"]),
-    note: z.string().trim().min(2).max(1_000),
-  })
-  .strict();
+const paymentMethod = z.enum([
+  "cash",
+  "pix",
+  "credit_card",
+  "debit_card",
+  "bank_transfer",
+  "other",
+]);
+
+export const settlementTransitionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("approve"), note: z.string().trim().min(2).max(1_000) }).strict(),
+  z.object({ action: z.literal("cancel"), note: z.string().trim().min(2).max(1_000) }).strict(),
+  z
+    .object({
+      action: z.literal("pay"),
+      note: z.string().trim().min(2).max(1_000),
+      paymentMethod,
+      paymentReference: z.string().trim().min(1).max(160).optional(),
+      attachmentId: id.optional(),
+      cashRegisterId: id.optional(),
+      approvalRequestId: id.optional(),
+    })
+    .strict(),
+]);
 
 export type SettlementConfigInput = z.infer<typeof settlementConfigSchema>;
 export type PartnershipPlanInput = z.infer<typeof partnershipPlanSchema>;

@@ -32,7 +32,7 @@ import {
 } from "@giromesa/db";
 import type { SystemRole } from "@giromesa/domain";
 import { BadRequestException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
-import { and, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { isApprovalActive } from "../pilot-operations/pilot-rules.js";
@@ -272,7 +272,14 @@ export class ManagementOverviewService {
         identityId,
         organizationId,
         unitId,
-        scoped.priorities,
+        await this.priorityTargets(
+          identityId,
+          organizationId,
+          unitId,
+          profileId,
+          scoped.priorities,
+          preferences.thresholds,
+        ),
         generatedAt,
       ),
       sources,
@@ -286,6 +293,157 @@ export class ManagementOverviewService {
       lastVisitedAt: preferences.lastVisitedAt?.toISOString() ?? null,
       partialSource: onlySource ?? null,
     };
+  }
+
+  private async priorityTargets<T extends { id: string; route: OverviewRoute }>(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    profileId: string,
+    priorities: T[],
+    thresholds: OverviewPreferences["thresholds"],
+  ) {
+    return Promise.all(
+      priorities.map(async (priority) => {
+        let target:
+          | { tableId?: string; tabId?: string; ticketId?: string; deliveryOrderId?: string }
+          | undefined;
+        try {
+          if (priority.id === "pending-approvals") {
+            const events = await this.database.db
+              .select({
+                tabId: posTabEvents.tabId,
+                type: posTabEvents.type,
+                payload: posTabEvents.payload,
+                createdAt: posTabEvents.createdAt,
+              })
+              .from(posTabEvents)
+              .where(
+                and(
+                  eq(posTabEvents.organizationId, organizationId),
+                  eq(posTabEvents.unitId, unitId),
+                  inArray(posTabEvents.type, [
+                    "approval.requested",
+                    "approval.approved",
+                    "approval.rejected",
+                  ]),
+                ),
+              )
+              .orderBy(desc(posTabEvents.createdAt))
+              .limit(500);
+            const decided = new Set(
+              events
+                .filter((event) => event.type !== "approval.requested")
+                .map((event) => String(event.payload.requestId ?? "")),
+            );
+            const pending = events.find(
+              (event) =>
+                event.type === "approval.requested" &&
+                !decided.has(String(event.payload.requestId ?? "")) &&
+                isApprovalActive(event.createdAt),
+            );
+            if (pending) target = { tabId: pending.tabId };
+          } else if (priority.id === "late-calls") {
+            const [call] = await this.database.db
+              .select({ tableId: posServiceCalls.tableId })
+              .from(posServiceCalls)
+              .leftJoin(posTabs, eq(posTabs.id, posServiceCalls.tabId))
+              .where(
+                and(
+                  eq(posServiceCalls.organizationId, organizationId),
+                  eq(posServiceCalls.unitId, unitId),
+                  sql`${posServiceCalls.status} <> 'resolved'`,
+                  sql`${posServiceCalls.createdAt} + (${posServiceCalls.slaMinutes} * interval '1 minute') < now()`,
+                  profileId === "waiter"
+                    ? sql`(${posTabs.responsibleIdentityId} = ${identityId} or (${posTabs.responsibleIdentityId} is null and ${posTabs.openedByIdentityId} = ${identityId}))`
+                    : undefined,
+                ),
+              )
+              .orderBy(asc(posServiceCalls.createdAt))
+              .limit(1);
+            if (call) target = { tableId: call.tableId };
+          } else if (priority.id === "ready-for-me") {
+            const [tab] = await this.database.db
+              .select({ tableId: posTabs.tableId })
+              .from(posKdsTickets)
+              .innerJoin(posOrders, eq(posOrders.id, posKdsTickets.orderId))
+              .innerJoin(posTabs, eq(posTabs.id, posOrders.tabId))
+              .where(
+                and(
+                  eq(posKdsTickets.organizationId, organizationId),
+                  eq(posKdsTickets.unitId, unitId),
+                  eq(posKdsTickets.status, "ready"),
+                  sql`(${posTabs.responsibleIdentityId} = ${identityId} or (${posTabs.responsibleIdentityId} is null and ${posTabs.openedByIdentityId} = ${identityId}))`,
+                ),
+              )
+              .orderBy(asc(posKdsTickets.createdAt))
+              .limit(1);
+            if (tab?.tableId) target = { tableId: tab.tableId };
+          } else if (priority.id === "tabs-to-charge") {
+            const [tab] = await this.database.db
+              .select({ id: posTabs.id })
+              .from(posTabs)
+              .where(
+                and(
+                  eq(posTabs.organizationId, organizationId),
+                  eq(posTabs.unitId, unitId),
+                  eq(posTabs.status, "open"),
+                ),
+              )
+              .orderBy(asc(posTabs.createdAt))
+              .limit(1);
+            if (tab) target = { tabId: tab.id };
+          } else if (priority.id === "late-kds") {
+            const [ticket] = await this.database.db
+              .select({ id: posKdsTickets.id })
+              .from(posKdsTickets)
+              .where(
+                and(
+                  eq(posKdsTickets.organizationId, organizationId),
+                  eq(posKdsTickets.unitId, unitId),
+                  inArray(posKdsTickets.status, ["pending", "preparing"]),
+                  sql`coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt} + (${thresholds.kdsDelayMinutes} * interval '1 minute')) < now()`,
+                ),
+              )
+              .orderBy(asc(sql`coalesce(${posKdsTickets.dueAt}, ${posKdsTickets.createdAt})`))
+              .limit(1);
+            if (ticket) target = { ticketId: ticket.id };
+          } else if (
+            ["late-deliveries", "ready-deliveries", "delivery-at-risk"].includes(priority.id)
+          ) {
+            const [order] = await this.database.db
+              .select({ id: deliveryOrders.id })
+              .from(deliveryOrders)
+              .where(
+                and(
+                  eq(deliveryOrders.organizationId, organizationId),
+                  eq(deliveryOrders.unitId, unitId),
+                  priority.id === "ready-deliveries"
+                    ? eq(deliveryOrders.status, "ready")
+                    : inArray(deliveryOrders.status, [
+                        "placed",
+                        "confirmed",
+                        "preparing",
+                        "ready",
+                        "dispatched",
+                      ]),
+                  priority.id === "late-deliveries"
+                    ? sql`${deliveryOrders.promisedAt} < now()`
+                    : priority.id === "delivery-at-risk"
+                      ? sql`${deliveryOrders.promisedAt} between now() and now() + (${thresholds.deliveryRiskMinutes} * interval '1 minute')`
+                      : undefined,
+                ),
+              )
+              .orderBy(asc(deliveryOrders.promisedAt))
+              .limit(1);
+            if (order) target = { deliveryOrderId: order.id };
+          }
+        } catch {
+          this.logger.warn(`Overview priority target unavailable: ${priority.id}`);
+        }
+        return { ...priority, ...(target ? { target } : {}) };
+      }),
+    );
   }
 
   private async optional<T>(

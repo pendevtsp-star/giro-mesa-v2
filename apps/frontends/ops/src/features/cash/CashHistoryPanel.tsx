@@ -1,5 +1,5 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
-import { Badge, Button, Card, EmptyState, Input, NativeSelect } from "@giromesa/ui";
+import { Badge, Button, Card, EmptyState, Input, Modal, NativeSelect } from "@giromesa/ui";
 import { type FormEvent, useEffect, useState } from "react";
 import { api } from "../../api";
 import {
@@ -12,6 +12,7 @@ import {
   parseCashShiftDetail,
 } from "../../management.shared";
 import { formatMoney } from "../../rules";
+import { CashClosureReceipt } from "./CashClosureReceipt";
 import { cashEntryLabel, paymentMethodLabel } from "./cash";
 
 type Filters = {
@@ -45,6 +46,7 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
   const [items, setItems] = useState<CashHistoryItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [detail, setDetail] = useState<CashShiftDetail | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
 
@@ -110,6 +112,7 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
           await api.management.cashShiftDetail(scope.organizationId, scope.unitId, cashShiftId),
         ),
       );
+      setShowReceipt(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível abrir o turno.");
     } finally {
@@ -338,7 +341,35 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
               </small>
             </p>
           ))}
+          {detail.shift.status !== "open" && (
+            <Button onClick={() => setShowReceipt(true)} type="button" variant="secondary">
+              Reimprimir comprovante
+            </Button>
+          )}
         </div>
+      )}
+      {detail && (
+        <Modal
+          isOpen={showReceipt}
+          onClose={() => setShowReceipt(false)}
+          size="md"
+          title="Comprovante de fechamento de caixa"
+        >
+          <CashClosureReceipt
+            shift={detail.shift}
+            breakdown={detail.tenderCounts
+              .filter((item) => item.expectedCents !== null)
+              .map((item) => ({ method: item.method, amountCents: item.expectedCents ?? 0 }))}
+          />
+          <div className="cash-slip-modal-actions">
+            <Button onClick={() => window.print()} type="button">
+              Imprimir comprovante
+            </Button>
+            <Button onClick={() => setShowReceipt(false)} type="button" variant="secondary">
+              Fechar
+            </Button>
+          </div>
+        </Modal>
       )}
     </Card>
   );

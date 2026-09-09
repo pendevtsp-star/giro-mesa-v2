@@ -41,7 +41,8 @@ export interface FiscalDashboard {
   pending: Array<{
     id: string;
     title: string;
-    detail: string;
+    cause: string;
+    nextAction: string;
     severity: "info" | "warning" | "critical";
   }>;
 }
@@ -219,7 +220,9 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
               {
                 id: "rejected",
                 title: `${rejectedCount} documento(s) rejeitado(s)`,
-                detail: "Consulte os documentos e corrija a causa antes do fechamento.",
+                cause: "O autorizador fiscal rejeitou um ou mais documentos.",
+                nextAction:
+                  "Abra as notas rejeitadas, corrija a causa indicada e atualize a situação.",
                 severity: "critical" as const,
               },
             ]
@@ -229,7 +232,9 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
               {
                 id: "pending",
                 title: `${pendingCount} documento(s) em processamento ou contingência`,
-                detail: "Aguarde autorização ou trate a pendência antes de fechar.",
+                cause: "A autorização ainda não foi concluída pelo provedor fiscal.",
+                nextAction:
+                  "Atualize a situação; se persistir, valide a conexão antes do fechamento.",
                 severity: "warning" as const,
               },
             ]
@@ -239,7 +244,8 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
               {
                 id: "classification",
                 title: `${missingClassification} produto(s) sem classificação fiscal ativa`,
-                detail: "Complete a classificação tributária antes da próxima emissão.",
+                cause: "O cadastro tributário dos produtos está incompleto.",
+                nextAction: "Complete e ative a classificação antes da próxima emissão.",
                 severity: "warning" as const,
               },
             ]
@@ -249,7 +255,8 @@ export function parseFiscalWorkspace(value: unknown): FiscalWorkspace {
               {
                 id: "accountant",
                 title: accountantOpenRequestTitle(openAccountantRequests),
-                detail: "Consulte o Portal do contador para responder às pendências.",
+                cause: "Há uma solicitação fiscal aberta entre a unidade e a contabilidade.",
+                nextAction: "Abra o Portal do contador, responda e anexe os documentos pedidos.",
                 severity: "info" as const,
               },
             ]
@@ -553,6 +560,20 @@ export function accountantOpenRequestTitle(count: number): string {
 export function accountantRequestStatusLabel(request: AccountantRequest): string {
   if (request.status === "resolved") return "Resolvida";
   return request.targetAudience === "accountant" ? "Aguardando contador" : "Aguardando empresa";
+}
+
+export function accountantRequestNextAction(
+  request: AccountantRequest,
+  audience: "accountant" | "establishment",
+): string {
+  if (request.status === "resolved")
+    return "Solicitação concluída; consulte a resposta registrada.";
+  if (request.targetAudience === audience) {
+    return "Revise o pedido, anexe os documentos necessários e registre a resposta.";
+  }
+  return request.targetAudience === "accountant"
+    ? "Aguardar a resposta do contador."
+    : "Aguardar a resposta do estabelecimento.";
 }
 
 export function canResolveAccountantRequest(

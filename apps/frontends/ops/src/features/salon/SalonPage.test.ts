@@ -4,6 +4,7 @@ import {
   buildTableGroupReason,
   buildTableTransferCommand,
   canOpenTableWorkspace,
+  compareSalonTableLabels,
   findPriorityServiceCall,
   nextTransferRefreshBoundary,
   parseSalonViewContext,
@@ -26,6 +27,18 @@ describe("atalho para a mesa", () => {
   it("lê a mesa vinculada sem confundir outros parâmetros", () => {
     expect(salonTableIdFromHash("#/salon?table=table-09&origem=attention")).toBe("table-09");
     expect(salonTableIdFromHash("#/salon?tab=table-09")).toBeNull();
+  });
+});
+
+describe("ordenação operacional das mesas", () => {
+  it("ordena números naturalmente e usa o id como desempate estável", () => {
+    const rows = [
+      { id: "c", label: "Mesa 10" },
+      { id: "b", label: "Mesa 2" },
+      { id: "a", label: "Mesa 2" },
+    ] as Parameters<typeof compareSalonTableLabels>[0][];
+
+    expect([...rows].sort(compareSalonTableLabels).map((row) => row.id)).toEqual(["a", "b", "c"]);
   });
 });
 

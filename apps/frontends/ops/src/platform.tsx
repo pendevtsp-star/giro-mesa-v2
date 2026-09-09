@@ -224,6 +224,7 @@ interface PlatformIncident {
   detail: string;
   category: string;
   severity: "info" | "warning" | "danger";
+  severityCode: "low" | "medium" | "high" | "critical";
   severityLabel: string;
   status: "open" | "claimed" | "snoozed" | "resolved";
   assignedTo: string | null;
@@ -231,12 +232,58 @@ interface PlatformIncident {
   snoozedUntil: string | null;
   outboxEventId: string | null;
   ageMinutes: number;
+  impact: "billing" | "orders" | "messaging" | "fiscal" | "operations";
+  impactCriterion: string;
 }
 
 interface IncidentList {
   items: PlatformIncident[];
   nextCursor: string | null;
   partialSources: string[];
+}
+
+interface SavedIncidentFilters {
+  status: string;
+  severity: string;
+  source: string;
+  impact: string;
+  age: string;
+  activePilotOnly: boolean;
+}
+
+const incidentFilterValues = {
+  status: ["active", "open", "claimed", "snoozed", "resolved", "all"],
+  severity: ["all", "critical", "high", "medium", "low"],
+  source: ["all", "outbox", "hub", "fiscal", "billing"],
+  impact: ["all", "orders", "messaging", "billing", "fiscal", "operations"],
+  age: ["all", "under_60", "60_240", "over_240"],
+} as const;
+
+export function parseSavedIncidentFilters(value: string | null): SavedIncidentFilters | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const keys = Object.keys(parsed);
+    if (
+      keys.length !== 6 ||
+      !keys.every((key) => key in incidentFilterValues || key === "activePilotOnly") ||
+      !incidentFilterValues.status.includes(parsed.status as never) ||
+      !incidentFilterValues.severity.includes(parsed.severity as never) ||
+      !incidentFilterValues.source.includes(parsed.source as never) ||
+      !incidentFilterValues.impact.includes(parsed.impact as never) ||
+      !incidentFilterValues.age.includes(parsed.age as never) ||
+      typeof parsed.activePilotOnly !== "boolean"
+    ) {
+      return null;
+    }
+    return parsed as unknown as SavedIncidentFilters;
+  } catch {
+    return null;
+  }
+}
+
+function incidentViewStorageKey(identityId: string): string {
+  return `gm:platform:incident-view:${identityId}`;
 }
 
 type CommercialTab = "catalog" | "promotions" | "landing" | "leads";
@@ -340,6 +387,12 @@ interface PlatformApi {
   incidents: (params: {
     search?: string;
     status?: string;
+    severity?: string;
+    source?: string;
+    impact?: string;
+    minAgeMinutes?: number;
+    maxAgeMinutes?: number;
+    activePilotOnly?: boolean;
     cursor?: string;
     limit: number;
   }) => Promise<unknown>;
@@ -939,6 +992,7 @@ function parseIncidentRows(rows: Row[]): PlatformIncident[] {
           : severity === "medium"
             ? "warning"
             : "info",
+      severityCode: severity as PlatformIncident["severityCode"],
       severityLabel:
         { low: "baixa", medium: "média", high: "alta", critical: "crítica" }[severity] ?? severity,
       status: state as PlatformIncident["status"],
@@ -947,6 +1001,8 @@ function parseIncidentRows(rows: Row[]): PlatformIncident[] {
       snoozedUntil: optionalText(row.snoozedUntil),
       outboxEventId: row.source === "outbox" ? text(row.sourceId) : null,
       ageMinutes: number(row.ageMinutes),
+      impact: text(row.impact) as PlatformIncident["impact"],
+      impactCriterion: text(row.criterion),
     };
   });
 }
@@ -1072,7 +1128,13 @@ function RemoteMessage({
   return null;
 }
 
-export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
+export function RealPlatformPage({
+  refreshToken,
+  identityId,
+}: {
+  refreshToken: number;
+  identityId: string;
+}) {
   const [area, setArea] = useState<"control" | "commercial" | "team">("control");
   const [tenantInput, setTenantInput] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
@@ -1082,6 +1144,20 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
   const [incidentInput, setIncidentInput] = useState("");
   const [incidentSearch, setIncidentSearch] = useState("");
   const [incidentStatusFilter, setIncidentStatusFilter] = useState("open");
+  const [incidentSeverityFilter, setIncidentSeverityFilter] = useState("all");
+  const [incidentSourceFilter, setIncidentSourceFilter] = useState("all");
+  const [incidentImpactFilter, setIncidentImpactFilter] = useState("all");
+  const [incidentAgeFilter, setIncidentAgeFilter] = useState("all");
+  const [incidentActivePilotOnly, setIncidentActivePilotOnly] = useState(false);
+  const [savedIncidentFilters, setSavedIncidentFilters] = useState<SavedIncidentFilters | null>(
+    () =>
+      typeof window === "undefined"
+        ? null
+        : parseSavedIncidentFilters(
+            window.localStorage.getItem(incidentViewStorageKey(identityId)),
+          ),
+  );
+  const [savedViewNotice, setSavedViewNotice] = useState<string | null>(null);
   const [incidentCursor, setIncidentCursor] = useState<string | undefined>();
   const [incidentHistory, setIncidentHistory] = useState<Array<string | undefined>>([]);
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
@@ -1104,6 +1180,13 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
     null,
   );
 
+  useEffect(() => {
+    setSavedIncidentFilters(
+      parseSavedIncidentFilters(window.localStorage.getItem(incidentViewStorageKey(identityId))),
+    );
+    setSavedViewNotice(null);
+  }, [identityId]);
+
   const overviewLoader = useCallback(() => {
     void refreshToken;
     return platformApi.overview();
@@ -1122,10 +1205,27 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
     return platformApi.incidents({
       ...(incidentSearch ? { search: incidentSearch } : {}),
       ...(incidentStatusFilter !== "all" ? { status: incidentStatusFilter } : {}),
+      ...(incidentSeverityFilter !== "all" ? { severity: incidentSeverityFilter } : {}),
+      ...(incidentSourceFilter !== "all" ? { source: incidentSourceFilter } : {}),
+      ...(incidentImpactFilter !== "all" ? { impact: incidentImpactFilter } : {}),
+      ...(incidentAgeFilter === "under_60" ? { maxAgeMinutes: 59 } : {}),
+      ...(incidentAgeFilter === "60_240" ? { minAgeMinutes: 60, maxAgeMinutes: 240 } : {}),
+      ...(incidentAgeFilter === "over_240" ? { minAgeMinutes: 241 } : {}),
+      ...(incidentActivePilotOnly ? { activePilotOnly: true } : {}),
       ...(incidentCursor ? { cursor: incidentCursor } : {}),
       limit: 20,
     });
-  }, [refreshToken, incidentCursor, incidentSearch, incidentStatusFilter]);
+  }, [
+    refreshToken,
+    incidentAgeFilter,
+    incidentActivePilotOnly,
+    incidentCursor,
+    incidentImpactFilter,
+    incidentSearch,
+    incidentSeverityFilter,
+    incidentSourceFilter,
+    incidentStatusFilter,
+  ]);
   const tenantLoader = useCallback(() => {
     void refreshToken;
     return selectedTenantId ? platformApi.tenant(selectedTenantId) : Promise.resolve(null);
@@ -1154,6 +1254,42 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
     setIncidentHistory([]);
     setIncidentCursor(undefined);
     setIncidentSearch(incidentInput.trim());
+  }
+
+  function currentIncidentFilters(): SavedIncidentFilters {
+    return {
+      status: incidentStatusFilter,
+      severity: incidentSeverityFilter,
+      source: incidentSourceFilter,
+      impact: incidentImpactFilter,
+      age: incidentAgeFilter,
+      activePilotOnly: incidentActivePilotOnly,
+    };
+  }
+
+  function saveIncidentFilters() {
+    const filters = currentIncidentFilters();
+    window.localStorage.setItem(incidentViewStorageKey(identityId), JSON.stringify(filters));
+    setSavedIncidentFilters(filters);
+    setSavedViewNotice("Visão salva neste navegador para este administrador.");
+  }
+
+  function applyIncidentFilters(filters: SavedIncidentFilters) {
+    setIncidentStatusFilter(filters.status);
+    setIncidentSeverityFilter(filters.severity);
+    setIncidentSourceFilter(filters.source);
+    setIncidentImpactFilter(filters.impact);
+    setIncidentAgeFilter(filters.age);
+    setIncidentActivePilotOnly(filters.activePilotOnly);
+    setIncidentHistory([]);
+    setIncidentCursor(undefined);
+    setSavedViewNotice("Visão local aplicada.");
+  }
+
+  function removeSavedIncidentFilters() {
+    window.localStorage.removeItem(incidentViewStorageKey(identityId));
+    setSavedIncidentFilters(null);
+    setSavedViewNotice("Visão local removida.");
   }
 
   function resetActionForm() {
@@ -1465,17 +1601,34 @@ export function RealPlatformPage({ refreshToken }: { refreshToken: number }) {
               tenantCursor={tenantCursor}
             />
             <IncidentPanel
+              activePilotOnly={incidentActivePilotOnly}
+              age={incidentAgeFilter}
+              applySavedFilters={() =>
+                savedIncidentFilters && applyIncidentFilters(savedIncidentFilters)
+              }
               canManage={canManageIncidents}
               canRetry={canRetryOutbox}
               history={incidentHistory}
               input={incidentInput}
+              impact={incidentImpactFilter}
               incidentCursor={incidentCursor}
               remote={incidents}
               setActionTarget={setActionTarget}
               setCursor={setIncidentCursor}
               setHistory={setIncidentHistory}
               setInput={setIncidentInput}
+              setAge={setIncidentAgeFilter}
+              setActivePilotOnly={setIncidentActivePilotOnly}
+              setImpact={setIncidentImpactFilter}
+              setSeverity={setIncidentSeverityFilter}
+              setSource={setIncidentSourceFilter}
               setStatus={setIncidentStatusFilter}
+              severity={incidentSeverityFilter}
+              savedFiltersAvailable={savedIncidentFilters !== null}
+              savedViewNotice={savedViewNotice}
+              saveFilters={saveIncidentFilters}
+              removeSavedFilters={removeSavedIncidentFilters}
+              source={incidentSourceFilter}
               status={incidentStatusFilter}
               submit={submitIncidentSearch}
             />
@@ -3266,24 +3419,43 @@ function TenantSearchPanel({
 }
 
 function IncidentPanel({
+  activePilotOnly,
+  age,
+  applySavedFilters,
   canManage,
   canRetry,
   history,
   input,
+  impact,
   incidentCursor,
   remote,
   setActionTarget,
   setCursor,
   setHistory,
   setInput,
+  setAge,
+  setActivePilotOnly,
+  setImpact,
+  setSeverity,
+  setSource,
   setStatus,
   status,
+  severity,
+  savedFiltersAvailable,
+  savedViewNotice,
+  saveFilters,
+  removeSavedFilters,
+  source,
   submit,
 }: {
+  activePilotOnly: boolean;
+  age: string;
+  applySavedFilters: () => void;
   canManage: boolean;
   canRetry: boolean;
   history: Array<string | undefined>;
   input: string;
+  impact: string;
   incidentCursor: string | undefined;
   remote: RemoteResult<IncidentList>;
   setActionTarget: (value: {
@@ -3293,8 +3465,19 @@ function IncidentPanel({
   setCursor: (value: string | undefined) => void;
   setHistory: React.Dispatch<React.SetStateAction<Array<string | undefined>>>;
   setInput: (value: string) => void;
+  setAge: (value: string) => void;
+  setActivePilotOnly: (value: boolean) => void;
+  setImpact: (value: string) => void;
+  setSeverity: (value: string) => void;
+  setSource: (value: string) => void;
   setStatus: (value: string) => void;
   status: string;
+  severity: string;
+  savedFiltersAvailable: boolean;
+  savedViewNotice: string | null;
+  saveFilters: () => void;
+  removeSavedFilters: () => void;
+  source: string;
   submit: (event: FormEvent) => void;
 }) {
   return (
@@ -3333,17 +3516,148 @@ function IncidentPanel({
               value={status}
             >
               <option value="open">Abertos</option>
+              <option value="active">Pendentes e em atendimento</option>
               <option value="claimed">Em atendimento</option>
               <option value="snoozed">Adiados</option>
               <option value="resolved">Resolvidos</option>
               <option value="all">Todos</option>
             </NativeSelect>
+            <NativeSelect
+              aria-label="Severidade do incidente"
+              onChange={(event) => {
+                setSeverity(event.target.value);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              value={severity}
+            >
+              <option value="all">Todas as severidades</option>
+              <option value="critical">Crítica</option>
+              <option value="high">Alta</option>
+              <option value="medium">Média</option>
+              <option value="low">Baixa</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Origem do incidente"
+              onChange={(event) => {
+                setSource(event.target.value);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              value={source}
+            >
+              <option value="all">Todas as origens</option>
+              <option value="outbox">Processamento assíncrono</option>
+              <option value="hub">Conector da unidade</option>
+              <option value="fiscal">Fiscal</option>
+              <option value="billing">Cobrança</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Idade do incidente"
+              onChange={(event) => {
+                setAge(event.target.value);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              value={age}
+            >
+              <option value="all">Qualquer idade</option>
+              <option value="under_60">Menos de 1 hora</option>
+              <option value="60_240">De 1 a 4 horas</option>
+              <option value="over_240">Mais de 4 horas</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Escopo do incidente"
+              onChange={(event) => {
+                setActivePilotOnly(event.target.value === "active_pilots");
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              value={activePilotOnly ? "active_pilots" : "all"}
+            >
+              <option value="all">Todos os tenants</option>
+              <option value="active_pilots">Somente pilotos ativos</option>
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Impacto do incidente"
+              onChange={(event) => {
+                setImpact(event.target.value);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              value={impact}
+            >
+              <option value="all">Todos os impactos</option>
+              <option value="orders">Pedidos</option>
+              <option value="messaging">Mensagens</option>
+              <option value="billing">Cobrança</option>
+              <option value="fiscal">Fiscal</option>
+              <option value="operations">Operação</option>
+            </NativeSelect>
             <Button size="sm" type="submit">
               Buscar
+            </Button>
+            <Button
+              onClick={() => {
+                setStatus("open");
+                setSeverity("critical");
+                setSource("all");
+                setAge("all");
+                setImpact("all");
+                setActivePilotOnly(false);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              Críticos agora
+            </Button>
+            <Button
+              aria-pressed={activePilotOnly && status === "active"}
+              onClick={() => {
+                setStatus("active");
+                setSeverity("all");
+                setSource("all");
+                setAge("all");
+                setImpact("all");
+                setActivePilotOnly(true);
+                setHistory([]);
+                setCursor(undefined);
+              }}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              Pilotos com problemas
             </Button>
           </div>
         </form>
       </search>
+      <div className="platform-saved-view">
+        <strong>Visão salva neste navegador</strong>
+        <span>
+          Somente os filtros deste administrador. Os resultados continuam sendo consultados no
+          servidor.
+        </span>
+        <div>
+          <Button onClick={saveFilters} size="sm" type="button" variant="secondary">
+            Salvar filtros atuais
+          </Button>
+          {savedFiltersAvailable && (
+            <>
+              <Button onClick={applySavedFilters} size="sm" type="button" variant="ghost">
+                Aplicar visão salva
+              </Button>
+              <Button onClick={removeSavedFilters} size="sm" type="button" variant="ghost">
+                Remover visão salva
+              </Button>
+            </>
+          )}
+        </div>
+        {savedViewNotice && <small aria-live="polite">{savedViewNotice}</small>}
+      </div>
       <RemoteMessage label="incidentes" retry={remote.retry} state={remote.state} />
       {remote.state.status === "ready" && (
         <>
@@ -3372,6 +3686,19 @@ function IncidentPanel({
                     </small>
                     <p>{incident.detail}</p>
                     <small>Aberto há {durationMinutes(incident.ageMinutes)}</small>
+                    <small>
+                      Impacto:{" "}
+                      {incident.impact === "orders"
+                        ? "Pedidos"
+                        : incident.impact === "messaging"
+                          ? "Mensagens"
+                          : incident.impact === "billing"
+                            ? "Cobrança"
+                            : incident.impact === "fiscal"
+                              ? "Fiscal"
+                              : "Operação"}{" "}
+                      · critério: {incident.impactCriterion}
+                    </small>
                     {incident.assignedTo && <small>Responsável: {incident.assignedTo}</small>}
                     {incident.snoozedUntil && (
                       <small>Adiado até {dateTime(incident.snoozedUntil)}</small>

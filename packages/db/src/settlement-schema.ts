@@ -16,7 +16,12 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
-import { managementPeople } from "./management-schema.js";
+import {
+  managementAccountsPayable,
+  managementFinanceAttachments,
+  managementPayablePayments,
+  managementPeople,
+} from "./management-schema.js";
 import { posOperationalShifts, posOrders, posTabs } from "./operations-schema.js";
 import { identities, organizations, units } from "./schema.js";
 
@@ -261,6 +266,13 @@ export const managementWaiterSettlements = pgTable(
     paidAt: timestamp("paid_at", { withTimezone: true }),
     paidByIdentityId: uuid("paid_by_identity_id").references(() => identities.id),
     paymentNote: text("payment_note"),
+    paymentMethod: varchar("payment_method", { length: 32 }),
+    paymentReference: varchar("payment_reference", { length: 160 }),
+    paymentAttachmentId: uuid("payment_attachment_id"),
+    financePayableId: uuid("finance_payable_id"),
+    financePaymentId: uuid("finance_payment_id").references(() => managementPayablePayments.id, {
+      onDelete: "restrict",
+    }),
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
     canceledByIdentityId: uuid("canceled_by_identity_id").references(() => identities.id),
     cancellationNote: text("cancellation_note"),
@@ -284,6 +296,29 @@ export const managementWaiterSettlements = pgTable(
       table.unitId,
       table.idempotencyKey,
     ),
+    index("management_waiter_settlements_finance_payable_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.financePayableId,
+    ),
+    foreignKey({
+      name: "management_waiter_settlements_finance_payable_fk",
+      columns: [table.organizationId, table.unitId, table.financePayableId],
+      foreignColumns: [
+        managementAccountsPayable.organizationId,
+        managementAccountsPayable.unitId,
+        managementAccountsPayable.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "management_waiter_settlements_payment_attachment_fk",
+      columns: [table.organizationId, table.unitId, table.paymentAttachmentId],
+      foreignColumns: [
+        managementFinanceAttachments.organizationId,
+        managementFinanceAttachments.unitId,
+        managementFinanceAttachments.id,
+      ],
+    }).onDelete("restrict"),
     foreignKey({
       name: "management_waiter_settlements_unit_fk",
       columns: [table.organizationId, table.unitId],
@@ -317,7 +352,7 @@ export const managementWaiterSettlements = pgTable(
     ),
     check(
       "management_waiter_settlements_lifecycle_check",
-      sql`(${table.status} = 'closed' and ${table.approvedAt} is null and ${table.paidAt} is null and ${table.canceledAt} is null) or (${table.status} = 'approved' and ${table.approvedAt} is not null and ${table.approvedByIdentityId} is not null and nullif(btrim(${table.approvalNote}), '') is not null and ${table.paidAt} is null and ${table.canceledAt} is null) or (${table.status} = 'paid' and ${table.approvedAt} is not null and ${table.approvedByIdentityId} is not null and ${table.paidAt} is not null and ${table.paidByIdentityId} is not null and nullif(btrim(${table.paymentNote}), '') is not null and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.paidAt} is null and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and nullif(btrim(${table.cancellationNote}), '') is not null)`,
+      sql`(${table.status} = 'closed' and ${table.approvedAt} is null and ${table.paidAt} is null and ${table.canceledAt} is null and ${table.paymentMethod} is null) or (${table.status} = 'approved' and ${table.approvedAt} is not null and ${table.approvedByIdentityId} is not null and nullif(btrim(${table.approvalNote}), '') is not null and ${table.paidAt} is null and ${table.canceledAt} is null and ${table.paymentMethod} is null) or (${table.status} = 'paid' and ${table.approvedAt} is not null and ${table.approvedByIdentityId} is not null and ${table.paidAt} is not null and ${table.paidByIdentityId} is not null and nullif(btrim(${table.paymentNote}), '') is not null and ${table.paymentMethod} in ('cash','pix','credit_card','debit_card','bank_transfer','other') and ${table.canceledAt} is null) or (${table.status} = 'canceled' and ${table.paidAt} is null and ${table.canceledAt} is not null and ${table.canceledByIdentityId} is not null and nullif(btrim(${table.cancellationNote}), '') is not null)`,
     ),
   ],
 );

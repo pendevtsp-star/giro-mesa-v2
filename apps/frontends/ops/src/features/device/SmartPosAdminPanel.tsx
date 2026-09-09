@@ -22,6 +22,7 @@ import {
   type SmartPosReconciliation,
   type SmartPosReconciliationStatus,
   smartPosAdmin,
+  smartPosIncidentHref,
 } from "./smartpos-admin";
 import "./smartpos-admin.css";
 
@@ -285,10 +286,42 @@ function HealthPanel({ health }: { health: SmartPosHealth }) {
                 <small>
                   {incidentLabels[incident.kind]} · {shortDate(incident.occurredAt)}
                 </small>
+                {(incident.amountCents !== undefined || incident.method || incident.provider) && (
+                  <small>
+                    {[
+                      incident.amountCents === undefined ? null : formatMoney(incident.amountCents),
+                      incident.method === "credit_card"
+                        ? "Crédito"
+                        : incident.method === "debit_card"
+                          ? "Débito"
+                          : incident.method === "pix"
+                            ? "Pix"
+                            : incident.method,
+                      incident.provider?.toUpperCase(),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </small>
+                )}
+                {incident.installationId && (
+                  <small title={incident.installationId}>
+                    Terminal {incident.installationId.slice(0, 8)}
+                  </small>
+                )}
               </span>
-              <Badge tone={incident.severity === "critical" ? "danger" : "warning"}>
-                {incident.severity === "critical" ? "Crítico" : "Atenção"}
-              </Badge>
+              <span className="smartpos-incident-actions">
+                <Badge tone={incident.severity === "critical" ? "danger" : "warning"}>
+                  {incident.severity === "critical" ? "Crítico" : "Atenção"}
+                </Badge>
+                {smartPosIncidentHref(incident) && (
+                  <a
+                    className="gm-button gm-button--secondary gm-button--sm"
+                    href={smartPosIncidentHref(incident) ?? undefined}
+                  >
+                    Abrir tentativa na conta
+                  </a>
+                )}
+              </span>
             </li>
           ))}
         </ul>

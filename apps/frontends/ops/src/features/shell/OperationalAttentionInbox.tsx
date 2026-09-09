@@ -241,6 +241,7 @@ export function buildOperationalAttentions(
         detail: job.lastError ?? "A impressora não recebeu o documento.",
         since: job.updatedAt,
         route: "counter",
+        tabId: job.tabId,
       });
     }
   }
@@ -315,7 +316,13 @@ export function OperationalAttentionInbox({
       setPresence(tableQrPresence);
       const floor = floorPayload
         ? parsePilotFloor(floorPayload)
-        : ({ tables: [], serviceCalls: [], tablePhases: [] } as unknown as PilotFloor);
+        : parsePilotFloor({
+            rooms: [],
+            tables: [],
+            openTabs: [],
+            serviceCalls: [],
+            tablePhases: [],
+          });
       const tabIds = [...new Set(floor.openTabs.map((tab) => tab.id))];
       const tabResults = await Promise.all(
         tabIds.map(async (tabId) => {
@@ -554,7 +561,7 @@ export function OperationalAttentionInbox({
             <>
               <div className="operational-attention-summary">
                 <span>{items.length} exigem ação</span>
-                {criticalCount > 0 && <Badge tone="danger">{criticalCount} vencidas</Badge>}
+                {criticalCount > 0 && <Badge tone="danger">{criticalCount} urgentes</Badge>}
                 {presence?.mode === "daily_code" && presence.code && (
                   <Badge tone="info">Código QR de hoje: {presence.code}</Badge>
                 )}
@@ -581,6 +588,13 @@ export function OperationalAttentionInbox({
                   <Badge tone="warning">Estado das notificações indisponível</Badge>
                 )}
               </div>
+              <p>
+                {canSalon
+                  ? "Chamados e pedidos das mesas acessíveis ao seu perfil"
+                  : "Impressões acessíveis ao seu perfil"}
+                {canSalon && canCounter ? ", além das falhas de impressão" : ""}. Estes alertas têm
+                escopo diferente dos indicadores do Salão.
+              </p>
               {pushError && (
                 <span className="operational-attention-error" role="alert">
                   {pushError}

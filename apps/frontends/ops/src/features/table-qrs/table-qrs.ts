@@ -69,3 +69,11 @@ export function tableQrFilename(label: string, extension: "svg" | "png") {
     .replace(/^-|-$/g, "");
   return `qr-${slug || "mesa"}.${extension}`;
 }
+
+export function tableQrReplacementWarning(row: {
+  label: string;
+  tokenVersion: number;
+  scanCount?: number;
+}) {
+  return `Substituir o código de ${row.label}? A placa atual (versão ${row.tokenVersion}, ${row.scanCount ?? 0} leitura(s)) deixará de funcionar imediatamente. Depois será obrigatório gerar, conferir e imprimir a nova placa.`;
+}

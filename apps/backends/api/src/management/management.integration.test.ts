@@ -419,6 +419,18 @@ it("persists an atomic tenant-isolated purchase, stock and payable flow", async 
       "approve-order-0001",
       { version: 1 },
     );
+    await database.db
+      .update(managementPurchaseOrders)
+      .set({ expectedAt: new Date() })
+      .where(eq(managementPurchaseOrders.id, purchase.purchaseOrderId));
+    const arrivingToday = await management.listPurchases(identityA.id, organizationA.id, unitA.id, {
+      arrival: "today",
+      page: 1,
+      pageSize: 1,
+    });
+    assert.equal(arrivingToday.orders.length, 1);
+    assert.equal(arrivingToday.orders[0]?.id, purchase.purchaseOrderId);
+    assert.equal(arrivingToday.pagination.total, 1);
     await assert.rejects(
       () =>
         management.approvePurchaseOrder(

@@ -10,7 +10,10 @@ import {
   isKdsItemTransitionConfirmed,
   isKdsRerouteConfirmed,
   KDS_PILOT_ACTIONS,
+  kdsChannelLabel,
+  kdsEtaPresentation,
   kdsHasUnacknowledgedAttention,
+  kdsTicketIdFromHash,
   parseKdsAnalytics,
   shouldInvalidateKdsTopic,
   sortKdsTickets,
@@ -33,6 +36,51 @@ const item = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("KDS operacional", () => {
+  it("traduz canais e evita precisão falsa enquanto a amostra de ETA é pequena", () => {
+    expect(kdsChannelLabel("dine-in")).toBe("Salão");
+    expect(kdsChannelLabel("unknown_provider_channel")).toBe("Outro canal");
+
+    const [ticket] = parseKds({
+      tickets: [
+        {
+          id: "ticket-eta",
+          orderId: "order-eta",
+          stationId: "station-1",
+          status: "pending",
+          createdAt: "2026-08-16T20:00:00.000Z",
+          eta: {
+            predictedReadyAt: "2026-08-16T20:15:00.000Z",
+            remainingMinutes: 0.2,
+            p50Minutes: 0.1,
+            p90Minutes: 1.2,
+            sampleSize: 5,
+          },
+        },
+      ],
+      items: [],
+    }).tickets;
+    expect(ticket).toBeDefined();
+    if (!ticket) return;
+
+    expect(kdsEtaPresentation(ticket, Date.parse("2026-08-16T20:10:00.000Z"))).toEqual({
+      primary: "Estimativa em formação",
+      secondary: "5/10 pedidos concluídos",
+    });
+
+    expect(ticket.eta).not.toBeNull();
+    if (!ticket.eta) return;
+    ticket.eta = { ...ticket.eta, sampleSize: 20 };
+    expect(kdsEtaPresentation(ticket, Date.parse("2026-08-16T20:10:00.000Z"))).toEqual({
+      primary: "Previsão em cerca de 5 min",
+      secondary: "Faixa estimada 1–1 min · 20 pedidos",
+    });
+  });
+
+  it("lê o ticket exato de um deep link do painel", () => {
+    expect(kdsTicketIdFromHash("#/kds?ticket=ticket-42")).toBe("ticket-42");
+    expect(kdsTicketIdFromHash("#/kds/station")).toBeNull();
+  });
+
   it("preserva o contrato legado e normaliza estados de item válidos", () => {
     const data = parseKds({
       serviceMode: "full_service",

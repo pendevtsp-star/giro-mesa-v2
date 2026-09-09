@@ -14,8 +14,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOpera
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The amountCents property</summary>
+        public int? AmountCents { get; set; }
         /// <summary>The entityId property</summary>
         public Guid? EntityId { get; set; }
+        /// <summary>The installationId property</summary>
+        public Guid? InstallationId { get; set; }
         /// <summary>The kind property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_kind? Kind { get; set; }
         /// <summary>The label property</summary>
@@ -26,10 +30,30 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOpera
 #else
         public string Label { get; set; }
 #endif
+        /// <summary>The method property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Method { get; set; }
+#nullable restore
+#else
+        public string Method { get; set; }
+#endif
         /// <summary>The occurredAt property</summary>
         public DateTimeOffset? OccurredAt { get; set; }
+        /// <summary>The paymentAttemptId property</summary>
+        public Guid? PaymentAttemptId { get; set; }
+        /// <summary>The provider property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Provider { get; set; }
+#nullable restore
+#else
+        public string Provider { get; set; }
+#endif
         /// <summary>The severity property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_severity? Severity { get; set; }
+        /// <summary>The tabId property</summary>
+        public Guid? TabId { get; set; }
         /// <summary>
         /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents"/> and sets the default values.
         /// </summary>
@@ -55,11 +79,17 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOpera
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "amountCents", n => { AmountCents = n.GetIntValue(); } },
                 { "entityId", n => { EntityId = n.GetGuidValue(); } },
+                { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "kind", n => { Kind = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_kind>(); } },
                 { "label", n => { Label = n.GetStringValue(); } },
+                { "method", n => { Method = n.GetStringValue(); } },
                 { "occurredAt", n => { OccurredAt = n.GetDateTimeOffsetValue(); } },
+                { "paymentAttemptId", n => { PaymentAttemptId = n.GetGuidValue(); } },
+                { "provider", n => { Provider = n.GetStringValue(); } },
                 { "severity", n => { Severity = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_severity>(); } },
+                { "tabId", n => { TabId = n.GetGuidValue(); } },
             };
         }
         /// <summary>
@@ -69,11 +99,17 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOpera
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("amountCents", AmountCents);
             writer.WriteGuidValue("entityId", EntityId);
+            writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_kind>("kind", Kind);
             writer.WriteStringValue("label", Label);
+            writer.WriteStringValue("method", Method);
             writer.WriteDateTimeOffsetValue("occurredAt", OccurredAt);
+            writer.WriteGuidValue("paymentAttemptId", PaymentAttemptId);
+            writer.WriteStringValue("provider", Provider);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.PaymentOperations.Health.HealthGetResponse_incidents_severity>("severity", Severity);
+            writer.WriteGuidValue("tabId", TabId);
             writer.WriteAdditionalData(AdditionalData);
         }
     }

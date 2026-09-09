@@ -209,6 +209,38 @@ export function hasActiveProductionRoute(
   return stationIds.some((stationId) => activeStationIds.has(stationId));
 }
 
+export function repeatRoundItemAvailability(
+  item: Pick<DraftCartItem, "productId" | "quantity">,
+  product:
+    | {
+        active: boolean;
+        available: boolean;
+        dailyStockRemaining?: number | null;
+        priceCents: number | null;
+        stationIds: readonly string[];
+      }
+    | undefined,
+  activeStationIds: ReadonlySet<string>,
+) {
+  if (!product?.active) return { available: false, reason: "Produto fora do cardápio atual." };
+  if (!product.available) return { available: false, reason: "Produto indisponível agora." };
+  if (product.priceCents === null) return { available: false, reason: "Produto sem preço atual." };
+  if (!hasActiveProductionRoute(product.stationIds, activeStationIds)) {
+    return { available: false, reason: "Produto sem estação ativa." };
+  }
+  if (
+    product.dailyStockRemaining !== null &&
+    product.dailyStockRemaining !== undefined &&
+    product.dailyStockRemaining < item.quantity
+  ) {
+    return {
+      available: false,
+      reason: `Restam ${Math.max(0, product.dailyStockRemaining)} unidade(s) no estoque diário.`,
+    };
+  }
+  return { available: true, reason: null, priceCents: product.priceCents };
+}
+
 export function orderSubmissionErrorMessage(createdCount: number, error: unknown) {
   const message = error instanceof Error ? error.message : "Não foi possível salvar o pedido.";
   if (!createdCount) return message;
@@ -676,6 +708,7 @@ export function TabWorkspace({
   scope,
   tabId,
   floor,
+  initialPaymentAttemptId = null,
   initialView = "order",
   compactHeading = false,
   onChanged,
@@ -683,6 +716,7 @@ export function TabWorkspace({
   scope: PilotScope;
   tabId: string;
   floor?: PilotFloor;
+  initialPaymentAttemptId?: string | null;
   initialView?: WorkspaceView;
   compactHeading?: boolean;
   onChanged: () => void;
@@ -738,6 +772,10 @@ export function TabWorkspace({
   const [lastOrder, setLastOrder] = useState<DraftCartItem[]>(() =>
     typeof window === "undefined" ? [] : parseStoredCart(readStoredValue(lastOrderStorageKey)),
   );
+  const [roundSelectionOpen, setRoundSelectionOpen] = useState(false);
+  const [roundSelection, setRoundSelection] = useState<Record<string, number>>({});
+  const [ruptureItemId, setRuptureItemId] = useState("");
+  const [ruptureReplacementProductId, setRuptureReplacementProductId] = useState("");
   const [pendingSubmission, setPendingSubmission] = useState<PendingOrderSubmission | null>(() =>
     typeof window === "undefined"
       ? null
@@ -834,7 +872,7 @@ export function TabWorkspace({
   const [responsibleIdentityId, setResponsibleIdentityId] = useState("");
   const [reopenReason, setReopenReason] = useState("");
   const [reopenPin, setReopenPin] = useState("");
-  const [smartPosOpen, setSmartPosOpen] = useState(false);
+  const [smartPosOpen, setSmartPosOpen] = useState(Boolean(initialPaymentAttemptId));
   const [integratedAttempt, setIntegratedAttempt] = useState<PaymentAttempt | null>(null);
   const [doseClubOpen, setDoseClubOpen] = useState(false);
   const [doseClubState, setDoseClubState] = useState<DoseClubLoadState>({ status: "idle" });
@@ -858,6 +896,13 @@ export function TabWorkspace({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new tab must reset navigation even when the requested view is unchanged.
   useEffect(() => setView(initialView), [initialView, tabId]);
+
+  useEffect(() => {
+    if (initialPaymentAttemptId) {
+      setView("account");
+      setSmartPosOpen(true);
+    }
+  }, [initialPaymentAttemptId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: trocar a comanda deve fechar e limpar a consulta, mesmo sem ler o identificador no corpo.
   useEffect(() => {
@@ -1465,6 +1510,32 @@ export function TabWorkspace({
               return count >= group.minimumSelections && count <= group.maximumSelections;
             });
             const activeItems = data.items.filter((item) => item.status !== "canceled");
+            const ruptureItems = activeItems.filter((item) => {
+              if (!item.productId || item.status === "draft") return false;
+              const current = menu.products.find((candidate) => candidate.id === item.productId);
+              return !current?.active || !current.available || current.priceCents === null;
+            });
+            const ruptureItem = ruptureItems.find((item) => item.id === ruptureItemId) ?? null;
+            const ruptureProduct = ruptureItem?.productId
+              ? menu.products.find((candidate) => candidate.id === ruptureItem.productId)
+              : null;
+            const ruptureAlternatives = ruptureProduct
+              ? menu.products.filter(
+                  (candidate) =>
+                    candidate.id !== ruptureProduct.id &&
+                    candidate.categoryId === ruptureProduct.categoryId &&
+                    candidate.active &&
+                    candidate.available &&
+                    candidate.priceCents !== null &&
+                    canReachProduction(candidate) &&
+                    (candidate.dailyStockRemaining === null ||
+                      candidate.dailyStockRemaining === undefined ||
+                      candidate.dailyStockRemaining >= (ruptureItem?.quantity ?? 1)),
+                )
+              : [];
+            const ruptureReplacement = menu.products.find(
+              (candidate) => candidate.id === ruptureReplacementProductId,
+            );
             const paymentSummary = summarizeTabPayments(data.payments);
             const paidCents = paymentSummary.paidCents;
             const remainingCents = Math.max(0, data.tab.totalCents - paidCents);
@@ -1750,19 +1821,20 @@ export function TabWorkspace({
               setLastRemovedItem(item);
             }
 
-            function repeatLastOrder() {
-              const repeatable = lastOrder.filter((item) => {
-                if (item.doseClub) return false;
+            function addSelectedRound() {
+              const repeatable = lastOrder.flatMap((item) => {
+                const selectedQuantity = roundSelection[item.id] ?? 0;
+                if (item.doseClub || selectedQuantity < 1) return [];
                 const selected = menu.products.find((product) => product.id === item.productId);
-                return (
-                  selected?.active &&
-                  selected.available &&
-                  selected.priceCents !== null &&
-                  canReachProduction(selected)
+                const availability = repeatRoundItemAvailability(
+                  { productId: item.productId, quantity: selectedQuantity },
+                  selected,
+                  activeStationIds,
                 );
+                return availability.available ? [{ ...item, quantity: selectedQuantity }] : [];
               });
               if (!repeatable.length) {
-                setFeedback("Não há itens disponíveis para repetir.");
+                setFeedback("Selecione ao menos um item disponível para montar a rodada.");
                 return;
               }
               setCart((current) => [
@@ -1773,8 +1845,10 @@ export function TabWorkspace({
                 rememberProduct(item.productId);
               });
               setFeedback(
-                `${repeatable.length} item(ns) do último pedido adicionados ao rascunho.`,
+                `${repeatable.reduce((sum, item) => sum + item.quantity, 0)} item(ns) da rodada adicionados ao rascunho para revisão.`,
               );
+              setRoundSelection({});
+              setRoundSelectionOpen(false);
             }
 
             async function requestBillAndPrint() {
@@ -2089,6 +2163,39 @@ export function TabWorkspace({
                 detail.retry();
                 tabs.retry();
                 onChanged();
+              }
+            }
+
+            async function setProductionCourseState(
+              ticketId: string,
+              course: NonNullable<DraftCartItem["course"]>,
+              state: "held" | "fired",
+            ) {
+              setBusy(true);
+              setFeedback("");
+              try {
+                await api.pilot.setKdsCourseState(
+                  scope.organizationId,
+                  scope.unitId,
+                  ticketId,
+                  course,
+                  state,
+                  crypto.randomUUID(),
+                );
+                setFeedback(
+                  state === "held"
+                    ? `${courseLabels[course]} mantida em espera na cozinha.`
+                    : `${courseLabels[course]} liberada para preparo.`,
+                );
+              } catch (error) {
+                setFeedback(
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível atualizar a etapa na cozinha.",
+                );
+              } finally {
+                setBusy(false);
+                detail.retry();
               }
             }
 
@@ -2885,8 +2992,14 @@ export function TabWorkspace({
                         </div>
                         <div className="quick-order-strip__items">
                           {lastOrder.length > 0 && (
-                            <Button onClick={repeatLastOrder} type="button">
-                              ↻ Repetir último
+                            <Button
+                              onClick={() => {
+                                setRoundSelection({});
+                                setRoundSelectionOpen(true);
+                              }}
+                              type="button"
+                            >
+                              ↻ Repor rodada
                             </Button>
                           )}
                           {quickProducts.map((item) => (
@@ -2910,6 +3023,91 @@ export function TabWorkspace({
                         </div>
                       </section>
                     )}
+                    <Modal
+                      className="repeat-round-modal"
+                      isOpen={roundSelectionOpen}
+                      onClose={() => setRoundSelectionOpen(false)}
+                      size="md"
+                      title="Repor itens da última rodada"
+                    >
+                      <div className="repeat-round-list">
+                        <p>
+                          Selecione somente o que será servido novamente. Preço, disponibilidade e
+                          estoque abaixo são os atuais; a seleção entra no rascunho antes do envio.
+                        </p>
+                        {lastOrder.map((item) => {
+                          const selectedProduct = menu.products.find(
+                            (candidate) => candidate.id === item.productId,
+                          );
+                          const selectedQuantity = roundSelection[item.id] ?? 0;
+                          const availability = item.doseClub
+                            ? { available: false, reason: "Dose pré-paga exige nova validação." }
+                            : repeatRoundItemAvailability(
+                                {
+                                  productId: item.productId,
+                                  quantity: Math.max(1, selectedQuantity),
+                                },
+                                selectedProduct,
+                                activeStationIds,
+                              );
+                          const optionCents = item.modifierOptionIds.reduce(
+                            (sum, optionId) =>
+                              sum +
+                              (menu.options.find((option) => option.id === optionId)
+                                ?.priceDeltaCents ?? 0),
+                            0,
+                          );
+                          return (
+                            <label className="repeat-round-item" key={item.id}>
+                              <input
+                                checked={selectedQuantity > 0}
+                                disabled={!availability.available}
+                                onChange={(event) =>
+                                  setRoundSelection((current) => ({
+                                    ...current,
+                                    [item.id]: event.target.checked ? item.quantity : 0,
+                                  }))
+                                }
+                                type="checkbox"
+                              />
+                              <span>
+                                <strong>{item.name}</strong>
+                                <small>
+                                  {availability.available && selectedProduct?.priceCents !== null
+                                    ? `${formatMoney((selectedProduct?.priceCents ?? 0) + optionCents)} por unidade`
+                                    : availability.reason}
+                                </small>
+                              </span>
+                              <Input
+                                aria-label={`Quantidade de ${item.name}`}
+                                disabled={!availability.available || selectedQuantity === 0}
+                                max={selectedProduct?.dailyStockRemaining ?? 99}
+                                min={1}
+                                onChange={(event) =>
+                                  setRoundSelection((current) => ({
+                                    ...current,
+                                    [item.id]: Math.max(1, Number(event.target.value) || 1),
+                                  }))
+                                }
+                                type="number"
+                                value={selectedQuantity || item.quantity}
+                              />
+                            </label>
+                          );
+                        })}
+                        <div className="repeat-round-actions">
+                          <Button onClick={() => setRoundSelectionOpen(false)} variant="ghost">
+                            Cancelar
+                          </Button>
+                          <Button
+                            disabled={!Object.values(roundSelection).some((value) => value > 0)}
+                            onClick={addSelectedRound}
+                          >
+                            Adicionar ao rascunho
+                          </Button>
+                        </div>
+                      </div>
+                    </Modal>
                     <Label className="search-field real-product-search">
                       <Icon aria-hidden="true" name="search" size={16} />
                       <Input
@@ -3426,6 +3624,57 @@ export function TabWorkspace({
                 )}
                 {view === "order" && (
                   <div className="data-list order-history-list">
+                    {(data.productionCourses?.length ?? 0) > 0 && (
+                      <Callout tone="info">
+                        <strong>Etapas confirmadas na cozinha</strong>
+                        <p>
+                          Controle a espera e a liberação pelos tickets reais desta comanda. Uma
+                          dependência da produção ainda pode segurar o item depois da liberação.
+                        </p>
+                        <div className="production-course-actions">
+                          {data.productionCourses?.map((entry) => (
+                            <span key={`${entry.ticketId}:${entry.course}`}>
+                              <span>
+                                <strong>{courseLabels[entry.course]}</strong>
+                                <small>
+                                  {entry.itemCount} item(ns) ·{" "}
+                                  {entry.state === "held" ? "em espera" : "liberado"}
+                                  {entry.dependencyHeld ? " · aguardando etapa anterior" : ""}
+                                </small>
+                              </span>
+                              <Button
+                                disabled={busy || entry.state === "held"}
+                                onClick={() =>
+                                  void setProductionCourseState(
+                                    entry.ticketId,
+                                    entry.course,
+                                    "held",
+                                  )
+                                }
+                                size="sm"
+                                variant="ghost"
+                              >
+                                Manter em espera
+                              </Button>
+                              <Button
+                                disabled={busy || entry.state === "fired"}
+                                onClick={() =>
+                                  void setProductionCourseState(
+                                    entry.ticketId,
+                                    entry.course,
+                                    "fired",
+                                  )
+                                }
+                                size="sm"
+                                variant="secondary"
+                              >
+                                Liberar preparo
+                              </Button>
+                            </span>
+                          ))}
+                        </div>
+                      </Callout>
+                    )}
                     {data.orders.map((order, orderIndex) => (
                       <article className="data-row" key={order.id}>
                         <div>
@@ -3478,7 +3727,7 @@ export function TabWorkspace({
                               onClick={() => void releaseOrder(order.id)}
                               size="sm"
                             >
-                              Liberar{" "}
+                              Enviar pedido em espera ·{" "}
                               {courseLabels[
                                 data.items.find((item) => item.orderId === order.id)?.course ??
                                   "anytime"
@@ -3492,6 +3741,126 @@ export function TabWorkspace({
                 )}
                 {view === "account" && (
                   <section className="account-overview">
+                    {ruptureItems.length > 0 && (
+                      <Callout tone="warning">
+                        <strong>
+                          {ruptureItems.length} item(ns) lançado(s) ficaram indisponíveis
+                        </strong>
+                        <p>
+                          Prepare um substituto no rascunho e conclua o cancelamento autorizado do
+                          item original. As duas confirmações permanecem separadas e visíveis.
+                        </p>
+                        <div className="rupture-actions">
+                          {ruptureItems.map((item) => (
+                            <Button
+                              key={item.id}
+                              onClick={() => {
+                                setRuptureItemId(item.id);
+                                setRuptureReplacementProductId("");
+                              }}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Resolver {item.productName}
+                            </Button>
+                          ))}
+                        </div>
+                      </Callout>
+                    )}
+                    <Modal
+                      isOpen={Boolean(ruptureItem)}
+                      onClose={() => {
+                        setRuptureItemId("");
+                        setRuptureReplacementProductId("");
+                      }}
+                      size="sm"
+                      title={
+                        ruptureItem
+                          ? `Resolver falta de ${ruptureItem.productName}`
+                          : "Resolver ruptura"
+                      }
+                    >
+                      {ruptureItem && (
+                        <div className="rupture-assistant">
+                          <p>
+                            O item original continua lançado até o cancelamento ser aprovado. O
+                            substituto será apenas adicionado ao rascunho desta comanda.
+                          </p>
+                          <Label>
+                            Substituto disponível
+                            <NativeSelect
+                              onChange={(event) =>
+                                setRuptureReplacementProductId(event.target.value)
+                              }
+                              value={ruptureReplacementProductId}
+                            >
+                              <option value="">Selecione</option>
+                              {ruptureAlternatives.map((candidate) => (
+                                <option key={candidate.id} value={candidate.id}>
+                                  {candidate.name} · {formatMoney(candidate.priceCents ?? 0)}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                          </Label>
+                          {ruptureAlternatives.length === 0 && (
+                            <Callout tone="warning">
+                              <strong>Sem alternativa disponível na mesma categoria</strong>
+                              <p>Cancele o item original ou escolha outro produto pela busca.</p>
+                            </Callout>
+                          )}
+                          {ruptureReplacement?.priceCents !== null && ruptureReplacement && (
+                            <p className="rupture-difference" role="status">
+                              Diferença estimada no rascunho:{" "}
+                              <strong>
+                                {formatMoney(
+                                  ruptureReplacement.priceCents * ruptureItem.quantity -
+                                    ruptureItem.netCents,
+                                )}
+                              </strong>
+                              . Adicionais do item original não são copiados.
+                            </p>
+                          )}
+                          <div className="rupture-actions">
+                            <Button
+                              disabled={!ruptureReplacement}
+                              onClick={() => {
+                                if (!ruptureReplacement) return;
+                                setCart((current) => [
+                                  ...current,
+                                  {
+                                    id: crypto.randomUUID(),
+                                    productId: ruptureReplacement.id,
+                                    name: ruptureReplacement.name,
+                                    quantity: ruptureItem.quantity,
+                                    modifierOptionIds: [],
+                                    ...(ruptureItem.seatNumber
+                                      ? { seatNumber: ruptureItem.seatNumber }
+                                      : {}),
+                                    ...(ruptureItem.course !== "anytime"
+                                      ? { course: ruptureItem.course }
+                                      : {}),
+                                    ...(ruptureItem.allergyNote
+                                      ? { allergyNote: ruptureItem.allergyNote }
+                                      : {}),
+                                    notes: `Substituição de ${ruptureItem.productName}; aguarda cancelamento do item original.`,
+                                  },
+                                ]);
+                                setApprovalItemId(ruptureItem.id);
+                                setItemActionId(ruptureItem.id);
+                                setApprovalReason("Produto indisponível");
+                                setRuptureItemId("");
+                                setRuptureReplacementProductId("");
+                                setFeedback(
+                                  "Substituto adicionado ao rascunho. Agora confirme ou solicite o cancelamento do item original abaixo.",
+                                );
+                              }}
+                            >
+                              Adicionar substituto ao rascunho
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </Modal>
                     <div className="account-overview__metrics">
                       <span>
                         <small>Total</small>
@@ -3549,7 +3918,7 @@ export function TabWorkspace({
                               value={paymentMode}
                             >
                               <option value="full">Conta inteira</option>
-                              <option value="per_person">Por pessoa</option>
+                              <option value="per_person">Dividir valor igualmente</option>
                               <option value="custom">Outro valor</option>
                             </NativeSelect>
                           </Label>
@@ -3588,9 +3957,10 @@ export function TabWorkspace({
                             />
                             {paymentMode === "per_person" && defaultPaymentReais !== null && (
                               <small>
-                                Sugestão de {formatMoney(Math.round(defaultPaymentReais * 100))} por
-                                pessoa. Uma pessoa paga este valor; confira o saldo após cada
-                                pagamento.
+                                Parcela sugerida de{" "}
+                                {formatMoney(Math.round(defaultPaymentReais * 100))}. Cada
+                                confirmação registra somente uma parcela; confira o saldo antes de
+                                receber a próxima. A conta não fica vinculada a pessoas específicas.
                               </small>
                             )}
                           </Label>
@@ -4809,6 +5179,7 @@ export function TabWorkspace({
                 {integratedPaymentEnabled && (
                   <SmartPosPaymentModal
                     embedded={scope.embedded === true}
+                    initialAttemptId={initialPaymentAttemptId}
                     installationId={scope.installationId ?? ""}
                     isOpen={smartPosOpen}
                     onApproved={() => {
@@ -4911,6 +5282,7 @@ export function TabWorkspace({
                       )}
                       {view === "account" && cashierPaymentEnabled && remainingCents > 0 && (
                         <Button
+                          className="service-action-dock__confirm"
                           disabled={busy || !manualPaymentReady}
                           form={`cashier-payment-form-${tabId}`}
                           size="sm"

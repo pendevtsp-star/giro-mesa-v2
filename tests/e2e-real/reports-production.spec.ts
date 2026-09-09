@@ -86,10 +86,12 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
     },
     dailySeries: legacyEmpty
       ? []
-      : [
-          { date: period.from, revenueCents: 100_000, previousRevenueCents: 80_000 },
-          { date: period.to, revenueCents: 50_000, previousRevenueCents: 40_000 },
-        ],
+      : period.from === period.to
+        ? [{ date: period.from, revenueCents: 150_000, previousRevenueCents: 120_000 }]
+        : [
+            { date: period.from, revenueCents: 100_000, previousRevenueCents: 80_000 },
+            { date: period.to, revenueCents: 50_000, previousRevenueCents: 40_000 },
+          ],
     breakdowns: {
       products: legacyEmpty
         ? []
@@ -297,7 +299,7 @@ function report(period: { from: string; to: string }, legacyEmpty = false) {
   };
 }
 
-async function mockReportsApi(page: Page, requestedPeriods: string[]) {
+async function mockReportsApi(page: Page, requestedPeriods: string[], role = "finance") {
   await mockCompatibleApiHealth(page, "reports-e2e");
   const savedViews: Array<Record<string, unknown>> = [];
   const alerts: Array<Record<string, unknown>> = [];
@@ -471,7 +473,7 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
                     active: true,
                   },
                 ],
-                scopes: [{ role: "finance", unitId }],
+                scopes: [{ role, unitId }],
               },
             ]
           : null;
@@ -483,6 +485,70 @@ async function mockReportsApi(page: Page, requestedPeriods: string[]) {
     );
   });
 }
+
+test("gestão consulta turno atual sem alterar o período do relatório em 375 px", async ({
+  page,
+}) => {
+  const periods: string[] = [];
+  await mockReportsApi(page, periods, "manager");
+  await page.route("**/management/overview", (route) =>
+    route.fulfill({
+      json: {
+        profileId: "manager",
+        generatedAt: "2026-09-09T18:00:00.000Z",
+        activeShift: { label: "Serviço da noite", startsAt: "2026-09-09T17:00:00.000Z" },
+        preferences: {
+          alertsEnabled: true,
+          minimumTone: "warning",
+          digestMinutes: 15,
+          thresholds: {
+            kdsDelayMinutes: 15,
+            stockCoverageDays: 3,
+            deliveryRiskMinutes: 15,
+            salesGoalCents: 100000,
+            maxKdsDelayed: 2,
+            maxStockouts: 0,
+            maxDeliveryDelayed: 0,
+            maxReconciliations: 0,
+          },
+        },
+        lastVisitedAt: null,
+        partialSource: null,
+        unavailableSources: ["inventory"],
+        metrics: [
+          {
+            id: "shift-sales",
+            label: "Vendas do turno",
+            value: "R$ 123,45",
+            detail: "Desde a abertura",
+            tone: "neutral",
+            route: "counter",
+            source: "operations",
+          },
+        ],
+        priorities: [],
+        pulse: [],
+        quickActions: [],
+        multiunit: [],
+        activity: [],
+        sources: [],
+      },
+    }),
+  );
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/#/reports");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await expect(page.getByRole("heading", { name: "Relatórios", exact: true })).toBeVisible();
+  await expect.poll(() => periods.length).toBeGreaterThan(0);
+  const initialPeriod = periods.at(-1);
+  await page.getByRole("button", { name: "Turno atual", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Resumo do turno atual" });
+  await expect(dialog.getByText("Serviço da noite")).toBeVisible();
+  await expect(dialog.getByText("Vendas do turno: R$ 123,45")).toBeVisible();
+  await expect(dialog.getByText(/Há fontes indisponíveis/)).toBeVisible();
+  expect(periods.at(-1)).toBe(initialPeriod);
+  await expectNoHorizontalOverflow(page);
+});
 
 test("navegação sai de Relatórios ao selecionar outro módulo", async ({ page }) => {
   await mockReportsApi(page, []);
@@ -535,7 +601,7 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page).toHaveURL(/reportOrganization=org-1.*reportUnit=unit-1.*#\/reports/);
   await expect(page.getByText("+25,0% vs. período anterior").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Visões compartilhadas" }).click();
+  await page.getByRole("button", { name: "Visões salvas na conta" }).click();
   await page.getByLabel("Nome").fill("Fechamento semanal");
   await page.getByRole("button", { name: "Salvar visão" }).click();
   await expect(page.getByText("Visão salva no servidor.")).toBeVisible();
@@ -656,7 +722,7 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
     "href",
     "#/finance",
   );
-  await page.getByRole("button", { name: "Salvar filtro atual" }).click();
+  await page.getByRole("button", { name: "Favoritar neste navegador" }).click();
   const appliedFromLabel = (await page.getByLabel("Data inicial").inputValue())
     .split("-")
     .reverse()
@@ -668,7 +734,7 @@ test("financeiro consulta relatório real por período sem inventar margem", asy
   await expect(page.getByRole("region", { name: "Filtros salvos" })).toContainText(
     `${appliedFromLabel} a ${appliedToLabel}`,
   );
-  await expect(page.getByRole("button", { name: "Salvar filtro atual" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Favoritar neste navegador" })).toBeDisabled();
   await expect(
     page.getByRole("img", { name: "Receita diária comparada ao período anterior" }),
   ).toBeVisible();

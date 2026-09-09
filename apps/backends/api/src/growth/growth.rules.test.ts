@@ -19,6 +19,10 @@ describe("growth rules", () => {
     assert.equal(canTransition(reservationTransitions, "confirmed", "seated"), true);
     assert.equal(canTransition(reservationTransitions, "completed", "booked"), false);
     assert.equal(canTransition(deliveryTransitions, "ready", "dispatched"), true);
+    assert.equal(canTransition(deliveryTransitions, "dispatched", "delivery_failed"), true);
+    assert.equal(canTransition(deliveryTransitions, "delivery_failed", "ready"), true);
+    assert.equal(canTransition(deliveryTransitions, "delivery_failed", "returned"), true);
+    assert.equal(canTransition(deliveryTransitions, "returned", "ready"), false);
     assert.equal(canTransition(deliveryTransitions, "completed", "canceled"), false);
     assert.equal(canTransition(transferTransitions, "in_transit", "received"), true);
   });

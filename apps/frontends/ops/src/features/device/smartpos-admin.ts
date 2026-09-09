@@ -69,6 +69,12 @@ export interface SmartPosHealth {
     entityId: string;
     label: string;
     occurredAt: string;
+    tabId?: string;
+    amountCents?: number;
+    method?: string;
+    provider?: string;
+    installationId?: string;
+    paymentAttemptId?: string;
   }>;
 }
 
@@ -163,6 +169,16 @@ function text(value: unknown, field: string) {
 function nullableText(value: unknown, field: string): string | null {
   if (value === null) return null;
   return text(value, field);
+}
+
+function optionalText(value: unknown, field: string): string | undefined {
+  if (value === null || value === undefined) return undefined;
+  return text(value, field);
+}
+
+function optionalInteger(value: unknown, field: string): number | undefined {
+  if (value === null || value === undefined) return undefined;
+  return integer(value, field);
 }
 
 function boolean(value: unknown, field: string) {
@@ -346,9 +362,26 @@ export function parseSmartPosHealth(value: unknown): SmartPosHealth {
         entityId: text(incident.entityId, "entityId"),
         label: text(incident.label, "label"),
         occurredAt: text(incident.occurredAt, "occurredAt"),
+        tabId: optionalText(incident.tabId, "tabId"),
+        amountCents: optionalInteger(incident.amountCents, "amountCents"),
+        method: optionalText(incident.method, "method"),
+        provider: optionalText(incident.provider, "provider"),
+        installationId: optionalText(incident.installationId, "installationId"),
+        paymentAttemptId: optionalText(incident.paymentAttemptId, "paymentAttemptId"),
       };
     }),
   };
+}
+
+export function smartPosIncidentHref(
+  incident: Pick<SmartPosHealth["incidents"][number], "tabId" | "paymentAttemptId">,
+) {
+  if (!incident.tabId || !incident.paymentAttemptId) return null;
+  const query = new URLSearchParams({
+    tab: incident.tabId,
+    paymentAttempt: incident.paymentAttemptId,
+  });
+  return `#/counter?${query.toString()}`;
 }
 
 export function parseSmartPosReconciliation(value: unknown): SmartPosReconciliation {

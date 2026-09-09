@@ -2,6 +2,11 @@ import { createOrganizationSchema, emailSchema } from "@giromesa/contracts";
 import { z } from "zod";
 import { platformInvitableRoles } from "./platform-access.js";
 
+const queryBooleanSchema = z.union([
+  z.boolean(),
+  z.enum(["true", "false"]).transform((value) => value === "true"),
+]);
+
 export const platformIdempotencyKeySchema = z.string().trim().min(8).max(160);
 export const platformReasonSchema = z.string().trim().min(8).max(500);
 
@@ -25,19 +30,33 @@ export const tenantDirectoryQuerySchema = z.object({
 });
 export type TenantDirectoryQuery = z.infer<typeof tenantDirectoryQuerySchema>;
 
-export const platformIncidentQuerySchema = z.object({
-  search: z.string().trim().max(120).optional().default(""),
-  status: z.enum(["active", "all", "open", "claimed", "snoozed", "resolved"]).optional(),
-  state: z
-    .enum(["active", "all", "open", "claimed", "snoozed", "resolved"])
-    .optional()
-    .default("active"),
-  severity: z.enum(["critical", "high", "medium", "low"]).optional(),
-  organizationId: z.string().uuid().optional(),
-  assignee: z.string().uuid().optional(),
-  cursor: z.coerce.number().int().min(1).max(10_000).optional(),
-  limit: z.coerce.number().int().min(1).max(200).optional().default(100),
-});
+export const platformIncidentQuerySchema = z
+  .object({
+    search: z.string().trim().max(120).optional().default(""),
+    status: z.enum(["active", "all", "open", "claimed", "snoozed", "resolved"]).optional(),
+    state: z
+      .enum(["active", "all", "open", "claimed", "snoozed", "resolved"])
+      .optional()
+      .default("active"),
+    severity: z.enum(["critical", "high", "medium", "low"]).optional(),
+    source: z.enum(["outbox", "hub", "fiscal", "billing"]).optional(),
+    impact: z.enum(["billing", "orders", "messaging", "fiscal", "operations"]).optional(),
+    minAgeMinutes: z.coerce.number().int().min(0).max(525_600).optional(),
+    maxAgeMinutes: z.coerce.number().int().min(0).max(525_600).optional(),
+    activePilotOnly: queryBooleanSchema.optional(),
+    organizationId: z.string().uuid().optional(),
+    assignee: z.string().uuid().optional(),
+    cursor: z.coerce.number().int().min(1).max(10_000).optional(),
+    limit: z.coerce.number().int().min(1).max(200).optional().default(100),
+  })
+  .strict()
+  .refine(
+    (value) =>
+      value.minAgeMinutes === undefined ||
+      value.maxAgeMinutes === undefined ||
+      value.minAgeMinutes <= value.maxAgeMinutes,
+    { path: ["maxAgeMinutes"], message: "A idade máxima deve ser maior que a mínima." },
+  );
 export type PlatformIncidentQuery = z.infer<typeof platformIncidentQuerySchema>;
 
 export const platformIncidentActionSchema = z

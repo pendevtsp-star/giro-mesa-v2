@@ -17,7 +17,7 @@ import { InternalKeyGuard } from "../billing/internal-key.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
 
-export const RELEASE_SCHEMA_VERSION = 80;
+export const RELEASE_SCHEMA_VERSION = 82;
 export const RELEASE_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -127,6 +127,9 @@ export class DatabaseReadinessService {
           crmAutomations: string | null;
           crmQuickReplies: string | null;
           edgeHubPairings: string | null;
+          financeAttachments: string | null;
+          settlementPayments: boolean;
+          deliveryFailures: boolean;
         }
       | undefined;
     try {
@@ -138,6 +141,9 @@ export class DatabaseReadinessService {
         crmAutomations: string | null;
         crmQuickReplies: string | null;
         edgeHubPairings: string | null;
+        financeAttachments: string | null;
+        settlementPayments: boolean;
+        deliveryFailures: boolean;
       }>(
         sql`select
           to_regclass('public.management_time_tracking_settings')::text as management,
@@ -146,7 +152,16 @@ export class DatabaseReadinessService {
           to_regclass('public.growth_whatsapp_messages')::text as "whatsappMessages",
           to_regclass('public.growth_crm_automation_rules')::text as "crmAutomations",
           to_regclass('public.growth_crm_quick_replies')::text as "crmQuickReplies",
-          to_regclass('public.edge_hub_pairing_codes')::text as "edgeHubPairings"`,
+          to_regclass('public.edge_hub_pairing_codes')::text as "edgeHubPairings",
+          to_regclass('public.management_finance_attachments')::text as "financeAttachments",
+          (select count(*) = 5 from information_schema.columns
+            where table_schema = 'public' and table_name = 'management_waiter_settlements'
+              and column_name in ('payment_method', 'payment_reference', 'payment_attachment_id',
+                'finance_payable_id', 'finance_payment_id')) as "settlementPayments",
+          (select count(*) = 2 from pg_enum e
+            join pg_type t on t.oid = e.enumtypid join pg_namespace n on n.oid = t.typnamespace
+            where n.nspname = 'public' and t.typname = 'growth_delivery_status'
+              and e.enumlabel in ('delivery_failed', 'returned')) as "deliveryFailures"`,
       );
     } catch (error) {
       this.logger.error(
@@ -166,6 +181,9 @@ export class DatabaseReadinessService {
       !readiness?.crmAutomations ? "growth_crm_automation_rules" : null,
       !readiness?.crmQuickReplies ? "growth_crm_quick_replies" : null,
       !readiness?.edgeHubPairings ? "edge_hub_pairing_codes" : null,
+      !readiness?.financeAttachments ? "management_finance_attachments" : null,
+      !readiness?.settlementPayments ? "management_waiter_settlements.payment_columns" : null,
+      !readiness?.deliveryFailures ? "growth_delivery_status.failure_states" : null,
     ].filter((value): value is string => Boolean(value));
     if (missingRelations.length > 0) {
       throw new ServiceUnavailableException({

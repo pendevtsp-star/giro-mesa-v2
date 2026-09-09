@@ -325,7 +325,7 @@ export function PageContent({
       );
     case "platform":
       return session.platformAdmin ? (
-        <RealPlatformPage refreshToken={refreshToken} />
+        <RealPlatformPage refreshToken={refreshToken} identityId={session.identityId} />
       ) : (
         <UnavailableRealPage title="Administração da plataforma" />
       );

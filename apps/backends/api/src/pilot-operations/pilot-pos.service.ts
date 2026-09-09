@@ -4518,6 +4518,7 @@ export class PilotPosService {
         entityType: "operational_shift",
         entityId: shift.id,
         metadata: {
+          handoverSnapshot: await this.shiftHandoverSnapshot(tx, organizationId, unitId),
           openTabsAcknowledged: openTabs.length,
           openTabsTotalCents: openTabs.reduce((sum, tab) => sum + tab.totalCents, 0),
           handoverIdentityId: input.handoverIdentityId ?? null,
@@ -5069,6 +5070,226 @@ export class PilotPosService {
       .where(and(eq(posTabs.organizationId, organizationId), eq(posTabs.unitId, unitId)));
   }
 
+  private async shiftHandoverSnapshot(tx: Transaction, organizationId: string, unitId: string) {
+    const [tabs, orders, calls, prints, cash] = await Promise.all([
+      tx
+        .select({ id: posTabs.id, number: posTabs.displayNumber })
+        .from(posTabs)
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.status, "open"),
+          ),
+        ),
+      tx
+        .select({ id: posOrders.id, tabId: posOrders.tabId, status: posOrders.status })
+        .from(posOrders)
+        .where(
+          and(
+            eq(posOrders.organizationId, organizationId),
+            eq(posOrders.unitId, unitId),
+            inArray(posOrders.status, ["draft", "sent", "preparing", "ready"]),
+          ),
+        ),
+      tx
+        .select({
+          id: posServiceCalls.id,
+          tableId: posServiceCalls.tableId,
+          tabId: posServiceCalls.tabId,
+        })
+        .from(posServiceCalls)
+        .where(
+          and(
+            eq(posServiceCalls.organizationId, organizationId),
+            eq(posServiceCalls.unitId, unitId),
+            ne(posServiceCalls.status, "resolved"),
+          ),
+        ),
+      tx
+        .select({ id: posPrintJobs.id, tabId: posPrintJobs.tabId, status: posPrintJobs.status })
+        .from(posPrintJobs)
+        .where(
+          and(
+            eq(posPrintJobs.organizationId, organizationId),
+            eq(posPrintJobs.unitId, unitId),
+            inArray(posPrintJobs.status, ["failed", "confirmation_required"]),
+          ),
+        ),
+      tx
+        .select({
+          id: managementCashShifts.id,
+          cashRegisterId: managementCashShifts.cashRegisterId,
+        })
+        .from(managementCashShifts)
+        .where(
+          and(
+            eq(managementCashShifts.organizationId, organizationId),
+            eq(managementCashShifts.unitId, unitId),
+            eq(managementCashShifts.status, "closed"),
+            ne(managementCashShifts.differenceCents, 0),
+          ),
+        ),
+    ]);
+    return { capturedAt: new Date().toISOString(), tabs, orders, calls, prints, cash };
+  }
+
+  async shiftHandover(identityId: string, organizationId: string, unitId: string) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    const current = await this.database.db.transaction((tx) =>
+      this.shiftHandoverSnapshot(tx, organizationId, unitId),
+    );
+    const [closure] = await this.database.db
+      .select({
+        id: auditEvents.id,
+        shiftId: auditEvents.entityId,
+        occurredAt: auditEvents.occurredAt,
+        metadata: auditEvents.metadata,
+        actorName: identities.displayName,
+      })
+      .from(auditEvents)
+      .leftJoin(identities, eq(identities.id, auditEvents.actorIdentityId))
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationId),
+          eq(auditEvents.unitId, unitId),
+          eq(auditEvents.action, "pos.operational_shift.closed"),
+        ),
+      )
+      .orderBy(desc(auditEvents.occurredAt))
+      .limit(1);
+    const [receipt] = closure
+      ? await this.database.db
+          .select({
+            acknowledgedAt: auditEvents.occurredAt,
+            acknowledgedBy: identities.displayName,
+          })
+          .from(auditEvents)
+          .leftJoin(identities, eq(identities.id, auditEvents.actorIdentityId))
+          .where(
+            and(
+              eq(auditEvents.organizationId, organizationId),
+              eq(auditEvents.unitId, unitId),
+              eq(auditEvents.action, "pos.operational_shift.handover_acknowledged"),
+              eq(auditEvents.entityId, closure.id),
+            ),
+          )
+          .orderBy(desc(auditEvents.occurredAt))
+          .limit(1)
+      : [];
+    return {
+      current,
+      lastHandover: closure?.metadata.handoverSnapshot
+        ? {
+            id: closure.id,
+            shiftId: closure.shiftId,
+            closedAt: closure.occurredAt,
+            closedBy: closure.actorName,
+            snapshot: closure.metadata.handoverSnapshot,
+            receipt: receipt ?? null,
+          }
+        : null,
+    };
+  }
+
+  async acknowledgeShiftHandover(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    handoverId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager"]);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "shift.handover_acknowledge",
+      { handoverId, identityId },
+      async (tx) => {
+        const [handover] = await tx
+          .select()
+          .from(auditEvents)
+          .where(
+            and(
+              eq(auditEvents.organizationId, organizationId),
+              eq(auditEvents.unitId, unitId),
+              eq(auditEvents.id, handoverId),
+              eq(auditEvents.action, "pos.operational_shift.closed"),
+            ),
+          )
+          .limit(1);
+        if (!handover?.metadata.handoverSnapshot)
+          throw new NotFoundException({ code: "SHIFT_HANDOVER_NOT_FOUND" });
+        const [receipt] = await tx
+          .insert(auditEvents)
+          .values({
+            organizationId,
+            unitId,
+            actorIdentityId: identityId,
+            action: "pos.operational_shift.handover_acknowledged",
+            entityType: "operational_shift_handover",
+            entityId: handoverId,
+            metadata: { shiftId: handover.entityId, responsibilityTransferred: false },
+          })
+          .returning({ id: auditEvents.id, acknowledgedAt: auditEvents.occurredAt });
+        return { receipt };
+      },
+    );
+  }
+
+  async deliveryProjectionStatus(identityId: string, organizationId: string, unitId: string) {
+    await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "delivery",
+    ]);
+    const rows = await this.database.db
+      .select({
+        tabId: posTabs.id,
+        orderId: posOrders.id,
+        reference: posTabs.displayNumber,
+        status: posOrders.status,
+        projectionId: deliveryOrders.id,
+      })
+      .from(posTabs)
+      .leftJoin(
+        posOrders,
+        and(
+          eq(posOrders.tabId, posTabs.id),
+          eq(posOrders.organizationId, organizationId),
+          eq(posOrders.unitId, unitId),
+        ),
+      )
+      .leftJoin(
+        deliveryOrders,
+        and(
+          eq(deliveryOrders.orderRef, posTabs.id),
+          eq(deliveryOrders.organizationId, organizationId),
+          eq(deliveryOrders.unitId, unitId),
+        ),
+      )
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationId),
+          eq(posTabs.unitId, unitId),
+          eq(posTabs.fulfillmentType, "delivery"),
+          eq(posTabs.status, "open"),
+          isNull(deliveryOrders.id),
+        ),
+      )
+      .orderBy(asc(posTabs.createdAt));
+    const missing = rows.map((row) => ({
+      tabId: row.tabId,
+      orderId: row.orderId,
+      reference: row.reference == null ? "Comanda delivery" : `Delivery ${row.reference}`,
+      status: row.status ?? "empty",
+      reason: "Registre zona e endereço para vincular esta comanda à expedição.",
+    }));
+    return { missing, totalMissing: new Set(missing.map((row) => row.tabId)).size };
+  }
+
   async listCounterQueue(
     identityId: string,
     organizationId: string,
@@ -5277,6 +5498,32 @@ export class PilotPosService {
         ),
       );
     const orderIds = orders.map((order) => order.id);
+    const productionCourseRows = orderIds.length
+      ? await this.database.db
+          .select({
+            ticketId: posKdsTicketItems.ticketId,
+            course: posOrderItems.course,
+            courseHeld: posKdsTicketItems.courseHeld,
+            dependencyHeld: posKdsTicketItems.dependencyHeld,
+            itemCount: sql<number>`sum(${posKdsTicketItems.quantity})::int`,
+          })
+          .from(posKdsTicketItems)
+          .innerJoin(posOrderItems, eq(posOrderItems.id, posKdsTicketItems.orderItemId))
+          .where(
+            and(
+              eq(posKdsTicketItems.organizationId, organizationId),
+              eq(posKdsTicketItems.unitId, unitId),
+              inArray(posOrderItems.orderId, orderIds),
+              eq(posKdsTicketItems.status, "queued"),
+            ),
+          )
+          .groupBy(
+            posKdsTicketItems.ticketId,
+            posOrderItems.course,
+            posKdsTicketItems.courseHeld,
+            posKdsTicketItems.dependencyHeld,
+          )
+      : [];
     const items =
       orderIds.length === 0
         ? []
@@ -5395,6 +5642,10 @@ export class PilotPosService {
         reversedCents,
         paidCents: grossPaidCents - reversedCents,
       },
+      productionCourses: productionCourseRows.map(({ courseHeld, ...course }) => ({
+        ...course,
+        state: courseHeld ? ("held" as const) : ("fired" as const),
+      })),
       events,
       presence,
       doseClubRedemptions: doseClubRedemptionRows,
@@ -10248,13 +10499,24 @@ export class PilotPosService {
       }
       return;
     }
-    if (sending && ["ready", "dispatched", "completed", "canceled"].includes(current.status)) {
+    if (
+      sending &&
+      ["ready", "dispatched", "completed", "canceled", "delivery_failed", "returned"].includes(
+        current.status,
+      )
+    ) {
       throw new ConflictException({
         code: "DELIVERY_ORDER_NOT_ACCEPTING_ITEMS",
         message: "Uma entrega pronta não aceita novos itens. Abra outra comanda de delivery.",
       });
     }
-    const terminal = ["dispatched", "completed", "canceled"].includes(current.status);
+    const terminal = [
+      "dispatched",
+      "completed",
+      "canceled",
+      "delivery_failed",
+      "returned",
+    ].includes(current.status);
     const orderStatuses = terminal
       ? []
       : await tx
@@ -16337,7 +16599,35 @@ export class PilotPosService {
     idempotencyKey: string,
     input: KdsCourseStateInput,
   ) {
-    await this.requireScopedRole(identityId, organizationId, unitId, ["owner", "manager", "kds"]);
+    const roles = await this.requireScopedRole(identityId, organizationId, unitId, [
+      "owner",
+      "manager",
+      "kds",
+      "waiter",
+      "cashier",
+    ]);
+    if (
+      !roles.some(
+        (role) =>
+          (role.unitId === null || role.unitId === unitId) &&
+          ["owner", "manager", "kds"].includes(role.role),
+      )
+    ) {
+      const [order] = await this.database.db
+        .select({ tabId: posOrders.tabId })
+        .from(posKdsTickets)
+        .innerJoin(posOrders, eq(posOrders.id, posKdsTickets.orderId))
+        .where(
+          and(
+            eq(posKdsTickets.organizationId, organizationId),
+            eq(posKdsTickets.unitId, unitId),
+            eq(posKdsTickets.id, ticketId),
+          ),
+        )
+        .limit(1);
+      if (!order) throw new NotFoundException({ code: "KDS_TICKET_NOT_FOUND" });
+      await this.requireTabOperationalAccess(identityId, organizationId, unitId, [order.tabId]);
+    }
     return this.idempotent(
       identityId,
       organizationId,
@@ -16352,7 +16642,7 @@ export class PilotPosService {
           ({ item, assignment }) =>
             item.course === input.course &&
             assignment.status === "queued" &&
-            assignment.held === (input.state === "fired"),
+            assignment.courseHeld === (input.state === "fired"),
         );
         if (matching.length === 0)
           throw new ConflictException({ code: "KDS_COURSE_NOT_ACTIONABLE" });

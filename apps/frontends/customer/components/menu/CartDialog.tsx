@@ -13,6 +13,7 @@ export function CartDialog({
   receipt,
   mode,
   tableAvailable,
+  tableLabel,
   tableOrder,
   options,
   fulfillment,
@@ -42,6 +43,7 @@ export function CartDialog({
   receipt: PublicOrderReceipt | null;
   mode: "table" | "off_premise";
   tableAvailable: boolean;
+  tableLabel?: string;
   tableOrder: TableOrderState;
   options: OrderOptionsState;
   fulfillment: "pickup" | "delivery";
@@ -77,7 +79,16 @@ export function CartDialog({
         <div className="cart-shell">
           <header>
             <div>
-              <h2 id="cart-dialog-title">Revisar pedido</h2>
+              <h2 id="cart-dialog-title">
+                {tableTracking ? "Acompanhar pedido" : "Revisar pedido"}
+              </h2>
+              <p>
+                {mode === "table"
+                  ? (tableLabel ?? "Pedido na mesa")
+                  : fulfillment === "delivery"
+                    ? "Pedido para entrega"
+                    : "Pedido para retirada"}
+              </p>
             </div>
             <Button type="button" variant="ghost" aria-label="Fechar seleção" onClick={onClose}>
               ×
@@ -94,7 +105,7 @@ export function CartDialog({
                 onChange={() => onMode("table")}
               />
               <span>
-                <b>Nesta mesa</b>
+                <b>{tableLabel ?? "Nesta mesa"}</b>
                 <small>Exige confirmação da equipe</small>
               </span>
             </label>

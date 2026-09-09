@@ -79,6 +79,7 @@ test("envia somente referências e quantidades para o servidor recalcular preço
           },
         ],
         notes: "Sem cebola",
+        allergyNote: "Amendoim",
       },
     ]),
     [
@@ -87,6 +88,7 @@ test("envia somente referências e quantidades para o servidor recalcular preço
         quantity: 2,
         modifierOptionIds: ["888a3a50-fe2e-49c4-a575-6656e704ac57"],
         notes: "Sem cebola",
+        allergyNote: "Amendoim",
       },
     ],
   );

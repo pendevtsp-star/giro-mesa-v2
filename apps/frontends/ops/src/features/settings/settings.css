@@ -7,6 +7,34 @@
   scroll-margin-top: calc(var(--gm-shell-topbar-height, 64px) + var(--gm-space-4));
 }
 
+.settings-section-nav {
+  align-items: center;
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius);
+  display: flex;
+  gap: var(--gm-space-2);
+  overflow-x: auto;
+  padding: var(--gm-space-2);
+  scrollbar-width: thin;
+}
+
+.settings-section-nav a {
+  border-radius: var(--gm-radius-sm);
+  color: var(--gm-muted);
+  flex: 0 0 auto;
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+  min-height: 40px;
+  padding: var(--gm-space-2) var(--gm-space-3);
+  text-decoration: none;
+}
+
+.settings-section-nav a:is(:hover, :focus-visible) {
+  background: var(--gm-surface-soft);
+  color: var(--gm-ink);
+}
+
 .setup-checklist {
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
@@ -22,6 +50,43 @@
   flex-wrap: wrap;
   gap: var(--gm-space-3);
   justify-content: space-between;
+}
+
+.setup-checklist__channel-status,
+.setup-checklist__channel-actions,
+.setup-checklist__check-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.setup-checklist__channel-status {
+  justify-content: flex-end;
+}
+
+.setup-checklist__channel-actions a {
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+}
+
+.setup-checklist .setup-checklist__manual-evidence {
+  color: var(--gm-ink);
+  overflow-wrap: anywhere;
+}
+
+.setup-checklist__check-form {
+  display: grid;
+  gap: var(--gm-space-3);
+}
+
+.setup-checklist__check-form label {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.setup-checklist__check-actions {
+  justify-content: flex-end;
 }
 
 .setup-checklist h2,
@@ -97,6 +162,18 @@
   .setup-checklist .gm-button,
   .setup-checklist summary {
     min-height: 40px;
+  }
+
+  .setup-checklist__extras > li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .setup-checklist__channel-status,
+  .setup-checklist__channel-actions,
+  .setup-checklist__channel-actions .gm-button {
+    justify-content: flex-start;
+    width: 100%;
   }
 }
 .settings-status-bar,

@@ -3,6 +3,8 @@ import {
   auditEvents,
   type Database,
   identities,
+  managementAccountsPayable,
+  managementFinanceAttachments,
   managementIdempotency,
   managementOperationalLosses,
   managementPartnershipPlans,
@@ -29,6 +31,7 @@ import {
 import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { ManagementService } from "./management.service.js";
 import {
   allocateCents,
   normalizeSettlementConfig,
@@ -118,6 +121,7 @@ type Preview = {
   createdAt: null;
   lines: PreviewLine[];
   sources: PreviewSource[];
+  blockers: Array<{ code: string; message: string }>;
 };
 
 function cents(value: number | string | null | undefined) {
@@ -134,6 +138,7 @@ export class ManagementSettlementsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly scope: ScopeService,
+    private readonly management: ManagementService,
   ) {}
 
   private async requireRole(
@@ -893,9 +898,10 @@ export class ManagementSettlementsService {
     if (configuration.aggregateAcrossUnits && period.operationalShiftId) {
       throw new BadRequestException({ code: "MULTIUNIT_SHIFT_NOT_SUPPORTED" });
     }
+    let shiftStatus: "active" | "closed" | null = null;
     if (period.operationalShiftId) {
       const [shift] = await tx
-        .select({ id: posOperationalShifts.id })
+        .select({ id: posOperationalShifts.id, status: posOperationalShifts.status })
         .from(posOperationalShifts)
         .where(
           and(
@@ -906,6 +912,7 @@ export class ManagementSettlementsService {
         )
         .limit(1);
       if (!shift) throw new NotFoundException({ code: "OPERATIONAL_SHIFT_NOT_FOUND" });
+      shiftStatus = shift.status;
     }
     const plan = await this.activePlan(tx, organizationId, unitId, period.to);
     const unitFilter = configuration.aggregateAcrossUnits
@@ -1169,6 +1176,15 @@ export class ManagementSettlementsService {
       createdAt: null,
       lines,
       sources,
+      blockers:
+        shiftStatus === "active"
+          ? [
+              {
+                code: "OPERATIONAL_SHIFT_STILL_ACTIVE",
+                message: "Encerre o turno operacional antes de fechar a apuração da equipe.",
+              },
+            ]
+          : [],
     };
   }
 
@@ -1212,6 +1228,11 @@ export class ManagementSettlementsService {
       period,
       async (tx) => {
         const preview = await this.buildPreview(tx, organizationId, unitId, period);
+        if (preview.blockers.length > 0)
+          throw new ConflictException({
+            code: "WAITER_SETTLEMENT_BLOCKED",
+            blockers: preview.blockers,
+          });
         if (preview.configuration.aggregateAcrossUnits && role !== "owner")
           throw new ForbiddenException({ code: "MULTIUNIT_SETTLEMENT_OWNER_REQUIRED" });
         const scopeKey = preview.configuration.aggregateAcrossUnits ? "organization" : unitId;
@@ -1308,6 +1329,68 @@ export class ManagementSettlementsService {
     );
   }
 
+  private async ensureFinancePayable(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    settlementRow: typeof managementWaiterSettlements.$inferSelect,
+    note: string,
+  ) {
+    if (settlementRow.financePayableId) return settlementRow.financePayableId;
+    const financeKey = createHash("sha256")
+      .update(`waiter-settlement:${settlementRow.id}`)
+      .digest("hex");
+    const idempotencyKey = `settlement-${financeKey}`;
+    const [existing] = await tx
+      .select({ id: managementAccountsPayable.id })
+      .from(managementAccountsPayable)
+      .where(
+        and(
+          eq(managementAccountsPayable.organizationId, organizationId),
+          eq(managementAccountsPayable.unitId, unitId),
+          eq(managementAccountsPayable.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return existing.id;
+    const [total] = await tx
+      .select({
+        payableCents: sql<number>`coalesce(sum(${managementWaiterSettlementLines.payableCents}), 0)::int`,
+      })
+      .from(managementWaiterSettlementLines)
+      .where(
+        and(
+          eq(managementWaiterSettlementLines.organizationId, organizationId),
+          eq(managementWaiterSettlementLines.unitId, unitId),
+          eq(managementWaiterSettlementLines.settlementId, settlementRow.id),
+        ),
+      );
+    const payableCents = Number(total?.payableCents ?? 0);
+    if (payableCents <= 0)
+      throw new ConflictException({
+        code: "WAITER_SETTLEMENT_NOT_PAYABLE",
+        message: "A apuração não possui valor elegível para pagamento.",
+      });
+    const payableId = randomUUID();
+    await tx.insert(managementAccountsPayable).values({
+      id: payableId,
+      organizationId,
+      unitId,
+      description: `Fechamento da equipe de ${settlementRow.periodFrom} a ${settlementRow.periodTo}`,
+      category: "Equipe",
+      documentNumber: `FECH-${settlementRow.id.slice(0, 8).toUpperCase()}`,
+      notes: note,
+      attachments: [],
+      amountCents: payableCents,
+      competenceDate: settlementRow.periodTo,
+      dueDate: settlementRow.periodTo,
+      idempotencyKey,
+      createdByIdentityId: identityId,
+    });
+    return payableId;
+  }
+
   async transition(
     identityId: string,
     organizationId: string,
@@ -1317,7 +1400,11 @@ export class ManagementSettlementsService {
     input: SettlementTransitionInput,
   ) {
     const allowed: readonly SettlementRole[] =
-      input.action === "pay" ? ["owner", "finance"] : ["owner", "manager"];
+      input.action === "pay"
+        ? input.paymentMethod === "cash"
+          ? ["owner"]
+          : ["owner", "finance"]
+        : ["owner", "manager"];
     await this.requireRole(identityId, organizationId, unitId, allowed);
     return this.idempotent(
       identityId,
@@ -1352,6 +1439,109 @@ export class ManagementSettlementsService {
             status: current.status,
           });
         const now = new Date();
+        let financePayableId: string | null = current.financePayableId;
+        let financePaymentId: string | null = null;
+        let paymentAttachmentId: string | null = null;
+        if (input.action === "approve") {
+          financePayableId = await this.ensureFinancePayable(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            current,
+            input.note,
+          );
+        } else if (input.action === "pay") {
+          financePayableId = await this.ensureFinancePayable(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            current,
+            current.approvalNote ?? input.note,
+          );
+          let financeAttachments: Array<{ id: string; name: string; mimeType?: string }> = [];
+          if (input.attachmentId) {
+            const [attachment] = await tx
+              .select()
+              .from(managementFinanceAttachments)
+              .where(
+                and(
+                  eq(managementFinanceAttachments.organizationId, organizationId),
+                  eq(managementFinanceAttachments.unitId, unitId),
+                  eq(managementFinanceAttachments.id, input.attachmentId),
+                ),
+              )
+              .limit(1);
+            if (!attachment) throw new NotFoundException({ code: "FINANCE_ATTACHMENT_NOT_FOUND" });
+            paymentAttachmentId = attachment.id;
+            financeAttachments = [
+              { id: attachment.id, name: attachment.fileName, mimeType: attachment.contentType },
+            ];
+            await tx
+              .update(managementAccountsPayable)
+              .set({ attachments: financeAttachments, updatedAt: now })
+              .where(
+                and(
+                  eq(managementAccountsPayable.organizationId, organizationId),
+                  eq(managementAccountsPayable.unitId, unitId),
+                  eq(managementAccountsPayable.id, financePayableId),
+                ),
+              );
+          }
+          const financeKey = createHash("sha256")
+            .update(`waiter-settlement:${settlementId}:${idempotencyKey.trim()}`)
+            .digest("hex");
+          const [payable] = await tx
+            .select({
+              amountCents: managementAccountsPayable.amountCents,
+              paidCents: managementAccountsPayable.paidCents,
+            })
+            .from(managementAccountsPayable)
+            .where(eq(managementAccountsPayable.id, financePayableId))
+            .limit(1);
+          if (!payable) throw new ConflictException({ code: "WAITER_SETTLEMENT_PAYABLE_MISSING" });
+          const payment = await this.management.payPayableInTransaction(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            financePayableId,
+            `settlement-payment-${financeKey}`,
+            {
+              amountCents: payable.amountCents - payable.paidCents,
+              method: input.paymentMethod,
+              reference: input.paymentReference,
+              cashRegisterId: input.cashRegisterId,
+              approvalRequestId: input.approvalRequestId,
+            },
+          );
+          financePaymentId = payment.paymentId;
+        } else if (current.financePayableId) {
+          const [canceledPayable] = await tx
+            .update(managementAccountsPayable)
+            .set({
+              status: "canceled",
+              canceledByIdentityId: identityId,
+              canceledAt: now,
+              cancellationReason: input.note,
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(managementAccountsPayable.id, current.financePayableId),
+                eq(managementAccountsPayable.status, "open"),
+                eq(managementAccountsPayable.paidCents, 0),
+              ),
+            )
+            .returning({ id: managementAccountsPayable.id });
+          if (!canceledPayable)
+            throw new ConflictException({
+              code: "WAITER_SETTLEMENT_PAYABLE_ALREADY_USED",
+              message:
+                "A conta vinculada já foi alterada ou recebeu pagamento. Revise a apuração antes de cancelar.",
+            });
+        }
         const values =
           input.action === "approve"
             ? {
@@ -1359,6 +1549,7 @@ export class ManagementSettlementsService {
                 approvedAt: now,
                 approvedByIdentityId: identityId,
                 approvalNote: input.note,
+                financePayableId,
               }
             : input.action === "pay"
               ? {
@@ -1366,6 +1557,11 @@ export class ManagementSettlementsService {
                   paidAt: now,
                   paidByIdentityId: identityId,
                   paymentNote: input.note,
+                  paymentMethod: input.paymentMethod,
+                  paymentReference: input.paymentReference,
+                  paymentAttachmentId,
+                  financePayableId,
+                  financePaymentId,
                 }
               : {
                   status: "canceled" as const,
@@ -1388,7 +1584,19 @@ export class ManagementSettlementsService {
           `management.waiter-settlement.${values.status}`,
           "waiter_settlement",
           settlementId,
-          { previousStatus: current.status, note: input.note },
+          {
+            previousStatus: current.status,
+            note: input.note,
+            ...(input.action === "pay"
+              ? {
+                  paymentMethod: input.paymentMethod,
+                  paymentReference: input.paymentReference ?? null,
+                  paymentAttachmentId,
+                  financePayableId,
+                  financePaymentId,
+                }
+              : {}),
+          },
         );
         return updated;
       },

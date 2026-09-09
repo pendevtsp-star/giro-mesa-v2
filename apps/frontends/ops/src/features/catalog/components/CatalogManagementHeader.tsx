@@ -9,12 +9,14 @@ type CatalogManagementHeaderProps = {
   groupCount: number;
   language: CatalogLanguage;
   productCount: number;
+  availableProductCount: number;
   production: boolean;
   onExportCsv: () => void;
   onImportCsv: (event: ChangeEvent<HTMLInputElement>) => void;
   onLanguageChange: (language: CatalogLanguage) => void;
   brandingHref: string;
   onOpenBulkAdjustment: () => void;
+  onOpenNewProduct: () => void;
   onOpenCustomerPreview: () => void;
   onOpenLabels: () => void;
   onOpenMatrix: () => void;
@@ -65,10 +67,12 @@ export function CatalogManagementHeader({
   groupCount,
   language,
   productCount,
+  availableProductCount,
   onExportCsv,
   onImportCsv,
   onLanguageChange,
   onOpenBulkAdjustment,
+  onOpenNewProduct,
   onOpenCustomerPreview,
   onOpenLabels,
   onOpenMatrix,
@@ -77,32 +81,15 @@ export function CatalogManagementHeader({
   onOpenPromotions,
   onOpenReorder,
   onOpenSpreadsheet,
+  production,
   tableQrHref,
 }: CatalogManagementHeaderProps) {
   const headerActions: HeaderAction[] = [
     {
-      icon: "finance",
-      label: "Matriz BCG",
-      onClick: onOpenMatrix,
-      title: "Matriz de Engenharia de Cardápio (BCG)",
-    },
-    {
       icon: "salon",
-      label: "Ver como Cliente & QR",
+      label: "Conferir como cliente",
       onClick: onOpenCustomerPreview,
-      title: "Simular Cardápio do Cliente e gerar QR Codes",
-    },
-    {
-      icon: "catalog",
-      label: "Etiquetas / Tags",
-      onClick: onOpenLabels,
-      title: "Gerar etiquetas de vitrine e placas de mesa",
-    },
-    {
-      icon: "download",
-      label: "Exportar CSV",
-      onClick: onExportCsv,
-      title: "Exportar Cardápio em CSV para Excel",
+      title: "Abrir a versão do cardápio que o cliente verá",
     },
     {
       icon: "list",
@@ -121,6 +108,24 @@ export function CatalogManagementHeader({
   const actions = headerActions;
 
   const secondaryActions: Array<HeaderAction | HeaderLink> = [
+    {
+      icon: "finance",
+      label: "Matriz BCG",
+      onClick: onOpenMatrix,
+      title: "Matriz de Engenharia de Cardápio (BCG)",
+    },
+    {
+      icon: "catalog",
+      label: "Etiquetas / Tags",
+      onClick: onOpenLabels,
+      title: "Gerar etiquetas de vitrine e placas de mesa",
+    },
+    {
+      icon: "download",
+      label: "Exportar CSV",
+      onClick: onExportCsv,
+      title: "Exportar Cardápio em CSV para Excel",
+    },
     {
       icon: "upload",
       label: "Planilha CSV",
@@ -156,14 +161,29 @@ export function CatalogManagementHeader({
   return (
     <header className="catalog-management-header">
       <div className="catalog-management-header__summary">
-        <h2>Gerenciar Cardápio</h2>
+        <h2>Cardápio da operação</h2>
         <p>
-          {productCount} itens cadastrados em {categoryCount} categorias
+          <strong>{availableProductCount} disponíveis</strong> ·{" "}
+          {productCount - availableProductCount} pausados · {categoryCount} categorias
         </p>
       </div>
 
       <fieldset className="gm-toolbar gm-toolbar--scroll catalog-management-header__actions">
         <legend className="gm-sr-only">Ações do cardápio</legend>
+        <Button
+          className="catalog-management-header__action"
+          disabled={!production}
+          onClick={onOpenNewProduct}
+          size="sm"
+          title={
+            production
+              ? "Cadastrar um item no cardápio"
+              : "Crie uma categoria e uma estação primeiro"
+          }
+        >
+          <Icon name="plus" size={14} />
+          <span>Novo produto</span>
+        </Button>
         {actions.map((action) => (
           <HeaderActionButton key={action.label} {...action} />
         ))}
@@ -172,7 +192,7 @@ export function CatalogManagementHeader({
           <summary>
             <Icon name="settings" size={14} />
             <span>Mais ações</span>
-            <small>{secondaryActions.length + 3}</small>
+            <small>{secondaryActions.length + 2}</small>
           </summary>
           <div className="gm-toolbar catalog-management-header__more-actions">
             <label

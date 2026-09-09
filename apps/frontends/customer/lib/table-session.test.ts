@@ -132,6 +132,7 @@ test("pedido da mesa envia somente produtos, adicionais e observação", () => {
       quantity: 2,
       modifiers: [{ id: "adicional-1", name: "Molho", priceCents: 100 }],
       notes: "Sem cebola",
+      allergyNote: "Amendoim",
     },
   ];
   assert.deepEqual(tableOrderLines(cart), [
@@ -140,6 +141,7 @@ test("pedido da mesa envia somente produtos, adicionais e observação", () => {
       quantity: 2,
       modifierOptionIds: ["adicional-1"],
       notes: "Sem cebola",
+      allergyNote: "Amendoim",
     },
   ]);
   assert.deepEqual(

@@ -96,6 +96,103 @@ it("persists and atomically copies tenant-scoped establishment settings", async 
 
     const scope = new ScopeService(database);
     const settings = new EstablishmentSettingsService(database, scope);
+    const initialChannelChecks = await settings.channelChecks(
+      owner.id,
+      organization.id,
+      sourceUnit.id,
+    );
+    assert.equal(initialChannelChecks.checks.length, 6);
+    assert.ok(initialChannelChecks.checks.every((check) => check.status === "not_tested"));
+    const qrCheck = await settings.recordChannelCheck(
+      owner.id,
+      organization.id,
+      sourceUnit.id,
+      "channel-check-qr",
+      {
+        channel: "qr",
+        status: "passed",
+        evidenceReference: "pedido TESTE-QR-001",
+        note: "Leitura no celular abriu a mesa correta.",
+      },
+    );
+    const replayedQrCheck = await settings.recordChannelCheck(
+      owner.id,
+      organization.id,
+      sourceUnit.id,
+      "channel-check-qr",
+      {
+        channel: "qr",
+        status: "passed",
+        evidenceReference: "pedido TESTE-QR-001",
+        note: "Leitura no celular abriu a mesa correta.",
+      },
+    );
+    assert.deepEqual(replayedQrCheck, qrCheck);
+    await assert.rejects(() =>
+      settings.recordChannelCheck(owner.id, organization.id, sourceUnit.id, "channel-check-qr", {
+        channel: "qr",
+        status: "failed",
+        evidenceReference: "pedido TESTE-QR-002",
+        note: "Leitura abriu uma mesa incorreta no celular.",
+      }),
+    );
+    await settings.recordChannelCheck(
+      manager.id,
+      organization.id,
+      sourceUnit.id,
+      "channel-check-cash",
+      {
+        channel: "cash",
+        status: "failed",
+        evidenceReference: "turno TESTE-CAIXA-001",
+        note: "Fechamento divergente; conferir a gaveta.",
+      },
+    );
+    const persistedChannelChecks = await settings.channelChecks(
+      manager.id,
+      organization.id,
+      sourceUnit.id,
+    );
+    assert.equal(
+      persistedChannelChecks.checks.find((check) => check.channel === "qr")?.status,
+      "passed",
+    );
+    assert.equal(
+      persistedChannelChecks.checks.find((check) => check.channel === "cash")?.status,
+      "failed",
+    );
+    assert.equal(
+      persistedChannelChecks.checks.find((check) => check.channel === "qr")?.actorDisplayName,
+      "Owner",
+    );
+    const channelAuditRows = await database.db
+      .select({ id: auditEvents.id })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organization.id),
+          eq(auditEvents.unitId, sourceUnit.id),
+          eq(auditEvents.action, "settings.channel_check.recorded"),
+        ),
+      );
+    assert.equal(channelAuditRows.length, 2);
+    await assert.rejects(() =>
+      settings.recordChannelCheck(
+        manager.id,
+        organization.id,
+        targetUnit.id,
+        "channel-check-denied",
+        {
+          channel: "delivery",
+          status: "passed",
+          evidenceReference: "pedido TESTE-DELIVERY-001",
+          note: "Pedido entregue e cobrança conferida.",
+        },
+      ),
+    );
+    await assert.rejects(() =>
+      settings.channelChecks(owner.id, foreignOrganization.id, foreignUnit.id),
+    );
     await assert.rejects(() =>
       settings.updateOrganization(manager.id, organization.id, {
         tradeName: "Sem permissão",

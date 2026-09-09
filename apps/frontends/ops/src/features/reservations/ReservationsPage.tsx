@@ -13,7 +13,7 @@ import {
   Textarea,
 } from "@giromesa/ui";
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { api } from "../../api";
+import { ApiClientError, api } from "../../api";
 import {
   type Customer,
   dateTime,
@@ -27,6 +27,7 @@ import {
   useRemote,
 } from "../../growth.shared";
 import { parsePilotFloor } from "../../operations.shared";
+import { isValidOperationalPhone } from "../counter/contact";
 import "./reservations.css";
 
 type SeatTarget = {
@@ -41,6 +42,121 @@ type SeatTarget = {
 function localDateValue(date = new Date()) {
   const offset = date.getTimezoneOffset() * 60_000;
   return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function localDateTimeValue(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+export function reservationDateError(value: string, now = Date.now()) {
+  const scheduled = new Date(value).getTime();
+  if (!Number.isFinite(scheduled)) return "Informe uma data e hora válidas para a reserva.";
+  if (scheduled <= now) return "Escolha uma data e hora futuras para a reserva.";
+  return null;
+}
+
+export type ReceptionSeatingOption = {
+  id: string;
+  label: string;
+  seats: number;
+  roomName: string;
+  kind: "table" | "group";
+};
+
+export function receptionSeatingOptions(
+  data: ReturnType<typeof parsePilotFloor>,
+  partySize: number,
+  allowReserved = false,
+) {
+  const eligibleStatus = (status: (typeof data.tables)[number]["status"]) =>
+    status === "available" || (allowReserved && status === "reserved");
+  const tableGroups = data.tableGroups ?? [];
+  const tableGroupMembers = data.tableGroupMembers ?? [];
+  const rooms = data.rooms ?? [];
+  const singleTabGroups = tableGroups.filter((group) => group.mode === "single_tab");
+  const groupedTableIds = new Set(
+    singleTabGroups.flatMap((group) =>
+      tableGroupMembers
+        .filter((member) => member.groupId === group.id)
+        .map((member) => member.tableId),
+    ),
+  );
+  const groups = singleTabGroups.flatMap((group): ReceptionSeatingOption[] => {
+    if (group.primaryTabId) return [];
+    const memberIds = tableGroupMembers
+      .filter((member) => member.groupId === group.id)
+      .map((member) => member.tableId);
+    const members = memberIds.flatMap((id) => {
+      const table = data.tables.find((candidate) => candidate.id === id);
+      return table ? [table] : [];
+    });
+    const anchor = members.find((table) => table.id === group.anchorTableId);
+    const seats = members.reduce((sum, table) => sum + table.seats, 0);
+    const groupStatusEligible =
+      members.every((table) => table.status === "available") ||
+      (allowReserved &&
+        anchor?.status === "reserved" &&
+        members.every((table) => table.id === anchor.id || table.status === "available"));
+    if (
+      !anchor ||
+      members.length !== memberIds.length ||
+      seats < partySize ||
+      members.some((table) => !table.active) ||
+      !groupStatusEligible
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: anchor.id,
+        kind: "group",
+        label: members.map((table) => table.label).join(" + "),
+        roomName: rooms.find((room) => room.id === anchor.roomId)?.name ?? "Salão",
+        seats,
+      },
+    ];
+  });
+  const tables = data.tables.flatMap((table): ReceptionSeatingOption[] => {
+    if (
+      !table.active ||
+      groupedTableIds.has(table.id) ||
+      table.seats < partySize ||
+      !eligibleStatus(table.status)
+    ) {
+      return [];
+    }
+    return [
+      {
+        id: table.id,
+        kind: "table",
+        label: table.label,
+        roomName: rooms.find((room) => room.id === table.roomId)?.name ?? "Salão",
+        seats: table.seats,
+      },
+    ];
+  });
+  return [...groups, ...tables].sort(
+    (left, right) =>
+      left.seats - right.seats || left.label.localeCompare(right.label, "pt-BR", { numeric: true }),
+  );
+}
+
+function hasCompatibleSeating(data: ReturnType<typeof parsePilotFloor>, partySize: number) {
+  if (data.tables.some((table) => table.active && table.seats >= partySize)) return true;
+  return (data.tableGroups ?? []).some((group) => {
+    if (group.mode !== "single_tab") return false;
+    const memberIds = (data.tableGroupMembers ?? [])
+      .filter((member) => member.groupId === group.id)
+      .map((member) => member.tableId);
+    return (
+      memberIds.length > 1 &&
+      memberIds.reduce(
+        (sum, id) => sum + (data.tables.find((table) => table.id === id)?.seats ?? 0),
+        0,
+      ) >= partySize
+    );
+  });
 }
 
 function agendaWindow(day: string) {
@@ -163,8 +279,8 @@ function CustomerLookup({
 }
 
 export function suggestedWait(data: ReturnType<typeof parsePilotFloor>, partySize: number) {
+  if (receptionSeatingOptions(data, partySize).length > 0) return 0;
   const compatible = data.tables.filter((table) => table.active && table.seats >= partySize);
-  if (compatible.some((table) => table.status === "available")) return 0;
   if (compatible.some((table) => ["needs_cleaning", "cleaning"].includes(table.status))) return 10;
   const releases = compatible.flatMap((table) => {
     const tab = data.openTabs.find((candidate) => candidate.tableId === table.id);
@@ -199,7 +315,7 @@ export function reservationCapacity(
     })
     .reduce((sum, row) => sum + row.partySize, 0);
   return {
-    compatible: activeTables.some((table) => table.seats >= partySize),
+    compatible: hasCompatibleSeating(floor, partySize),
     remainingSeats: totalSeats - reservedSeats - partySize,
   };
 }
@@ -280,6 +396,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   );
   const reservationComposerRef = useRef<HTMLDetailsElement>(null);
   const waitlistComposerRef = useRef<HTMLDetailsElement>(null);
+  const seatingSelectRef = useRef<HTMLSelectElement>(null);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCustomerQuery(customerQuery.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -350,11 +467,16 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
 
   async function createReservation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const date = new Date(scheduledAt);
-    if (Number.isNaN(date.getTime())) {
-      setFeedback("Informe uma data e hora válidas para a reserva.");
+    const dateError = reservationDateError(scheduledAt);
+    if (dateError) {
+      setFeedback(dateError);
       return;
     }
+    if (!isValidOperationalPhone(guestPhone)) {
+      setFeedback("Informe um telefone válido com DDD.");
+      return;
+    }
+    const date = new Date(scheduledAt);
     setBusy("new-reservation");
     setFeedback("");
     try {
@@ -385,6 +507,10 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
 
   async function createWaitlistEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isValidOperationalPhone(guestPhone)) {
+      setFeedback("Informe um telefone válido com DDD.");
+      return;
+    }
     setBusy("new-waitlist");
     setFeedback("");
     try {
@@ -445,7 +571,20 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       waitlistHistory.retry();
       floor.retry();
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Não foi possível ocupar a mesa.");
+      if (
+        error instanceof ApiClientError &&
+        error.status === 409 &&
+        ["TABLE_NOT_AVAILABLE", "TABLE_OCCUPIED", "TABLE_GROUP_OCCUPIED"].includes(error.code)
+      ) {
+        setSelectedTableId("");
+        floor.retry();
+        setFeedback(
+          "A disponibilidade mudou. Escolha outra mesa; os dados do cliente foram preservados.",
+        );
+        window.requestAnimationFrame(() => seatingSelectRef.current?.focus());
+      } else {
+        setFeedback(error instanceof Error ? error.message : "Não foi possível ocupar a mesa.");
+      }
     } finally {
       setBusy("");
     }
@@ -557,8 +696,9 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             <label>
               Telefone
               <Input
-                minLength={8}
+                inputMode="tel"
                 onChange={(event) => setGuestPhone(event.target.value)}
+                pattern="\\+?[0-9 ()-]{10,30}"
                 type="tel"
                 value={guestPhone}
               />
@@ -576,6 +716,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             <label>
               Data e hora
               <Input
+                min={localDateTimeValue()}
                 onChange={(event) => {
                   setScheduledAt(event.target.value);
                   if (event.target.value.length >= 10)
@@ -601,7 +742,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                 role="status"
               >
                 {!capacity.compatible
-                  ? `Atenção: nenhuma mesa individual comporta ${partySize} pessoas.`
+                  ? `Atenção: nenhuma mesa ou grupo configurado comporta ${partySize} pessoas.`
                   : capacity.remainingSeats < 0
                     ? `Atenção: a agenda excede a capacidade estimada em ${Math.abs(capacity.remainingSeats)} lugar(es).`
                     : `Capacidade estimada após esta reserva: ${capacity.remainingSeats} lugar(es).`}
@@ -646,8 +787,9 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             <label>
               Telefone
               <Input
-                minLength={8}
+                inputMode="tel"
                 onChange={(event) => setGuestPhone(event.target.value)}
+                pattern="\\+?[0-9 ()-]{10,30}"
                 type="tel"
                 value={guestPhone}
               />
@@ -800,6 +942,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                           {row.status === "seated" && (
                             <Button
                               disabled={busy === row.id}
+                              title="Arquiva o acompanhamento da reserva. A comanda e a conta são encerradas no Atendimento."
                               onClick={() =>
                                 void mutate(
                                   row.id,
@@ -814,7 +957,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                               }
                               size="sm"
                             >
-                              Concluir
+                              Concluir recepção
                             </Button>
                           )}
                           {["booked", "confirmed"].includes(row.status) && (
@@ -1122,24 +1265,20 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         {seatTarget && (
           <RemoteGate remote={floor}>
             {(data) => {
-              const compatibleTables = data.tables
-                .filter(
-                  (table) =>
-                    table.active &&
-                    table.seats >= seatTarget.partySize &&
-                    (table.status === "available" ||
-                      (seatTarget.kind === "reservation" && table.status === "reserved")),
-                )
-                .sort(
-                  (left, right) =>
-                    left.seats - right.seats || left.label.localeCompare(right.label),
-                );
+              const compatibleTables = receptionSeatingOptions(
+                data,
+                seatTarget.partySize,
+                seatTarget.kind === "reservation",
+              );
               return compatibleTables.length === 0 ? (
-                <EmptyState
-                  icon={<Icon name="salon" size={28} />}
-                  title="Sem mesa compatível"
-                  description={`Nenhuma mesa livre comporta ${seatTarget.partySize} pessoa(s).`}
-                />
+                <div className="seat-guest-empty">
+                  <EmptyState
+                    icon={<Icon name="salon" size={28} />}
+                    title="Sem mesa compatível"
+                    description={`Nenhuma mesa ou grupo livre comporta ${seatTarget.partySize} pessoa(s).`}
+                  />
+                  <a href="#/salon">Organizar mesas no Salão</a>
+                </div>
               ) : (
                 <form
                   className="seat-guest-form"
@@ -1153,16 +1292,17 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                     única operação.
                   </p>
                   <label>
-                    Mesa compatível
+                    Mesa ou grupo compatível
                     <NativeSelect
                       onChange={(event) => setSelectedTableId(event.target.value)}
                       required
+                      ref={seatingSelectRef}
                       value={selectedTableId}
                     >
                       <option value="">Selecione</option>
                       {compatibleTables.map((table) => (
-                        <option key={table.id} value={table.id}>
-                          {data.rooms.find((room) => room.id === table.roomId)?.name ?? "Salão"} ·{" "}
+                        <option key={`${table.kind}-${table.id}`} value={table.id}>
+                          {table.roomName} · {table.kind === "group" ? "Grupo " : ""}
                           {table.label} · {table.seats} lugares
                         </option>
                       ))}

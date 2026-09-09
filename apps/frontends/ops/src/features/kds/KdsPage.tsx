@@ -59,11 +59,13 @@ import {
   KDS_STATUS_LABEL,
   type KdsAnalytics,
   kdsChannelLabel,
+  kdsEtaPresentation,
   kdsFreshnessAgeMinutes,
   kdsHasUnacknowledgedAttention,
   kdsOperatingDay,
   kdsSla,
   kdsStationLabel,
+  kdsTicketIdFromHash,
   kdsTicketReference,
   parseKdsAnalytics,
   productiveKdsAllDay,
@@ -355,12 +357,7 @@ function TicketCard({
     .filter((value, index, values) => values.indexOf(value) === index);
   const blockedItems = items.filter((item) => item.blocked?.active);
   const attentionPending = items.filter(kdsHasUnacknowledgedAttention);
-  const predictedReadyAt = ticket.eta?.predictedReadyAt
-    ? Date.parse(ticket.eta.predictedReadyAt)
-    : Number.NaN;
-  const etaRemainingMinutes = Number.isFinite(predictedReadyAt)
-    ? Math.max(0, Math.ceil((predictedReadyAt - now) / 60_000))
-    : (ticket.eta?.remainingMinutes ?? ticket.eta?.p50Minutes ?? null);
+  const etaPresentation = kdsEtaPresentation(ticket, now);
   const ticketAdvanceBlocked =
     blockedItems.length > 0 || (next === "ready" && attentionPending.length > 0);
   const targetMinutes = Math.max(1, sla.targetMinutes);
@@ -392,7 +389,7 @@ function TicketCard({
             </span>
           </div>
           <div className="real-kds-card__badges">
-            {ticket.rush && <Badge tone="danger">RUSH</Badge>}
+            {ticket.rush && <Badge tone="danger">Prioridade</Badge>}
             <Badge tone={statusTone(ticket.status)}>{KDS_STATUS_LABEL[ticket.status]}</Badge>
           </div>
         </header>
@@ -422,20 +419,8 @@ function TicketCard({
           {kdsChannelLabel(ticket.channel) && <span>{kdsChannelLabel(ticket.channel)}</span>}
           {ticket.customerName && <span>{ticket.customerName}</span>}
           {formatTime(ticket.promisedAt) && <span>Prometido {formatTime(ticket.promisedAt)}</span>}
-          {etaRemainingMinutes !== null && (
-            <span>
-              ETA {etaRemainingMinutes} min
-              {formatTime(ticket.eta?.predictedReadyAt ?? null)
-                ? ` · ${formatTime(ticket.eta?.predictedReadyAt ?? null)}`
-                : ""}
-            </span>
-          )}
-          {ticket.eta && ticket.eta.p50Minutes !== null && ticket.eta.p90Minutes !== null && (
-            <span>
-              Faixa {ticket.eta.p50Minutes}–{ticket.eta.p90Minutes} min
-              {ticket.eta.sampleSize !== null ? ` · ${ticket.eta.sampleSize} amostras` : ""}
-            </span>
-          )}
+          {etaPresentation?.primary && <span>{etaPresentation.primary}</span>}
+          {etaPresentation?.secondary && <span>{etaPresentation.secondary}</span>}
         </div>
 
         {items.length === 0 ? (
@@ -686,7 +671,7 @@ function TicketCard({
 
         {canSequenceCourses && data.capabilities.courseFire && items.length > 0 && (
           <details className="kds-course-actions">
-            <summary>Fogo e espera por curso</summary>
+            <summary>Ordem de preparo por curso</summary>
             <div>
               {courses.map((course) => {
                 const key = `${prefix}course:${course}:`;
@@ -700,7 +685,7 @@ function TicketCard({
                       size="sm"
                       variant="ghost"
                     >
-                      Segurar
+                      Aguardar
                     </Button>
                     <Button
                       disabled={busy}
@@ -708,7 +693,7 @@ function TicketCard({
                       size="sm"
                       variant="secondary"
                     >
-                      Fogo
+                      Liberar preparo
                     </Button>
                   </span>
                 );
@@ -728,7 +713,7 @@ function TicketCard({
             onClick={() => onTicketState(ticket, next as "preparing" | "ready")}
           >
             <span>{cardBusy ? "Confirmando…" : kdsActionLabel[ticket.status]}</span>
-            <kbd className="real-kds-card__bump-kbd">↵ Bump</kbd>
+            <kbd className="real-kds-card__bump-kbd">↵ Avançar</kbd>
           </Button>
         )}
 
@@ -879,6 +864,9 @@ export function RealKdsPage({
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [focusedPrintTicketId, setFocusedPrintTicketId] = useState<string | null>(null);
+  const [deepLinkedTicketId, setDeepLinkedTicketId] = useState(() =>
+    typeof window === "undefined" ? null : kdsTicketIdFromHash(window.location.hash),
+  );
   const workspaceRef = useRef<HTMLDivElement>(null);
   const printInFlightRef = useRef(new Set<string>());
   const confirmationsRef = useRef(new Map<string, PendingConfirmation>());
@@ -894,6 +882,30 @@ export function RealKdsPage({
     const timer = globalThis.setInterval(() => setNow(Date.now()), 30_000);
     return () => globalThis.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const readTarget = () => setDeepLinkedTicketId(kdsTicketIdFromHash(window.location.hash));
+    window.addEventListener("hashchange", readTarget);
+    return () => window.removeEventListener("hashchange", readTarget);
+  }, []);
+
+  useEffect(() => {
+    if (!deepLinkedTicketId || remote.state.status !== "ready") return;
+    const target = remote.state.data.tickets.find((ticket) => ticket.id === deepLinkedTicketId);
+    if (!target || !["pending", "preparing", "ready"].includes(target.status)) return;
+    const stationBlocked = stationLocked && stationId !== "all" && stationId !== target.stationId;
+    if (stationBlocked) return;
+    if (stationId !== target.stationId) setStationId(target.stationId);
+    if (viewMode !== "station") setViewMode("station");
+    const frame = window.requestAnimationFrame(() => {
+      const card = [...document.querySelectorAll<HTMLElement>("[data-kds-ticket]")].find(
+        (element) => element.dataset.kdsTicket === deepLinkedTicketId,
+      );
+      card?.scrollIntoView({ behavior: "smooth", block: "center" });
+      card?.querySelector<HTMLElement>("button")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [deepLinkedTicketId, remote.state, stationId, stationLocked, viewMode]);
 
   useEffect(() => {
     if (area !== "station" && area !== "pass") return;
@@ -966,7 +978,9 @@ export function RealKdsPage({
         setTerminalProfileStatus("synced");
         setTerminalProfileMessage("Perfil sincronizado com a unidade.");
         if ((area === "station" || area === "pass") && area !== profile.mode) {
-          window.location.hash = `#/kds/${profile.mode}`;
+          window.location.hash = `#/kds/${profile.mode}${
+            deepLinkedTicketId ? `?ticket=${encodeURIComponent(deepLinkedTicketId)}` : ""
+          }`;
         }
       })
       .catch(() => {
@@ -981,6 +995,7 @@ export function RealKdsPage({
     };
   }, [
     area,
+    deepLinkedTicketId,
     remote.state,
     scope.organizationId,
     scope.unitId,
@@ -2115,6 +2130,20 @@ export function RealKdsPage({
           data.stations.find((station) => station.id === effectiveStationId)?.name ??
           "Todas as estações";
         const operationalStationId = operationalViewMode === "pass" ? "all" : effectiveStationId;
+        const deepLinkedTicket = deepLinkedTicketId
+          ? data.tickets.find((ticket) => ticket.id === deepLinkedTicketId)
+          : null;
+        const deepLinkMessage = !deepLinkedTicketId
+          ? null
+          : !deepLinkedTicket
+            ? "O ticket indicado não está disponível nesta unidade. A fila geral permanece acessível."
+            : !["pending", "preparing", "ready"].includes(deepLinkedTicket.status)
+              ? "O ticket indicado já saiu da fila ativa. A fila geral permanece acessível."
+              : stationLocked &&
+                  effectiveStationId !== "all" &&
+                  effectiveStationId !== deepLinkedTicket.stationId
+                ? `O ticket pertence a ${kdsStationLabel(deepLinkedTicket)}, fora da estação fixada neste terminal.`
+                : null;
         const cloudUnavailable =
           data.freshness.status === "offline" || data.freshness.projectionBlocked;
         const connectionReady =
@@ -2512,6 +2541,12 @@ export function RealKdsPage({
                   </section>
                 )}
 
+                {deepLinkMessage && (
+                  <p className="kds-inline-alert" role="alert">
+                    {deepLinkMessage}
+                  </p>
+                )}
+
                 <section aria-label="Indicadores da produção" className="kds-metrics">
                   <span>
                     <strong>{count("pending")}</strong> aguardando
@@ -2644,7 +2679,7 @@ export function RealKdsPage({
                                     </small>
                                   </div>
                                   <span className="real-kds-card__badges">
-                                    {prioritized && <Badge tone="danger">RUSH</Badge>}
+                                    {prioritized && <Badge tone="danger">Prioridade</Badge>}
                                     <Badge
                                       tone={inPass ? "success" : readyForPass ? "info" : "warning"}
                                     >
@@ -2758,7 +2793,7 @@ export function RealKdsPage({
                     open={allDayExpanded}
                   >
                     <summary>
-                      <strong>All-day</strong>
+                      <strong>Produção total</strong>
                       <span>
                         {allDay.reduce((sum, item) => sum + item.quantity, 0)} unidades na produção
                       </span>

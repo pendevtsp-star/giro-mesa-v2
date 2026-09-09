@@ -70,6 +70,18 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
   let mediaUploads = 0;
   let specializedSummary: "backend79" | "ready" = "backend79";
   let specializedSummaryFailuresRemaining = 0;
+  let channelCheckKey = "";
+  let channelChecks = ["qr", "cash", "fiscal", "printing", "smartpos", "delivery"].map(
+    (channel) => ({
+      channel,
+      status: "not_tested",
+      evidenceReference: null,
+      note: null,
+      actorIdentityId: null,
+      actorDisplayName: null,
+      checkedAt: null,
+    }),
+  );
 
   await page.route(/\/v1\//, async (route) => {
     const request = route.request();
@@ -146,6 +158,19 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
             }
           : {}),
       });
+    }
+    if (path.endsWith(`/units/${unitId}/settings/channel-checks`)) {
+      if (request.method() === "GET") return json({ checks: channelChecks });
+      channelCheckKey = request.headers()["idempotency-key"] ?? "";
+      const body = request.postDataJSON();
+      const saved = {
+        ...body,
+        actorIdentityId: identityId,
+        actorDisplayName: "Proprietário",
+        checkedAt: "2026-09-09T18:00:00.000Z",
+      };
+      channelChecks = [saved, ...channelChecks.filter((item) => item.channel !== body.channel)];
+      return json(saved);
     }
     if (path.endsWith(`/units/${unitId}/settings/history`))
       return json([
@@ -241,6 +266,22 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
   await expect(page.getByText("3 produtos ativos.")).toBeVisible();
   await expect(page.getByText("Cadastro não é homologação")).toBeVisible();
   await expect(page.getByLabel("Nome interno da unidade")).toHaveValue("Centro Histórico");
+  await page.getByText("Canais e continuidade", { exact: true }).click();
+  const smartPosCheck = page
+    .locator(".setup-checklist__extras > li")
+    .filter({ hasText: "SmartPOS" });
+  await expect(smartPosCheck).toContainText("Não testado");
+  await smartPosCheck.getByRole("button", { name: "Registrar teste" }).click();
+  const checkDialog = page.getByRole("dialog", { name: "Registrar conferência manual" });
+  await checkDialog.getByLabel("Protocolo ou referência da evidência").fill("TESTE-POS-001");
+  await checkDialog
+    .getByLabel("O que foi testado e próximo passo")
+    .fill("Pagamento aprovado e comprovado no extrato do turno.");
+  await checkDialog.getByRole("button", { name: "Registrar conferência" }).click();
+  await expect(smartPosCheck).toContainText("Teste aprovado");
+  await expect(smartPosCheck).toContainText("TESTE-POS-001");
+  await expect(smartPosCheck).toContainText("Proprietário");
+  expect(channelCheckKey.length).toBeGreaterThanOrEqual(8);
   await page.locator(".setup-checklist").screenshot({
     path: testInfo.outputPath("settings-checklist-375-dark.png"),
   });

@@ -12,6 +12,14 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
     public partial class TableOrdersPostRequestBody_items : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The allergyNote property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? AllergyNote { get; set; }
+#nullable restore
+#else
+        public string AllergyNote { get; set; }
+#endif
         /// <summary>The modifierOptionIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -50,6 +58,7 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "allergyNote", n => { AllergyNote = n.GetStringValue(); } },
                 { "modifierOptionIds", n => { ModifierOptionIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "notes", n => { Notes = n.GetStringValue(); } },
                 { "productId", n => { ProductId = n.GetGuidValue(); } },
@@ -63,6 +72,7 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("allergyNote", AllergyNote);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("modifierOptionIds", ModifierOptionIds);
             writer.WriteStringValue("notes", Notes);
             writer.WriteGuidValue("productId", ProductId);

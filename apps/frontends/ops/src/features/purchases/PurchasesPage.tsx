@@ -39,6 +39,22 @@ const newLine = (): DraftLine => ({
 });
 const humanOrder = (id: string) => `PC-${id.slice(0, 8).toUpperCase()}`;
 const decimal = (value: string) => Number(value.trim().replace(",", "."));
+export function purchaseReceiptLineState(
+  orderedQuantity: string,
+  receivedQuantity: string | null,
+  enteredQuantity: string,
+) {
+  const ordered = Math.max(0, decimal(orderedQuantity) || 0);
+  const received = Math.max(0, decimal(receivedQuantity ?? "0") || 0);
+  const entered = Math.max(0, decimal(enteredQuantity) || 0);
+  const remaining = Math.max(0, ordered - received);
+  return {
+    entered,
+    remaining,
+    pendingAfter: Math.max(0, remaining - entered),
+    exceedsRemaining: entered > remaining + 0.000_001,
+  };
+}
 const labels: Record<string, string> = {
   draft: "Rascunho",
   approved: "Aprovado",
@@ -78,6 +94,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
   const [nfeOpen, setNfeOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
+  const [arrival, setArrival] = useState<"all" | "today" | "overdue">("all");
   const [page, setPage] = useState(1);
   const purchases = useRemote(
     scope,
@@ -87,9 +104,10 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
           page,
           pageSize: 8,
           status: status === "all" ? undefined : status,
+          arrival: arrival === "all" ? undefined : arrival,
           search: query.trim() || undefined,
         }),
-      [page, query, status],
+      [arrival, page, query, status],
     ),
     parsePurchases,
   );
@@ -322,6 +340,26 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   (line): line is { item: (typeof receiptItems)[number]; draft: ReceiptDraft } =>
                     decimal(line.draft?.quantity ?? "") > 0,
                 );
+              if (!receiptLines.length) {
+                setToast({
+                  tone: "danger",
+                  message: "Informe ao menos uma quantidade recebida.",
+                });
+                return;
+              }
+              if (
+                receiptLines.some(
+                  ({ item, draft }) =>
+                    purchaseReceiptLineState(item.quantity, item.receivedQuantity, draft.quantity)
+                      .exceedsRemaining,
+                )
+              ) {
+                setToast({
+                  tone: "danger",
+                  message: "Há quantidade maior que o restante do pedido. Revise as linhas.",
+                });
+                return;
+              }
               if (receiptLines.some(({ draft }) => !draft.locationId)) {
                 setToast({
                   tone: "danger",
@@ -553,6 +591,42 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                     <Badge>{data.page?.total ?? data.orders.length} pedido(s)</Badge>
                   </div>
                   <div className="gm-toolbar purchases-toolbar">
+                    <fieldset className="purchases-arrival-filter">
+                      <legend>Entregas</legend>
+                      <Button
+                        aria-pressed={arrival === "all"}
+                        onClick={() => {
+                          setArrival("all");
+                          setPage(1);
+                        }}
+                        size="sm"
+                        variant={arrival === "all" ? "secondary" : "ghost"}
+                      >
+                        Todos
+                      </Button>
+                      <Button
+                        aria-pressed={arrival === "today"}
+                        onClick={() => {
+                          setArrival("today");
+                          setPage(1);
+                        }}
+                        size="sm"
+                        variant={arrival === "today" ? "secondary" : "ghost"}
+                      >
+                        Chega hoje
+                      </Button>
+                      <Button
+                        aria-pressed={arrival === "overdue"}
+                        onClick={() => {
+                          setArrival("overdue");
+                          setPage(1);
+                        }}
+                        size="sm"
+                        variant={arrival === "overdue" ? "secondary" : "ghost"}
+                      >
+                        Atrasados
+                      </Button>
+                    </fieldset>
                     <SearchField
                       aria-label="Buscar pedido ou fornecedor"
                       className="purchases-toolbar__search"
@@ -796,7 +870,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                   ) : (
                     <EmptyState
                       description={
-                        query || status !== "all"
+                        query || status !== "all" || arrival !== "all"
                           ? "Ajuste os filtros para localizar outro pedido."
                           : "Crie o primeiro pedido com fornecedor, itens e previsão de entrega."
                       }
@@ -1123,7 +1197,19 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                 >
                   <form className="gm-form-stack" onSubmit={(event) => void submitReceipt(event)}>
                     <p className="purchases-note">
-                      Informe somente o que chegou agora. O restante fica pendente no pedido.
+                      {selectedReceipt && (
+                        <strong>
+                          {(selectedReceipt.supplierId
+                            ? supplierById.get(selectedReceipt.supplierId)
+                            : null) ?? "Fornecedor"}
+                          {selectedReceipt.expectedAt
+                            ? ` · previsto ${dateLabel(selectedReceipt.expectedAt)}`
+                            : ""}
+                        </strong>
+                      )}
+                      <br />
+                      Informe somente o que chegou agora. Cada divergência aparece antes da
+                      confirmação e o restante fica pendente no pedido.
                     </p>
                     <fieldset className="purchases-lines">
                       <legend>Linhas restantes</legend>
@@ -1138,16 +1224,17 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                           batchCode: "",
                           expiresAt: "",
                         };
-                        const remaining = Math.max(
-                          0,
-                          decimal(item.quantity) - decimal(item.receivedQuantity ?? "0"),
+                        const lineState = purchaseReceiptLineState(
+                          item.quantity,
+                          item.receivedQuantity,
+                          draft.quantity,
                         );
                         return (
                           <div className="purchases-receipt-line" key={item.id}>
                             <strong>
                               {itemById.get(item.inventoryItemId)?.name ?? "Item"}
                               <small>
-                                Restante: {remaining}{" "}
+                                Restante: {lineState.remaining.toLocaleString("pt-BR")}{" "}
                                 {snapshot.purchaseUnit ??
                                   snapshot.stockUnit ??
                                   itemById.get(item.inventoryItemId)?.purchaseUnit ??
@@ -1159,14 +1246,34 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                               <span>Quantidade</span>
                               <Input
                                 inputMode="decimal"
+                                max={lineState.remaining}
+                                min="0"
                                 onChange={(event) =>
                                   setReceipt((all) => ({
                                     ...all,
                                     [item.id]: { ...draft, quantity: event.target.value },
                                   }))
                                 }
+                                step="0.001"
                                 value={draft.quantity}
                               />
+                              {lineState.exceedsRemaining ? (
+                                <small className="purchases-receipt-status purchases-receipt-status--danger">
+                                  Excede o restante em{" "}
+                                  {(lineState.entered - lineState.remaining).toLocaleString(
+                                    "pt-BR",
+                                  )}
+                                </small>
+                              ) : lineState.entered > 0 && lineState.pendingAfter > 0 ? (
+                                <small className="purchases-receipt-status purchases-receipt-status--warning">
+                                  Parcial: ficam {lineState.pendingAfter.toLocaleString("pt-BR")}{" "}
+                                  pendentes
+                                </small>
+                              ) : lineState.entered > 0 ? (
+                                <small className="purchases-receipt-status purchases-receipt-status--success">
+                                  Linha completa
+                                </small>
+                              ) : null}
                             </label>
                             <label className="gm-form-field">
                               <span>Local de entrada</span>
@@ -1229,6 +1336,14 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                             (item) =>
                               decimal(receipt[item.id]?.quantity ?? "") > 0 &&
                               receipt[item.id]?.locationId,
+                          ) ||
+                          receiptItems.some(
+                            (item) =>
+                              purchaseReceiptLineState(
+                                item.quantity,
+                                item.receivedQuantity,
+                                receipt[item.id]?.quantity ?? "",
+                              ).exceedsRemaining,
                           )
                         }
                         type="submit"

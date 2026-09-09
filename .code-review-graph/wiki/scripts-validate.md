@@ -63,7 +63,7 @@ Directory-based community: scripts
 | validateFiscalEnvironment | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 93-132 |
 | nonEmpty | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.mjs | 134-140 |
 
-*... and 8 more members.*
+*... and 4 more members.*
 
 ## Execution Flows
 
@@ -76,7 +76,7 @@ No execution flows pass through this community.
 - `push` (86 edge(s))
 - `test` (26 edge(s))
 - `includes` (12 edge(s))
-- `join` (10 edge(s))
+- `join` (9 edge(s))
 - `match` (8 edge(s))
 - `then` (7 edge(s))
 - `trim` (7 edge(s))
@@ -91,7 +91,6 @@ No execution flows pass through this community.
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/deploy-hardening.test.mjs` (58 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-fiscal-release.test.mjs` (19 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-smartpos-release.mjs` (14 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/scripts/check-supply-chain.test.mjs` (14 edge(s))

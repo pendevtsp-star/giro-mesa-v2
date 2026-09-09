@@ -19,6 +19,7 @@ import {
 } from "@giromesa/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { platformIncidentQuerySchema } from "./platform.schemas.js";
 import { platformAccessForEmail } from "./platform-access.js";
 import { PlatformControlService, resolvePilotAccessEndsAt } from "./platform-control.service.js";
 
@@ -88,6 +89,7 @@ test("persists, audits and replays a six-month pilot grant without touching anot
     organizationIds.push(organization.id, foreignOrganization.id);
 
     const startsAt = new Date();
+    const futureStartsAt = new Date(startsAt.getTime() + 24 * 60 * 60_000);
     const initialEndsAt = new Date(startsAt.getTime() + 14 * 24 * 60 * 60_000);
     const [trial, foreignTrial] = await database.db
       .insert(trials)
@@ -102,7 +104,7 @@ test("persists, audits and replays a six-month pilot grant without touching anot
         {
           organizationId: foreignOrganization.id,
           commercialPlanId: plan.id,
-          startsAt,
+          startsAt: futureStartsAt,
           endsAt: initialEndsAt,
           activatedByIdentityId: actor.id,
         },
@@ -209,6 +211,36 @@ test("persists, audits and replays a six-month pilot grant without touching anot
       .from(outboxEvents)
       .where(and(eq(outboxEvents.aggregateType, "trial"), eq(outboxEvents.aggregateId, trial.id)));
     assert.equal(replayedQueue.length, 1);
+
+    const incidentTopic = `order.pilot-filter.${suffix}`;
+    await database.db.insert(outboxEvents).values([
+      {
+        topic: incidentTopic,
+        aggregateType: "trial",
+        aggregateId: trial.id,
+        payload: { organizationId: organization.id },
+        attempts: 5,
+        lastError: "PILOT_FILTER_TEST",
+      },
+      {
+        topic: incidentTopic,
+        aggregateType: "trial",
+        aggregateId: foreignTrial.id,
+        payload: { organizationId: foreignOrganization.id },
+        attempts: 5,
+        lastError: "PILOT_FILTER_TEST",
+      },
+    ]);
+    const activePilotIncidents = await service.incidents(
+      platformIncidentQuerySchema.parse({
+        search: incidentTopic,
+        status: "active",
+        activePilotOnly: true,
+        limit: 1,
+      }),
+    );
+    assert.equal(activePilotIncidents.total, 1);
+    assert.equal(activePilotIncidents.items[0]?.organizationId, organization.id);
   } finally {
     if (trialIds.length > 0) {
       await database.db.delete(outboxEvents).where(inArray(outboxEvents.aggregateId, trialIds));

@@ -9,20 +9,19 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.St
 {
     [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
     #pragma warning disable CS1591
-    public partial class StatusPatchRequestBody : IAdditionalDataHolder, IParsable
+    public partial class StatusPatchRequestBody : IParsable
     #pragma warning restore CS1591
     {
-        /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
-        public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The reason property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Reason { get; set; }
+#nullable restore
+#else
+        public string Reason { get; set; }
+#endif
         /// <summary>The status property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Status.StatusPatchRequestBody_status? Status { get; set; }
-        /// <summary>
-        /// Instantiates a new <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Status.StatusPatchRequestBody"/> and sets the default values.
-        /// </summary>
-        public StatusPatchRequestBody()
-        {
-            AdditionalData = new Dictionary<string, object>();
-        }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value
         /// </summary>
@@ -41,6 +40,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.St
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "reason", n => { Reason = n.GetStringValue(); } },
                 { "status", n => { Status = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Status.StatusPatchRequestBody_status>(); } },
             };
         }
@@ -51,8 +51,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.St
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteStringValue("reason", Reason);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.DeliveryOrders.Item.Status.StatusPatchRequestBody_status>("status", Status);
-            writer.WriteAdditionalData(AdditionalData);
         }
     }
 }

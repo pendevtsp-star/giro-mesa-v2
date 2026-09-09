@@ -440,7 +440,7 @@ test("operador visualiza pedidos, abre detalhes e avança uma transição", asyn
   await expect(details).toContainText("CEP 04101000");
   await expect(details).toContainText("Prometido para");
   await expect(details).toContainText("Histórico");
-  await expect(details).toContainText("placed");
+  await expect(details).toContainText("Recebido");
   await expect(details).toContainText("Última posição");
   await details.getByRole("button", { name: "Solicitar notificação" }).click();
   await expect.poll(() => calls.notifications.length).toBe(1);

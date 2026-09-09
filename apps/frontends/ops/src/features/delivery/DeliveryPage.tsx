@@ -49,6 +49,53 @@ type Filter = "all" | "late" | "scheduled";
 type Column = "received" | "preparing" | "ready" | "dispatched";
 type TransitionStatus = Exclude<DeliveryOrderStatus, "draft" | "dispatched">;
 
+type DeliveryProjectionStatus = {
+  missing: Array<{
+    tabId: string;
+    orderId: string | null;
+    reference: string;
+    status: string;
+    reason: string;
+  }>;
+  totalMissing: number;
+};
+
+export function deliveryOrderIdFromHash(hash: string) {
+  const query = hash.split("?")[1] ?? "";
+  return new URLSearchParams(query).get("order")?.trim() || null;
+}
+
+export function parseDeliveryProjectionStatus(value: unknown): DeliveryProjectionStatus {
+  if (!value || typeof value !== "object") throw new Error("Diagnóstico de delivery inválido.");
+  const row = value as Record<string, unknown>;
+  if (!Array.isArray(row.missing) || typeof row.totalMissing !== "number")
+    throw new Error("Diagnóstico de delivery inválido.");
+  const missing = row.missing.map((entry) => {
+    if (!entry || typeof entry !== "object") throw new Error("Diagnóstico de delivery inválido.");
+    const item = entry as Record<string, unknown>;
+    if (
+      typeof item.tabId !== "string" ||
+      (item.orderId !== null && typeof item.orderId !== "string") ||
+      typeof item.reference !== "string" ||
+      typeof item.status !== "string" ||
+      typeof item.reason !== "string"
+    )
+      throw new Error("Diagnóstico de delivery inválido.");
+    return {
+      tabId: item.tabId,
+      orderId: item.orderId as string | null,
+      reference: item.reference,
+      status: item.status,
+      reason: item.reason,
+    };
+  });
+  return { missing, totalMissing: Math.max(0, Math.floor(row.totalMissing)) };
+}
+
+export function groupDeliveryProjectionGaps(status: DeliveryProjectionStatus) {
+  return [...new Map(status.missing.map((item) => [item.tabId, item])).values()];
+}
+
 const columns: Array<{ id: Column; label: string }> = [
   { id: "received", label: "Recebidos" },
   { id: "preparing", label: "Em preparo" },
@@ -60,7 +107,57 @@ function columnFor(status: DeliveryOrderStatus): Column | null {
   if (status === "draft" || status === "placed") return "received";
   if (status === "confirmed" || status === "preparing") return "preparing";
   if (status === "ready") return "ready";
-  return status === "dispatched" ? "dispatched" : null;
+  return status === "dispatched" || status === "delivery_failed" ? "dispatched" : null;
+}
+
+export function deliveryStatusLabel(status: DeliveryOrderStatus) {
+  return {
+    draft: "Rascunho",
+    placed: "Recebido",
+    confirmed: "Confirmado",
+    preparing: "Em preparo",
+    ready: "Pronto",
+    dispatched: "Em rota",
+    delivery_failed: "Tentativa sem sucesso",
+    returned: "Devolvido à loja",
+    completed: "Concluído",
+    canceled: "Cancelado",
+  }[status];
+}
+
+export function deliveryPaymentMethodLabel(method: string) {
+  return (
+    {
+      pay_on_fulfillment: "Cobrança na entrega/retirada",
+      cash: "Dinheiro",
+      pix: "Pix",
+      credit_card: "Cartão de crédito",
+      debit_card: "Cartão de débito",
+    }[method] ?? "Forma de cobrança não identificada"
+  );
+}
+
+export function deliveryPaymentStatusLabel(status: string) {
+  return status === "paid" ? "Recebimento confirmado" : "Cobrança pendente";
+}
+
+export function deliveryCourierStatusLabel(status: string) {
+  return (
+    {
+      available: "Disponível",
+      assigned: "Atribuído",
+      delivering: "Em entrega",
+      offline: "Offline",
+    }[status] ?? "Status não identificado"
+  );
+}
+
+export function deliveryNotificationTypeLabel(type: DeliveryNotification["type"]) {
+  return {
+    status_update: "Atualização do pedido",
+    courier_assigned: "Entregador atribuído",
+    courier_arriving: "Entregador chegando",
+  }[type];
 }
 
 function orderId(order: DeliveryOrder) {
@@ -117,7 +214,9 @@ function nextAction(
         ? { label: "Despachar", dispatch: true }
         : { label: "Concluir retirada", status: "completed" };
     case "dispatched":
-      return { label: "Concluir entrega", status: "completed" };
+      return { label: "Revisar conclusão" };
+    case "delivery_failed":
+      return { label: "Resolver tentativa" };
     default:
       return null;
   }
@@ -282,10 +381,18 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     () => api.growth.deliveryCouriers(scope.organizationId, scope.unitId),
     parseDeliveryCouriers,
   );
+  const projectionStatus = useRemote(
+    scope,
+    () => api.pilot.deliveryProjectionStatus(scope.organizationId, scope.unitId),
+    parseDeliveryProjectionStatus,
+  );
   const [tab, setTab] = useState<Tab>("orders");
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
   const [selected, setSelected] = useState<DeliveryOrder | null>(null);
+  const [deepLinkedOrderId, setDeepLinkedOrderId] = useState(() =>
+    typeof window === "undefined" ? null : deliveryOrderIdFromHash(window.location.hash),
+  );
   const [courierId, setCourierId] = useState("");
   const [creatingCourier, setCreatingCourier] = useState(false);
   const [editingZone, setEditingZone] = useState<DeliveryZone | "new" | null>(null);
@@ -330,6 +437,26 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    const readTarget = () => setDeepLinkedOrderId(deliveryOrderIdFromHash(window.location.hash));
+    window.addEventListener("hashchange", readTarget);
+    return () => window.removeEventListener("hashchange", readTarget);
+  }, []);
+
+  useEffect(() => {
+    if (!deepLinkedOrderId || orders.state.status !== "ready") return;
+    const target = orders.state.data.find((order) => order.id === deepLinkedOrderId);
+    if (target) {
+      setSelected(target);
+      setNotice(null);
+    } else {
+      setNotice({
+        error: true,
+        text: "O pedido indicado não está disponível nesta unidade ou saiu da janela da fila.",
+      });
+    }
+  }, [deepLinkedOrderId, orders.state]);
 
   useEffect(() => {
     if (serverFilterKey !== "all:") filteredOrders.retry();
@@ -406,14 +533,21 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
     [summary],
   );
 
-  async function transition(order: DeliveryOrder) {
-    const action = nextAction(order);
-    if (!action?.status) return;
-    const nextStatus = action.status;
+  async function transition(
+    order: DeliveryOrder,
+    requestedStatus?: TransitionStatus,
+    reason?: string,
+  ) {
+    const nextStatus = requestedStatus ?? nextAction(order)?.status;
+    if (!nextStatus) return;
     setBusy(order.id);
     setNotice(null);
     try {
-      await api.growth.transitionDelivery(scope.organizationId, order.id, nextStatus);
+      await api.growth.transitionDelivery(scope.organizationId, order.id, {
+        status: nextStatus,
+        ...(reason?.trim() ? { reason: reason.trim() } : {}),
+      });
+      dispatchAttemptsRef.current.delete(order.id);
       orders.update((rows) =>
         rows.map((row) => (row.id === order.id ? { ...row, status: nextStatus } : row)),
       );
@@ -421,7 +555,12 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         rows.map((row) => (row.id === order.id ? { ...row, status: nextStatus } : row)),
       );
       setSelected(null);
-      setNotice({ text: `Pedido ${orderId(order)} atualizado.` });
+      setNotice({
+        text:
+          nextStatus === "completed" && order.paymentStatus !== "paid"
+            ? `Entrega concluída; cobrança de ${formatMoney(order.totalCents)} continua pendente na comanda.`
+            : `Pedido ${orderId(order)} atualizado.`,
+      });
     } catch (error) {
       setNotice({
         error: true,
@@ -714,6 +853,29 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                 {realtime.freshness?.stale && <span>Sincronização pendente</span>}
                 {syncWarning && <span>{syncWarning}</span>}
               </div>
+              {projectionStatus.state.status === "ready" &&
+                projectionStatus.state.data.totalMissing > 0 && (
+                  <Callout tone="warning">
+                    <strong>
+                      {projectionStatus.state.data.totalMissing} comanda(s) de delivery precisam de
+                      revisão de projeção.
+                    </strong>
+                    <p>
+                      A comanda existe no atendimento, mas ainda não aparece como pedido nesta fila.
+                      Revise o status e a origem sem recriar o pedido.
+                    </p>
+                    <ul>
+                      {groupDeliveryProjectionGaps(projectionStatus.state.data).map((gap) => (
+                        <li key={gap.tabId}>
+                          <a href={`#/counter?tab=${encodeURIComponent(gap.tabId)}`}>
+                            Abrir {gap.reference}
+                          </a>{" "}
+                          · {gap.status}
+                        </li>
+                      ))}
+                    </ul>
+                  </Callout>
+                )}
               <Card
                 className="delivery-realtime-notices"
                 aria-label="Atualizações auditáveis do delivery"
@@ -914,7 +1076,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                                 busy={busy === order.id}
                                 key={order.id}
                                 onAdvance={() =>
-                                  nextAction(order)?.dispatch
+                                  nextAction(order)?.dispatch || !nextAction(order)?.status
                                     ? setSelected(order)
                                     : void transition(order)
                                 }
@@ -959,7 +1121,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                           busy={busy === order.id}
                           key={order.id}
                           onAdvance={() =>
-                            nextAction(order)?.dispatch
+                            nextAction(order)?.dispatch || !nextAction(order)?.status
                               ? setSelected(order)
                               : void transition(order)
                           }
@@ -995,7 +1157,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         onRequestNotification={(audience, type) =>
           selected && void requestNotification(selected, audience, type)
         }
-        onTransition={() => selected && void transition(selected)}
+        onTransition={(status, reason) => selected && void transition(selected, status, reason)}
         order={selected}
       />
       {editingZone !== null && (
@@ -1111,9 +1273,17 @@ function OrderCard({
         {order.courierReference && (
           <div className="delivery-order-card__courier-tag">
             <span>🛵 {order.courierReference}</span>
-            {order.courierStatus && <small>({order.courierStatus})</small>}
+            {order.courierStatus && (
+              <small>({deliveryCourierStatusLabel(order.courierStatus)})</small>
+            )}
           </div>
         )}
+        <div className="delivery-order-card__payment">
+          <span>{deliveryPaymentMethodLabel(order.paymentMethod)}</span>
+          <Badge tone={order.paymentStatus === "paid" ? "success" : "warning"}>
+            {deliveryPaymentStatusLabel(order.paymentStatus)}
+          </Badge>
+        </div>
       </button>
 
       <div className="delivery-order-card__footer">
@@ -1521,7 +1691,7 @@ function OrderModal({
     audience: "operations" | "customer",
     type: "status_update" | "courier_assigned" | "courier_arriving",
   ) => void;
-  onTransition: () => void;
+  onTransition: (status: TransitionStatus, reason?: string) => void;
 }) {
   const action = order ? nextAction(order) : null;
   const [notifAudience, setNotifAudience] = useState<"operations" | "customer">("operations");
@@ -1529,6 +1699,7 @@ function OrderModal({
     "status_update" | "courier_assigned" | "courier_arriving"
   >("status_update");
   const [coverageOverrideReason, setCoverageOverrideReason] = useState("");
+  const [exceptionReason, setExceptionReason] = useState("");
   return (
     <Modal
       isOpen={order !== null}
@@ -1539,7 +1710,17 @@ function OrderModal({
       {order && (
         <div className="delivery-detail">
           <div className="delivery-detail__summary">
-            <Badge tone={order.status === "dispatched" ? "success" : "info"}>{order.status}</Badge>
+            <Badge
+              tone={
+                order.status === "delivery_failed"
+                  ? "danger"
+                  : order.status === "dispatched"
+                    ? "success"
+                    : "info"
+              }
+            >
+              {deliveryStatusLabel(order.status)}
+            </Badge>
             <strong>{formatMoney(order.totalCents)}</strong>
           </div>
           <dl>
@@ -1574,12 +1755,15 @@ function OrderModal({
             {order.courierStatus && (
               <div>
                 <dt>Status do entregador</dt>
-                <dd>{order.courierStatus}</dd>
+                <dd>{deliveryCourierStatusLabel(order.courierStatus)}</dd>
               </div>
             )}
             <div>
               <dt>Pagamento</dt>
-              <dd>{order.paymentStatus === "paid" ? "Pago" : "Aguardando pagamento"}</dd>
+              <dd>
+                {deliveryPaymentMethodLabel(order.paymentMethod)} ·{" "}
+                {deliveryPaymentStatusLabel(order.paymentStatus)} · {formatMoney(order.totalCents)}
+              </dd>
             </div>
             <div>
               <dt>Agendamento</dt>
@@ -1624,7 +1808,7 @@ function OrderModal({
                 {order.history.map((entry) => (
                   <li key={entry.id}>
                     <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
-                    <span>{`${entry.fromStatus ? `${entry.fromStatus} → ` : ""}${entry.toStatus}`}</span>
+                    <span>{`${entry.fromStatus ? `${deliveryStatusLabel(entry.fromStatus)} → ` : ""}${deliveryStatusLabel(entry.toStatus)}`}</span>
                   </li>
                 ))}
               </ol>
@@ -1641,7 +1825,7 @@ function OrderModal({
               <ol>
                 {order.notifications.map((notification) => (
                   <li key={notification.id}>
-                    <span>{`${notification.audience === "operations" ? "Operação" : "Cliente"} · ${notification.type}`}</span>
+                    <span>{`${notification.audience === "operations" ? "Operação" : "Cliente"} · ${deliveryNotificationTypeLabel(notification.type)}`}</span>
                     <small>Pendente do provedor — não enviada</small>
                     <time dateTime={notification.createdAt}>
                       {dateTime(notification.createdAt)}
@@ -1684,6 +1868,17 @@ function OrderModal({
               Solicitar notificação
             </Button>
           </div>
+          {order.paymentStatus !== "paid" && (
+            <Callout tone={order.status === "completed" ? "danger" : "warning"}>
+              <strong>
+                {order.status === "completed"
+                  ? "Entrega concluída; cobrança pendente."
+                  : "Cobrança ainda pendente."}
+              </strong>{" "}
+              Registre {formatMoney(order.totalCents)} na comanda antes de encerrar o atendimento.{" "}
+              <a href={`#/counter?tab=${encodeURIComponent(order.orderRef)}`}>Abrir conta exata</a>
+            </Callout>
+          )}
           {action?.dispatch ? (
             <form
               className="gm-form-stack"
@@ -1747,9 +1942,64 @@ function OrderModal({
                 {busy ? "Despachando…" : "Atribuir e despachar"}
               </Button>
             </form>
+          ) : order.status === "dispatched" || order.status === "delivery_failed" ? (
+            <div className="gm-form-stack">
+              {order.status === "delivery_failed" && (
+                <Callout tone="danger">
+                  A tentativa precisa de um destino auditável: nova saída ou devolução à loja.
+                </Callout>
+              )}
+              <label className="gm-form-field">
+                <span>
+                  {order.status === "dispatched"
+                    ? "Motivo do insucesso (para registrar problema)"
+                    : "Motivo da decisão"}
+                </span>
+                <Textarea
+                  maxLength={500}
+                  minLength={10}
+                  onChange={(event) => setExceptionReason(event.target.value)}
+                  placeholder="Ex.: cliente ausente após duas tentativas de contato"
+                  rows={3}
+                  value={exceptionReason}
+                />
+              </label>
+              <div className="delivery-zone-real__actions">
+                {order.status === "dispatched" ? (
+                  <>
+                    <Button disabled={busy} onClick={() => onTransition("completed")}>
+                      {busy ? "Atualizando…" : "Concluir entrega"}
+                    </Button>
+                    <Button
+                      disabled={busy || exceptionReason.trim().length < 10}
+                      onClick={() => onTransition("delivery_failed", exceptionReason)}
+                      variant="danger"
+                    >
+                      Registrar insucesso
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      disabled={busy || exceptionReason.trim().length < 10}
+                      onClick={() => onTransition("ready", exceptionReason)}
+                    >
+                      Retornar à fila para nova tentativa
+                    </Button>
+                    <Button
+                      disabled={busy || exceptionReason.trim().length < 10}
+                      onClick={() => onTransition("returned", exceptionReason)}
+                      variant="danger"
+                    >
+                      Confirmar devolução à loja
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
           ) : (
-            action && (
-              <Button disabled={busy} onClick={onTransition}>
+            action?.status && (
+              <Button disabled={busy} onClick={() => action.status && onTransition(action.status)}>
                 {busy ? "Atualizando…" : action.label}
               </Button>
             )

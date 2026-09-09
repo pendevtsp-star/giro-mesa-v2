@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
 import type { PosPrintJob } from "../../api";
-import type { PilotFloor } from "../../operations.shared";
+import { type PilotFloor, parsePilotFloor } from "../../operations.shared";
 import { buildOperationalAttentions, operationalAttentionHref } from "./OperationalAttentionInbox";
 
 describe("buildOperationalAttentions", () => {
+  it("mantém as falhas de impressão acessíveis sem permissão de Salão", () => {
+    const floor = parsePilotFloor({
+      rooms: [],
+      tables: [],
+      openTabs: [],
+      serviceCalls: [],
+      tablePhases: [],
+    });
+    expect(floor.openTabs.map((tab) => tab.id)).toEqual([]);
+    const result = buildOperationalAttentions(
+      floor,
+      [
+        {
+          id: "failed-print",
+          status: "failed",
+          updatedAt: "2026-09-09T12:00:00Z",
+          lastError: "Sem papel",
+        } as PosPrintJob,
+      ],
+      { salon: false, counter: true },
+    );
+    expect(result.map((item) => item.id)).toEqual(["print:failed-print"]);
+  });
   it("prioritizes overdue calls, ready orders and failed prints", () => {
     const now = new Date("2026-08-20T15:00:00Z").getTime();
     const floor = {

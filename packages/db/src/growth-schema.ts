@@ -49,6 +49,8 @@ export const deliveryStatus = pgEnum("growth_delivery_status", [
   "preparing",
   "ready",
   "dispatched",
+  "delivery_failed",
+  "returned",
   "completed",
   "canceled",
 ]);

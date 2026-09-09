@@ -52,6 +52,11 @@ export function CartSummary({
               <p>{line.modifiers.map((modifier) => modifier.name).join(", ")}</p>
             )}
             {line.notes && <small>Obs.: {line.notes}</small>}
+            {line.allergyNote && (
+              <p>
+                <strong>Alergia: {line.allergyNote}</strong>
+              </p>
+            )}
             <strong>{formatMoney(cartLineTotal(line, fulfillment))}</strong>
           </div>
           <div className="quantity">

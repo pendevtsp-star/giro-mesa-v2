@@ -135,6 +135,7 @@ export function MenuExperience({
   const [selected, setSelected] = useState<MenuItem | null>(null);
   const [selection, setSelection] = useState<Record<string, Modifier[]>>({});
   const [notes, setNotes] = useState("");
+  const [allergyNote, setAllergyNote] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -416,31 +417,47 @@ export function MenuExperience({
     const apiUrl = apiBase();
     if (!apiUrl || !apiEnabled()) return;
     let active = true;
-    void fetch(
-      `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders/${encodeURIComponent(orderId)}`,
-      { cache: "no-store", credentials: "include" },
-    )
-      .then(async (response) => ({
-        response,
-        order: readTableOrder(await responsePayload(response)),
-      }))
-      .then(({ response, order }) => {
+    let retry: number | undefined;
+    const restoredOrderId = orderId;
+    setTableOrder({ status: "restoring" });
+    async function restore() {
+      try {
+        const response = await fetch(
+          `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders/${encodeURIComponent(restoredOrderId)}`,
+          { cache: "no-store", credentials: "include", signal: AbortSignal.timeout(10_000) },
+        );
+        const order = readTableOrder(await responsePayload(response));
         if (!active) return;
-        if (!response.ok || !order) {
+        if (response.status === 404 || classifyPublicFailure(response.status) === "session") {
           window.sessionStorage.removeItem(tableOrderStorageKey(menuSlug));
+          setTableOrder({ status: "idle" });
           return;
         }
-        setTableOrder({ status: "tracking", order });
-      })
-      .catch(() => undefined);
+        if (!response.ok || !order) throw new Error("Consulta indisponível");
+        setTableOrder({ status: "tracking", order, updatedAt: Date.now() });
+        setNotice((current) =>
+          current?.text.startsWith("Ainda estamos consultando") ? null : current,
+        );
+      } catch {
+        if (!active) return;
+        setNotice({
+          tone: "warning",
+          text: "Ainda estamos consultando seu pedido anterior. Aguarde a recuperação antes de repetir a solicitação.",
+        });
+        retry = window.setTimeout(restore, 3_000);
+      }
+    }
+    void restore();
     return () => {
       active = false;
+      if (retry !== undefined) window.clearTimeout(retry);
     };
   }, [menuSlug, session]);
 
   const trackedOrder = tableOrder.status === "tracking" ? tableOrder.order : null;
   useEffect(() => {
-    if (trackedOrder?.status !== "draft") return;
+    if (!trackedOrder || trackedOrder.status === "served" || trackedOrder.status === "canceled")
+      return;
     const orderId = trackedOrder.orderId;
     const apiUrl = apiBase();
     if (!apiUrl || !apiEnabled()) return;
@@ -456,22 +473,25 @@ export function MenuExperience({
       try {
         const response = await fetch(
           `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-orders/${encodeURIComponent(orderId)}`,
-          { cache: "no-store", credentials: "include" },
+          { cache: "no-store", credentials: "include", signal: AbortSignal.timeout(10_000) },
         );
         const payload = await responsePayload(response);
         const next = readTableOrder(payload);
+        if (!active) return;
         if (!response.ok || !next) {
           if (classifyPublicFailure(response.status) === "session") {
             setSession({ status: "expired" });
             setTableOrder({ status: "error", message: requestFailure("order", response.status) });
             return;
           }
+          setTableOrder((current) =>
+            current.status === "tracking" ? { ...current, connectionError: true } : current,
+          );
         } else {
-          setTableOrder({ status: "tracking", order: next });
-          if (next.status === "sent") {
+          setTableOrder({ status: "tracking", order: next, updatedAt: Date.now() });
+          if (next.status !== trackedOrder?.status) void loadConsumption();
+          if (next.status === "sent" && trackedOrder?.status === "draft") {
             setNotice({ tone: "success", text: "A equipe confirmou o pedido da mesa." });
-            void loadConsumption();
-            return;
           }
           if (next.status === "canceled") {
             setNotice({
@@ -480,10 +500,13 @@ export function MenuExperience({
             });
             return;
           }
-          if (next.status !== "draft") return;
+          if (next.status === "served") return;
         }
       } catch {
-        // A solicitação permanece em rascunho; a próxima leitura tenta novamente.
+        if (active)
+          setTableOrder((current) =>
+            current.status === "tracking" ? { ...current, connectionError: true } : current,
+          );
       } finally {
         polling = false;
       }
@@ -507,6 +530,7 @@ export function MenuExperience({
     setSelection({});
     setQuantity(1);
     setNotes("");
+    setAllergyNote("");
     setProductError(undefined);
     window.setTimeout(() => productDialog.current?.showModal(), 0);
   }
@@ -555,6 +579,7 @@ export function MenuExperience({
         quantity,
         modifiers,
         notes: notes.trim() || undefined,
+        allergyNote: allergyNote.trim() || undefined,
       },
     ]);
     setNotice({ tone: "success", text: `${selected.name} foi adicionado à seleção.` });
@@ -634,6 +659,7 @@ export function MenuExperience({
   }
 
   async function placeTableOrder() {
+    if (tableOrder.status === "restoring" || tableOrder.status === "submitting") return;
     if (!cart.length || session.status !== "ready" || !session.activeTab) return;
     const apiUrl = apiBase();
     if (!apiUrl || !apiEnabled()) return;
@@ -664,7 +690,7 @@ export function MenuExperience({
         }
         throw new Error(requestFailure("order", response.status));
       }
-      setTableOrder({ status: "tracking", order });
+      setTableOrder({ status: "tracking", order, updatedAt: Date.now() });
       setTableOrderAttempt(null);
       window.sessionStorage.setItem(tableOrderStorageKey(menuSlug), order.orderId);
       setCart([]);
@@ -809,6 +835,7 @@ export function MenuExperience({
         }}
         onRefreshConsumption={() => void loadConsumption()}
         onOpenTableOrder={() => openCart("table")}
+        trackingTableOrder={tableOrder.status === "tracking" || tableOrder.status === "restoring"}
         onPresenceCodeChange={setPresenceCode}
         onConfirmPresence={() => void confirmPresence()}
       />
@@ -847,6 +874,7 @@ export function MenuExperience({
         selected={selected}
         selection={selection}
         notes={notes}
+        allergyNote={allergyNote}
         quantity={quantity}
         unitPrice={selectedUnitPrice}
         error={productError}
@@ -857,6 +885,7 @@ export function MenuExperience({
         }}
         onToggleModifier={toggleModifier}
         onNotes={setNotes}
+        onAllergyNote={setAllergyNote}
         onQuantity={setQuantity}
         onAdd={addToCart}
       />
@@ -867,6 +896,7 @@ export function MenuExperience({
         receipt={orderReceipt}
         mode={orderMode}
         tableAvailable={session.status === "ready" && session.activeTab}
+        tableLabel={session.status === "ready" ? session.tableLabel : undefined}
         tableOrder={tableOrder}
         options={orderOptions}
         fulfillment={fulfillment}

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   platformIncidentActionSchema,
+  platformIncidentQuerySchema,
   platformReasonBodySchema,
   platformTenantRegistrationSchema,
   tenantDirectoryQuerySchema,
@@ -30,6 +31,38 @@ describe("platform request schemas", () => {
         reason: "Aguardando retorno do provedor",
         snoozedUntil: "amanhã",
       }).success,
+      false,
+    );
+  });
+
+  it("valida filtros globais de origem, severidade, idade e impacto", () => {
+    assert.deepEqual(
+      platformIncidentQuerySchema.parse({
+        severity: "critical",
+        source: "outbox",
+        impact: "orders",
+        minAgeMinutes: "60",
+        maxAgeMinutes: "240",
+        activePilotOnly: "true",
+      }),
+      {
+        search: "",
+        state: "active",
+        severity: "critical",
+        source: "outbox",
+        impact: "orders",
+        minAgeMinutes: 60,
+        maxAgeMinutes: 240,
+        activePilotOnly: true,
+        limit: 100,
+      },
+    );
+    assert.equal(
+      platformIncidentQuerySchema.safeParse({ minAgeMinutes: 300, maxAgeMinutes: 60 }).success,
+      false,
+    );
+    assert.equal(
+      platformIncidentQuerySchema.parse({ activePilotOnly: "false" }).activePilotOnly,
       false,
     );
   });
