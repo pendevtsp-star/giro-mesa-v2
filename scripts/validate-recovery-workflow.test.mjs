@@ -75,6 +75,19 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /json\.dumps\(value, sort_keys=True, separators=\(",", ":"\)\)/);
 });
 
+test("recovery frontends receive the same public API bindings as the target", () => {
+  const publish = readFileSync(publishPath, "utf8");
+  const target = publish.slice(0, publish.indexOf("\n  release-manifest:"));
+  const recovery = publish.slice(
+    publish.indexOf("\n  publish-recovery:"),
+    publish.indexOf("\n  validate-recovery:"),
+  );
+  const bindings = (source) =>
+    source.match(/^\s+(?:NEXT_PUBLIC_|VITE_)[A-Z_]+=.+$/gm)?.map((line) => line.trim());
+  assert.equal(bindings(target)?.length, 7);
+  assert.deepEqual(bindings(recovery), bindings(target));
+});
+
 test("runtime matrix creates each schema database once when recovery equals target", () => {
   const script = readFileSync(validatorPath, "utf8");
   const selection = script.slice(
