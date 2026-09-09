@@ -37,7 +37,7 @@ export function isAllowedRealtimeOrigin(
 export function configuredTrustProxy(
   value = process.env.TRUST_PROXY,
   nodeEnv = process.env.NODE_ENV,
-): boolean | number | string | string[] {
+): boolean | string | string[] {
   const normalized = value?.trim();
   if (!normalized || normalized === "false") return false;
   if (normalized === "true") {
@@ -46,7 +46,9 @@ export function configuredTrustProxy(
     }
     return true;
   }
-  if (/^\d+$/.test(normalized)) return Number(normalized);
+  if (/^\d+$/.test(normalized)) {
+    throw new Error("TRUST_PROXY hop counts are unsafe; configure trusted addresses or CIDRs");
+  }
   const proxies = normalized
     .split(",")
     .map((proxy) => proxy.trim())
