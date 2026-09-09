@@ -94,16 +94,15 @@ test("privileged recovery authorization binds the schema 80 evidence", () => {
   assert.equal(matrix.targetMigration, "0080_campaign_attribution_cost");
   assert.equal(matrix.transitions.length, 11);
   const expectedEvidence = {
-    path: "docs/evidence/recovery/36cec6-validation-0080.json",
-    sha256: "sha256:8f2574d745496c2c49986c1c7a8994b7f093a3154e2d48f28493d7ee1acc8a06",
-    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34253704633",
-    testReportDigest:
-      "sha256:8f2574d745496c2c49986c1c7a8994b7f093a3154e2d48f28493d7ee1acc8a06",
+    path: "docs/evidence/recovery/07bb30f5-validation-0080.json",
+    sha256: "sha256:e9ad6d0a98b34ae9fabf638b52f7484b7622575a5322bf089bf38bdc659020e7",
+    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34365691644",
+    testReportDigest: "sha256:e9ad6d0a98b34ae9fabf638b52f7484b7622575a5322bf089bf38bdc659020e7",
   };
   for (const transition of matrix.transitions) {
     assert.equal(transition.appliedAfter, matrix.targetMigration);
     assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
-    assert.equal(transition.recoveryArtifact, "git:36cec6535b1826f6ebe34b98cb697762e3517ceb");
+    assert.equal(transition.recoveryArtifact, "git:07bb30f5362d30d950432e04cf32fe2a2e40ad16");
     assert.equal(transition.testedUpgrade, true);
     assert.deepEqual(transition.evidence, expectedEvidence);
   }

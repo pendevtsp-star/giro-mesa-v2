@@ -867,9 +867,9 @@ test("pre-migration backup binds the migration actually applied in the source da
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
     assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
-    assert.equal(transition.recoveryArtifact, "git:36cec6535b1826f6ebe34b98cb697762e3517ceb");
+    assert.equal(transition.recoveryArtifact, "git:07bb30f5362d30d950432e04cf32fe2a2e40ad16");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34253704633$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34365691644$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });

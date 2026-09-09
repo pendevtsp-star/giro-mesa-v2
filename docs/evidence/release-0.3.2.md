@@ -22,3 +22,9 @@ Data: 9 de setembro de 2026.
 O primeiro CI bloqueou a publicação na auditoria de dependências. Foram atualizados Next.js para 16.3.3, sharp para 0.35.4, js-yaml do gerador OpenAPI para 4.3.2 e Vitest para 4.1.11. Os limites de segurança do CI permanecem ativos. Referências: [Next.js/AVIF](https://github.com/advisories/GHSA-2xp9-vwfh-vxw4), [sharp](https://github.com/advisories/GHSA-rgj7-g3m4-5g8c), [js-yaml](https://github.com/advisories/GHSA-2883-xcg3-v3hh) e [Vitest](https://github.com/advisories/GHSA-82fw-gwwq-j7x9).
 
 A auditoria local após a atualização não encontrou vulnerabilidades conhecidas. Os 22 testes do site, 21 do cardápio público e os 315 testes Ops/UI passaram; builds do site e cardápio público também passaram.
+
+## Recuperação revalidada
+
+A publicação detectou dependências vulneráveis na recuperação antiga, não na versão principal. O candidato `07bb30f5362d30d950432e04cf32fe2a2e40ad16` preserva o esquema 77 e recebe as atualizações de dependências acima, Fastify 5.12.1 e a proteção de proxy já usada na versão principal. Não altera regras financeiras nem migrations.
+
+A [validação isolada no GitHub](https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34365691644) passou: varreduras de segurança, migrações PostgreSQL 16/17, API e worker nos esquemas 77/80, processamento da fila e compatibilidade Dose Club. O relatório original está em `docs/evidence/recovery/07bb30f5-validation-0080.json`, com SHA-256 `e9ad6d0a98b34ae9fabf638b52f7484b7622575a5322bf089bf38bdc659020e7`. A publicação privilegiada repete a validação antes de assinar os artefatos; nenhum gate foi relaxado.
