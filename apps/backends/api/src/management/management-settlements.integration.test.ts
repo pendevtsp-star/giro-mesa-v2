@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   identities,
   managementAccountsPayable,
+  managementCashEntries,
   managementPayablePayments,
   managementPeople,
   managementWaiterSettlements,
@@ -243,6 +244,20 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
       ),
       (error) => errorCode(error) === "WAITER_SETTLEMENT_PAYABLE_ALREADY_USED",
     );
+    const cashRegister = await management.createCashRegister(
+      owner.id,
+      organization.id,
+      unit.id,
+      `settlement-register-${randomUUID()}`,
+      { name: "Caixa da apuração" },
+    );
+    const cashShift = await management.openCashShift(
+      owner.id,
+      organization.id,
+      unit.id,
+      `settlement-cash-shift-${randomUUID()}`,
+      { openingCents: 2_000, cashRegisterId: cashRegister.id as string },
+    );
     const paid = await service.transition(
       owner.id,
       organization.id,
@@ -251,12 +266,13 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
       `pay-${randomUUID()}`,
       {
         action: "pay",
-        note: "Pix confirmado",
-        paymentMethod: "pix",
-        paymentReference: "PIX-2032-04-10",
+        note: "Dinheiro confirmado",
+        paymentMethod: "cash",
+        paymentReference: "CAIXA-2032-04-10",
+        cashRegisterId: cashRegister.id as string,
       },
     );
-    assert.equal(paid.paymentMethod, "pix");
+    assert.equal(paid.paymentMethod, "cash");
     const [persistedSettlement] = await database.db
       .select()
       .from(managementWaiterSettlements)
@@ -272,7 +288,43 @@ it("apura perda sem descontá-la do pagamento e permite refazer fechamento cance
       .select()
       .from(managementPayablePayments)
       .where(eq(managementPayablePayments.id, persistedSettlement.financePaymentId as string));
-    assert.equal(payment?.reference, "PIX-2032-04-10");
+    assert.equal(payment?.reference, "CAIXA-2032-04-10");
+    const cashEntriesBeforeReversal = await database.db
+      .select()
+      .from(managementCashEntries)
+      .where(eq(managementCashEntries.cashShiftId, cashShift.cashShiftId));
+    assert.equal(cashEntriesBeforeReversal.length, 1);
+    await assert.rejects(
+      management.reversePayablePayment(
+        owner.id,
+        organization.id,
+        unit.id,
+        payment?.id as string,
+        `generic-reversal-${randomUUID()}`,
+        { reason: "Tentativa fora da apuração", cashRegisterId: cashRegister.id as string },
+      ),
+      (error) => errorCode(error) === "WAITER_SETTLEMENT_PAYABLE_MANAGED",
+    );
+    const [settlementAfterReversalAttempt] = await database.db
+      .select()
+      .from(managementWaiterSettlements)
+      .where(eq(managementWaiterSettlements.id, replacement.id));
+    const [payableAfterReversalAttempt] = await database.db
+      .select()
+      .from(managementAccountsPayable)
+      .where(eq(managementAccountsPayable.id, persistedSettlement.financePayableId));
+    const [paymentAfterReversalAttempt] = await database.db
+      .select()
+      .from(managementPayablePayments)
+      .where(eq(managementPayablePayments.id, payment?.id as string));
+    const cashEntriesAfterReversal = await database.db
+      .select()
+      .from(managementCashEntries)
+      .where(eq(managementCashEntries.cashShiftId, cashShift.cashShiftId));
+    assert.equal(settlementAfterReversalAttempt?.status, "paid");
+    assert.equal(payableAfterReversalAttempt?.status, "paid");
+    assert.equal(paymentAfterReversalAttempt?.status, "posted");
+    assert.equal(cashEntriesAfterReversal.length, cashEntriesBeforeReversal.length);
 
     await database.db
       .update(managementWaiterSettlements)

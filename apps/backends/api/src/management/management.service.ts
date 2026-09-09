@@ -15147,6 +15147,12 @@ export class ManagementService {
           )
           .limit(1);
         if (!payment) throw new NotFoundException({ code: "PAYABLE_PAYMENT_NOT_FOUND" });
+        await this.assertPayableIsNotSettlementManaged(
+          tx,
+          organizationId,
+          unitId,
+          payment.payableId,
+        );
         if (payment.status !== "posted")
           throw new ConflictException({ code: "FINANCE_PAYMENT_ALREADY_REVERSED" });
         await tx.execute(

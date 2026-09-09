@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -49,7 +50,7 @@ test("shared validator proves the full database and runtime compatibility matrix
   const script = readFileSync(validatorPath, "utf8");
   assert.match(script, /postgres16/);
   assert.match(script, /postgres17/);
-  assert.match(script, /for level in "\$recovery_level" "\$target_level"/);
+  assert.match(script, /for level in "\$\{runtime_levels\[@\]\}"/);
   assert.match(script, /target_tag="\$\{target_identity\[0\]/);
   assert.match(script, /DATABASE_URL=.*pnpm db:migrate/);
   assert.match(script, /run_target_database_matrix 16/);
@@ -72,6 +73,27 @@ test("shared validator proves the full database and runtime compatibility matrix
   assert.match(script, /recovery-validation\.json/);
   assert.match(script, /recovery-validation\.json\.sha256/);
   assert.match(script, /json\.dumps\(value, sort_keys=True, separators=\(",", ":"\)\)/);
+});
+
+test("runtime matrix creates each schema database once when recovery equals target", () => {
+  const script = readFileSync(validatorPath, "utf8");
+  const selection = script.slice(
+    script.indexOf("runtime_levels=("),
+    script.indexOf("for level in"),
+  );
+  assert.ok(selection.length > 0);
+  const bash = process.platform === "win32" ? "C:\\Program Files\\Git\\bin\\bash.exe" : "bash";
+  for (const [recovery, target, expected] of [
+    [77, 82, "77\n82\n"],
+    [82, 82, "82\n"],
+  ]) {
+    const result = spawnSync(bash, ["-c", `${selection}\nprintf '%s\\n' "\${runtime_levels[@]}"`], {
+      encoding: "utf8",
+      env: { ...process.env, recovery_level: String(recovery), target_level: String(target) },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout, expected);
+  }
 });
 
 test("fresh bootstrap does not use a newly-added enum value in the same transaction", () => {

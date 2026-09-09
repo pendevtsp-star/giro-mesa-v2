@@ -81,6 +81,6 @@ Cobertura funcional dirigida:
 
 ## Limites para a entrada em produção
 
-Implementação e validações são locais. Não houve commit, push, publicação de imagem, deploy ou execução em terminal físico. O bundle Ops ainda emite aviso de chunk acima de 500 kB; testes .NET têm avisos preexistentes do analisador xUnit.
+Este registro descreve a validação da implementação, anterior à publicação. Nessa etapa, os checks foram locais, sem execução em terminal físico. A autorização posterior inclui commit, push, publicação assinada, promoção na VPS e limpeza segura após a verificação do runtime. O bundle Ops ainda emite aviso de chunk acima de 500 kB; testes .NET têm avisos preexistentes do analisador xUnit.
 
 Antes de ativar os canais na casa, permanece necessária a conferência com impressora real, maquininha/provedor, emissão fiscal, entrega com pagamento conciliado, retorno da internet e restauração de backup. Os registros por canal adicionados nesta entrega guardam essa evidência; testes de software não a substituem.

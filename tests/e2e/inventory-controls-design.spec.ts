@@ -309,8 +309,15 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Estoque" })).toBeVisible();
     const inventoryTabs = page.getByRole("group", { name: "Seções do estoque" });
-    await expect(inventoryTabs.getByRole("button").nth(0)).toContainText("Visão geral");
-    await expect(inventoryTabs.getByRole("button").nth(1)).toContainText("Vasilhames");
+    await expect(inventoryTabs.getByRole("button").nth(0)).toContainText("Turno");
+    await expect(inventoryTabs.getByRole("button").nth(1)).toContainText("Pendências");
+    await expect(inventoryTabs.getByRole("button").nth(2)).toContainText("Saldos");
+    const moreAreas = page.locator(".inventory-more-views");
+    await moreAreas.getByText("Mais áreas do estoque").click();
+    await expect(moreAreas.getByRole("button", { name: "Vasilhames" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
     await page.getByRole("button", { name: "Novo item de revenda" }).click();
     const resaleItemDialog = page.getByRole("dialog", { name: "Novo item de revenda" });
@@ -319,11 +326,11 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
       "resale",
     );
     await page.keyboard.press("Escape");
-    await page.getByRole("button", { name: /Controles/ }).click();
+    await moreAreas.getByRole("button", { name: "Controles" }).click();
     await expect(page.getByRole("heading", { name: "Contagem cega" })).toBeVisible();
     await expect(page.getByText("Temperatura crítica: 11 °C.")).toBeVisible();
     await expect(page.getByText("82%")).toBeVisible();
-    await page.getByRole("button", { name: /Vasilhames/ }).click();
+    await moreAreas.getByRole("button", { name: "Vasilhames" }).click();
     await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
     await expect(page.getByText("Mesa 12").first()).toBeVisible();
     await expect(page.getByText("Última divergência de contagem")).toBeVisible();

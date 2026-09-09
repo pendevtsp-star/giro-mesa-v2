@@ -305,7 +305,9 @@ PY
   mv -f -- "$temporary" "$runtime_environment"
 }
 
-for level in "$recovery_level" "$target_level"; do
+runtime_levels=("$recovery_level")
+if ((target_level != recovery_level)); then runtime_levels+=("$target_level"); fi
+for level in "${runtime_levels[@]}"; do
   database="recovery_level_${level}"
   api="gm-recovery-api-${level}-${suffix}"
   worker="gm-recovery-worker-${level}-${suffix}"

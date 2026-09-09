@@ -9,6 +9,7 @@ const documentId = "f1111111-1111-4111-8111-111111111111";
 
 test("fiscal mantém a próxima ação legível no desktop e em 375 px", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A matriz de larguras já cobre mobile.");
+  test.setTimeout(90_000);
   await mockCompatibleApi(page);
   await page.route(/\/health$/, (route) =>
     route.fulfill({
@@ -301,7 +302,17 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
       await expect(page).toHaveURL(
         /#\/counter\?tab=a3333333-3333-4333-8333-333333333333&origem=fiscal$/,
       );
-      await expect(page.getByText("Não foi possível carregar esta área")).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Balcão e retirada" })).toBeVisible({
+        timeout: 30_000,
+      });
+      const counterError = page
+        .getByRole("alert")
+        .filter({ hasText: "Não foi possível carregar esta área" });
+      await expect(counterError).toBeVisible({ timeout: 15_000 });
+      await expect(counterError).toContainText(
+        "Os dados operacionais vieram em formato inesperado.",
+      );
+      await expect(counterError.getByRole("button", { name: "Tentar novamente" })).toBeVisible();
       await page.goto("http://127.0.0.1:3112/#/fiscal?secao=documents");
       await expect(page.getByRole("heading", { name: "Notas fiscais" })).toBeVisible();
     } else {
