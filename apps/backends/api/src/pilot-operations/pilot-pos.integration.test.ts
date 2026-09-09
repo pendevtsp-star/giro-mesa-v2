@@ -5,6 +5,7 @@ import {
   identities,
   managementInventoryItems,
   managementPeople,
+  managementProductReturnables,
   managementReturnableCustodyHandoffs,
   managementReturnableCustodyMovements,
   managementReturnablePolicies,
@@ -550,6 +551,105 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       })
       .returning();
     assert.ok(returnableOrder);
+    const [pendingReturnableItem] = await database.db
+      .insert(posOrderItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        orderId: returnableOrder.id,
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        unitPriceCents: 0,
+        grossCents: 0,
+        netCents: 0,
+        status: "served",
+      })
+      .returning();
+    assert.ok(pendingReturnableItem);
+    const pendingReturnableEvents = await database.db
+      .insert(outboxEvents)
+      .values(
+        ["pos.order.sent", "pos.item.canceled"].map((topic) => ({
+          topic,
+          aggregateType: "tab",
+          aggregateId: groupCloseTabId,
+          payload: {
+            organizationId: organizationA.id,
+            unitId: unitA.id,
+            tabId: groupCloseTabId,
+            orderId: returnableOrder.id,
+            itemId: pendingReturnableItem.id,
+          },
+        })),
+      )
+      .returning();
+    const ordinaryClose = await pos.closeTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      groupCloseTabId,
+      "close-with-unrelated-inventory-pending",
+      { printRequested: false },
+    );
+    assert.equal(ordinaryClose.returnables.hasPending, false);
+    assert.equal(ordinaryClose.returnables.pendingEventCount, 0);
+    await pos.reopenTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      groupCloseTabId,
+      "reopen-before-returnable-pending",
+      { pin: "1234", reason: "Verificar processamento de vasilhames" },
+    );
+    const [returnableMapping] = await database.db
+      .insert(managementProductReturnables)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        productId: product.id,
+        containerInventoryItemId: returnableContainer.id,
+      })
+      .returning();
+    assert.ok(returnableMapping);
+    for (const active of [true, false]) {
+      await database.db
+        .update(managementProductReturnables)
+        .set({ active })
+        .where(eq(managementProductReturnables.id, returnableMapping.id));
+      await assert.rejects(
+        () =>
+          pos.closeTab(
+            identity.id,
+            organizationA.id,
+            unitA.id,
+            groupCloseTabId,
+            `close-with-returnable-processing-${active}`,
+            { printRequested: false },
+          ),
+        (error: unknown) => {
+          assert.ok(error instanceof ConflictException);
+          const response = error.getResponse() as {
+            code: string;
+            pending: { issueCount: number; processingPending: boolean; pendingEventCount: number };
+          };
+          assert.equal(response.code, "TAB_HAS_OPEN_RETURNABLE_CUSTODY");
+          assert.equal(response.pending.issueCount, 0);
+          assert.equal(response.pending.processingPending, true);
+          assert.equal(response.pending.pendingEventCount, 2);
+          return true;
+        },
+      );
+    }
+    await database.db
+      .update(outboxEvents)
+      .set({ processedAt: new Date() })
+      .where(
+        inArray(
+          outboxEvents.id,
+          pendingReturnableEvents.map((event) => event.id),
+        ),
+      );
     const [returnableIssue] = await database.db
       .insert(managementReturnableCustodyMovements)
       .values({

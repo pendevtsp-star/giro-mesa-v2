@@ -2412,7 +2412,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     </small>
                   </span>
                   {attentionSummary.overdue > 0 && (
-                    <Badge tone="danger">{attentionSummary.overdue} SLA vencido</Badge>
+                    <Badge tone="danger">
+                      {attentionSummary.overdue} atendimento(s) atrasado(s)
+                    </Badge>
                   )}
                   {attentionSummary.failedPrints > 0 && (
                     <Badge tone="danger">{attentionSummary.failedPrints} falha de impressão</Badge>
@@ -2455,10 +2457,18 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 </div>
               </header>
               {canManageShift && (
-                <section aria-label="Controle do turno" className="salon-shift-control">
-                  <span>
-                    <small>{data.activeShift ? "Turno atual" : "Atendimento"}</small>
+                <details
+                  aria-label="Controle do turno"
+                  className="salon-shift-control"
+                  open={!data.activeShift}
+                >
+                  <summary>
+                    <Icon name="clock" size={16} />
                     <strong>{data.activeShift?.label ?? "Nenhum turno aberto"}</strong>
+                    <span>{data.activeShift ? "Gerenciar turno" : "Abrir atendimento"}</span>
+                    <Icon name="chevron-down" size={16} />
+                  </summary>
+                  <div className="salon-shift-control__body">
                     <small id="salon-shift-close-status">
                       {!data.activeShift
                         ? "Abra o turno para distribuir praças e equipe."
@@ -2466,34 +2476,34 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           ? "Sem pendências: o turno pode ser encerrado."
                           : `${shiftClosureSummary}. Resolva tudo para encerrar ou faça a passagem.`}
                     </small>
-                  </span>
-                  <div className="salon-shift-control__actions">
-                    {!data.activeShift ? (
-                      <Button onClick={openShiftReview} size="sm">
-                        Abrir turno
-                      </Button>
-                    ) : (
-                      <>
-                        <Button onClick={openHandover} size="sm" variant="secondary">
-                          Passar turno
+                    <div className="salon-shift-control__actions">
+                      {!data.activeShift ? (
+                        <Button onClick={openShiftReview} size="sm">
+                          Abrir turno
                         </Button>
-                        <Button
-                          aria-describedby="salon-shift-close-status"
-                          disabled={busy || !canCloseShift}
-                          onClick={() =>
-                            window.confirm(
-                              "Encerrar o turno sem pendências? Uma nova operação exigirá a abertura de outro turno.",
-                            ) && void closeShift({ acknowledgeOpenTabs: false })
-                          }
-                          size="sm"
-                          variant="danger"
-                        >
-                          Encerrar turno
-                        </Button>
-                      </>
-                    )}
+                      ) : (
+                        <>
+                          <Button onClick={openHandover} size="sm" variant="secondary">
+                            Passar turno
+                          </Button>
+                          <Button
+                            aria-describedby="salon-shift-close-status"
+                            disabled={busy || !canCloseShift}
+                            onClick={() =>
+                              window.confirm(
+                                "Encerrar o turno sem pendências? Uma nova operação exigirá a abertura de outro turno.",
+                              ) && void closeShift({ acknowledgeOpenTabs: false })
+                            }
+                            size="sm"
+                            variant="danger"
+                          >
+                            Encerrar turno
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
-                </section>
+                </details>
               )}
               {(!online || floor.refreshError) && (
                 <div className="salon-recovery-banner" role="alert">
@@ -2924,7 +2934,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <summary>
                     <span>
                       <strong>Carga por praça e responsável</strong>
-                      <small>Leitura operacional; qualquer redistribuição continua manual.</small>
                     </span>
                     <Badge tone="neutral">{operationalLoad.sections.length} praça(s)</Badge>
                   </summary>
@@ -4771,6 +4780,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             className={`salon-fast-list-row salon-fast-list-row--${presentation.className} ${isSelected ? "selected" : ""}`}
                             key={item.id}
                             onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
                               if (event.key !== "Enter" && event.key !== " ") return;
                               event.preventDefault();
                               if (joinMode) {
@@ -5081,23 +5091,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       <div className="table-operation-strip">
                         <div>
                           <span>
-                            <small>Ambiente físico</small>
-                            <strong>
-                              {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
-                                "Sem ambiente"}
-                            </strong>
-                          </span>
-                          <span>
-                            <small>Praça do turno</small>
+                            <small>Praça</small>
                             <strong>{selectedAssignment?.section.name ?? "Sem praça"}</strong>
-                          </span>
-                          <span>
-                            <small>Responsável</small>
-                            <strong>
-                              {selectedGroupResponsible?.displayName ??
-                                selectedAssignment?.primary?.displayName ??
-                                "Equipe"}
-                            </strong>
                           </span>
                           {selectedCall && (
                             <span className="table-operation-strip__call">

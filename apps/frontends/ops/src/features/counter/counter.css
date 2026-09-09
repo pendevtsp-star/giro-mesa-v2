@@ -178,7 +178,7 @@
     display: flex;
     font-size: 0.72rem;
     font-weight: 750;
-    min-height: 34px;
+    min-height: 44px;
     padding: 8px 2px;
   }
 
@@ -583,10 +583,6 @@
     font-size: 0.72rem;
   }
 
-  .counter-workspace-close {
-    display: none;
-  }
-
   .attendance-cockpit {
     gap: 8px;
   }
@@ -729,7 +725,7 @@
     color: var(--gm-brand);
   }
 
-  .workspace-tabs__more[open] > summary > span {
+  .workspace-tabs__more[open] > summary .gm-icon {
     transform: rotate(180deg);
   }
 
@@ -1295,7 +1291,7 @@
 
   .account-overview__metrics small {
     color: var(--gm-muted);
-    font-size: 0.62rem;
+    font-size: var(--gm-font-xs);
   }
 
   .account-overview__metrics strong {
@@ -1304,10 +1300,185 @@
   }
 
   .account-overview__metrics [data-balance="true"] {
+    background: color-mix(in srgb, var(--gm-action) 10%, var(--gm-surface));
     border-color: color-mix(in srgb, var(--gm-warning) 45%, var(--gm-border));
   }
 
-  .account-payments {
+  .account-overview__metrics [data-balance="true"] strong {
+    font-size: var(--gm-font-xl);
+  }
+
+  .account-payment-desk {
+    background: var(--gm-surface-soft);
+    border: 1px solid var(--gm-border);
+    border-radius: 12px;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .account-payment-desk__heading {
+    align-items: end;
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+  }
+
+  .account-payment-desk__heading > span {
+    display: grid;
+    gap: 2px;
+  }
+
+  .account-payment-desk__heading small,
+  .account-payment-desk__notice {
+    color: var(--gm-muted);
+    font-size: var(--gm-font-xs);
+  }
+
+  .account-payment-desk__heading > small {
+    max-width: 34ch;
+    text-align: right;
+  }
+
+  .account-payment-desk__heading strong {
+    color: var(--gm-ink);
+    font-family: var(--gm-display);
+    font-size: var(--gm-font-xl);
+  }
+
+  .account-payment-desk :is(label, .cashier-payment-form__reference) {
+    align-items: stretch;
+    display: grid;
+    gap: 6px;
+  }
+
+  .account-payment-desk :is(input, select, .gm-button) {
+    min-height: 44px;
+  }
+
+  .account-payment-desk .cashier-payment-form__fields > label {
+    align-items: start;
+    display: grid;
+    gap: 6px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .account-payment-desk .cashier-payment-form__fields {
+    border: 0;
+    display: grid;
+    gap: 0.45rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .account-payment-desk .cash-change-field {
+    align-items: end;
+    display: grid;
+    gap: 6px 10px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .account-payment-desk .cash-change-field > input {
+    flex: none;
+    height: 44px;
+    min-height: 44px;
+    width: 100%;
+  }
+
+  .account-payment-desk .cash-change-field > :is(span, strong) {
+    flex: none;
+  }
+
+  .account-payment-reference {
+    border-top: 1px solid var(--gm-border);
+    display: grid;
+    gap: 8px;
+    padding-top: 10px;
+  }
+
+  .account-payment-reference > summary {
+    cursor: pointer;
+    font-size: var(--gm-font-xs);
+    font-weight: 700;
+  }
+
+  .account-payment-reference > small,
+  .account-payment-desk .gm-callout p {
+    color: var(--gm-muted);
+    font-size: var(--gm-font-xs);
+    margin: 0;
+  }
+
+  .account-payment-desk .gm-callout a {
+    color: inherit;
+    font-weight: 800;
+  }
+
+  .account-print-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .account-print-disclosure .print-split-form {
+    border-inline: 0;
+    border-radius: 0;
+  }
+
+  .account-items-disclosure .account-lines,
+  .account-items-disclosure .account-payments {
+    margin: 10px;
+  }
+
+  .account-disclosure {
+    background: var(--gm-surface);
+    border: 1px solid var(--gm-border);
+    border-radius: 10px;
+  }
+
+  .account-disclosure > summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-size: var(--gm-font-sm);
+    font-weight: 750;
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+
+  .account-disclosure[open] > summary {
+    border-bottom: 1px solid var(--gm-border);
+  }
+
+  .account-disclosure > form,
+  .account-charge-grid {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .account-charge-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-charge-grid > form {
+    display: grid;
+    gap: 8px;
+  }
+
+  .account-disclosure :is(input, select, .gm-button) {
+    min-height: 44px;
+  }
+
+  .tab-workspace.attendance-cockpit .search-field {
+    background: var(--gm-surface);
+    color: var(--gm-ink);
+  }
+
+  .account-items-disclosure .account-payments {
     border: 1px solid var(--gm-border);
     border-radius: 10px;
     display: grid;
@@ -1380,6 +1551,21 @@
     padding: 0;
   }
 
+  .ops-actions--account {
+    border: 0;
+  }
+
+  .ops-actions__title {
+    display: block;
+    font-size: var(--gm-font-sm);
+    padding: 10px 12px;
+  }
+
+  .ops-actions--account .action-grid {
+    grid-template-columns: 1fr;
+    padding: 0;
+  }
+
   .ops-actions > summary {
     cursor: pointer;
     font-size: 0.72rem;
@@ -1413,7 +1599,7 @@
     min-height: 36px;
   }
 
-  .cash-change-field {
+  .account-payment-desk .cash-change-field {
     background: var(--gm-paper);
     border: 1px solid var(--gm-border);
     border-radius: 8px;
@@ -1427,53 +1613,31 @@
     font-size: 0.72rem;
   }
 
-  .cashier-payment-form__shortcuts,
-  .cashier-payment-form__fields {
-    border: 0;
-    display: grid;
-    gap: 0.45rem;
-    grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
-    margin: 0;
-    min-width: 0;
-    padding: 0;
-  }
-
-  .cashier-payment-form__full,
-  .cashier-payment-form__submit {
+  .account-payment-desk .cashier-payment-form__submit {
     grid-column: 1 / -1;
   }
 
-  .cashier-payment-form__full {
-    justify-content: center;
-  }
-
-  .cashier-payment-form__shortcuts .gm-button {
-    justify-content: center;
-    min-width: 0;
-    padding-inline: 0.6rem;
-  }
-
-  .cashier-payment-form__fields > label,
-  .cashier-payment-form__reference {
+  .account-payment-desk .cashier-payment-form__fields > label,
+  .account-payment-desk .cashier-payment-form__reference {
     min-width: 0;
   }
 
-  .cash-change-field {
+  .real-product-option__favorite .gm-icon--filled,
+  .quick-order-strip__favorite {
+    fill: currentColor;
+  }
+
+  .quick-order-strip__favorite {
+    margin-right: 4px;
+    vertical-align: -2px;
+  }
+
+  .cart-preview__allergy {
     align-items: center;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-  }
-
-  .cash-change-field > span,
-  .cash-change-field > strong {
-    flex: 1 1 7rem;
-  }
-
-  .cash-change-field > input {
-    flex: 2 1 9rem;
-    min-width: 0;
-    width: auto;
+    color: var(--gm-danger);
+    display: inline-flex;
+    gap: 3px;
+    margin-left: 4px;
   }
 
   .approval-form {
@@ -1497,13 +1661,22 @@
     width: 100%;
   }
 
-  .service-action-dock {
+  .tab-workspace.attendance-cockpit .service-action-dock {
+    background: var(--gm-surface);
+    border: 1px solid var(--gm-border);
     border-radius: 10px;
+    bottom: 8px;
+    position: sticky;
+    z-index: 13;
+  }
+
+  .tab-workspace.attendance-cockpit .service-action-dock .gm-button {
+    min-height: 44px;
   }
 
   .tab-workspace.attendance-cockpit .workspace-tabs--primary > button[aria-current="page"] {
-    background: var(--gm-brand);
-    color: white;
+    background: var(--gm-action);
+    color: var(--gm-on-action);
   }
 
   .workspace-tabs--primary > button[aria-current="page"] .gm-badge {
@@ -1652,33 +1825,8 @@
       display: block;
     }
 
-    .counter-ops-panel--active {
-      background: var(--gm-surface);
-      inset: 0;
-      overflow: auto;
-      padding: 10px;
-      position: fixed;
-      z-index: 50;
-    }
-
     .counter-ops-panel--active .attendance-cockpit {
       min-height: calc(100dvh - 62px);
-    }
-
-    .counter-workspace-close {
-      align-items: center;
-      background: var(--gm-paper);
-      border: 1px solid var(--gm-border);
-      border-radius: 6px;
-      color: var(--gm-brand);
-      cursor: pointer;
-      display: inline-flex;
-      font: inherit;
-      font-size: 0.72rem;
-      font-weight: 800;
-      margin-bottom: 8px;
-      min-height: 36px;
-      padding: 6px 10px;
     }
   }
 
@@ -1772,10 +1920,6 @@
 
     .counter-operation .ops-tab-list .data-row {
       min-height: 76px;
-    }
-
-    .counter-ops-panel--active {
-      padding: 8px;
     }
 
     .tab-workspace.attendance-cockpit {
@@ -1944,16 +2088,30 @@
 
     .account-overview__metrics {
       gap: 6px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .account-overview__metrics > span {
-      align-items: center;
-      display: flex;
-      justify-content: space-between;
+      align-items: start;
+      display: grid;
+      gap: 2px;
+      justify-content: initial;
       padding: 8px 10px;
     }
 
-    .service-action-dock {
+    .account-overview__metrics > [data-balance="true"] {
+      grid-column: 1 / -1;
+    }
+
+    .account-payment-desk__heading {
+      align-items: start;
+    }
+
+    .account-payment-desk__heading strong {
+      font-size: var(--gm-font-lg);
+    }
+
+    .tab-workspace.attendance-cockpit .service-action-dock {
       bottom: 0;
     }
 
@@ -1980,6 +2138,86 @@
       scroll-behavior: auto;
       transition-duration: 0.01ms;
     }
+  }
+}
+
+.counter-operation .counter-ops-panel--active {
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+  display: block;
+  max-height: calc(100dvh - 200px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  position: sticky;
+  scrollbar-gutter: stable;
+  top: 80px;
+}
+
+.counter-ops-panel--active .counter-workspace-close {
+  background: var(--gm-surface);
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+  min-height: 44px;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 30;
+}
+
+.counter-ops-panel--active .attendance-cockpit .workspace-tabs--primary {
+  top: 52px;
+}
+
+.counter-operation--selected .counter-open-form > .gm-button {
+  grid-column: 1 / -1;
+  grid-row: auto;
+}
+
+@container counter-operation (max-width: 930px) {
+  .counter-operation .counter-ops-panel--active {
+    border: 0;
+    border-radius: 0;
+    inset: 0;
+    max-height: 100dvh;
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    position: fixed;
+    z-index: 50;
+  }
+}
+
+/* Must remain outside @layer legacy: the UI input utilities and Salon modal rules are unlayered. */
+.tab-workspace.attendance-cockpit .account-payment-desk :is(input, select) {
+  height: 44px;
+  min-height: 44px;
+}
+
+.tab-workspace.attendance-cockpit .account-payment-desk .cashier-payment-form__fields > label {
+  align-items: start;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tab-workspace.attendance-cockpit .account-payment-desk .cash-change-field {
+  align-items: end;
+  display: grid;
+  gap: 6px 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+}
+
+.tab-workspace.attendance-cockpit .account-payment-desk .cash-change-field > input {
+  flex: none;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .tab-workspace.attendance-cockpit .account-payment-desk .cash-change-field {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

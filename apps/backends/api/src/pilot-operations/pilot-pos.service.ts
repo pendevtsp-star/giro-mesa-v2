@@ -29,6 +29,7 @@ import {
   managementInventoryReservations,
   managementOperationalLosses,
   managementPeople,
+  managementProductReturnables,
   managementRecipeComponents,
   managementRecipeVersions,
   managementReturnableCustodyHandoffs,
@@ -121,7 +122,21 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import * as argon2 from "argon2";
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { tablePresenceCode } from "../common/table-presence-code.js";
 import { DatabaseService } from "../database/database.module.js";
@@ -8633,6 +8648,27 @@ export class PilotPosService {
           isNull(outboxEvents.processedAt),
           sql`${outboxEvents.payload} ->> 'organizationId' = ${organizationId}`,
           sql`${outboxEvents.payload} ->> 'unitId' = ${unitId}`,
+          // Include inactive links: an in-flight worker may already have read them as active.
+          exists(
+            tx
+              .select({ id: posOrderItems.id })
+              .from(posOrderItems)
+              .innerJoin(
+                managementProductReturnables,
+                and(
+                  eq(managementProductReturnables.organizationId, posOrderItems.organizationId),
+                  eq(managementProductReturnables.unitId, posOrderItems.unitId),
+                  eq(managementProductReturnables.productId, posOrderItems.productId),
+                ),
+              )
+              .where(
+                and(
+                  eq(posOrderItems.organizationId, organizationId),
+                  eq(posOrderItems.unitId, unitId),
+                  sql`${posOrderItems.orderId}::text = ${outboxEvents.payload} ->> 'orderId'`,
+                ),
+              ),
+          ),
         ),
       );
     const containers = new Map<

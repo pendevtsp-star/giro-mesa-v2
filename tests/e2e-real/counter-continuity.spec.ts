@@ -231,6 +231,93 @@ test("retoma após timeout e recarga com a mesma idempotência", async ({ page }
   expect(calls.sendKeys).toHaveLength(1);
 });
 
+async function expectNoHorizontalOverflow(page: Page) {
+  const dimensions = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+  }));
+  expect(dimensions.document, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.viewport);
+}
+
+test("retorna a fila preservando rascunho, filtros, foco e tema", async ({ page }) => {
+  test.setTimeout(60_000);
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "timeout-once", calls);
+  await page.goto(`/#/counter?stage=new&channel=pickup&query=coffee&tab=${tab.id}`);
+  await page.getByRole("button", { name: "Abrir opera\u00e7\u00e3o" }).click();
+
+  const panel = page.locator("#counter-order-panel");
+  await expect(panel).toBeVisible();
+  await page.getByRole("button", { name: "Adicionar Caf\u00e9 Continuidade", exact: true }).click();
+  const draft = page.getByRole("complementary", { name: "Rascunho do pedido" });
+  await expect(draft).toContainText("Caf\u00e9 Continuidade");
+  await expect(page.getByRole("button", { name: /Enviar 1 item/ })).toBeVisible();
+  expect(calls.createKeys).toHaveLength(0);
+  expect(calls.sendKeys).toHaveLength(0);
+
+  const viewports = [
+    { width: 360, height: 760 },
+    { width: 375, height: 812 },
+    { width: 768, height: 1024 },
+    { width: 1440, height: 900 },
+  ];
+  for (const theme of ["light", "dark"] as const) {
+    await page.evaluate((nextTheme) => {
+      document.documentElement.dataset.theme = nextTheme;
+    }, theme);
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await expectNoHorizontalOverflow(page);
+      const close = page.getByRole("button", { name: "Voltar para a fila", exact: true });
+      const closeBounds = await panel.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+        const closeButton = element.querySelector<HTMLElement>(".counter-workspace-close");
+        const rect = closeButton?.getBoundingClientRect();
+        return {
+          bottom: rect?.bottom ?? 0,
+          height: rect?.height ?? 0,
+          top: rect?.top ?? 0,
+          viewport: window.innerHeight,
+        };
+      });
+      await expect(close).toBeVisible();
+      expect(closeBounds.height).toBeGreaterThan(0);
+      expect(closeBounds.top).toBeGreaterThanOrEqual(-1);
+      expect(closeBounds.bottom).toBeLessThanOrEqual(closeBounds.viewport + 1);
+      await close.click();
+      await expect(panel).toHaveCount(0);
+      await expect(page).toHaveURL(/#\/counter\?stage=new&channel=pickup&query=coffee$/);
+
+      const reopen = page.getByRole("button", { name: "Ver pedido", exact: true });
+      await expect(reopen).toBeVisible();
+      await reopen.click();
+      await expect(panel).toBeVisible();
+      await expect(draft).toContainText("Caf\u00e9 Continuidade");
+      await expect(page).toHaveURL(
+        /#\/counter\?stage=new&channel=pickup&query=coffee&tab=tab-counter$/,
+      );
+    }
+  }
+
+  const more = panel.locator(".workspace-tabs__more");
+  await more.locator("summary").click();
+  await expect(more).toHaveAttribute("open", "");
+  await page.keyboard.press("Escape");
+  await expect(more).not.toHaveAttribute("open", "");
+  await expect(panel).toBeVisible();
+  await expect(page).toHaveURL(
+    /#\/counter\?stage=new&channel=pickup&query=coffee&tab=tab-counter$/,
+  );
+
+  const returnFocus = page.getByRole("button", { name: "Ver pedido", exact: true });
+  await page.keyboard.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/counter\?stage=new&channel=pickup&query=coffee$/);
+  await expect(returnFocus).toBeFocused();
+  expect(calls.createKeys).toHaveLength(0);
+  expect(calls.sendKeys).toHaveLength(0);
+});
+
 test("libera o rascunho quando a API rejeita a criação definitivamente", async ({ page }) => {
   const calls: CounterCalls = { createKeys: [], sendKeys: [] };
   await mockCounterApi(page, "permanent", calls);

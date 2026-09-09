@@ -22,6 +22,7 @@ export type IconName =
   | "plus"
   | "minus"
   | "search"
+  | "star"
   | "refresh"
   | "chevron-right"
   | "clock"
@@ -41,6 +42,7 @@ export type IconName =
   | "chevron-down";
 
 const ICON_PATHS: Record<IconName, ReactNode> = {
+  star: <path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" />,
   menu: (
     <>
       <line x1="3" y1="12" x2="21" y2="12" />

@@ -3,12 +3,13 @@ import {
   Button,
   Card,
   EmptyState,
+  Icon,
   Input,
   Label,
   NativeSelect,
   SearchField,
 } from "@giromesa/ui";
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../api";
 import { type Customer, parseCustomerPage } from "../../growth.shared";
 import { pilotMutation } from "../../operational-dispatch";
@@ -61,14 +62,27 @@ const counterStageOrder: CounterQueueStage[] = [
 ];
 
 export const COUNTER_PRESETS = [
-  { id: "pickup", label: "🛍️ Retirada", fulfillment: "pickup" as const, defaultMinutes: 20 },
+  {
+    id: "pickup",
+    label: "Retirada",
+    icon: "purchases",
+    fulfillment: "pickup" as const,
+    defaultMinutes: 20,
+  },
   {
     id: "dine_in",
-    label: "☕ Balcão Local",
+    label: "Balcão local",
+    icon: "counter",
     fulfillment: "dine_in" as const,
     defaultMinutes: null,
   },
-  { id: "delivery", label: "🛵 Delivery", fulfillment: "delivery" as const, defaultMinutes: 45 },
+  {
+    id: "delivery",
+    label: "Delivery",
+    icon: "delivery",
+    fulfillment: "delivery" as const,
+    defaultMinutes: 45,
+  },
 ] as const;
 
 export const PROMISED_MINUTES_PRESETS = [15, 30, 45, 60] as const;
@@ -175,6 +189,30 @@ export function RealCounterPage({
   const [selected, setSelected] = useState<string | null>(() =>
     typeof window === "undefined" ? null : counterTabIdFromHash(window.location.hash),
   );
+  const panelRef = useRef<HTMLElement>(null);
+  const overviewRef = useRef<HTMLElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const queueScrollRef = useRef({ x: 0, y: 0 });
+  const restoringOverviewRef = useRef(false);
+
+  function selectTab(tabId: string | null, trigger?: HTMLElement) {
+    if (tabId) {
+      returnFocusRef.current = trigger ?? null;
+      queueScrollRef.current = { x: window.scrollX, y: window.scrollY };
+    } else {
+      restoringOverviewRef.current = true;
+    }
+    const url = new URL(window.location.href);
+    const [route = "#/counter", query = ""] = url.hash.split("?");
+    const params = new URLSearchParams(query);
+    if (tabId) params.set("tab", tabId);
+    else params.delete("tab");
+    url.hash = params.size ? `${route}?${params}` : route;
+    window.history.replaceState(window.history.state, "", url);
+    setSelected(tabId);
+  }
+
   const [label, setLabel] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [debouncedCustomerSearch, setDebouncedCustomerSearch] = useState("");
@@ -214,7 +252,7 @@ export function RealCounterPage({
   useEffect(() => {
     const syncSelectedTab = () => {
       const tabId = counterTabIdFromHash(window.location.hash);
-      if (tabId) setSelected(tabId);
+      setSelected(tabId);
     };
     window.addEventListener("hashchange", syncSelectedTab);
     return () => window.removeEventListener("hashchange", syncSelectedTab);
@@ -237,6 +275,18 @@ export function RealCounterPage({
     () => scope.load("floor", undefined, () => api.pilot.floor(scope.organizationId, scope.unitId)),
     parsePilotFloor,
   );
+  useEffect(() => {
+    if (queue.state.status !== "ready") return;
+    if (selected) {
+      panelRef.current?.scrollTo({ top: 0 });
+      closeButtonRef.current?.focus();
+    } else if (restoringOverviewRef.current) {
+      restoringOverviewRef.current = false;
+      const trigger = returnFocusRef.current;
+      (trigger?.isConnected ? trigger : overviewRef.current)?.focus({ preventScroll: true });
+      window.scrollTo(queueScrollRef.current.x, queueScrollRef.current.y);
+    }
+  }, [selected, queue.state.status]);
   const customers = useRemote(
     scope,
     () =>
@@ -294,7 +344,7 @@ export function RealCounterPage({
               ),
             );
             const tab = parseTab(record(value.tab));
-            setSelected(tab.id);
+            selectTab(tab.id);
             setLabel("");
             setCustomerSearch("");
             setSelectedCustomerId(null);
@@ -340,7 +390,12 @@ export function RealCounterPage({
             <div
               className={`ops-layout counter-operation ${selected ? "counter-operation--selected" : "counter-operation--idle"} ${embedded ? "counter-page--embedded" : ""}`}
             >
-              <section className="ops-board">
+              <section
+                aria-label="Visão geral do balcão"
+                className="ops-board"
+                ref={overviewRef}
+                tabIndex={-1}
+              >
                 <Card className="counter-quick-open-card">
                   <div className="counter-quick-open-header">
                     <div>
@@ -361,6 +416,7 @@ export function RealCounterPage({
                           type="button"
                           variant={fulfillmentType === preset.fulfillment ? "primary" : "secondary"}
                         >
+                          <Icon name={preset.icon} size={16} />
                           {preset.label}
                         </Button>
                       ))}
@@ -417,8 +473,7 @@ export function RealCounterPage({
                           </datalist>
                           {selectedCustomer ? (
                             <small role="status">
-                              Cadastro vinculado ao CRM. Nome e telefone serão preservados como
-                              snapshot desta comanda.
+                              Cliente vinculado. Nome e telefone ficam registrados nesta comanda.
                             </small>
                           ) : customerOptions.length === 0 ? (
                             <small>Nenhum cliente cadastrado. Preencha os dados manualmente.</small>
@@ -613,7 +668,7 @@ export function RealCounterPage({
                     </div>
                   )}
                   <div className="counter-metric-pill counter-metric-pill--total">
-                    <span>Total estimado</span>
+                    <span>Valor dos pedidos nesta página</span>
                     <strong>
                       {formatMoney(
                         counterQueue.items.reduce((sum, item) => sum + item.totalCents, 0),
@@ -724,8 +779,10 @@ export function RealCounterPage({
                         key={tab.id}
                       >
                         <button
+                          aria-controls={selected === tab.id ? "counter-order-panel" : undefined}
+                          aria-expanded={selected === tab.id}
                           className="counter-queue-card__select-btn"
-                          onClick={() => setSelected(tab.id)}
+                          onClick={(event) => selectTab(tab.id, event.currentTarget)}
                           type="button"
                         >
                           <div className="counter-queue-card__top">
@@ -776,7 +833,8 @@ export function RealCounterPage({
                                 <span
                                   className={`counter-sla-tag ${stage === "late" ? "counter-sla-tag--late" : ""}`}
                                 >
-                                  {stage === "late" ? "⚠️ Atrasado · " : "Prazo: "}
+                                  {stage === "late" && <Icon name="alert-circle" size={14} />}
+                                  {stage === "late" ? "Atrasado · " : "Prazo: "}
                                   {new Date(tab.promisedAt).toLocaleTimeString("pt-BR", {
                                     hour: "2-digit",
                                     minute: "2-digit",
@@ -795,11 +853,13 @@ export function RealCounterPage({
                               rel="noopener noreferrer"
                               target="_blank"
                             >
-                              💬 Avisar no WhatsApp
+                              <Icon name="crm" size={16} /> Avisar no WhatsApp
                             </a>
                           )}
                           <Button
-                            onClick={() => setSelected(tab.id)}
+                            aria-controls={selected === tab.id ? "counter-order-panel" : undefined}
+                            aria-expanded={selected === tab.id}
+                            onClick={(event) => selectTab(tab.id, event.currentTarget)}
                             size="sm"
                             type="button"
                             variant={selected === tab.id ? "primary" : "secondary"}
@@ -871,14 +931,32 @@ export function RealCounterPage({
                 )}
               </section>
               {selected && (
-                <aside className="ops-panel counter-ops-panel--active">
+                <aside
+                  aria-label="Pedido do balcão"
+                  className="ops-panel counter-ops-panel--active"
+                  id="counter-order-panel"
+                  ref={panelRef}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Escape" || event.defaultPrevented) return;
+                    const target = event.target as HTMLElement;
+                    if (
+                      target.closest("input, textarea, select") ||
+                      document.querySelector("dialog[open]") ||
+                      panelRef.current?.querySelector(".workspace-tabs__more[open]")
+                    )
+                      return;
+                    event.stopPropagation();
+                    selectTab(null);
+                  }}
+                >
                   <Button
                     className="counter-workspace-close"
-                    onClick={() => setSelected(null)}
+                    onClick={() => selectTab(null)}
+                    ref={closeButtonRef}
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                   >
-                    ← Voltar para a fila
+                    <Icon name="x" size={16} /> Voltar para a fila
                   </Button>
                   <TabWorkspace
                     key={selected}

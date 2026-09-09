@@ -4,6 +4,7 @@ import {
   Button,
   Callout,
   Card,
+  Icon,
   Input,
   Label,
   Modal,
@@ -39,6 +40,7 @@ import {
   summarizeTabPayments,
   useRemote,
 } from "../../operations.shared";
+import { routeHref } from "../../router";
 import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
 import { currentTerminalPrinterId, readActiveTerminalProfile } from "../shell/terminal-profile";
@@ -105,6 +107,7 @@ type PrintJob = {
 export type WorkspaceView = "order" | "account" | "table" | "activity";
 type PrintMode = "account" | "payments" | "final";
 type CloseTabBody = Parameters<typeof api.pilot.closeTab>[3];
+type AccountPaymentMode = "full" | "per_person" | "custom";
 
 type PendingOrderSubmissionScope = {
   organizationId: string;
@@ -805,9 +808,14 @@ export function TabWorkspace({
   const [moveTargetTabId, setMoveTargetTabId] = useState("");
   const [moveItemId, setMoveItemId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<ManualPaymentMethod>("cash");
-  const [paymentReais, setPaymentReais] = useState(0);
-  const [cashReceivedReais, setCashReceivedReais] = useState(0);
+  const [paymentMode, setPaymentMode] = useState<AccountPaymentMode>("full");
+  const [perPersonCount, setPerPersonCount] = useState(2);
+  const [paymentReais, setPaymentReais] = useState<number | null | undefined>(undefined);
+  const [cashReceivedReais, setCashReceivedReais] = useState<number | null | undefined>(undefined);
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const [balanceRefreshRequired, setBalanceRefreshRequired] = useState(false);
+  const balanceRevisionRef = useRef(0);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [readyNotificationConsent, setReadyNotificationConsent] = useState(false);
@@ -839,7 +847,6 @@ export function TabWorkspace({
   const metadataVersionRef = useRef(0);
   const moreMenuRef = useRef<HTMLDetailsElement>(null);
   const productSearchRef = useRef<HTMLInputElement>(null);
-  const paymentAmountRef = useRef<HTMLInputElement>(null);
   const deliveryIdempotencyKeysRef = useRef(new Map<string, string>());
   const terminalProfile = readActiveTerminalProfile(scope.unitId);
   const terminalPaymentMode =
@@ -1254,7 +1261,14 @@ export function TabWorkspace({
 
   useEffect(() => {
     const refresh = () => {
-      if (document.visibilityState === "visible" && navigator.onLine) detail.refreshSilently();
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        const balanceRevision = balanceRevisionRef.current;
+        void detail.refreshSilently().then((updated) => {
+          if (updated && balanceRevision === balanceRevisionRef.current) {
+            setBalanceRefreshRequired(false);
+          }
+        });
+      }
     };
     const interval = window.setInterval(refresh, 8_000);
     return () => window.clearInterval(interval);
@@ -1289,18 +1303,29 @@ export function TabWorkspace({
     action: () => Promise<T>,
     success: string | ((result: T) => string),
     onSuccess?: (result: T) => void,
+    onError?: (error: unknown) => void,
   ) {
     setBusy(true);
     setFeedback("");
     try {
       const result = await action();
       onSuccess?.(result);
-      setFeedback(typeof success === "function" ? success(result) : success);
-      detail.retry();
-      tabs.retry();
+      balanceRevisionRef.current += 1;
+      setBalanceRefreshRequired(true);
+      const detailUpdated = await detail.refresh();
+      void tabs.refresh();
       onChanged();
+      if (!detailUpdated) {
+        setFeedback(
+          "A ação foi registrada, mas o saldo ainda não foi atualizado. Aguarde a sincronização antes de receber.",
+        );
+        return true;
+      }
+      setBalanceRefreshRequired(false);
+      setFeedback(typeof success === "function" ? success(result) : success);
       return true;
     } catch (error) {
+      onError?.(error);
       setFeedback(
         error instanceof Error ? error.message : "A ação não foi confirmada pelo servidor.",
       );
@@ -1443,6 +1468,45 @@ export function TabWorkspace({
             const paymentSummary = summarizeTabPayments(data.payments);
             const paidCents = paymentSummary.paidCents;
             const remainingCents = Math.max(0, data.tab.totalCents - paidCents);
+            const safePerPersonCount =
+              Number.isInteger(perPersonCount) && perPersonCount >= 2 && perPersonCount <= 50
+                ? perPersonCount
+                : 2;
+            const suggestedPaymentCents =
+              paymentMode === "full"
+                ? remainingCents
+                : paymentMode === "per_person"
+                  ? Math.round(remainingCents / safePerPersonCount)
+                  : null;
+            const defaultPaymentReais =
+              paymentReais === undefined
+                ? suggestedPaymentCents === null
+                  ? null
+                  : suggestedPaymentCents / 100
+                : paymentReais;
+            const defaultCashReceivedReais =
+              cashReceivedReais === undefined ? defaultPaymentReais : cashReceivedReais;
+            const paymentAmountCents =
+              defaultPaymentReais === null || !Number.isFinite(defaultPaymentReais)
+                ? null
+                : Math.round(defaultPaymentReais * 100);
+            const cashReceivedCents =
+              defaultCashReceivedReais === null || !Number.isFinite(defaultCashReceivedReais)
+                ? null
+                : Math.round(defaultCashReceivedReais * 100);
+            const manualPaymentReady =
+              !balanceRefreshRequired &&
+              paymentAmountCents !== null &&
+              Number.isSafeInteger(paymentAmountCents) &&
+              paymentAmountCents > 0 &&
+              paymentAmountCents <= remainingCents &&
+              (paymentMethod !== "cash" ||
+                (cashReceivedCents !== null &&
+                  Number.isSafeInteger(cashReceivedCents) &&
+                  cashReceivedCents >= paymentAmountCents));
+            const printAttention = printJobs.find(
+              (job) => job.status === "failed" || job.status === "confirmation_required",
+            );
             const closesWithoutConsumption = canCloseWithoutConsumption(
               data.tab.totalCents,
               paidCents,
@@ -1836,16 +1900,106 @@ export function TabWorkspace({
 
             function prepareFullCashierPayment() {
               setView("account");
-              const remainingReais = remainingCents / 100;
-              setPaymentReais(remainingReais);
-              if (paymentMethod === "cash") setCashReceivedReais(remainingReais);
-              window.requestAnimationFrame(() => {
-                paymentAmountRef.current?.scrollIntoView({ block: "center" });
-                paymentAmountRef.current?.focus();
+              setPaymentMode("full");
+              setPaymentReais(undefined);
+              setCashReceivedReais(undefined);
+            }
+
+            function submitManualPayment(event: FormEvent<HTMLFormElement>) {
+              event.preventDefault();
+              setPaymentError("");
+              if (busy) {
+                return;
+              }
+              if (balanceRefreshRequired) {
+                setPaymentError(
+                  "Aguarde a atualização do saldo antes de confirmar outro pagamento.",
+                );
+                return;
+              }
+              if (defaultPaymentReais === null || !Number.isFinite(defaultPaymentReais)) {
+                setPaymentError("Informe um valor válido antes de confirmar o pagamento.");
+                return;
+              }
+              const amountCents = Math.round(defaultPaymentReais * 100);
+              const cashReceivedCents =
+                defaultCashReceivedReais === null || !Number.isFinite(defaultCashReceivedReais)
+                  ? null
+                  : Math.round(defaultCashReceivedReais * 100);
+              if (
+                !Number.isSafeInteger(amountCents) ||
+                amountCents <= 0 ||
+                amountCents > remainingCents ||
+                (paymentMethod === "cash" &&
+                  (cashReceivedCents === null ||
+                    !Number.isSafeInteger(cashReceivedCents) ||
+                    cashReceivedCents < amountCents))
+              ) {
+                setPaymentError("Confira o valor recebido antes de confirmar o pagamento.");
+                return;
+              }
+              const changeCents =
+                paymentMethod === "cash" && cashReceivedCents !== null
+                  ? Math.max(0, cashReceivedCents - amountCents)
+                  : 0;
+              const reference =
+                paymentReference.trim() ||
+                (paymentMethod === "cash"
+                  ? `Recebido ${formatMoney(cashReceivedCents ?? 0)}; troco ${formatMoney(changeCents)}`
+                  : undefined);
+              const installationId =
+                readActiveTerminalProfile(scope.unitId)?.installationId ?? undefined;
+              void mutate(
+                () =>
+                  scope.dispatch(
+                    "pos.payment.record_requested",
+                    pilotMutation("record-payment", {
+                      tabId,
+                      body: { method: paymentMethod, amountCents, reference, installationId },
+                    }),
+                    (key) =>
+                      api.pilot.recordPayment(
+                        scope.organizationId,
+                        scope.unitId,
+                        tabId,
+                        { method: paymentMethod, amountCents, reference, installationId },
+                        key,
+                      ),
+                  ),
+                manualPaymentSuccessMessage(
+                  paymentMethod,
+                  amountCents,
+                  remainingCents,
+                  changeCents,
+                ),
+                undefined,
+                (error) =>
+                  setPaymentError(
+                    error instanceof ApiClientError && error.code === "CASH_SHIFT_REQUIRED"
+                      ? "Abra o caixa desta unidade em Contas e caixa antes de registrar dinheiro."
+                      : error instanceof ApiClientError && error.code === "CASH_REGISTER_REQUIRED"
+                        ? "Selecione uma gaveta aberta antes de registrar dinheiro."
+                        : error instanceof ApiClientError &&
+                            error.code === "CASH_REGISTER_BINDING_REQUIRED"
+                          ? "Vincule este terminal a uma gaveta aberta antes de registrar dinheiro."
+                          : error instanceof Error
+                            ? error.message
+                            : "O pagamento não foi registrado. Confira os dados e tente novamente.",
+                  ),
+              ).then((saved) => {
+                if (!saved) return;
+                setPaymentMode("full");
+                setPaymentReais(undefined);
+                setPaymentReference("");
+                setCashReceivedReais(undefined);
               });
             }
 
             function openReceive() {
+              if (balanceRefreshRequired) {
+                setFeedback("Aguarde a atualização do saldo antes de abrir outro pagamento.");
+                return;
+              }
               if (integratedPaymentEnabled) {
                 setView("account");
                 setSmartPosOpen(true);
@@ -2260,7 +2414,7 @@ export function TabWorkspace({
                   >
                     <summary>
                       {view === "table" ? "Detalhes" : view === "activity" ? "Histórico" : "Mais"}
-                      <span aria-hidden="true">⌄</span>
+                      <Icon aria-hidden="true" name="chevron-down" size={14} />
                     </summary>
                     <div className="workspace-tabs__menu">
                       <Button
@@ -2307,26 +2461,6 @@ export function TabWorkspace({
                     </div>
                   </details>
                 </nav>
-                {tabOpen && closesWithoutConsumption && (
-                  <div className="account-close-actions">
-                    <Button
-                      disabled={busy}
-                      onClick={() =>
-                        window.confirm(
-                          `Fechar ${displayLabel} sem consumo? A mesa seguirá para limpeza.`,
-                        ) &&
-                        void mutate(
-                          () => closeTabWithReturnableCheck({ printRequested: false }),
-                          "Atendimento encerrado.",
-                        )
-                      }
-                      size="sm"
-                      variant="danger"
-                    >
-                      {data.tab.tableId ? "Encerrar Mesa" : "Encerrar sem consumo"}
-                    </Button>
-                  </div>
-                )}
                 {feedback && (
                   <Toast
                     actionLabel={undoResponsibility ? "Desfazer" : undefined}
@@ -2763,7 +2897,13 @@ export function TabWorkspace({
                               }
                               type="button"
                             >
-                              {favoriteProductIds.includes(item.id) ? "★ " : ""}
+                              {favoriteProductIds.includes(item.id) && (
+                                <Icon
+                                  className="quick-order-strip__favorite"
+                                  name="star"
+                                  size={14}
+                                />
+                              )}
                               {item.name}
                             </Button>
                           ))}
@@ -2771,7 +2911,7 @@ export function TabWorkspace({
                       </section>
                     )}
                     <Label className="search-field real-product-search">
-                      <span aria-hidden="true">⌕</span>
+                      <Icon aria-hidden="true" name="search" size={16} />
                       <Input
                         ref={productSearchRef}
                         onChange={(event) => setProductSearch(event.target.value)}
@@ -2887,7 +3027,13 @@ export function TabWorkspace({
                             }
                             type="button"
                           >
-                            {favoriteProductIds.includes(item.id) ? "★" : "☆"}
+                            <Icon
+                              className={
+                                favoriteProductIds.includes(item.id) ? "gm-icon--filled" : ""
+                              }
+                              name="star"
+                              size={18}
+                            />
                           </Button>
                         </article>
                       ))}
@@ -3162,7 +3308,12 @@ export function TabWorkspace({
                                 ? `${item.doseClubSnapshot.doseMl} ml · pré-pago · limite ${item.doseClubSnapshot.availableDoses}`
                                 : item.notes || "Sem observação"}
                               {item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""}
-                              {item.allergyNote ? ` · ⚠ ${item.allergyNote}` : ""}
+                              {item.allergyNote && (
+                                <span className="cart-preview__allergy">
+                                  <Icon name="alert-circle" size={13} />
+                                  <b>Alergia:</b> {item.allergyNote}
+                                </span>
+                              )}
                             </small>
                             <b>
                               {item.doseClub
@@ -3354,61 +3505,157 @@ export function TabWorkspace({
                         )}
                       </span>
                       <span data-balance={remainingCents > 0}>
-                        <small>Saldo</small>
+                        <small>Saldo a receber</small>
                         <strong>{formatMoney(remainingCents)}</strong>
                       </span>
                     </div>
+                    {cashierPaymentEnabled && tabOpen && remainingCents > 0 && (
+                      <form
+                        className="cashier-payment-form account-payment-desk"
+                        id={`cashier-payment-form-${tabId}`}
+                        onSubmit={submitManualPayment}
+                      >
+                        <div className="account-payment-desk__heading">
+                          <span>
+                            <small>Receber agora</small>
+                            <strong>Receber</strong>
+                          </span>
+                        </div>
+                        <div className="cashier-payment-form__fields">
+                          <Label>
+                            Forma de pagamento
+                            <NativeSelect
+                              onChange={(event) =>
+                                setPaymentMethod(event.target.value as typeof paymentMethod)
+                              }
+                              value={paymentMethod}
+                            >
+                              <option value="cash">Dinheiro</option>
+                              <option value="pix">Pix (registro manual)</option>
+                              <option value="debit_card">Débito (maquininha externa)</option>
+                              <option value="credit_card">Crédito (maquininha externa)</option>
+                              <option value="other">Outro meio de pagamento</option>
+                            </NativeSelect>
+                          </Label>
+                          <Label>
+                            Como receber
+                            <NativeSelect
+                              onChange={(event) => {
+                                const nextMode = event.target.value as AccountPaymentMode;
+                                setPaymentMode(nextMode);
+                                setPaymentReais(nextMode === "custom" ? null : undefined);
+                                setCashReceivedReais(undefined);
+                              }}
+                              value={paymentMode}
+                            >
+                              <option value="full">Conta inteira</option>
+                              <option value="per_person">Por pessoa</option>
+                              <option value="custom">Outro valor</option>
+                            </NativeSelect>
+                          </Label>
+                          {paymentMode === "per_person" && (
+                            <Label>
+                              Dividir o saldo por
+                              <Input
+                                max={50}
+                                min={2}
+                                onChange={(event) => setPerPersonCount(Number(event.target.value))}
+                                step={1}
+                                type="number"
+                                value={safePerPersonCount}
+                              />
+                            </Label>
+                          )}
+                          <Label>
+                            Valor a receber
+                            <Input
+                              min={0.01}
+                              onChange={(event) => {
+                                const next = event.target.value;
+                                if (!next) {
+                                  setPaymentMode("custom");
+                                  setPaymentReais(null);
+                                  setCashReceivedReais(undefined);
+                                  return;
+                                }
+                                setPaymentMode("custom");
+                                setPaymentReais(Number(next));
+                                setCashReceivedReais(undefined);
+                              }}
+                              step="0.01"
+                              type="number"
+                              value={defaultPaymentReais ?? ""}
+                            />
+                            {paymentMode === "per_person" && defaultPaymentReais !== null && (
+                              <small>
+                                Sugestão de {formatMoney(Math.round(defaultPaymentReais * 100))} por
+                                pessoa. Uma pessoa paga este valor; confira o saldo após cada
+                                pagamento.
+                              </small>
+                            )}
+                          </Label>
+                        </div>
+                        {paymentMethod === "cash" && (
+                          <Label className="cash-change-field">
+                            <span>Valor recebido</span>
+                            <Input
+                              min={defaultPaymentReais ?? 0.01}
+                              onChange={(event) =>
+                                setCashReceivedReais(
+                                  event.target.value === "" ? null : Number(event.target.value),
+                                )
+                              }
+                              step="0.01"
+                              type="number"
+                              value={defaultCashReceivedReais ?? ""}
+                            />
+                            <strong>
+                              Troco:{" "}
+                              {formatMoney(
+                                Math.max(0, (cashReceivedCents ?? 0) - (paymentAmountCents ?? 0)),
+                              )}
+                            </strong>
+                          </Label>
+                        )}
+                        {paymentMethod !== "cash" && (
+                          <details className="account-payment-reference">
+                            <summary>Referência e confirmação externa</summary>
+                            <Label>
+                              Referência opcional
+                              <Input
+                                onChange={(event) => setPaymentReference(event.target.value)}
+                                placeholder="Ex.: identificação ou observação"
+                                value={paymentReference}
+                              />
+                            </Label>
+                            <small>Registre somente após a confirmação externa.</small>
+                          </details>
+                        )}
+                        {paymentError && (
+                          <div role="alert">
+                            <Callout tone="danger">
+                              <strong>Pagamento não registrado</strong>
+                              <p>{paymentError}</p>
+                              {(paymentError.startsWith("Abra o caixa") ||
+                                paymentError.includes("gaveta")) && (
+                                <a href={routeHref("cash")}>Abrir Contas e caixa</a>
+                              )}
+                            </Callout>
+                          </div>
+                        )}
+                      </form>
+                    )}
                     <div className="account-overview__actions">
-                      {cashierPaymentEnabled && remainingCents > 0 && (
-                        <Button
-                          disabled={busy || !tabOpen}
-                          onClick={prepareFullCashierPayment}
-                          size="sm"
-                        >
-                          Receber conta inteira · {formatMoney(remainingCents)}
-                        </Button>
-                      )}
                       {integratedPaymentEnabled && (
                         <Button
                           className="smart-pos-trigger"
-                          disabled={!tabOpen || remainingCents <= 0}
+                          disabled={
+                            busy || balanceRefreshRequired || !tabOpen || remainingCents <= 0
+                          }
                           onClick={() => setSmartPosOpen(true)}
                           size="sm"
                         >
                           Cobrar {formatMoney(remainingCents)} na maquininha
-                        </Button>
-                      )}
-                      <Button
-                        disabled={busy || billRequestPending || !tabOpen}
-                        onClick={() => void requestBillAndPrint()}
-                        size="sm"
-                        variant="secondary"
-                      >
-                        {!localPrintingEnabled
-                          ? billCall
-                            ? "Conta já solicitada ao caixa"
-                            : "Pedir conta ao caixa"
-                          : data.tab.tableId && billCall
-                            ? "Reimprimir pré-conta"
-                            : billRequestPending
-                              ? "Solicitando conta…"
-                              : data.tab.tableId
-                                ? "Pedir conta e imprimir"
-                                : "Imprimir pré-conta"}
-                      </Button>
-                      {localPrintingEnabled && data.tab.tableId && !billCall && (
-                        <Button onClick={() => printDocument("account")} size="sm" variant="ghost">
-                          Só imprimir pré-conta
-                        </Button>
-                      )}
-                      {localPrintingEnabled && (
-                        <Button
-                          disabled={data.payments.length === 0}
-                          onClick={() => printDocument("payments")}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Extrato de pagamentos
                         </Button>
                       )}
                     </div>
@@ -3434,326 +3681,367 @@ export function TabWorkspace({
                           </Button>
                         </Callout>
                       )}
-                    <small className="account-print-help">
-                      A pré-conta mostra itens, total, valores pagos e saldo. Não fecha a comanda e
-                      não registra pagamento.
-                    </small>
-                    {localPrintingEnabled && tabOpen && remainingCents > 0 && (
-                      <form className="print-split-form" onSubmit={submitPrintSplit}>
-                        <strong>Imprimir divisão sugerida</strong>
-                        <NativeSelect
-                          aria-label="Forma da divisão impressa"
-                          onChange={(event) =>
-                            setPrintSplitMethod(event.target.value as typeof printSplitMethod)
-                          }
-                          value={printSplitMethod}
-                        >
-                          <option value="equal_people">Dividir igualmente por pessoas</option>
-                          <option value="fixed_amount">Vias por valor fixo</option>
-                        </NativeSelect>
-                        <Label>
-                          Quantidade de vias
-                          <Input
-                            max={50}
-                            min={2}
-                            onChange={(event) => setPrintSplitPartCount(Number(event.target.value))}
-                            type="number"
-                            value={printSplitPartCount}
-                          />
-                        </Label>
-                        {printSplitMethod === "fixed_amount" && (
-                          <Label>
-                            Valor sugerido por via
-                            <Input
-                              min={0.01}
-                              onChange={(event) =>
-                                setPrintSplitFixedReais(Number(event.target.value))
-                              }
-                              step="0.01"
-                              type="number"
-                              value={printSplitFixedReais}
-                            />
-                          </Label>
-                        )}
-                        <Button
-                          disabled={
-                            busy ||
-                            printSplitPartCount < 2 ||
-                            (printSplitMethod === "fixed_amount" && printSplitFixedReais <= 0)
-                          }
-                          size="sm"
-                          type="submit"
-                        >
-                          Criar e imprimir vias
-                        </Button>
-                        <small>Divisão sugerida e persistida; não registra pagamento.</small>
-                      </form>
+                    {printAttention && (
+                      <Callout tone={printAttention.status === "failed" ? "danger" : "warning"}>
+                        <strong>Impressão precisa de conferência</strong>
+                        <p>{printStatusLabel(printAttention)}. Abra Impressões para resolver.</p>
+                      </Callout>
                     )}
-                    {visiblePrintJobs.length > 0 && (
-                      <div aria-label="Fila de impressão" className="print-queue" role="status">
-                        {visiblePrintJobs.map((job) => (
-                          <span key={job.id}>
-                            <strong>{job.label}</strong>
-                            <small>{printStatusLabel(job)}</small>
-                            {(job.status === "printed" || job.status === "fallback") && (
-                              <Input
-                                aria-label={`Motivo da reimpressão de ${job.label}`}
-                                maxLength={500}
-                                minLength={3}
-                                onChange={(event) =>
-                                  setReprintReasons((current) => ({
-                                    ...current,
-                                    [job.id]: event.target.value,
-                                  }))
-                                }
-                                placeholder="Motivo obrigatório para reimprimir"
-                                value={reprintReasons[job.id] ?? ""}
-                              />
-                            )}
-                            {job.status !== "preparing" && (
-                              <div className="print-queue__actions">
-                                <Button
-                                  disabled={
-                                    (job.status === "printed" || job.status === "fallback") &&
-                                    (reprintReasons[job.id]?.trim().length ?? 0) < 3
-                                  }
-                                  onClick={() => void reprintDocument(job)}
-                                  type="button"
-                                >
-                                  {printActionLabel(job.status)}
-                                </Button>
-                                {job.status === "confirmation_required" && (
-                                  <Button
-                                    onClick={() => void markPrintNotDelivered(job)}
-                                    type="button"
-                                    variant="secondary"
-                                  >
-                                    Marcar não impresso
-                                  </Button>
-                                )}
-                              </div>
-                            )}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {data.payments.length > 0 && (
-                      <section className="account-payments" aria-label="Pagamentos registrados">
-                        <strong>Pagamentos</strong>
-                        {data.payments.map((payment) => (
-                          <span key={payment.id}>
-                            <span>
-                              <b>
-                                {
-                                  {
-                                    cash: "Dinheiro",
-                                    credit_card: "Crédito",
-                                    debit_card: "Débito",
-                                    pix: "Pix",
-                                    other: "Outro",
-                                  }[payment.method]
-                                }
-                                {payment.financialStatus === "reversed" && (
-                                  <Badge tone="danger">Estornado</Badge>
-                                )}
-                              </b>
-                              <small>
-                                {new Date(payment.createdAt).toLocaleString("pt-BR")}
-                                {payment.reference ? ` · ${payment.reference}` : ""}
-                              </small>
-                            </span>
-                            <span>
-                              <strong>{formatMoney(payment.amountCents)}</strong>
-                              {payment.financialStatus === "reversed" && (
-                                <small>Líquido {formatMoney(payment.netAmountCents)}</small>
-                              )}
-                            </span>
-                          </span>
-                        ))}
-                      </section>
-                    )}
-                    <div className="account-lines">
-                      {activeItems.map((item) => (
-                        <div className="account-line-group" key={item.id}>
-                          <div className="account-line">
-                            <span>
-                              <strong>
-                                {item.quantity}× {item.productName}
-                              </strong>
-                              <small>{item.status === "draft" ? "Em espera" : "Lançado"}</small>
-                              {approvalStatusForItem(item.id) && (
-                                <Badge tone={approvalStatusForItem(item.id)?.tone}>
-                                  {approvalStatusForItem(item.id)?.label}
-                                </Badge>
-                              )}
-                            </span>
-                            <strong>{formatMoney(item.netCents)}</strong>
-                            {tabOpen && (
-                              <Button
-                                aria-expanded={itemActionId === item.id}
-                                aria-label={`Ações para ${item.productName}`}
-                                onClick={() => {
-                                  setApprovalItemId(item.id);
-                                  setItemActionId((current) =>
-                                    current === item.id ? "" : item.id,
-                                  );
-                                }}
-                                type="button"
-                              >
-                                Mais
-                              </Button>
-                            )}
-                          </div>
-                          {itemActionId === item.id && (
-                            <form
-                              className="approval-form approval-form--inline"
-                              onSubmit={(event) => event.preventDefault()}
+                    {localPrintingEnabled && (
+                      <details className="account-disclosure account-print-disclosure">
+                        <summary>
+                          Impressões{visiblePrintJobs.length ? ` (${visiblePrintJobs.length})` : ""}
+                        </summary>
+                        <div className="account-print-actions">
+                          <Button
+                            disabled={busy || billRequestPending || !tabOpen}
+                            onClick={() => void requestBillAndPrint()}
+                            size="sm"
+                            type="button"
+                            variant="secondary"
+                          >
+                            {data.tab.tableId && billCall
+                              ? "Reimprimir pré-conta"
+                              : billRequestPending
+                                ? "Solicitando…"
+                                : data.tab.tableId
+                                  ? "Pedir conta e imprimir"
+                                  : "Imprimir pré-conta"}
+                          </Button>
+                          {data.tab.tableId && !billCall && (
+                            <Button
+                              onClick={() => void printDocument("account")}
+                              size="sm"
+                              type="button"
+                              variant="ghost"
                             >
-                              <div className="approval-form__heading">
-                                <span>Ajustar item</span>
-                                <strong>{item.productName}</strong>
-                                <Button onClick={() => setItemActionId("")} type="button">
-                                  Fechar
-                                </Button>
-                              </div>
-                              <p>
-                                {canApproveAdjustments
-                                  ? "Autorize com seu código gerencial ou encaminhe para outro responsável."
-                                  : "Envie a solicitação; o gerente aprova no próprio dispositivo com o código dele."}
-                              </p>
+                              Só imprimir pré-conta
+                            </Button>
+                          )}
+                          <Button
+                            disabled={data.payments.length === 0}
+                            onClick={() => void printDocument("payments")}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            Extrato de pagamentos
+                          </Button>
+                        </div>
+                        {tabOpen && remainingCents > 0 && (
+                          <form className="print-split-form" onSubmit={submitPrintSplit}>
+                            <strong>Dividir pré-conta</strong>
+                            <NativeSelect
+                              aria-label="Forma da divisão impressa"
+                              onChange={(event) =>
+                                setPrintSplitMethod(event.target.value as typeof printSplitMethod)
+                              }
+                              value={printSplitMethod}
+                            >
+                              <option value="equal_people">Dividir igualmente por pessoas</option>
+                              <option value="fixed_amount">Vias por valor fixo</option>
+                            </NativeSelect>
+                            <Label>
+                              Quantidade de vias
+                              <Input
+                                max={50}
+                                min={2}
+                                onChange={(event) =>
+                                  setPrintSplitPartCount(Number(event.target.value))
+                                }
+                                type="number"
+                                value={printSplitPartCount}
+                              />
+                            </Label>
+                            {printSplitMethod === "fixed_amount" && (
                               <Label>
-                                Motivo
+                                Valor sugerido por via
                                 <Input
-                                  list={`adjustment-reasons-${tabId}`}
-                                  minLength={3}
-                                  onChange={(event) => setApprovalReason(event.target.value)}
-                                  value={approvalReason}
-                                />
-                              </Label>
-                              <datalist id={`adjustment-reasons-${tabId}`}>
-                                {adjustmentReasons.map((reason) => (
-                                  <option key={reason} value={reason} />
-                                ))}
-                              </datalist>
-                              <Label>
-                                Desconto em reais
-                                <Input
-                                  min={0}
-                                  onChange={(event) => setDiscountReais(Number(event.target.value))}
+                                  min={0.01}
+                                  onChange={(event) =>
+                                    setPrintSplitFixedReais(Number(event.target.value))
+                                  }
                                   step="0.01"
                                   type="number"
-                                  value={discountReais}
+                                  value={printSplitFixedReais}
                                 />
                               </Label>
-                              {canApproveAdjustments && (
-                                <Label>
-                                  Seu código gerencial
+                            )}
+                            <Button
+                              disabled={
+                                busy ||
+                                printSplitPartCount < 2 ||
+                                (printSplitMethod === "fixed_amount" && printSplitFixedReais <= 0)
+                              }
+                              size="sm"
+                              type="submit"
+                            >
+                              Criar e imprimir vias
+                            </Button>
+                            <small>
+                              Valores divididos sobre o saldo. Imprimir não registra pagamento.
+                            </small>
+                          </form>
+                        )}
+                        {visiblePrintJobs.length > 0 && (
+                          <div aria-label="Fila de impressão" className="print-queue" role="status">
+                            {visiblePrintJobs.map((job) => (
+                              <span key={job.id}>
+                                <strong>{job.label}</strong>
+                                <small>{printStatusLabel(job)}</small>
+                                {(job.status === "printed" || job.status === "fallback") && (
                                   <Input
-                                    autoComplete="one-time-code"
-                                    inputMode="numeric"
-                                    maxLength={8}
-                                    minLength={4}
+                                    aria-label={`Motivo da reimpressão de ${job.label}`}
+                                    maxLength={500}
+                                    minLength={3}
                                     onChange={(event) =>
-                                      setApprovalPin(event.target.value.replace(/\D/g, ""))
+                                      setReprintReasons((current) => ({
+                                        ...current,
+                                        [job.id]: event.target.value,
+                                      }))
                                     }
-                                    type="password"
-                                    value={approvalPin}
+                                    placeholder="Motivo obrigatório para reimprimir"
+                                    value={reprintReasons[job.id] ?? ""}
+                                  />
+                                )}
+                                {job.status !== "preparing" && (
+                                  <div className="print-queue__actions">
+                                    <Button
+                                      disabled={
+                                        (job.status === "printed" || job.status === "fallback") &&
+                                        (reprintReasons[job.id]?.trim().length ?? 0) < 3
+                                      }
+                                      onClick={() => void reprintDocument(job)}
+                                      type="button"
+                                    >
+                                      {printActionLabel(job.status)}
+                                    </Button>
+                                    {job.status === "confirmation_required" && (
+                                      <Button
+                                        onClick={() => void markPrintNotDelivered(job)}
+                                        type="button"
+                                        variant="secondary"
+                                      >
+                                        Marcar não impresso
+                                      </Button>
+                                    )}
+                                  </div>
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </details>
+                    )}
+                    <details className="account-disclosure account-items-disclosure">
+                      <summary>Itens e pagamentos da conta</summary>
+                      {data.payments.length > 0 && (
+                        <section className="account-payments" aria-label="Pagamentos registrados">
+                          <strong>Pagamentos</strong>
+                          {data.payments.map((payment) => (
+                            <span key={payment.id}>
+                              <span>
+                                <b>
+                                  {
+                                    {
+                                      cash: "Dinheiro",
+                                      credit_card: "Crédito",
+                                      debit_card: "Débito",
+                                      pix: "Pix",
+                                      other: "Outro",
+                                    }[payment.method]
+                                  }
+                                  {payment.financialStatus === "reversed" && (
+                                    <Badge tone="danger">Estornado</Badge>
+                                  )}
+                                </b>
+                                <small>
+                                  {new Date(payment.createdAt).toLocaleString("pt-BR")}
+                                  {payment.reference ? ` · ${payment.reference}` : ""}
+                                </small>
+                              </span>
+                              <span>
+                                <strong>{formatMoney(payment.amountCents)}</strong>
+                                {payment.financialStatus === "reversed" && (
+                                  <small>Líquido {formatMoney(payment.netAmountCents)}</small>
+                                )}
+                              </span>
+                            </span>
+                          ))}
+                        </section>
+                      )}
+                      <div className="account-lines">
+                        {activeItems.map((item) => (
+                          <div className="account-line-group" key={item.id}>
+                            <div className="account-line">
+                              <span>
+                                <strong>
+                                  {item.quantity}× {item.productName}
+                                </strong>
+                                <small>{item.status === "draft" ? "Em espera" : "Lançado"}</small>
+                                {approvalStatusForItem(item.id) && (
+                                  <Badge tone={approvalStatusForItem(item.id)?.tone}>
+                                    {approvalStatusForItem(item.id)?.label}
+                                  </Badge>
+                                )}
+                              </span>
+                              <strong>{formatMoney(item.netCents)}</strong>
+                              {tabOpen && (
+                                <Button
+                                  aria-expanded={itemActionId === item.id}
+                                  aria-label={`Ações para ${item.productName}`}
+                                  onClick={() => {
+                                    setApprovalItemId(item.id);
+                                    setItemActionId((current) =>
+                                      current === item.id ? "" : item.id,
+                                    );
+                                  }}
+                                  type="button"
+                                >
+                                  Mais
+                                </Button>
+                              )}
+                            </div>
+                            {itemActionId === item.id && (
+                              <form
+                                className="approval-form approval-form--inline"
+                                onSubmit={(event) => event.preventDefault()}
+                              >
+                                <div className="approval-form__heading">
+                                  <span>Ajustar item</span>
+                                  <strong>{item.productName}</strong>
+                                  <Button onClick={() => setItemActionId("")} type="button">
+                                    Fechar
+                                  </Button>
+                                </div>
+                                <p>
+                                  {canApproveAdjustments
+                                    ? "Autorize com seu código gerencial ou encaminhe para outro responsável."
+                                    : "Envie a solicitação; o gerente aprova no próprio dispositivo com o código dele."}
+                                </p>
+                                <Label>
+                                  Motivo
+                                  <Input
+                                    list={`adjustment-reasons-${tabId}`}
+                                    minLength={3}
+                                    onChange={(event) => setApprovalReason(event.target.value)}
+                                    value={approvalReason}
                                   />
                                 </Label>
-                              )}
-                              <div className="dialog-actions">
-                                {!canApproveAdjustments && (
-                                  <>
-                                    <Button
-                                      disabled={
-                                        busy ||
-                                        !approvalItemId ||
-                                        approvalReason.trim().length < 3 ||
-                                        discountReais <= 0
-                                      }
-                                      onClick={() =>
-                                        void mutate(
-                                          () =>
-                                            api.pilot.requestApproval(
-                                              scope.organizationId,
-                                              scope.unitId,
-                                              tabId,
-                                              {
-                                                itemId: approvalItemId,
-                                                action: "discount",
-                                                discountCents: Math.round(discountReais * 100),
-                                                reason: approvalReason.trim(),
-                                              },
-                                              crypto.randomUUID(),
-                                            ),
-                                          "Desconto enviado para aprovação.",
-                                        )
-                                      }
-                                      size="sm"
-                                      variant="secondary"
-                                    >
-                                      Solicitar desconto
-                                    </Button>
-                                    <Button
-                                      disabled={
-                                        busy || !approvalItemId || approvalReason.trim().length < 3
-                                      }
-                                      onClick={() =>
-                                        void mutate(
-                                          () =>
-                                            api.pilot.requestApproval(
-                                              scope.organizationId,
-                                              scope.unitId,
-                                              tabId,
-                                              {
-                                                itemId: approvalItemId,
-                                                action: "cancel",
-                                                reason: approvalReason.trim(),
-                                              },
-                                              crypto.randomUUID(),
-                                            ),
-                                          "Cancelamento enviado para aprovação.",
-                                        )
-                                      }
-                                      size="sm"
-                                      variant="danger"
-                                    >
-                                      Solicitar cancelamento
-                                    </Button>
-                                  </>
-                                )}
+                                <datalist id={`adjustment-reasons-${tabId}`}>
+                                  {adjustmentReasons.map((reason) => (
+                                    <option key={reason} value={reason} />
+                                  ))}
+                                </datalist>
+                                <Label>
+                                  Desconto em reais
+                                  <Input
+                                    min={0}
+                                    onChange={(event) =>
+                                      setDiscountReais(Number(event.target.value))
+                                    }
+                                    step="0.01"
+                                    type="number"
+                                    value={discountReais}
+                                  />
+                                </Label>
                                 {canApproveAdjustments && (
-                                  <>
-                                    <Button
-                                      disabled={
-                                        busy ||
-                                        !approvalItemId ||
-                                        approvalPin.length < 4 ||
-                                        approvalReason.trim().length < 3 ||
-                                        discountReais <= 0
+                                  <Label>
+                                    Seu código gerencial
+                                    <Input
+                                      autoComplete="one-time-code"
+                                      inputMode="numeric"
+                                      maxLength={8}
+                                      minLength={4}
+                                      onChange={(event) =>
+                                        setApprovalPin(event.target.value.replace(/\D/g, ""))
                                       }
-                                      onClick={() =>
-                                        void mutate(
-                                          () =>
-                                            scope.dispatch(
-                                              "pos.item.discount_requested",
-                                              pilotMutation("discount-item", {
-                                                itemId: approvalItemId,
-                                                body: {
+                                      type="password"
+                                      value={approvalPin}
+                                    />
+                                  </Label>
+                                )}
+                                <div className="dialog-actions">
+                                  {!canApproveAdjustments && (
+                                    <>
+                                      <Button
+                                        disabled={
+                                          busy ||
+                                          !approvalItemId ||
+                                          approvalReason.trim().length < 3 ||
+                                          discountReais <= 0
+                                        }
+                                        onClick={() =>
+                                          void mutate(
+                                            () =>
+                                              api.pilot.requestApproval(
+                                                scope.organizationId,
+                                                scope.unitId,
+                                                tabId,
+                                                {
+                                                  itemId: approvalItemId,
+                                                  action: "discount",
                                                   discountCents: Math.round(discountReais * 100),
-                                                  approval: {
-                                                    approverMembershipId: scope.membershipId,
-                                                    pin: approvalPin,
-                                                    reason: approvalReason.trim(),
-                                                  },
+                                                  reason: approvalReason.trim(),
                                                 },
-                                              }),
-                                              (key) =>
-                                                api.pilot.discountItem(
-                                                  scope.organizationId,
-                                                  scope.unitId,
-                                                  approvalItemId,
-                                                  {
+                                                crypto.randomUUID(),
+                                              ),
+                                            "Desconto enviado para aprovação.",
+                                          )
+                                        }
+                                        size="sm"
+                                        variant="secondary"
+                                      >
+                                        Solicitar desconto
+                                      </Button>
+                                      <Button
+                                        disabled={
+                                          busy ||
+                                          !approvalItemId ||
+                                          approvalReason.trim().length < 3
+                                        }
+                                        onClick={() =>
+                                          void mutate(
+                                            () =>
+                                              api.pilot.requestApproval(
+                                                scope.organizationId,
+                                                scope.unitId,
+                                                tabId,
+                                                {
+                                                  itemId: approvalItemId,
+                                                  action: "cancel",
+                                                  reason: approvalReason.trim(),
+                                                },
+                                                crypto.randomUUID(),
+                                              ),
+                                            "Cancelamento enviado para aprovação.",
+                                          )
+                                        }
+                                        size="sm"
+                                        variant="danger"
+                                      >
+                                        Solicitar cancelamento
+                                      </Button>
+                                    </>
+                                  )}
+                                  {canApproveAdjustments && (
+                                    <>
+                                      <Button
+                                        disabled={
+                                          busy ||
+                                          !approvalItemId ||
+                                          approvalPin.length < 4 ||
+                                          approvalReason.trim().length < 3 ||
+                                          discountReais <= 0
+                                        }
+                                        onClick={() =>
+                                          void mutate(
+                                            () =>
+                                              scope.dispatch(
+                                                "pos.item.discount_requested",
+                                                pilotMutation("discount-item", {
+                                                  itemId: approvalItemId,
+                                                  body: {
                                                     discountCents: Math.round(discountReais * 100),
                                                     approval: {
                                                       approverMembershipId: scope.membershipId,
@@ -3761,126 +4049,97 @@ export function TabWorkspace({
                                                       reason: approvalReason.trim(),
                                                     },
                                                   },
-                                                  key,
-                                                ),
-                                            ),
-                                          "Desconto aprovado e aplicado.",
-                                        )
-                                      }
-                                      size="sm"
-                                      variant="secondary"
-                                    >
-                                      Aplicar desconto
-                                    </Button>
-                                    <Button
-                                      disabled={
-                                        busy ||
-                                        !approvalItemId ||
-                                        approvalPin.length < 4 ||
-                                        approvalReason.trim().length < 3
-                                      }
-                                      onClick={() =>
-                                        void mutate(
-                                          () =>
-                                            scope.dispatch(
-                                              "pos.item.cancel_requested",
-                                              pilotMutation("cancel-item", {
-                                                itemId: approvalItemId,
-                                                approval: {
-                                                  approverMembershipId: scope.membershipId,
-                                                  pin: approvalPin,
-                                                  reason: approvalReason.trim(),
-                                                },
-                                              }),
-                                              (key) =>
-                                                api.pilot.cancelItem(
-                                                  scope.organizationId,
-                                                  scope.unitId,
-                                                  approvalItemId,
-                                                  {
+                                                }),
+                                                (key) =>
+                                                  api.pilot.discountItem(
+                                                    scope.organizationId,
+                                                    scope.unitId,
+                                                    approvalItemId,
+                                                    {
+                                                      discountCents: Math.round(
+                                                        discountReais * 100,
+                                                      ),
+                                                      approval: {
+                                                        approverMembershipId: scope.membershipId,
+                                                        pin: approvalPin,
+                                                        reason: approvalReason.trim(),
+                                                      },
+                                                    },
+                                                    key,
+                                                  ),
+                                              ),
+                                            "Desconto aprovado e aplicado.",
+                                          )
+                                        }
+                                        size="sm"
+                                        variant="secondary"
+                                      >
+                                        Aplicar desconto
+                                      </Button>
+                                      <Button
+                                        disabled={
+                                          busy ||
+                                          !approvalItemId ||
+                                          approvalPin.length < 4 ||
+                                          approvalReason.trim().length < 3
+                                        }
+                                        onClick={() =>
+                                          void mutate(
+                                            () =>
+                                              scope.dispatch(
+                                                "pos.item.cancel_requested",
+                                                pilotMutation("cancel-item", {
+                                                  itemId: approvalItemId,
+                                                  approval: {
                                                     approverMembershipId: scope.membershipId,
                                                     pin: approvalPin,
                                                     reason: approvalReason.trim(),
                                                   },
-                                                  key,
-                                                ),
-                                            ),
-                                          "Item cancelado com aprovação.",
-                                        )
-                                      }
-                                      size="sm"
-                                      variant="danger"
-                                    >
-                                      Cancelar item
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </form>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {tabOpen &&
-                      data.tab.totalCents > 0 &&
-                      remainingCents === 0 &&
-                      terminalPaymentMode !== "disabled" && (
-                        <div className="account-close-actions">
-                          {localPrintingEnabled && (
-                            <Button
-                              disabled={busy}
-                              onClick={() => {
-                                if (
-                                  !window.confirm(
-                                    `Encerrar ${displayLabel} e imprimir o comprovante final?`,
-                                  )
-                                )
-                                  return;
-                                void closeAndPrint();
-                              }}
-                              size="sm"
-                            >
-                              Encerrar e imprimir
-                            </Button>
-                          )}
-                          <Button
-                            disabled={busy}
-                            onClick={() =>
-                              window.confirm(
-                                `Encerrar ${displayLabel} sem imprimir comprovante?`,
-                              ) &&
-                              void mutate(
-                                () => closeTabWithReturnableCheck({ printRequested: false }),
-                                "Atendimento encerrado.",
-                              )
-                            }
-                            size="sm"
-                            variant="danger"
-                          >
-                            Encerrar sem imprimir
-                          </Button>
-                        </div>
-                      )}
+                                                }),
+                                                (key) =>
+                                                  api.pilot.cancelItem(
+                                                    scope.organizationId,
+                                                    scope.unitId,
+                                                    approvalItemId,
+                                                    {
+                                                      approverMembershipId: scope.membershipId,
+                                                      pin: approvalPin,
+                                                      reason: approvalReason.trim(),
+                                                    },
+                                                    key,
+                                                  ),
+                                              ),
+                                            "Item cancelado com aprovação.",
+                                          )
+                                        }
+                                        size="sm"
+                                        variant="danger"
+                                      >
+                                        Cancelar item
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </form>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   </section>
                 )}
                 {tabOpen && view !== "order" && view !== "activity" && (
                   <section className={`workspace-tools workspace-tools--${view}`}>
-                    <div className="workspace-tools__heading">
-                      <strong>
-                        {view === "account" ? "Receber e ajustar conta" : "Ações da mesa"}
-                      </strong>
-                      <small>
-                        {view === "account"
-                          ? "Pagamento, taxa, gorjeta e correções por item."
-                          : "Transferência e organização do atendimento."}
-                      </small>
-                    </div>
-                    <details className="ops-actions" open={view === "account" ? true : undefined}>
-                      <summary>
-                        {view === "account"
-                          ? "Receber pagamento e fazer ajustes"
-                          : "Ajustes da comanda"}
-                      </summary>
+                    {view === "table" && (
+                      <div className="workspace-tools__heading">
+                        <strong>Ações da mesa</strong>
+                        <small>Transferência e organização do atendimento.</small>
+                      </div>
+                    )}
+                    <div className={`ops-actions ops-actions--${view}`}>
+                      {view === "table" && (
+                        <strong className="ops-actions__title">Ajustes da comanda</strong>
+                      )}
                       <div className="action-grid">
                         <form
                           hidden={view !== "table"}
@@ -3916,6 +4175,7 @@ export function TabWorkspace({
                         >
                           <h3>Transferir mesa</h3>
                           <NativeSelect
+                            aria-label="Mesa de destino"
                             onChange={(event) => setTransferTableId(event.target.value)}
                             value={transferTableId}
                           >
@@ -3964,6 +4224,7 @@ export function TabWorkspace({
                         >
                           <h3>Transferir item</h3>
                           <NativeSelect
+                            aria-label="Item a transferir"
                             onChange={(event) => setMoveItemId(event.target.value)}
                             value={moveItemId}
                           >
@@ -3977,6 +4238,7 @@ export function TabWorkspace({
                               ))}
                           </NativeSelect>
                           <NativeSelect
+                            aria-label="Comanda de destino do item"
                             onChange={(event) => setMoveTargetTabId(event.target.value)}
                             value={moveTargetTabId}
                           >
@@ -3993,184 +4255,6 @@ export function TabWorkspace({
                             type="submit"
                           >
                             Transferir item
-                          </Button>
-                        </form>
-                        <form
-                          className="cashier-payment-form"
-                          hidden={view !== "account" || !cashierPaymentEnabled}
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            if (paymentReais <= 0) return;
-                            const changeReais = Math.max(0, cashReceivedReais - paymentReais);
-                            const amountCents = Math.round(paymentReais * 100);
-                            const reference =
-                              paymentReference.trim() ||
-                              (paymentMethod === "cash" && cashReceivedReais > 0
-                                ? `Recebido ${formatMoney(Math.round(cashReceivedReais * 100))}; troco ${formatMoney(Math.round(changeReais * 100))}`
-                                : undefined);
-                            const installationId =
-                              readActiveTerminalProfile(scope.unitId)?.installationId ?? undefined;
-                            void mutate(
-                              () =>
-                                scope.dispatch(
-                                  "pos.payment.record_requested",
-                                  pilotMutation("record-payment", {
-                                    tabId,
-                                    body: {
-                                      method: paymentMethod,
-                                      amountCents,
-                                      reference,
-                                      installationId,
-                                    },
-                                  }),
-                                  (key) =>
-                                    api.pilot.recordPayment(
-                                      scope.organizationId,
-                                      scope.unitId,
-                                      tabId,
-                                      {
-                                        method: paymentMethod,
-                                        amountCents,
-                                        reference,
-                                        installationId,
-                                      },
-                                      key,
-                                    ),
-                                ),
-                              manualPaymentSuccessMessage(
-                                paymentMethod,
-                                amountCents,
-                                remainingCents,
-                                Math.round(changeReais * 100),
-                              ),
-                            ).then((saved) => {
-                              if (!saved) return;
-                              setPaymentReais(0);
-                              setPaymentReference("");
-                              setCashReceivedReais(0);
-                            });
-                          }}
-                        >
-                          <h3>Receber pagamento</h3>
-                          <p>
-                            Pago {formatMoney(paidCents)} · falta {formatMoney(remainingCents)}
-                          </p>
-                          <fieldset className="cashier-payment-form__shortcuts">
-                            <legend className="gm-sr-only">Atalhos para receber a conta</legend>
-                            <Button
-                              className="cashier-payment-form__full"
-                              onClick={prepareFullCashierPayment}
-                              type="button"
-                            >
-                              Conta inteira · {formatMoney(remainingCents)}
-                            </Button>
-                            <Button
-                              onClick={() => setPaymentReais(remainingCents / 400)}
-                              type="button"
-                              variant="secondary"
-                            >
-                              25%
-                            </Button>
-                            <Button
-                              onClick={() => setPaymentReais(remainingCents / 200)}
-                              type="button"
-                              variant="secondary"
-                            >
-                              50%
-                            </Button>
-                            <Button
-                              onClick={() =>
-                                setPaymentReais(
-                                  remainingCents / Math.max(1, data.tab.guestCount) / 100,
-                                )
-                              }
-                              type="button"
-                              variant="secondary"
-                            >
-                              1 pessoa
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setPaymentReais(0);
-                              }}
-                              type="button"
-                              variant="secondary"
-                            >
-                              Valor livre
-                            </Button>
-                          </fieldset>
-                          <div className="cashier-payment-form__fields">
-                            <Label>
-                              Forma de pagamento
-                              <NativeSelect
-                                onChange={(event) =>
-                                  setPaymentMethod(event.target.value as typeof paymentMethod)
-                                }
-                                value={paymentMethod}
-                              >
-                                <option value="cash">Dinheiro</option>
-                                <option value="pix">Pix (registro manual)</option>
-                                <option value="debit_card">Débito (maquininha externa)</option>
-                                <option value="credit_card">Crédito (maquininha externa)</option>
-                                <option value="other">Outro meio de pagamento</option>
-                              </NativeSelect>
-                              <small>
-                                Meios eletrônicos devem ser registrados somente após a confirmação
-                                externa.
-                              </small>
-                            </Label>
-                            <Label>
-                              Valor a receber
-                              <Input
-                                ref={paymentAmountRef}
-                                min={0.01}
-                                onChange={(event) => setPaymentReais(Number(event.target.value))}
-                                step="0.01"
-                                type="number"
-                                value={paymentReais}
-                              />
-                            </Label>
-                          </div>
-                          {paymentMethod === "cash" && (
-                            <Label className="cash-change-field">
-                              <span>Valor recebido</span>
-                              <Input
-                                min={paymentReais}
-                                onChange={(event) =>
-                                  setCashReceivedReais(Number(event.target.value))
-                                }
-                                step="0.01"
-                                type="number"
-                                value={cashReceivedReais}
-                              />
-                              <strong>
-                                Troco:{" "}
-                                {formatMoney(
-                                  Math.round(Math.max(0, cashReceivedReais - paymentReais) * 100),
-                                )}
-                              </strong>
-                            </Label>
-                          )}
-                          <Label className="cashier-payment-form__reference">
-                            Referência opcional
-                            <Input
-                              onChange={(event) => setPaymentReference(event.target.value)}
-                              placeholder="Ex.: identificação ou observação"
-                              value={paymentReference}
-                            />
-                          </Label>
-                          <Button
-                            className="cashier-payment-form__submit"
-                            disabled={
-                              busy ||
-                              paymentReais <= 0 ||
-                              Math.round(paymentReais * 100) > remainingCents ||
-                              (paymentMethod === "cash" && cashReceivedReais < paymentReais)
-                            }
-                            size="sm"
-                            type="submit"
-                          >
-                            Registrar pagamento
                           </Button>
                         </form>
                         <form
@@ -4213,6 +4297,7 @@ export function TabWorkspace({
                         >
                           <h3>Unificar comandas</h3>
                           <NativeSelect
+                            aria-label="Comanda de origem"
                             onChange={(event) => setMergeTabId(event.target.value)}
                             value={mergeTabId}
                           >
@@ -4259,161 +4344,173 @@ export function TabWorkspace({
                             Unificar aqui
                           </Button>
                         </form>
-                        <form
-                          hidden={view !== "account"}
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            if (splitItemId)
-                              void mutate(
-                                () =>
-                                  scope.dispatch(
-                                    "pos.tab.split_requested",
-                                    pilotMutation("split-tab", {
-                                      tabId,
-                                      body: {
-                                        label: splitLabel.trim() || "Conta separada",
-                                        items: [
-                                          { orderItemId: splitItemId, quantity: splitQuantity },
-                                        ],
-                                      },
-                                    }),
-                                    (key) =>
-                                      api.pilot.splitTab(
-                                        scope.organizationId,
-                                        scope.unitId,
+                        <details className="account-disclosure" hidden={view !== "account"}>
+                          <summary>Separar item em outra comanda</summary>
+                          <form
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              if (splitItemId)
+                                void mutate(
+                                  () =>
+                                    scope.dispatch(
+                                      "pos.tab.split_requested",
+                                      pilotMutation("split-tab", {
                                         tabId,
-                                        {
+                                        body: {
                                           label: splitLabel.trim() || "Conta separada",
                                           items: [
                                             { orderItemId: splitItemId, quantity: splitQuantity },
                                           ],
                                         },
-                                        key,
-                                      ),
-                                  ),
-                                (result) =>
-                                  `Item separado em nova comanda. ${result.printJobs.length} via(s) foram criadas na fila de impressão.`,
-                                (result) => {
-                                  const localJobs = result.printJobs.map(printJobFromServer);
-                                  setPrintJobs((current) =>
-                                    [...localJobs, ...current].slice(0, 12),
-                                  );
-                                },
-                              );
-                          }}
-                        >
-                          <h3>Separar item</h3>
-                          <Input
-                            aria-label="Nome da nova comanda"
-                            maxLength={120}
-                            onChange={(event) => setSplitLabel(event.target.value)}
-                            placeholder="Nome da nova comanda"
-                            value={splitLabel}
-                          />
-                          <NativeSelect
-                            onChange={(event) => setSplitItemId(event.target.value)}
-                            value={splitItemId}
+                                      }),
+                                      (key) =>
+                                        api.pilot.splitTab(
+                                          scope.organizationId,
+                                          scope.unitId,
+                                          tabId,
+                                          {
+                                            label: splitLabel.trim() || "Conta separada",
+                                            items: [
+                                              { orderItemId: splitItemId, quantity: splitQuantity },
+                                            ],
+                                          },
+                                          key,
+                                        ),
+                                    ),
+                                  (result) =>
+                                    `Item separado em nova comanda. ${result.printJobs.length} via(s) foram criadas na fila de impressão.`,
+                                  (result) => {
+                                    const localJobs = result.printJobs.map(printJobFromServer);
+                                    setPrintJobs((current) =>
+                                      [...localJobs, ...current].slice(0, 12),
+                                    );
+                                  },
+                                );
+                            }}
                           >
-                            <option value="">Selecione</option>
-                            {activeItems.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.quantity}× {item.productName}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                          <Input
-                            min={1}
-                            onChange={(event) => setSplitQuantity(Number(event.target.value))}
-                            type="number"
-                            value={splitQuantity}
-                          />
-                          <Button disabled={busy || !splitItemId} size="sm" type="submit">
-                            Separar
-                          </Button>
-                        </form>
-                        <form
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void mutate(
-                              () =>
-                                scope.dispatch(
-                                  "pos.tab.service_charge_requested",
-                                  pilotMutation("service-charge", {
-                                    tabId,
-                                    basisPoints: Math.round(servicePercent * 100),
-                                  }),
-                                  (key) =>
-                                    api.pilot.serviceCharge(
-                                      scope.organizationId,
-                                      scope.unitId,
-                                      tabId,
-                                      Math.round(servicePercent * 100),
-                                      key,
-                                    ),
-                                ),
-                              "Taxa de serviço atualizada.",
-                            );
-                          }}
+                            <h3>Separar item</h3>
+                            <Input
+                              aria-label="Nome da nova comanda"
+                              maxLength={120}
+                              onChange={(event) => setSplitLabel(event.target.value)}
+                              placeholder="Nome da nova comanda"
+                              value={splitLabel}
+                            />
+                            <NativeSelect
+                              aria-label="Item a separar"
+                              onChange={(event) => setSplitItemId(event.target.value)}
+                              value={splitItemId}
+                            >
+                              <option value="">Selecione</option>
+                              {activeItems.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.quantity}× {item.productName}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                            <Input
+                              aria-label="Quantidade a separar"
+                              min={1}
+                              onChange={(event) => setSplitQuantity(Number(event.target.value))}
+                              type="number"
+                              value={splitQuantity}
+                            />
+                            <Button disabled={busy || !splitItemId} size="sm" type="submit">
+                              Separar
+                            </Button>
+                          </form>
+                        </details>
+                        <details
+                          className="account-disclosure"
                           hidden={view !== "account" || !canAdjustCharges}
                         >
-                          <h3>Serviço</h3>
-                          <Label>
-                            Percentual
-                            <Input
-                              max={100}
-                              min={0}
-                              onChange={(event) => setServicePercent(Number(event.target.value))}
-                              step="0.01"
-                              type="number"
-                              value={servicePercent}
-                            />
-                          </Label>
-                          <Button disabled={busy} size="sm" type="submit">
-                            Aplicar
-                          </Button>
-                        </form>
-                        <form
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void mutate(
-                              () =>
-                                scope.dispatch(
-                                  "pos.tab.tip_requested",
-                                  pilotMutation("tip", {
-                                    tabId,
-                                    tipCents: Math.round(tipReais * 100),
-                                  }),
-                                  (key) =>
-                                    api.pilot.tip(
-                                      scope.organizationId,
-                                      scope.unitId,
-                                      tabId,
-                                      Math.round(tipReais * 100),
-                                      key,
+                          <summary>Taxa de serviço e gorjeta</summary>
+                          <div className="account-charge-grid">
+                            <form
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void mutate(
+                                  () =>
+                                    scope.dispatch(
+                                      "pos.tab.service_charge_requested",
+                                      pilotMutation("service-charge", {
+                                        tabId,
+                                        basisPoints: Math.round(servicePercent * 100),
+                                      }),
+                                      (key) =>
+                                        api.pilot.serviceCharge(
+                                          scope.organizationId,
+                                          scope.unitId,
+                                          tabId,
+                                          Math.round(servicePercent * 100),
+                                          key,
+                                        ),
                                     ),
-                                ),
-                              "Gorjeta atualizada.",
-                            );
-                          }}
-                          hidden={view !== "account" || !canAdjustCharges}
-                        >
-                          <h3>Gorjeta</h3>
-                          <Label>
-                            Valor em reais
-                            <Input
-                              min={0}
-                              onChange={(event) => setTipReais(Number(event.target.value))}
-                              step="0.01"
-                              type="number"
-                              value={tipReais}
-                            />
-                          </Label>
-                          <Button disabled={busy} size="sm" type="submit">
-                            Aplicar
-                          </Button>
-                        </form>
+                                  "Taxa de serviço atualizada.",
+                                );
+                              }}
+                            >
+                              <h3>Serviço</h3>
+                              <Label>
+                                Percentual
+                                <Input
+                                  max={100}
+                                  min={0}
+                                  onChange={(event) =>
+                                    setServicePercent(Number(event.target.value))
+                                  }
+                                  step="0.01"
+                                  type="number"
+                                  value={servicePercent}
+                                />
+                              </Label>
+                              <Button disabled={busy} size="sm" type="submit">
+                                Aplicar
+                              </Button>
+                            </form>
+                            <form
+                              onSubmit={(event) => {
+                                event.preventDefault();
+                                void mutate(
+                                  () =>
+                                    scope.dispatch(
+                                      "pos.tab.tip_requested",
+                                      pilotMutation("tip", {
+                                        tabId,
+                                        tipCents: Math.round(tipReais * 100),
+                                      }),
+                                      (key) =>
+                                        api.pilot.tip(
+                                          scope.organizationId,
+                                          scope.unitId,
+                                          tabId,
+                                          Math.round(tipReais * 100),
+                                          key,
+                                        ),
+                                    ),
+                                  "Gorjeta atualizada.",
+                                );
+                              }}
+                            >
+                              <h3>Gorjeta</h3>
+                              <Label>
+                                Valor em reais
+                                <Input
+                                  min={0}
+                                  onChange={(event) => setTipReais(Number(event.target.value))}
+                                  step="0.01"
+                                  type="number"
+                                  value={tipReais}
+                                />
+                              </Label>
+                              <Button disabled={busy} size="sm" type="submit">
+                                Aplicar
+                              </Button>
+                            </form>
+                          </div>
+                        </details>
                       </div>
-                    </details>
+                    </div>
                   </section>
                 )}
                 {tabOpen &&
@@ -4794,8 +4891,9 @@ export function TabWorkspace({
                               : "Pedir conta"}
                         </Button>
                       )}
-                      {!cart.length && (
+                      {!cart.length && remainingCents > 0 && view !== "account" && (
                         <Button
+                          disabled={busy || balanceRefreshRequired}
                           onClick={() =>
                             terminalPaymentMode === "disabled"
                               ? void requestBillAndPrint()
@@ -4811,6 +4909,73 @@ export function TabWorkspace({
                               : "Receber no caixa"}
                         </Button>
                       )}
+                      {view === "account" && cashierPaymentEnabled && remainingCents > 0 && (
+                        <Button
+                          disabled={busy || !manualPaymentReady}
+                          form={`cashier-payment-form-${tabId}`}
+                          size="sm"
+                          type="submit"
+                        >
+                          Confirmar {formatMoney(paymentAmountCents ?? 0)}
+                        </Button>
+                      )}
+                      {closesWithoutConsumption && (
+                        <Button
+                          disabled={busy}
+                          onClick={() =>
+                            window.confirm(
+                              `Fechar ${displayLabel} sem consumo? A mesa seguirá para limpeza.`,
+                            ) &&
+                            void mutate(
+                              () => closeTabWithReturnableCheck({ printRequested: false }),
+                              "Atendimento encerrado.",
+                            )
+                          }
+                          size="sm"
+                          variant="danger"
+                        >
+                          {data.tab.tableId ? "Encerrar mesa" : "Encerrar sem consumo"}
+                        </Button>
+                      )}
+                      {data.tab.totalCents > 0 &&
+                        remainingCents === 0 &&
+                        terminalPaymentMode !== "disabled" && (
+                          <>
+                            {localPrintingEnabled && (
+                              <Button
+                                disabled={busy}
+                                onClick={() => {
+                                  if (
+                                    !window.confirm(
+                                      `Encerrar ${displayLabel} e imprimir o comprovante final?`,
+                                    )
+                                  )
+                                    return;
+                                  void closeAndPrint();
+                                }}
+                                size="sm"
+                              >
+                                Encerrar e imprimir
+                              </Button>
+                            )}
+                            <Button
+                              disabled={busy}
+                              onClick={() =>
+                                window.confirm(
+                                  `Encerrar ${displayLabel} sem imprimir comprovante?`,
+                                ) &&
+                                void mutate(
+                                  () => closeTabWithReturnableCheck({ printRequested: false }),
+                                  "Atendimento encerrado.",
+                                )
+                              }
+                              size="sm"
+                              variant="danger"
+                            >
+                              Encerrar sem imprimir
+                            </Button>
+                          </>
+                        )}
                       <Button onClick={() => setView("table")} size="sm" variant="ghost">
                         Dados e ações
                       </Button>

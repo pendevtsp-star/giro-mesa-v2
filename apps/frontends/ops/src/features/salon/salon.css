@@ -175,7 +175,8 @@
 }
 .search-field {
   align-items: center;
-  background: #fff;
+  background: var(--gm-surface-sunken);
+  color: var(--gm-ink);
   border: 1px solid var(--gm-border);
   border-radius: 999px;
   display: flex;
@@ -189,6 +190,10 @@
   min-width: 0;
   outline: 0;
   width: 100%;
+}
+.search-field:focus-within {
+  outline: 2px solid var(--gm-focus);
+  outline-offset: 2px;
 }
 .search-field--small {
   max-width: 240px;
@@ -2790,21 +2795,39 @@
 }
 
 .salon-shift-control {
-  align-items: center;
   background: var(--gm-surface-soft);
-  border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-sm);
-  display: flex;
-  gap: var(--gm-space-3);
-  justify-content: space-between;
   min-width: 0;
-  padding: var(--gm-space-2) var(--gm-space-3);
+  padding: 0 var(--gm-space-3);
 }
 
-.salon-shift-control > span {
-  display: grid;
-  gap: 1px;
+.salon-shift-control > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: var(--gm-space-2);
+  list-style: none;
+  min-height: 44px;
+}
+.salon-shift-control > summary strong {
+  flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+.salon-shift-control > summary > span {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+.salon-shift-control > summary::-webkit-details-marker {
+  display: none;
+}
+.salon-shift-control[open] > summary > svg:last-child {
+  transform: rotate(180deg);
+}
+.salon-shift-control__body {
+  display: grid;
+  gap: var(--gm-space-3);
+  padding-block: var(--gm-space-2) var(--gm-space-3);
 }
 
 .salon-shift-control small {
@@ -2888,7 +2911,6 @@
   background: var(--gm-success);
   display: block;
   height: 100%;
-  transition: width 160ms ease;
 }
 
 .salon-setup-assistant ol {
@@ -3321,9 +3343,7 @@
   min-height: 108px;
   padding: 0.75rem;
   text-align: left;
-  transition:
-    background-color 0.2s ease-out,
-    border-color 0.2s ease-out;
+  transition: border-color var(--gm-duration-fast) var(--gm-ease-out);
 }
 
 .main-content--salon .real-table__header,
@@ -3387,26 +3407,51 @@
 
 .main-content--salon .real-table--available {
   border-left-color: var(--gm-success);
+  --table-status-ink: var(--gm-success);
+  --table-status-surface: var(--gm-success-soft);
 }
 
 .main-content--salon .real-table--occupied {
   background: color-mix(in srgb, var(--gm-info-soft) 34%, var(--gm-surface));
   border-left-color: var(--gm-info);
+  --table-status-ink: var(--gm-info);
+  --table-status-surface: var(--gm-info-soft);
 }
 
 .main-content--salon .real-table--attention {
   background: color-mix(in srgb, var(--gm-danger-soft) 45%, var(--gm-surface));
   border-left-color: var(--gm-danger);
+  --table-status-ink: var(--gm-danger);
+  --table-status-surface: var(--gm-danger-soft);
 }
 
 .main-content--salon .real-table--closing {
   background: color-mix(in srgb, var(--gm-warning-soft) 45%, var(--gm-surface));
   border-left-color: var(--gm-warning);
+  --table-status-ink: var(--gm-warning);
+  --table-status-surface: var(--gm-warning-soft);
 }
 
 .main-content--salon .real-table--reserved {
   background: var(--gm-surface-soft);
   border-left-color: var(--gm-muted);
+  --table-status-ink: var(--gm-ink);
+  --table-status-surface: var(--gm-surface-soft);
+}
+.main-content--salon .real-table__status {
+  align-items: center;
+  background: var(--table-status-surface, var(--gm-warning-soft));
+  border-radius: var(--gm-radius-sm);
+  color: var(--table-status-ink, var(--gm-warning));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gm-space-1);
+  padding: var(--gm-space-1) var(--gm-space-2);
+}
+.main-content--salon .real-table__status > small {
+  color: inherit;
+  font-weight: 700;
+  white-space: normal;
 }
 
 .counter-station-card {
@@ -3885,10 +3930,7 @@
 
 .salon-service-modal__summary > span {
   color: var(--gm-muted);
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--gm-font-xs);
 }
 
 .salon-service-modal__context {
@@ -5177,7 +5219,7 @@
   .salon-service-modal .gm-modal__header > strong {
     flex: 1 1 auto;
     order: 1;
-    white-space: nowrap;
+    white-space: normal;
   }
   .salon-service-modal .gm-modal__description {
     flex: 1 0 100%;
@@ -5536,7 +5578,6 @@
   background: linear-gradient(90deg, var(--gm-brand) 0%, #25a176 100%);
   border-radius: 999px;
   height: 100%;
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .salon-metric-card--alert {
@@ -5619,7 +5660,7 @@
 .salon-fast-list-row {
   align-items: center;
   border-bottom: 1px solid var(--gm-border-light);
-  border-left: 3px solid transparent;
+  border-left: 1px solid transparent;
   cursor: pointer;
   display: grid;
   gap: 0.5rem;
@@ -5891,7 +5932,6 @@
   height: 100%;
   background: linear-gradient(90deg, var(--gm-primary), var(--gm-success));
   border-radius: 999px;
-  transition: width 0.3s ease;
 }
 
 .split-bill-controls {
