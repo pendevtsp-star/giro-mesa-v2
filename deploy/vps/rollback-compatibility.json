@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0080_campaign_attribution_cost",
+  "requiredAppliedMigration": "0082_delivery_failure_states",
   "transitions": [],
   "fullRestore": {
     "required": true,

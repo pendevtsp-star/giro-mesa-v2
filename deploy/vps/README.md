@@ -33,7 +33,9 @@ O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CO
 
 ## Rollback
 
-`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0077_people_multi_role_access`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
+`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0082_delivery_failure_states`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
+
+O recovery `e520b3c07cf99ad8924436d1a7635719e1e221e3` mantém API e worker compatíveis com schema 82 após uma falha de promoção. Ele não substitui o restore necessário para voltar ao código de schema 80: as regras de liquidação da equipe e os novos estados de entrega exigem código compatível. A evidência está em `docs/evidence/release-2026-09-09.md`.
 
 ## Domínios
 

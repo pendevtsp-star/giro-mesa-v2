@@ -724,7 +724,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0080_campaign_attribution_cost");
+  assert.equal(matrix.requiredAppliedMigration, "0082_delivery_failure_states");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -841,7 +841,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0080_campaign_attribution_cost");
+  assert.equal(recovery.targetMigration, "0082_delivery_failure_states");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -862,14 +862,19 @@ test("pre-migration backup binds the migration actually applied in the source da
       },
       { appliedBefore: "0079_realtime_outbox_notify", appliedBeforeWhen: "1788654500000" },
       { appliedBefore: "0080_campaign_attribution_cost", appliedBeforeWhen: "1788829660611" },
+      {
+        appliedBefore: "0081_management_finance_documents_and_settlement_payments",
+        appliedBeforeWhen: "1788972000000",
+      },
+      { appliedBefore: "0082_delivery_failure_states", appliedBeforeWhen: "1788972000001" },
     ],
   );
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
-    assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
-    assert.equal(transition.recoveryArtifact, "git:07bb30f5362d30d950432e04cf32fe2a2e40ad16");
+    assert.equal(transition.recoveryMigration, "0082_delivery_failure_states");
+    assert.equal(transition.recoveryArtifact, "git:e520b3c07cf99ad8924436d1a7635719e1e221e3");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34365691644$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34402742819$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });

@@ -110,28 +110,28 @@ test("schema 0043 adopts the historical event and DoseClub objects", () => {
   assert.match(migration, /CREATE INDEX IF NOT EXISTS "doseclub_states_updated_idx"/);
 });
 
-test("privileged recovery authorization binds the schema 80 evidence", () => {
+test("privileged recovery authorization binds the schema 82 evidence", () => {
   const publish = readFileSync(publishPath, "utf8");
   const matrix = JSON.parse(readFileSync(recoveryMatrixPath, "utf8"));
-  assert.equal(matrix.targetMigration, "0080_campaign_attribution_cost");
-  assert.equal(matrix.transitions.length, 11);
+  assert.equal(matrix.targetMigration, "0082_delivery_failure_states");
+  assert.equal(matrix.transitions.length, 13);
   const expectedEvidence = {
-    path: "docs/evidence/recovery/07bb30f5-validation-0080.json",
-    sha256: "sha256:e9ad6d0a98b34ae9fabf638b52f7484b7622575a5322bf089bf38bdc659020e7",
-    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34365691644",
-    testReportDigest: "sha256:e9ad6d0a98b34ae9fabf638b52f7484b7622575a5322bf089bf38bdc659020e7",
+    path: "docs/evidence/recovery/e520b3c0-validation-0082.json",
+    sha256: "sha256:371c62c58847bbb211aaa692be6e1ee24686460a37e66e251c6117a19085f000",
+    workflowRun: "https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/34402742819",
+    testReportDigest: "sha256:371c62c58847bbb211aaa692be6e1ee24686460a37e66e251c6117a19085f000",
   };
   for (const transition of matrix.transitions) {
     assert.equal(transition.appliedAfter, matrix.targetMigration);
-    assert.equal(transition.recoveryMigration, "0077_people_multi_role_access");
-    assert.equal(transition.recoveryArtifact, "git:07bb30f5362d30d950432e04cf32fe2a2e40ad16");
+    assert.equal(transition.recoveryMigration, "0082_delivery_failure_states");
+    assert.equal(transition.recoveryArtifact, "git:e520b3c07cf99ad8924436d1a7635719e1e221e3");
     assert.equal(transition.testedUpgrade, true);
     assert.deepEqual(transition.evidence, expectedEvidence);
   }
   const evidence = JSON.parse(readFileSync(join(root, expectedEvidence.path), "utf8"));
   assert.equal(evidence.targetMigration, matrix.targetMigration);
-  assert.deepEqual(evidence.schemaLevels, [77, 80]);
-  assert.equal(evidence.runtime.schemaLevel, 80);
+  assert.deepEqual(evidence.schemaLevels, [82, 82]);
+  assert.equal(evidence.runtime.schemaLevel, 82);
   assert.equal(evidence.securityScan.gitleaks, "passed");
   assert.equal(evidence.securityScan.trivy, "passed");
   for (const scriptPath of [entrypointPath, provenancePath]) {
