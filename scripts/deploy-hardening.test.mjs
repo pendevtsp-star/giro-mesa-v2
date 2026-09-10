@@ -724,7 +724,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0082_delivery_failure_states");
+  assert.equal(matrix.requiredAppliedMigration, "0083_linked_service_accounts");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -841,7 +841,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0082_delivery_failure_states");
+  assert.equal(recovery.targetMigration, "0083_linked_service_accounts");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -867,14 +867,15 @@ test("pre-migration backup binds the migration actually applied in the source da
         appliedBeforeWhen: "1788972000000",
       },
       { appliedBefore: "0082_delivery_failure_states", appliedBeforeWhen: "1788972000001" },
+      { appliedBefore: "0083_linked_service_accounts", appliedBeforeWhen: "1789065000000" },
     ],
   );
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
-    assert.equal(transition.recoveryMigration, "0082_delivery_failure_states");
-    assert.equal(transition.recoveryArtifact, "git:e520b3c07cf99ad8924436d1a7635719e1e221e3");
+    assert.equal(transition.recoveryMigration, "0083_linked_service_accounts");
+    assert.equal(transition.recoveryArtifact, "git:2baa3098091d10638e604083c28a3bac9c8f4397");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34402742819$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34519597202$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });
