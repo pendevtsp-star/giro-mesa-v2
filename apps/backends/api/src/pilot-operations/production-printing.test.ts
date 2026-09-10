@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  billPrintingPolicySchema,
   createProductionPrinterSchema,
   productionPrinterConnectionProbeInputSchema,
   productionPrintPolicyInputSchema,
 } from "@giromesa/contracts";
-import { isPrivatePrinterAddress } from "./production-printing.service.js";
+import { isPrivatePrinterAddress, printerDeliveryIssue } from "./production-printing.service.js";
 
 const printer = {
   hubId: crypto.randomUUID(),
@@ -24,6 +25,43 @@ const printer = {
 } as const;
 
 describe("production printing contracts", () => {
+  it("validates the cashier policy and exposes offline, unapplied and untested printers", () => {
+    assert.equal(
+      billPrintingPolicySchema.safeParse({ mode: "cashier_printer", printerId: null, revision: 0 })
+        .success,
+      false,
+    );
+    assert.equal(
+      billPrintingPolicySchema.safeParse({ mode: "notify_cashier", printerId: null, revision: 0 })
+        .success,
+      true,
+    );
+    const state = {
+      applyStatus: "applied" as const,
+      appliedRevision: 2,
+      revision: 2,
+      lastStatus: "online" as const,
+      lastError: null,
+      lastTestAt: new Date(),
+    };
+    assert.equal(printerDeliveryIssue(state, false), "EDGE_HUB_OFFLINE");
+    assert.equal(
+      printerDeliveryIssue({ ...state, appliedRevision: 1 }, true),
+      "PRINTER_CONFIGURATION_PENDING",
+    );
+    assert.equal(
+      printerDeliveryIssue({ ...state, lastStatus: "unknown" }, true),
+      "PRINTER_TEST_REQUIRED",
+    );
+    assert.equal(
+      printerDeliveryIssue(
+        { ...state, lastStatus: "error", lastError: "PRINTER_UNREACHABLE" },
+        true,
+      ),
+      "PRINTER_UNREACHABLE",
+    );
+    assert.equal(printerDeliveryIssue(state, true), null);
+  });
   it("accepts private, link-local and loopback IP literals only", () => {
     assert.equal(isPrivatePrinterAddress("10.1.2.3"), true);
     assert.equal(isPrivatePrinterAddress("172.31.0.9"), true);

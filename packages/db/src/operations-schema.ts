@@ -509,6 +509,42 @@ export const posProductionPrinters = pgTable(
   ],
 );
 
+export const posBillPrintingPolicies = pgTable(
+  "pos_bill_printing_policies",
+  {
+    organizationId: uuid("organization_id").notNull(),
+    unitId: uuid("unit_id").primaryKey(),
+    mode: varchar("mode", { length: 24 })
+      .$type<"notify_cashier" | "cashier_printer" | "local_terminal">()
+      .notNull()
+      .default("notify_cashier"),
+    printerId: uuid("printer_id"),
+    revision: integer("revision").notNull().default(1),
+    ...timestamps,
+  },
+  (table) => [
+    foreignKey({
+      name: "pos_bill_printing_policies_unit_fk",
+      columns: [table.organizationId, table.unitId],
+      foreignColumns: [units.organizationId, units.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "pos_bill_printing_policies_printer_fk",
+      columns: [table.organizationId, table.unitId, table.printerId],
+      foreignColumns: [
+        posProductionPrinters.organizationId,
+        posProductionPrinters.unitId,
+        posProductionPrinters.id,
+      ],
+    }),
+    check(
+      "pos_bill_printing_policies_mode_check",
+      sql`(${table.mode} = 'cashier_printer' AND ${table.printerId} IS NOT NULL) OR (${table.mode} IN ('notify_cashier', 'local_terminal') AND ${table.printerId} IS NULL)`,
+    ),
+    check("pos_bill_printing_policies_revision_check", sql`${table.revision} > 0`),
+  ],
+);
+
 export const posProductionStations = pgTable(
   "pos_production_stations",
   {
@@ -1722,6 +1758,7 @@ export const posTabs = pgTable(
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
     tableId: uuid("table_id"),
+    serviceRootTabId: uuid("service_root_tab_id"),
     operationalShiftId: uuid("operational_shift_id"),
     shiftSectionId: uuid("shift_section_id"),
     openedByIdentityId: uuid("opened_by_identity_id")
@@ -1743,6 +1780,7 @@ export const posTabs = pgTable(
     status: posTabStatus("status").notNull().default("open"),
     mergedIntoTabId: uuid("merged_into_tab_id"),
     serviceChargeBasisPoints: integer("service_charge_basis_points").notNull().default(0),
+    serviceChargeAdjustmentCents: integer("service_charge_adjustment_cents").notNull().default(0),
     tipCents: integer("tip_cents").notNull().default(0),
     subtotalCents: integer("subtotal_cents").notNull().default(0),
     discountCents: integer("discount_cents").notNull().default(0),
@@ -1755,7 +1793,23 @@ export const posTabs = pgTable(
     unique("pos_tabs_scope_id_unique").on(table.organizationId, table.unitId, table.id),
     uniqueIndex("pos_tabs_one_open_per_table_unique")
       .on(table.organizationId, table.unitId, table.tableId)
-      .where(sql`${table.status} = 'open' AND ${table.tableId} IS NOT NULL`),
+      .where(
+        sql`${table.status} = 'open' AND ${table.tableId} IS NOT NULL AND ${table.serviceRootTabId} IS NULL`,
+      ),
+    index("pos_tabs_service_root_idx").on(
+      table.organizationId,
+      table.unitId,
+      table.serviceRootTabId,
+    ),
+    foreignKey({
+      name: "pos_tabs_service_root_fk",
+      columns: [table.organizationId, table.unitId, table.serviceRootTabId],
+      foreignColumns: [table.organizationId, table.unitId, table.id],
+    }).onDelete("restrict"),
+    check(
+      "pos_tabs_service_root_not_self_check",
+      sql`${table.serviceRootTabId} IS NULL OR ${table.serviceRootTabId} <> ${table.id}`,
+    ),
     index("pos_tabs_open_idx").on(table.organizationId, table.unitId, table.status),
     index("pos_tabs_reports_closed_idx").on(
       table.organizationId,

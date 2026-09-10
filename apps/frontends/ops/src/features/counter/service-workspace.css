@@ -1,0 +1,356 @@
+.service-workspace {
+  container: service-workspace / inline-size;
+  min-width: 0;
+}
+
+.service-workspace-grid {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.service-workspace-grid[hidden] {
+  display: none;
+}
+
+.service-order-area,
+.service-account-area,
+.service-accounts,
+.split-consumption {
+  min-width: 0;
+}
+
+.service-order-area {
+  display: grid;
+  gap: 12px;
+}
+
+.service-workspace .service-order-area .order-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.service-workspace .order-composer > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.service-workspace .order-composer > .cart-preview {
+  inset: auto;
+  margin: 0;
+  max-height: none;
+  position: static;
+}
+
+.service-workspace .service-account-area {
+  background: var(--gm-surface);
+  border: 1px solid var(--gm-border);
+  border-radius: 14px;
+  padding: 14px;
+  scroll-margin-top: 72px;
+}
+
+.service-workspace-actions {
+  align-items: center;
+  background: var(--gm-surface);
+  border-bottom: 1px solid var(--gm-border);
+  display: flex;
+  gap: 6px;
+  padding-block: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 14;
+}
+
+.service-workspace-actions > button {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: 8px;
+  color: var(--gm-ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+
+.service-workspace-actions > button[aria-current="page"] {
+  background: var(--gm-action);
+  border-color: var(--gm-action);
+  color: var(--gm-on-action);
+}
+
+.service-workspace-actions > button:focus-visible,
+.service-accounts__select:focus-visible {
+  outline: 2px solid var(--gm-brand);
+  outline-offset: 3px;
+}
+
+.service-workspace-actions .workspace-tabs__more > summary {
+  min-height: 44px;
+}
+
+.service-account-area > header,
+.service-account-area .service-consumption-heading,
+.service-accounts > header,
+.split-consumption > header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.service-account-area > header h3 {
+  margin: 2px 0;
+  font-size: 1.15rem;
+}
+
+.service-accounts > header {
+  margin-block: 8px;
+}
+.service-accounts > header > :is(div, span),
+.split-consumption > header > div {
+  display: grid;
+  gap: 3px;
+}
+
+.service-accounts small,
+.split-consumption small {
+  color: var(--gm-muted);
+  font-size: 0.75rem;
+}
+
+.service-accounts__list {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+}
+
+.service-accounts__list > article {
+  border: 1px solid var(--gm-border);
+  border-radius: 10px;
+  background: var(--gm-surface);
+  min-width: 0;
+  padding: 4px;
+}
+
+.service-accounts__list > article[data-selected="true"] {
+  border-color: var(--gm-brand);
+  box-shadow: inset 0 0 0 1px var(--gm-brand);
+  background: color-mix(in srgb, var(--gm-brand) 6%, var(--gm-surface));
+}
+
+.service-accounts__select {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--gm-ink);
+  cursor: pointer;
+  display: grid;
+  font: inherit;
+  gap: 4px;
+  padding: 8px;
+  text-align: start;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.service-accounts__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.service-workspace :is(.service-accounts, .service-account-area) .gm-button {
+  min-height: 44px;
+}
+
+.service-workspace .service-account-area .account-overview__metrics {
+  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.service-account-area .account-overview__metrics > span:last-child {
+  grid-column: 1 / -1;
+}
+.service-workspace .service-account-area .account-overview__metrics strong {
+  font-size: 1.05rem;
+}
+.service-account-area .account-overview__metrics > span:last-child strong {
+  font-size: 1.4rem;
+}
+.service-workspace .service-account-area .cashier-payment-form__fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+.service-workspace .service-account-area .cash-change-field {
+  grid-template-columns: minmax(0, 1fr);
+}
+.service-account-area .account-print-disclosure {
+  display: grid;
+  gap: 10px;
+}
+.service-account-area .account-print-disclosure > header {
+  display: grid;
+  gap: 3px;
+}
+.service-account-area .account-print-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.service-account-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.service-account-area .print-job {
+  overflow-wrap: anywhere;
+}
+
+.split-consumption {
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border-strong);
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+.split-consumption fieldset {
+  border: 0;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+.split-consumption .split-consumption__item {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 76px;
+}
+.split-consumption__item > span {
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.split-consumption input,
+.split-consumption select {
+  min-height: 44px;
+  min-width: 0;
+  width: 100%;
+}
+.split-consumption__preview {
+  border-top: 1px solid var(--gm-border);
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+.split-consumption__preview > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: space-between;
+}
+
+@container service-workspace (min-width: 980px) {
+  .service-workspace-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 36%);
+  }
+}
+
+@container service-workspace (max-width: 979px) {
+  .service-workspace[data-focus="account"] .service-account-area {
+    grid-row: 1;
+  }
+  .service-workspace[data-focus="account"] .service-order-area {
+    grid-row: 2;
+  }
+}
+
+@container service-workspace (max-width: 500px) {
+  .service-workspace-actions {
+    gap: 4px;
+  }
+  .service-workspace-actions > button {
+    flex: 1;
+    font-size: 0.75rem;
+    padding-inline: 6px;
+  }
+  .service-workspace-actions > button > svg {
+    display: none;
+  }
+  .service-accounts__list {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(140px, 1fr);
+    grid-template-columns: none;
+    overflow-x: auto;
+  }
+  .service-accounts__select {
+    font-size: 0.85rem;
+  }
+  .service-accounts__select small {
+    display: none;
+  }
+  .service-accounts__actions {
+    display: none;
+  }
+  .service-accounts > header > div small {
+    display: none;
+  }
+  .service-workspace :is(button, summary, input, select) {
+    min-height: 44px;
+  }
+  .service-workspace :is(input, select, textarea) {
+    font-size: 16px;
+  }
+  .service-account-area {
+    padding: 10px;
+  }
+  .service-account-shortcuts .gm-button {
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: normal;
+    font-size: 0.75rem;
+  }
+  .service-action-dock__status small {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .service-workspace :is(button, summary, input, select) {
+    min-height: 44px;
+  }
+  .service-workspace :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .salon-attendance-tables .salon-attendance-tables__select {
+    display: none;
+  }
+  .salon-attendance-tables .salon-attendance-tables__list .gm-button {
+    align-items: start;
+    display: grid;
+    justify-content: stretch;
+    min-width: 0;
+    text-align: start;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 500px) {
+  .salon-service-modal--attendance .gm-modal__description {
+    display: none;
+  }
+}

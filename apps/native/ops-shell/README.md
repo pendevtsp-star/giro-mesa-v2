@@ -4,11 +4,19 @@ Aplicativo .NET MAUI que empacota o bundle React de `apps/frontends/ops` e forne
 
 ## Empacotamento
 
-1. Execute o build de `@giromesa/ops`.
+1. Execute o build de `@giromesa/ops` com `VITE_API_URL=https://api.giromesa.com.br` para distribuição.
 2. Execute `sync-ops-bundle.ps1`.
 3. Compile o target Windows. Para incluir Android/iOS, instale os respectivos workloads e passe `-p:GiroMesaMobileTargets=true`.
 
 O SDK .NET 10 e os workloads MAUI do alvo precisam estar instalados. Para validar o pacote Windows, execute `dotnet build apps/native/ops-shell/GiroMesa.OpsShell.csproj` a partir da raiz do repositório.
+
+O bundle `Resources/Raw/wwwroot` é versionado e precisa acompanhar alterações de interface. Nunca sincronize um build de E2E apontando para localhost. O script valida o diretório de destino e a presença do `index.html` antes de substituir seus arquivos; `-ValidateOnly` faz essa conferência sem copiar ou excluir arquivos. O self-check da bridge pode rodar sem workload MAUI ou terminal físico:
+
+```powershell
+rtk proxy dotnet run --project apps/native/ops-shell/checks/SmartPos.SelfCheck/SmartPos.SelfCheck.csproj
+```
+
+Esse check valida contratos e proteções da bridge; impressão física, pareamento e pagamentos continuam exigindo equipamento e homologação.
 
 ## APK SmartPOS assinado
 

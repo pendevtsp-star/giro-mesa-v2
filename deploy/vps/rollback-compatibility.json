@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0082_delivery_failure_states",
+  "requiredAppliedMigration": "0083_linked_service_accounts",
   "transitions": [],
   "fullRestore": {
     "required": true,

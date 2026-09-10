@@ -54,6 +54,8 @@ describe("database readiness", () => {
             "management_finance_attachments",
             "management_waiter_settlements.payment_columns",
             "growth_delivery_status.failure_states",
+            "pos_tabs.linked_service_columns",
+            "pos_bill_printing_policies",
           ],
         });
         return true;
@@ -73,6 +75,8 @@ describe("database readiness", () => {
       financeAttachments: "present",
       settlementPayments: true,
       deliveryFailures: false,
+      linkedAccounts: true,
+      billPrintingPolicy: "present",
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -87,6 +91,39 @@ describe("database readiness", () => {
       },
     );
     readiness.deliveryFailures = true;
+    await service.assertReady();
+  });
+
+  it("does not declare schema 83 ready until linked accounts and bill printing are migrated", async () => {
+    const readiness = {
+      management: "present",
+      tableQrMetrics: "present",
+      operationalPush: "present",
+      whatsappMessages: "present",
+      crmAutomations: "present",
+      crmQuickReplies: "present",
+      edgeHubPairings: "present",
+      financeAttachments: "present",
+      settlementPayments: true,
+      deliveryFailures: true,
+      linkedAccounts: false,
+      billPrintingPolicy: null as string | null,
+    };
+    const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
+    const service = new DatabaseReadinessService(database);
+    await assert.rejects(
+      () => service.assertReady(),
+      (error: unknown) => {
+        assert.ok(error instanceof ServiceUnavailableException);
+        assert.deepEqual((error.getResponse() as { missingRelations: string[] }).missingRelations, [
+          "pos_tabs.linked_service_columns",
+          "pos_bill_printing_policies",
+        ]);
+        return true;
+      },
+    );
+    readiness.linkedAccounts = true;
+    readiness.billPrintingPolicy = "present";
     await service.assertReady();
   });
 });

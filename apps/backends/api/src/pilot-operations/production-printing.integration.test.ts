@@ -8,13 +8,17 @@ import {
   identities,
   memberships,
   organizations,
+  posPrintJobs,
   posProductionPrinters,
+  posTabEvents,
+  posTabs,
   roleBindings,
   units,
 } from "@giromesa/db";
 import { and, eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { PilotPosService } from "./pilot-pos.service.js";
 import { ProductionPrintingService } from "./production-printing.service.js";
 
 function errorCode(error: unknown) {
@@ -336,8 +340,216 @@ it("keeps one desired default per Edge Hub and ignores stale printer-test result
       .where(eq(hubCommands.id, tested.commandId))
       .limit(1);
     assert.ok(acknowledgedTest?.acknowledgedAt);
+
+    await database.db
+      .update(posProductionPrinters)
+      .set({ documentTypes: ["kds_ticket", "partial_statement"] })
+      .where(eq(posProductionPrinters.id, restoredA.id));
+    const configuredPolicy = await service.updateBillPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      `bill-policy-${runId}`,
+      {
+        mode: "cashier_printer",
+        printerId: restoredA.id,
+        revision: 0,
+      },
+    );
+    assert.equal(configuredPolicy.policy.revision, 1);
+    assert.deepEqual(
+      (await service.readBillPolicy(owner.id, organization.id, unit.id)).policy,
+      configuredPolicy.policy,
+    );
+    await assert.rejects(
+      service.updateBillPolicy(owner.id, organization.id, unit.id, `bill-policy-stale-${runId}`, {
+        mode: "notify_cashier",
+        printerId: null,
+        revision: 0,
+      }),
+      (error: unknown) => errorCode(error) === "BILL_PRINTING_POLICY_VERSION_CONFLICT",
+    );
+    const [tab] = await database.db
+      .insert(posTabs)
+      .values({ organizationId: organization.id, unitId: unit.id, openedByIdentityId: owner.id })
+      .returning();
+    assert.ok(tab);
+    const snapshot = {
+      schemaVersion: 2,
+      tab: { label: "Mesa teste" },
+      totals: { totalCents: 1234 },
+      items: [],
+      payments: [],
+    };
+    const [initial] = await database.db
+      .insert(posPrintJobs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        tabId: tab.id,
+        documentType: "partial_statement",
+        payload: snapshot,
+        requestedByIdentityId: owner.id,
+      })
+      .returning();
+    assert.ok(initial);
+    await database.db.delete(hubHeartbeats).where(eq(hubHeartbeats.hubId, hubA.id));
+    const queued = await database.db.transaction((tx) =>
+      service.queueFinancialJob(tx, initial, restoredA.id),
+    );
+    assert.equal(queued.status, "queued");
+    assert.equal(queued.lastError, "EDGE_HUB_OFFLINE");
+    assert.ok(queued.hubCommandId);
+    const queuedCommandId = queued.hubCommandId;
+    const [command] = await database.db
+      .select()
+      .from(hubCommands)
+      .where(eq(hubCommands.id, queued.hubCommandId));
+    assert.equal(command?.payload.documentType, "partial_statement");
+    assert.deepEqual(command?.payload.payload, snapshot);
+    assert.equal(command?.payload.stationId, undefined);
+    const scope = { id: hubA.id, organizationId: organization.id, unitId: unit.id };
+    await database.db.transaction((tx) =>
+      service.applyCommandResult(tx, scope, {
+        commandId: queuedCommandId,
+        type: "print_job.execute",
+        cloudPrintJobId: queued.id,
+        status: "printed",
+        errorCode: null,
+      }),
+    );
+    assert.equal(
+      (await database.db.select().from(posPrintJobs).where(eq(posPrintJobs.id, queued.id)))[0]
+        ?.status,
+      "printed",
+    );
+    const [second] = await database.db
+      .insert(posPrintJobs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        tabId: tab.id,
+        documentType: "partial_statement",
+        payload: snapshot,
+        requestedByIdentityId: owner.id,
+      })
+      .returning();
+    assert.ok(second);
+    const expired = await database.db.transaction((tx) =>
+      service.queueFinancialJob(tx, second, restoredA.id),
+    );
+    assert.ok(expired.hubCommandId);
+    await database.db
+      .update(hubCommands)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(hubCommands.id, expired.hubCommandId));
+    await database.db.transaction((tx) =>
+      service.expireUnknownPrintCommands(tx, { organizationId: organization.id, unitId: unit.id }),
+    );
+    assert.equal(
+      (await database.db.select().from(posPrintJobs).where(eq(posPrintJobs.id, expired.id)))[0]
+        ?.status,
+      "confirmation_required",
+    );
+    const pos = new PilotPosService(database, new ScopeService(database), undefined, service);
+    const listed = await pos.listPrintJobs(owner.id, organization.id, unit.id, {
+      tabId: tab.id,
+      limit: 100,
+    });
+    assert.ok(listed.every((job) => job.deliveryRoute === "cloud"));
+    const paymentStatement = await pos.createPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      tab.id,
+      `payment-statement-${runId}`,
+      {
+        documentType: "payment_statement",
+        copies: 1,
+      },
+    );
+    assert.equal(paymentStatement.printJob.deliveryRoute, "cashier");
+    assert.equal(paymentStatement.printJob.hubCommandId, null);
+    await assert.rejects(
+      pos.updatePrintJobStatus(
+        owner.id,
+        organization.id,
+        unit.id,
+        expired.id,
+        `client-ack-${runId}`,
+        {
+          status: "printed",
+        },
+      ),
+      (error: unknown) => errorCode(error) === "KDS_PRINT_JOB_RESULT_VIA_HUB_REQUIRED",
+    );
+    await assert.rejects(
+      pos.retryPrintJob(
+        owner.id,
+        organization.id,
+        unit.id,
+        expired.id,
+        `unknown-retry-${runId}`,
+        {},
+      ),
+      (error: unknown) => errorCode(error) === "PRINT_JOB_NOT_FAILED",
+    );
+    await service.resolveUnknownPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      expired.id,
+      `resolve-${runId}`,
+      {
+        outcome: "failed",
+        reason: "Operador conferiu ausência de impressão",
+      },
+    );
+    const retryA = await pos.retryPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      expired.id,
+      `retry-a-${runId}`,
+      {},
+    );
+    const retryB = await pos.retryPrintJob(
+      owner.id,
+      organization.id,
+      unit.id,
+      expired.id,
+      `retry-b-${runId}`,
+      {},
+    );
+    assert.equal(retryA.printJob.id, retryB.printJob.id);
+    assert.notEqual(retryA.printJob.id, expired.id);
+    assert.equal(retryA.printJob.deliveryRoute, "cloud");
+    assert.deepEqual(retryA.printJob.payload, snapshot);
+    assert.ok(retryA.printJob.hubCommandId);
+    const retryCommandId = retryA.printJob.hubCommandId;
+    await database.db.transaction((tx) =>
+      service.applyCommandResult(tx, scope, {
+        commandId: retryCommandId,
+        type: "print_job.execute",
+        cloudPrintJobId: retryA.printJob.id,
+        status: "failed",
+        errorCode: "PRINTER_UNREACHABLE",
+      }),
+    );
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(posProductionPrinters)
+          .where(eq(posProductionPrinters.id, restoredA.id))
+      )[0]?.lastStatus,
+      "error",
+    );
   } finally {
     if (organizationId) {
+      await database.db.delete(posTabEvents).where(eq(posTabEvents.organizationId, organizationId));
+      await database.db.delete(posPrintJobs).where(eq(posPrintJobs.organizationId, organizationId));
+      await database.db.delete(posTabs).where(eq(posTabs.organizationId, organizationId));
       await database.db.delete(organizations).where(eq(organizations.id, organizationId));
     }
     if (identityId) {

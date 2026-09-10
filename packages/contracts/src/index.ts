@@ -612,6 +612,20 @@ export const productionReadinessIssueSchema = z.enum([
   "EDGE_HUB_OFFLINE",
 ]);
 
+export const billPrintingPolicySchema = z
+  .object({
+    mode: z.enum(["notify_cashier", "cashier_printer", "local_terminal"]),
+    printerId: z.uuid().nullable(),
+    revision: z.number().int().min(0),
+  })
+  .strict()
+  .refine((input) => (input.mode === "cashier_printer") === (input.printerId !== null), {
+    message: "Selecione a impressora somente para impressão automática no caixa.",
+    path: ["printerId"],
+  });
+export type BillPrintingPolicy = z.infer<typeof billPrintingPolicySchema>;
+export const billPrintingPolicyResponseSchema = z.object({ policy: billPrintingPolicySchema });
+
 export const productionPrintPolicyInputSchema = z
   .object({
     deliveryMode: productionDeliveryModeSchema,
@@ -850,16 +864,25 @@ export interface KdsTicketPrintPayloadV1 {
   }>;
 }
 
-export interface PrintJobExecuteCommandV1 {
+export type PrintJobExecuteCommandV1 = {
   cloudPrintJobId: string;
   idempotencyKey: string;
-  stationId: string;
-  stationName: string;
-  documentType: "kds_ticket";
-  payload: KdsTicketPrintPayloadV1;
   copies: number;
   printerId: string;
-}
+} & (
+  | {
+      stationId: string;
+      stationName: string;
+      documentType: "kds_ticket";
+      payload: KdsTicketPrintPayloadV1;
+    }
+  | {
+      stationId?: never;
+      stationName?: never;
+      documentType: "partial_statement" | "payment_statement" | "final_receipt";
+      payload: PrintDocumentPayloadV2;
+    }
+);
 
 export interface PrinterConfigurationCommandV1 {
   printerId: string;

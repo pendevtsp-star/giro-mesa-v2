@@ -258,6 +258,7 @@ export function usesQuickServiceMode(mode: ServiceMode) {
 export interface PosTab {
   id: string;
   tableId: string | null;
+  serviceRootTabId?: string | null;
   openedAt?: string | null;
   createdAt?: string | null;
   operationalShiftId: string | null;
@@ -476,6 +477,8 @@ export interface TabPayment {
 }
 
 export interface TabDetail {
+  relatedTabs?: RelatedServiceTab[];
+  productionPrintJobs?: Array<{ id: string; status: string; lastError: string | null }>;
   productionCourses?: Array<{
     ticketId: string;
     course: "anytime" | "starter" | "main" | "dessert";
@@ -496,6 +499,13 @@ export interface TabDetail {
     createdAt: string;
   }>;
   presence: Array<{ identityId: string; displayName: string }>;
+}
+
+export interface RelatedServiceTab extends PosTab {
+  paidCents: number;
+  reservedCents: number;
+  coveredLossCents: number;
+  remainingCents: number;
 }
 
 export type KdsTicketStatus = "pending" | "preparing" | "ready" | "done" | "canceled";
@@ -911,6 +921,7 @@ export function parseTab(row: Row): PosTab {
   return {
     id: text(row.id),
     tableId: optionalText(row.tableId),
+    serviceRootTabId: optionalText(row.serviceRootTabId),
     openedAt: optionalText(row.openedAt ?? row.createdAt),
     createdAt: optionalText(row.createdAt ?? row.openedAt),
     operationalShiftId: optionalText(row.operationalShiftId),
@@ -1526,6 +1537,20 @@ export function summarizeTabPayments(payments: TabPayment[]) {
 export function parseTabDetail(value: unknown): TabDetail {
   const payload = record(value);
   return {
+    relatedTabs: records(payload.relatedTabs ?? []).map((row) => ({
+      ...parseTab(row),
+      paidCents: number(row.paidCents ?? 0),
+      reservedCents: number(row.reservedCents ?? 0),
+      coveredLossCents: number(row.coveredLossCents ?? 0),
+      remainingCents: number(row.remainingCents ?? row.totalCents),
+    })),
+    productionPrintJobs: records(payload.printJobs ?? [])
+      .filter((row) => row.documentType === "kds_ticket")
+      .map((row) => ({
+        id: text(row.id),
+        status: text(row.status),
+        lastError: optionalText(row.lastError),
+      })),
     productionCourses: records(payload.productionCourses ?? []).map((row) => {
       const course = text(row.course);
       const state = text(row.state);

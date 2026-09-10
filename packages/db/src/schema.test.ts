@@ -803,6 +803,23 @@ describe("database schema", () => {
     assert.match(migration, /CREATE TABLE "platform_staff_access"/);
   });
 
+  it("persists scoped linked accounts while keeping one open root per table", async () => {
+    assert.ok(posTabs.serviceRootTabId);
+    assert.ok(posTabs.serviceChargeAdjustmentCents);
+    const migration = await readFile(
+      new URL("../drizzle/0083_linked_service_accounts.sql", import.meta.url),
+      "utf8",
+    );
+    assert.match(
+      migration,
+      /FOREIGN KEY \("organization_id", "unit_id", "service_root_tab_id"\) REFERENCES "pos_tabs" \("organization_id", "unit_id", "id"\)/,
+    );
+    assert.match(
+      migration,
+      /CREATE UNIQUE INDEX "pos_tabs_one_open_per_table_unique"[^;]+"service_root_tab_id" IS NULL/,
+    );
+  });
+
   it("persists one-time Edge Hub pairing codes without the raw code", async () => {
     assert.ok(edgeHubPairingCodes.codeHash);
     assert.ok(edgeHubPairingCodes.expiresAt);

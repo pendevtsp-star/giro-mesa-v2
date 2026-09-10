@@ -13,9 +13,28 @@ rtk pnpm --filter @giromesa/ops exec vitest run src/features/salon/SalonPage.tes
 rtk pnpm --filter @giromesa/ops typecheck
 ```
 
-O E2E deve concluir abertura de mesas, pedido, unificação, divisão persistida, pedido de conta, confirmação da impressão pelo navegador, restauração do contexto após reload e sinalização offline. O teste PostgreSQL de `pilot-pos.integration.test.ts` deve confirmar que duas aberturas concorrentes da mesma mesa produzem exatamente uma comanda.
+O E2E deve concluir abertura de mesas, pedido, unificação, divisão persistida, pedido de conta, restauração do contexto após reload e sinalização offline. Impressão local exige confirmação explícita do operador; jobs cloud exigem resultado autenticado do Edge Hub. O teste PostgreSQL de `pilot-pos.integration.test.ts` deve confirmar que duas aberturas concorrentes da mesma mesa produzem exatamente uma comanda raiz.
 
 Para 500 mesas e 50 terminais, execute o profile `target` descrito em [load-gates.md](./load-gates.md). Smoke local não aprova capacidade.
+
+## Contas do mesmo atendimento
+
+A partir da migration `0083_linked_service_accounts`, separar consumo sem escolher outra mesa mantém `tableId` e vincula a nova conta por `serviceRootTabId`. Na mesma tela, selecione Principal ou uma conta vinculada para operar, imprimir, receber e finalizar. Também é possível mover quantidades para outra conta aberta do mesmo atendimento. Os valores confirmados vêm da API; a prévia da divisão é uma estimativa.
+
+- Atualize a página e confirme as mesmas contas, itens, pagamentos e saldo. O resumo `getTab.service` soma o atendimento; `relatedTabs` mantém valores e situação de cada conta.
+- Divida quantidades com desconto e taxa cujo arredondamento produza resto de centavo. A soma deve permanecer idêntica após recarregar; o ajuste da taxa fica persistido. Repetir a mesma chave idempotente não cria outra conta nem outra baixa de consumo.
+- Confirme que itens já enviados mantêm quantidade e estágio no KDS sem novo preparo ou nova baixa de estoque. Itens ainda não enviados devem ser divididos separadamente dos já enviados.
+- Origem e destino devem estar abertos e sem pagamento, perda aprovada ou cobrança reservada. A divisão para conta existente exige o mesmo atendimento, mesa e percentual de taxa. Transferir um atendimento com contas vinculadas para outra mesa permanece bloqueado.
+- Receba cada conta individualmente. Finalizar a Principal mantém a mesa ocupada enquanto houver outra conta aberta; somente a última finalização envia a mesa para limpeza. Execute também duas finalizações concorrentes.
+- Imprima vias da Principal e de uma conta nomeada: os nomes das contas devem diferir, com a mesma mesa identificada separadamente. A situação de um job não pode ser inferida da abertura de uma janela de impressão.
+
+O teste real dedicado usa `tests/e2e-live/unified-service.config.ts` e `unified-service-live.spec.ts`. Execute-o somente com banco e serviços locais descartáveis configurados; registre a cobertura efetivamente observada em desktop e 375 px.
+
+## Destino da pré-conta
+
+Em Dispositivo/Impressão, a política por unidade define `notify_cashier` (avisar o caixa, padrão), `cashier_printer` (impressora cadastrada no caixa via Edge Hub) ou `local_terminal` (perfil local autorizado). A política tem revisão para detectar alterações concorrentes. Ela não altera o destino dos comprovantes de pagamento ou de fechamento.
+
+Em `cashier_printer`, o job e seu comando cloud persistem mesmo quando o Hub está offline; a fila mostra o diagnóstico. Reconectar não pode duplicar a via. Um comando expirado exige conferência do resultado; o navegador não pode confirmar nem reivindicar o job cloud. Falha confirmada permite nova tentativa auditada; resultado desconhecido exige resolução explícita antes disso.
 
 ## Gate físico 58 e 80 mm
 

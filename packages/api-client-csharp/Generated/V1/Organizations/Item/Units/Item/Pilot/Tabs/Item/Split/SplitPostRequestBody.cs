@@ -42,6 +42,8 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
 #endif
         /// <summary>The tableId property</summary>
         public Guid? TableId { get; set; }
+        /// <summary>The targetTabId property</summary>
+        public Guid? TargetTabId { get; set; }
         /// <summary>The terminalId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -74,6 +76,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
                 { "label", n => { Label = n.GetStringValue(); } },
                 { "printerId", n => { PrinterId = n.GetStringValue(); } },
                 { "tableId", n => { TableId = n.GetGuidValue(); } },
+                { "targetTabId", n => { TargetTabId = n.GetGuidValue(); } },
                 { "terminalId", n => { TerminalId = n.GetStringValue(); } },
             };
         }
@@ -90,6 +93,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Sp
             writer.WriteStringValue("label", Label);
             writer.WriteStringValue("printerId", PrinterId);
             writer.WriteGuidValue("tableId", TableId);
+            writer.WriteGuidValue("targetTabId", TargetTabId);
             writer.WriteStringValue("terminalId", TerminalId);
         }
     }

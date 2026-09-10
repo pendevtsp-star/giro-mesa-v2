@@ -1,0 +1,1 @@
+var e=/^\+?[0-9 ()-]+$/;function t(t){let n=t.trim();if(!n)return!0;if(!e.test(n))return!1;let r=n.replace(/\D/g,``);return r.length===10||r.length===11||(r.length===12||r.length===13)&&r.startsWith(`55`)}export{t};

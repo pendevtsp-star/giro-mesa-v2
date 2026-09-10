@@ -5079,7 +5079,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             </div>
 
             <Modal
-              className={`salon-service-modal${table && !tab ? " salon-service-modal--compact max-sm:items-stretch max-sm:p-0" : ""}`}
+              className={`salon-service-modal${table && !tab ? " salon-service-modal--compact max-sm:items-stretch max-sm:p-0" : " salon-service-modal--attendance"}`}
               contentClassName={
                 table && !tab
                   ? "h-fit max-h-[min(92dvh,680px)] w-[calc(100vw-2rem)] max-w-[680px] max-sm:h-dvh max-sm:max-h-none max-sm:w-screen max-sm:max-w-none max-sm:rounded-none"
@@ -5107,7 +5107,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       <span>{selectedTabOpenedMinutes} min</span>
                       <span aria-hidden="true">·</span>
                       {selectedCanSeeFinancials && (
-                        <strong>Total: {formatMoney(tab.totalCents)}</strong>
+                        <strong>
+                          Total da mesa:{" "}
+                          {formatMoney(
+                            data.openTabs
+                              .filter((account) => account.tableId === table.id)
+                              .reduce((sum, account) => sum + account.totalCents, 0),
+                          )}
+                        </strong>
                       )}
                     </div>
                   </div>
@@ -5118,479 +5125,531 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
               size={tab ? "xl" : "lg"}
               title={table?.label ?? "Atendimento da mesa"}
             >
-              <div className="table-drawer salon-workspace salon-workspace--modal">
-                {table && (
-                  <>
-                    {Boolean(
-                      tab &&
-                        (selectedCall || (selectedCanOperate && selectedReadyOrderIds.length > 0)),
-                    ) && (
-                      <section className="salon-next-action" aria-label="Próxima ação da mesa">
-                        <span>
-                          <small>Ação necessária</small>
-                          <strong>{selectedNextAction}</strong>
-                        </span>
-                        <small>
-                          {selectedPhase
-                            ? `${servicePhasePresentation[selectedPhase.phase]} · ${elapsedLabel(selectedPhase.since)}`
-                            : selectedCall
-                              ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
-                              : ""}
-                        </small>
-                        {selectedCanOperate &&
-                          ["owner", "manager", "waiter"].includes(scope.profileId) &&
-                          selectedReadyOrderIds.length > 0 && (
-                            <Button
-                              aria-busy={busy}
-                              disabled={busy}
-                              onClick={() => void serveReadyOrders(selectedReadyOrderIds)}
-                              size="sm"
-                            >
-                              {busy ? "Confirmando…" : "Marcar como servido"}
-                            </Button>
-                          )}
-                      </section>
-                    )}
-                    {Boolean(tab) && (
-                      <div className="table-operation-strip">
-                        <div>
+              <div className="salon-attendance-layout">
+                {table && tab && (
+                  <nav aria-label="Mesas do salão" className="salon-attendance-tables">
+                    <strong>Mesas</strong>
+                    <Label className="salon-attendance-tables__select">
+                      Trocar mesa
+                      <NativeSelect
+                        value={table.id}
+                        onChange={(event) => {
+                          const target = activeTables.find(
+                            (item) => item.id === event.target.value,
+                          );
+                          if (target) selectTable(target);
+                        }}
+                      >
+                        {activeTables.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                    </Label>
+                    <div className="salon-attendance-tables__list">
+                      {activeTables.map((item) => (
+                        <Button
+                          aria-current={item.id === table.id ? "true" : undefined}
+                          disabled={busy}
+                          key={item.id}
+                          onClick={() => selectTable(item)}
+                          variant={item.id === table.id ? "secondary" : "ghost"}
+                        >
+                          <strong>{item.label}</strong>
+                          <small>{tableStatusPresentation(displayStatus(item)).label}</small>
+                        </Button>
+                      ))}
+                    </div>
+                  </nav>
+                )}
+                <div className="table-drawer salon-workspace salon-workspace--modal">
+                  {table && (
+                    <>
+                      {Boolean(
+                        tab &&
+                          (selectedCall ||
+                            (selectedCanOperate && selectedReadyOrderIds.length > 0)),
+                      ) && (
+                        <section className="salon-next-action" aria-label="Próxima ação da mesa">
                           <span>
-                            <small>Praça</small>
-                            <strong>{selectedAssignment?.section.name ?? "Sem praça"}</strong>
+                            <small>Ação necessária</small>
+                            <strong>{selectedNextAction}</strong>
                           </span>
-                          {selectedCall && (
-                            <span className="table-operation-strip__call">
-                              <small>{callKindLabel[selectedCall.kind]}</small>
-                              <strong>
-                                {selectedCall.status === "acknowledged" &&
-                                selectedCall.acknowledgedAt
-                                  ? "Assumido por " +
-                                    callOwner(selectedCall.acknowledgedByIdentityId) +
-                                    " " +
-                                    elapsedLabel(selectedCall.acknowledgedAt)
-                                  : `Aguardando ${elapsedLabel(selectedCall.createdAt)}`}
-                              </strong>
-                            </span>
-                          )}
-                        </div>
-                        {selectedCanOperate && (
-                          <nav aria-label="Ações rápidas da mesa">
-                            {selectedCall && (
+                          <small>
+                            {selectedPhase
+                              ? `${servicePhasePresentation[selectedPhase.phase]} · ${elapsedLabel(selectedPhase.since)}`
+                              : selectedCall
+                                ? `${callKindLabel[selectedCall.kind]} · ${elapsedLabel(selectedCall.createdAt)}`
+                                : ""}
+                          </small>
+                          {selectedCanOperate &&
+                            ["owner", "manager", "waiter"].includes(scope.profileId) &&
+                            selectedReadyOrderIds.length > 0 && (
                               <Button
+                                aria-busy={busy}
                                 disabled={busy}
-                                onClick={() =>
-                                  void transitionCall(
-                                    selectedCall.id,
-                                    selectedCall.status === "open" ? "acknowledged" : "resolved",
-                                  )
-                                }
+                                onClick={() => void serveReadyOrders(selectedReadyOrderIds)}
                                 size="sm"
-                                variant={selectedCall.status === "open" ? "secondary" : "ghost"}
                               >
-                                {selectedCall.status === "open"
-                                  ? "Assumir chamado"
-                                  : "Resolver chamado"}
+                                {busy ? "Confirmando…" : "Marcar como servido"}
                               </Button>
                             )}
+                        </section>
+                      )}
+                      {Boolean(tab) && (
+                        <div className="table-operation-strip">
+                          <div>
+                            <span>
+                              <small>Praça</small>
+                              <strong>{selectedAssignment?.section.name ?? "Sem praça"}</strong>
+                            </span>
+                            {selectedCall && (
+                              <span className="table-operation-strip__call">
+                                <small>{callKindLabel[selectedCall.kind]}</small>
+                                <strong>
+                                  {selectedCall.status === "acknowledged" &&
+                                  selectedCall.acknowledgedAt
+                                    ? "Assumido por " +
+                                      callOwner(selectedCall.acknowledgedByIdentityId) +
+                                      " " +
+                                      elapsedLabel(selectedCall.acknowledgedAt)
+                                    : `Aguardando ${elapsedLabel(selectedCall.createdAt)}`}
+                                </strong>
+                              </span>
+                            )}
+                          </div>
+                          {selectedCanOperate && (
+                            <nav aria-label="Ações rápidas da mesa">
+                              {selectedCall && (
+                                <Button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void transitionCall(
+                                      selectedCall.id,
+                                      selectedCall.status === "open" ? "acknowledged" : "resolved",
+                                    )
+                                  }
+                                  size="sm"
+                                  variant={selectedCall.status === "open" ? "secondary" : "ghost"}
+                                >
+                                  {selectedCall.status === "open"
+                                    ? "Assumir chamado"
+                                    : "Resolver chamado"}
+                                </Button>
+                              )}
 
-                            {tab && (
-                              <Button
-                                onClick={() => setMoveTableOpen(true)}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                <Icon name="salon" size={14} />
-                                <span>Mudar Mesa</span>
-                              </Button>
-                            )}
-                            {canReorganizeTurn && (
-                              <details className="table-more-actions" data-salon-floating-menu>
-                                <summary>Mais ações</summary>
-                                <div>
-                                  {data.activeShift && (
+                              {tab && (
+                                <Button
+                                  onClick={() => setMoveTableOpen(true)}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  <Icon name="salon" size={14} />
+                                  <span>Mudar Mesa</span>
+                                </Button>
+                              )}
+                              {canReorganizeTurn && (
+                                <details className="table-more-actions" data-salon-floating-menu>
+                                  <summary>Mais ações</summary>
+                                  <div>
+                                    {data.activeShift && (
+                                      <Button
+                                        onClick={() => {
+                                          setSelectedTableId(null);
+                                          setWorkspaceMode("shift");
+                                          setFloorFocusId(table.id);
+                                          setFloorEditRequestKey((current) => current + 1);
+                                        }}
+                                        size="sm"
+                                        variant="ghost"
+                                      >
+                                        Mover neste turno
+                                      </Button>
+                                    )}
+                                    {data.activeShift &&
+                                      selectedBaseSection &&
+                                      !selectedTransfer && (
+                                        <Button
+                                          onClick={openTransferDialog}
+                                          size="sm"
+                                          variant="ghost"
+                                        >
+                                          Ajustar praça
+                                        </Button>
+                                      )}
                                     <Button
                                       onClick={() => {
                                         setSelectedTableId(null);
-                                        setWorkspaceMode("shift");
-                                        setFloorFocusId(table.id);
-                                        setFloorEditRequestKey((current) => current + 1);
+                                        setView("map");
+                                        setWorkspaceMode("operate");
+                                        setJoinMode(true);
+                                        setJoinSelection([
+                                          selectedGroup?.anchorTableId ?? table.id,
+                                        ]);
                                       }}
                                       size="sm"
                                       variant="ghost"
                                     >
-                                      Mover neste turno
+                                      Organizar com outra mesa
                                     </Button>
-                                  )}
-                                  {data.activeShift && selectedBaseSection && !selectedTransfer && (
-                                    <Button onClick={openTransferDialog} size="sm" variant="ghost">
-                                      Ajustar praça
-                                    </Button>
-                                  )}
-                                  <Button
-                                    onClick={() => {
-                                      setSelectedTableId(null);
-                                      setView("map");
-                                      setWorkspaceMode("operate");
-                                      setJoinMode(true);
-                                      setJoinSelection([selectedGroup?.anchorTableId ?? table.id]);
-                                    }}
-                                    size="sm"
-                                    variant="ghost"
-                                  >
-                                    Organizar com outra mesa
-                                  </Button>
-                                </div>
-                              </details>
-                            )}
-                          </nav>
-                        )}
-                      </div>
-                    )}
-                    {selectedCanOperate &&
-                      scope.profileId === "waiter" &&
-                      selectedAssignment &&
-                      selectedAssignment.primary?.identityId !== scope.identityId && (
-                        <div className="cross-room-service-notice" role="note">
-                          <strong>
-                            {selectedSectionRole === "support"
-                              ? `Apoiando ${selectedAssignment.section.name}`
-                              : tab?.responsibleIdentityId === scope.identityId
-                                ? "Visita assumida em outra praça"
-                                : "Mesa de outra praça"}
-                          </strong>
-                          <span>
-                            {selectedAssignment.section.name}
-                            {selectedAssignment.primary
-                              ? ` · titular ${selectedAssignment.primary.displayName}. `
-                              : " · sem titular. "}
-                            {selectedSectionRole === "support"
-                              ? "Você recebe o contexto de toda a praça durante este turno."
-                              : tab?.responsibleIdentityId === scope.identityId
-                                ? "Você responde por esta visita; a divisão original do turno não muda."
-                                : "Apoie toda a praça ou assuma apenas esta visita no botão abaixo da comanda."}
-                          </span>
-                          {selectedSectionRole !== "primary" && (
-                            <div className="cross-room-service-notice__actions">
-                              <Button
-                                disabled={busy}
-                                onClick={() =>
-                                  void toggleSectionCoverage(
-                                    selectedAssignment.section.id,
-                                    selectedAssignment.section.name,
-                                    selectedSectionRole !== "support",
-                                  )
-                                }
-                                size="sm"
-                                variant={selectedSectionRole === "support" ? "ghost" : "secondary"}
-                              >
-                                {selectedSectionRole === "support"
-                                  ? "Encerrar apoio"
-                                  : "Apoiar esta praça"}
-                              </Button>
-                            </div>
+                                  </div>
+                                </details>
+                              )}
+                            </nav>
                           )}
                         </div>
                       )}
-                    {selectedCanOperate && selectedTransfer && canReorganizeTurn && (
-                      <div className="temporary-table-assignment" role="note">
-                        <span>
-                          <strong>
-                            {`Remanejada para ${selectedAssignment?.section.name ?? "outra praça"}`}
-                          </strong>
-                          <small>
-                            {`Retorno automático às ${new Date(selectedTransfer.expiresAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}. A comanda atual mantém o responsável até uma nova passagem.`}
-                          </small>
-                        </span>
-                        <Button
-                          disabled={busy}
-                          onClick={() => void endSelectedTableTransfer()}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Desfazer remanejamento
-                        </Button>
-                      </div>
-                    )}
-                    {selectedTimeline.length > 0 && (
-                      <details className="salon-table-timeline">
-                        <summary>Linha do tempo da mesa</summary>
-                        <ol>
-                          {selectedTimeline.map((item) => (
-                            <li key={item.id}>
-                              <time dateTime={item.at}>
-                                {new Date(item.at).toLocaleTimeString("pt-BR", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })}
-                              </time>
-                              <span>
-                                <strong>{item.label}</strong>
-                                {item.detail && <small>{item.detail}</small>}
-                              </span>
-                            </li>
-                          ))}
-                        </ol>
-                      </details>
-                    )}
-                    {selectedCanOperate && selectedGroup && (
-                      <div className="group-workspace-bar group-workspace-bar--real">
-                        <span>
-                          <strong>
-                            {selectedGroup.mode === "single_tab"
-                              ? "Comanda única"
-                              : "Comandas separadas"}
-                          </strong>
-                          <small>
-                            {selectedGroupTableIds.length} mesas agrupadas
-                            {selectedGroupResponsible
-                              ? ` · ${selectedGroupResponsible.displayName} responsável`
-                              : ""}
-                          </small>
-                        </span>
-                        <div className="group-workspace-bar__actions">
-                          {selectedGroupTableIds.length > 1 && (
-                            <>
-                              <NativeSelect
-                                aria-label="Mesa a retirar do grupo"
-                                onChange={(event) => setDetachTableId(event.target.value)}
-                                value={detachTableId}
-                              >
-                                <option value="">Separar mesa…</option>
-                                {selectedGroupTableIds
-                                  .filter((id) => id !== selectedGroup.anchorTableId)
-                                  .map((id) => {
-                                    const member = data.tables.find(
-                                      (candidate) => candidate.id === id,
-                                    );
-                                    return member ? (
-                                      <option key={id} value={id}>
-                                        {member.label}
-                                      </option>
-                                    ) : null;
-                                  })}
-                              </NativeSelect>
-                              <Button
-                                disabled={busy || !detachTableId}
-                                onClick={() => void detachFromGroup()}
-                                size="sm"
-                                variant="ghost"
-                              >
-                                Retirar
-                              </Button>
-                            </>
-                          )}
+                      {selectedCanOperate &&
+                        scope.profileId === "waiter" &&
+                        selectedAssignment &&
+                        selectedAssignment.primary?.identityId !== scope.identityId && (
+                          <div className="cross-room-service-notice" role="note">
+                            <strong>
+                              {selectedSectionRole === "support"
+                                ? `Apoiando ${selectedAssignment.section.name}`
+                                : tab?.responsibleIdentityId === scope.identityId
+                                  ? "Visita assumida em outra praça"
+                                  : "Mesa de outra praça"}
+                            </strong>
+                            <span>
+                              {selectedAssignment.section.name}
+                              {selectedAssignment.primary
+                                ? ` · titular ${selectedAssignment.primary.displayName}. `
+                                : " · sem titular. "}
+                              {selectedSectionRole === "support"
+                                ? "Você recebe o contexto de toda a praça durante este turno."
+                                : tab?.responsibleIdentityId === scope.identityId
+                                  ? "Você responde por esta visita; a divisão original do turno não muda."
+                                  : "Apoie toda a praça ou assuma apenas esta visita no botão abaixo da comanda."}
+                            </span>
+                            {selectedSectionRole !== "primary" && (
+                              <div className="cross-room-service-notice__actions">
+                                <Button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void toggleSectionCoverage(
+                                      selectedAssignment.section.id,
+                                      selectedAssignment.section.name,
+                                      selectedSectionRole !== "support",
+                                    )
+                                  }
+                                  size="sm"
+                                  variant={
+                                    selectedSectionRole === "support" ? "ghost" : "secondary"
+                                  }
+                                >
+                                  {selectedSectionRole === "support"
+                                    ? "Encerrar apoio"
+                                    : "Apoiar esta praça"}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      {selectedCanOperate && selectedTransfer && canReorganizeTurn && (
+                        <div className="temporary-table-assignment" role="note">
+                          <span>
+                            <strong>
+                              {`Remanejada para ${selectedAssignment?.section.name ?? "outra praça"}`}
+                            </strong>
+                            <small>
+                              {`Retorno automático às ${new Date(selectedTransfer.expiresAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}. A comanda atual mantém o responsável até uma nova passagem.`}
+                            </small>
+                          </span>
                           <Button
                             disabled={busy}
-                            onClick={() => void dissolveGroup()}
+                            onClick={() => void endSelectedTableTransfer()}
                             size="sm"
                             variant="ghost"
                           >
-                            Desfazer grupo
+                            Desfazer remanejamento
                           </Button>
                         </div>
-                      </div>
-                    )}
-
-                    {selectedCanOperate &&
-                      selectedCanSeeFinancials &&
-                      selectedGroup?.mode === "physical_only" &&
-                      selectedGroupTabs.length > 1 && (
-                        <fieldset className="group-account-tabs">
-                          <legend>Comandas do grupo</legend>
-                          {selectedGroupTabs.map((groupTab) => {
-                            const accountTable = data.tables.find(
-                              (candidate) => candidate.id === groupTab.tableId,
-                            );
-                            return (
-                              <Button
-                                aria-pressed={tab?.id === groupTab.id}
-                                key={groupTab.id}
-                                onClick={() => setSelectedTabId(groupTab.id)}
-                                type="button"
-                              >
-                                <span>{accountTable?.label ?? groupTab.label ?? "Comanda"}</span>
-                                <strong>{formatMoney(groupTab.totalCents)}</strong>
-                              </Button>
-                            );
-                          })}
-                        </fieldset>
+                      )}
+                      {selectedTimeline.length > 0 && (
+                        <details className="salon-table-timeline">
+                          <summary>Linha do tempo da mesa</summary>
+                          <ol>
+                            {selectedTimeline.map((item) => (
+                              <li key={item.id}>
+                                <time dateTime={item.at}>
+                                  {new Date(item.at).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </time>
+                                <span>
+                                  <strong>{item.label}</strong>
+                                  {item.detail && <small>{item.detail}</small>}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
+                        </details>
+                      )}
+                      {selectedCanOperate && selectedGroup && (
+                        <div className="group-workspace-bar group-workspace-bar--real">
+                          <span>
+                            <strong>
+                              {selectedGroup.mode === "single_tab"
+                                ? "Comanda única"
+                                : "Comandas separadas"}
+                            </strong>
+                            <small>
+                              {selectedGroupTableIds.length} mesas agrupadas
+                              {selectedGroupResponsible
+                                ? ` · ${selectedGroupResponsible.displayName} responsável`
+                                : ""}
+                            </small>
+                          </span>
+                          <div className="group-workspace-bar__actions">
+                            {selectedGroupTableIds.length > 1 && (
+                              <>
+                                <NativeSelect
+                                  aria-label="Mesa a retirar do grupo"
+                                  onChange={(event) => setDetachTableId(event.target.value)}
+                                  value={detachTableId}
+                                >
+                                  <option value="">Separar mesa…</option>
+                                  {selectedGroupTableIds
+                                    .filter((id) => id !== selectedGroup.anchorTableId)
+                                    .map((id) => {
+                                      const member = data.tables.find(
+                                        (candidate) => candidate.id === id,
+                                      );
+                                      return member ? (
+                                        <option key={id} value={id}>
+                                          {member.label}
+                                        </option>
+                                      ) : null;
+                                    })}
+                                </NativeSelect>
+                                <Button
+                                  disabled={busy || !detachTableId}
+                                  onClick={() => void detachFromGroup()}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  Retirar
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              disabled={busy}
+                              onClick={() => void dissolveGroup()}
+                              size="sm"
+                              variant="ghost"
+                            >
+                              Desfazer grupo
+                            </Button>
+                          </div>
+                        </div>
                       )}
 
-                    {!selectedCanOperate ? (
-                      <Card className="table-start table-start--protected">
-                        <div>
-                          <h2>Atendimento de outra praça</h2>
-                          <span>
-                            {table.responsibleDisplayName
-                              ? `Responsável: ${table.responsibleDisplayName}. `
-                              : "Responsável preservado. "}
-                            {table.openedAt
-                              ? `Em atendimento desde ${new Date(table.openedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`
-                              : "Os dados pessoais, a comanda e os valores não estão no seu escopo."}
-                          </span>
-                        </div>
-                      </Card>
-                    ) : tab && canOpenTableWorkspace(accessForTable(table), tab.id) ? (
-                      <TabWorkspace
-                        compactHeading
-                        initialView={selectedCall?.kind === "bill" ? "account" : "order"}
-                        key={tab.id}
-                        scope={scope}
-                        tabId={tab.id}
-                        floor={data}
-                        onChanged={floor.retry}
-                      />
-                    ) : table.status === "needs_cleaning" || table.status === "cleaning" ? (
-                      <Card className="table-start">
-                        <div>
-                          <h2>
-                            {table.status === "needs_cleaning"
-                              ? "Mesa aguardando limpeza"
-                              : "Limpeza em andamento"}
-                          </h2>
-                          <span>
-                            A mesa só volta a receber clientes depois da confirmação da equipe.
-                          </span>
-                        </div>
-                        <Button
-                          disabled={busy}
-                          onClick={() =>
-                            void updateTurnover(
-                              table.status === "needs_cleaning" ? "cleaning" : "available",
-                            )
-                          }
-                        >
-                          {busy
-                            ? "Atualizando…"
-                            : table.status === "needs_cleaning"
-                              ? "Assumir limpeza"
-                              : "Concluir e liberar mesa"}
-                        </Button>
-                      </Card>
-                    ) : (
-                      <section className="gm-card table-start table-start--opening">
-                        <div className="table-start__header">
-                          <div className="table-start__tags">
-                            <Badge tone={table.status === "reserved" ? "warning" : "success"}>
-                              {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
-                            </Badge>
-                            <span className="table-start__capacity">{table.seats} lugares</span>
-                            <span className="table-start__separator" aria-hidden="true">
-                              ·
-                            </span>
-                            <span className="table-start__location">
-                              {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
-                                "Salão"}{" "}
-                              · {selectedAssignment?.section.name ?? "Sem praça"}
+                      {selectedCanOperate &&
+                        selectedCanSeeFinancials &&
+                        selectedGroup?.mode === "physical_only" &&
+                        selectedGroupTabs.length > 1 && (
+                          <fieldset className="group-account-tabs">
+                            <legend>Comandas do grupo</legend>
+                            {selectedGroupTabs.map((groupTab) => {
+                              const accountTable = data.tables.find(
+                                (candidate) => candidate.id === groupTab.tableId,
+                              );
+                              return (
+                                <Button
+                                  aria-pressed={tab?.id === groupTab.id}
+                                  key={groupTab.id}
+                                  onClick={() => setSelectedTabId(groupTab.id)}
+                                  type="button"
+                                >
+                                  <span>{accountTable?.label ?? groupTab.label ?? "Comanda"}</span>
+                                  <strong>{formatMoney(groupTab.totalCents)}</strong>
+                                </Button>
+                              );
+                            })}
+                          </fieldset>
+                        )}
+
+                      {!selectedCanOperate ? (
+                        <Card className="table-start table-start--protected">
+                          <div>
+                            <h2>Atendimento de outra praça</h2>
+                            <span>
+                              {table.responsibleDisplayName
+                                ? `Responsável: ${table.responsibleDisplayName}. `
+                                : "Responsável preservado. "}
+                              {table.openedAt
+                                ? `Em atendimento desde ${new Date(table.openedAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`
+                                : "Os dados pessoais, a comanda e os valores não estão no seu escopo."}
                             </span>
                           </div>
-                          <h2>
-                            {table.status === "reserved"
-                              ? "Confirmar chegada"
-                              : selectedUsesQuickFlow
-                                ? "Abrir comanda rápida"
-                                : "Iniciar atendimento"}
-                          </h2>
-                          <p>
-                            {table.status === "reserved"
-                              ? "A confirmação abre uma nova comanda vazia; nenhum item é herdado da reserva."
-                              : "Defina o número de pessoas para abrir a comanda e iniciar os pedidos imediatamente."}
-                          </p>
-                        </div>
-                        <div className="table-start__controls">
-                          {!selectedUsesQuickFlow && (
-                            <fieldset className="table-start__guests">
-                              <legend>Pessoas</legend>
-                              <div className="table-start__guest-stepper">
-                                <Button
-                                  aria-label="Diminuir quantidade de pessoas"
-                                  className="table-start__stepper-btn"
-                                  disabled={busy || guests <= 1}
-                                  onClick={() =>
-                                    setGuests((current) =>
-                                      Math.max(1, Number.isFinite(current) ? current - 1 : 1),
-                                    )
-                                  }
-                                  size="sm"
-                                  type="button"
-                                  variant="ghost"
-                                >
-                                  −
-                                </Button>
-                                <Input
-                                  aria-label="Pessoas"
-                                  className="table-start__stepper-input [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                                  min={1}
-                                  max={500}
-                                  onBlur={() => guests < 1 && setGuests(1)}
-                                  onChange={(event) => {
-                                    const next = event.currentTarget.valueAsNumber;
-                                    setGuests(
-                                      Number.isFinite(next) ? Math.min(500, Math.max(0, next)) : 0,
-                                    );
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") void openTab();
-                                  }}
-                                  type="number"
-                                  value={guests}
-                                />
-                                <Button
-                                  aria-label="Aumentar quantidade de pessoas"
-                                  className="table-start__stepper-btn"
-                                  disabled={busy || guests >= 500}
-                                  onClick={() =>
-                                    setGuests((current) =>
-                                      Math.min(500, Number.isFinite(current) ? current + 1 : 1),
-                                    )
-                                  }
-                                  size="sm"
-                                  type="button"
-                                  variant="ghost"
-                                >
-                                  +
-                                </Button>
-                              </div>
-                            </fieldset>
-                          )}
-                          <div className="table-start__customer-field">
-                            <label
-                              className="table-start__field-label"
-                              htmlFor="table-start-customer-input"
-                            >
-                              Cliente (opcional)
-                            </label>
-                            <Input
-                              aria-label="Identificação do cliente ou reserva (opcional)"
-                              disabled={busy}
-                              id="table-start-customer-input"
-                              onChange={(e) => setOpeningCustomerName(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void openTab();
-                              }}
-                              placeholder="Nome ou identificação da mesa"
-                              value={openingCustomerName}
-                            />
+                        </Card>
+                      ) : tab && canOpenTableWorkspace(accessForTable(table), tab.id) ? (
+                        <TabWorkspace
+                          compactHeading
+                          initialView={selectedCall?.kind === "bill" ? "account" : "order"}
+                          key={tab.id}
+                          scope={scope}
+                          tabId={tab.id}
+                          floor={data}
+                          onChanged={floor.retry}
+                        />
+                      ) : table.status === "needs_cleaning" || table.status === "cleaning" ? (
+                        <Card className="table-start">
+                          <div>
+                            <h2>
+                              {table.status === "needs_cleaning"
+                                ? "Mesa aguardando limpeza"
+                                : "Limpeza em andamento"}
+                            </h2>
+                            <span>
+                              A mesa só volta a receber clientes depois da confirmação da equipe.
+                            </span>
                           </div>
                           <Button
-                            className="table-start__submit-btn"
-                            disabled={busy || (!selectedUsesQuickFlow && guests < 1)}
-                            onClick={() => void openTab()}
-                            variant="primary"
+                            disabled={busy}
+                            onClick={() =>
+                              void updateTurnover(
+                                table.status === "needs_cleaning" ? "cleaning" : "available",
+                              )
+                            }
                           >
                             {busy
-                              ? "Abrindo…"
-                              : table.status === "reserved"
-                                ? "Confirmar chegada e pedir"
-                                : selectedUsesQuickFlow
-                                  ? "Abrir e pedir"
-                                  : "Abrir atendimento e pedir"}
+                              ? "Atualizando…"
+                              : table.status === "needs_cleaning"
+                                ? "Assumir limpeza"
+                                : "Concluir e liberar mesa"}
                           </Button>
-                        </div>
-                      </section>
-                    )}
-                  </>
-                )}
+                        </Card>
+                      ) : (
+                        <section className="gm-card table-start table-start--opening">
+                          <div className="table-start__header">
+                            <div className="table-start__tags">
+                              <Badge tone={table.status === "reserved" ? "warning" : "success"}>
+                                {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
+                              </Badge>
+                              <span className="table-start__capacity">{table.seats} lugares</span>
+                              <span className="table-start__separator" aria-hidden="true">
+                                ·
+                              </span>
+                              <span className="table-start__location">
+                                {floorPlanItems.find((item) => item.id === table.id)?.areaLabel ??
+                                  "Salão"}{" "}
+                                · {selectedAssignment?.section.name ?? "Sem praça"}
+                              </span>
+                            </div>
+                            <h2>
+                              {table.status === "reserved"
+                                ? "Confirmar chegada"
+                                : selectedUsesQuickFlow
+                                  ? "Abrir comanda rápida"
+                                  : "Iniciar atendimento"}
+                            </h2>
+                            <p>
+                              {table.status === "reserved"
+                                ? "A confirmação abre uma nova comanda vazia; nenhum item é herdado da reserva."
+                                : "Defina o número de pessoas para abrir a comanda e iniciar os pedidos imediatamente."}
+                            </p>
+                          </div>
+                          <div className="table-start__controls">
+                            {!selectedUsesQuickFlow && (
+                              <fieldset className="table-start__guests">
+                                <legend>Pessoas</legend>
+                                <div className="table-start__guest-stepper">
+                                  <Button
+                                    aria-label="Diminuir quantidade de pessoas"
+                                    className="table-start__stepper-btn"
+                                    disabled={busy || guests <= 1}
+                                    onClick={() =>
+                                      setGuests((current) =>
+                                        Math.max(1, Number.isFinite(current) ? current - 1 : 1),
+                                      )
+                                    }
+                                    size="sm"
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    −
+                                  </Button>
+                                  <Input
+                                    aria-label="Pessoas"
+                                    className="table-start__stepper-input [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                    min={1}
+                                    max={500}
+                                    onBlur={() => guests < 1 && setGuests(1)}
+                                    onChange={(event) => {
+                                      const next = event.currentTarget.valueAsNumber;
+                                      setGuests(
+                                        Number.isFinite(next)
+                                          ? Math.min(500, Math.max(0, next))
+                                          : 0,
+                                      );
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") void openTab();
+                                    }}
+                                    type="number"
+                                    value={guests}
+                                  />
+                                  <Button
+                                    aria-label="Aumentar quantidade de pessoas"
+                                    className="table-start__stepper-btn"
+                                    disabled={busy || guests >= 500}
+                                    onClick={() =>
+                                      setGuests((current) =>
+                                        Math.min(500, Number.isFinite(current) ? current + 1 : 1),
+                                      )
+                                    }
+                                    size="sm"
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    +
+                                  </Button>
+                                </div>
+                              </fieldset>
+                            )}
+                            <div className="table-start__customer-field">
+                              <label
+                                className="table-start__field-label"
+                                htmlFor="table-start-customer-input"
+                              >
+                                Cliente (opcional)
+                              </label>
+                              <Input
+                                aria-label="Identificação do cliente ou reserva (opcional)"
+                                disabled={busy}
+                                id="table-start-customer-input"
+                                onChange={(e) => setOpeningCustomerName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") void openTab();
+                                }}
+                                placeholder="Nome ou identificação da mesa"
+                                value={openingCustomerName}
+                              />
+                            </div>
+                            <Button
+                              className="table-start__submit-btn"
+                              disabled={busy || (!selectedUsesQuickFlow && guests < 1)}
+                              onClick={() => void openTab()}
+                              variant="primary"
+                            >
+                              {busy
+                                ? "Abrindo…"
+                                : table.status === "reserved"
+                                  ? "Confirmar chegada e pedir"
+                                  : selectedUsesQuickFlow
+                                    ? "Abrir e pedir"
+                                    : "Abrir atendimento e pedir"}
+                            </Button>
+                          </div>
+                        </section>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </Modal>
             <Modal

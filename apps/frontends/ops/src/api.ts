@@ -4,6 +4,7 @@ import type {
   ApiHealthResponse,
   ApiOperations,
   BillingCheckoutInput,
+  BillPrintingPolicy,
   ChannelCheck,
   ChannelCheckInput,
   CopyUnitSettingsInput,
@@ -123,6 +124,8 @@ export type EdgeHubPilotExperience = "easy" | "minor_difficulty" | "blocked";
 
 export interface PosPrintJob {
   id: string;
+  printedAt?: string | null;
+  hubCommandId?: string | null;
   tabId: string;
   documentType: PrintDocumentType;
   status: PrintJobStatus;
@@ -136,6 +139,7 @@ export interface PosPrintJob {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  deliveryRoute?: "local" | "cashier" | "cloud";
 }
 
 export interface DoseClubEligibleProduct {
@@ -619,7 +623,7 @@ export interface PurchaseInvoiceInput {
   }>;
 }
 
-type PrintTarget = { terminalId?: string; printerId?: string };
+type PrintTarget = { installationId?: string; terminalId?: string; printerId?: string };
 
 export class ApiClientError extends Error {
   constructor(
@@ -4293,6 +4297,16 @@ export const api = {
       request<{ stations: ProductionPrintingStation[] }>(
         pilotPath(organizationId, unitId, "production-printing/stations"),
       ),
+    billPrintingPolicy: (organizationId: string, unitId: string) =>
+      request<{ policy: BillPrintingPolicy }>(
+        pilotPath(organizationId, unitId, "production-printing/bill-policy"),
+      ),
+    updateBillPrintingPolicy: (organizationId: string, unitId: string, body: BillPrintingPolicy) =>
+      idempotentRequest<{ policy: BillPrintingPolicy }>(
+        pilotPath(organizationId, unitId, "production-printing/bill-policy"),
+        "PUT",
+        body,
+      ),
     productionPrinters: (organizationId: string, unitId: string) =>
       request<{ printers: ProductionPrinter[]; hubs: ProductionPrinterHub[] }>(
         pilotPath(organizationId, unitId, "production-printers"),
@@ -5609,7 +5623,7 @@ export const api = {
         call: unknown;
         duplicate: boolean;
         printJob: PosPrintJob | null;
-        deliveryRoute: "local" | "cashier";
+        deliveryRoute: "local" | "cashier" | "cloud";
       }>(
         pilotPath(organizationId, unitId, `tables/${encodeURIComponent(tableId)}/calls`),
         "POST",
@@ -5749,8 +5763,9 @@ export const api = {
       organizationId: string,
       unitId: string,
       tabId: string,
-      body: {
+      body: PrintTarget & {
         tableId?: string;
+        targetTabId?: string;
         label?: string;
         items: Array<{ orderItemId: string; quantity: number }>;
       },

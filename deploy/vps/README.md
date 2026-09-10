@@ -33,9 +33,50 @@ O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CO
 
 ## Rollback
 
-`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0082_delivery_failure_states`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
+`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0083_linked_service_accounts`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
 
-O recovery `e520b3c07cf99ad8924436d1a7635719e1e221e3` mantém API e worker compatíveis com schema 82 após uma falha de promoção. Ele não substitui o restore necessário para voltar ao código de schema 80: as regras de liquidação da equipe e os novos estados de entrega exigem código compatível. A evidência está em `docs/evidence/release-2026-09-09.md`.
+O recovery histórico `e520b3c07cf99ad8924436d1a7635719e1e221e3` foi validado para schema 82, conforme `docs/evidence/release-2026-09-09.md`. Essa aprovação não cobre schema 83: o código de recuperação precisa preservar as contas vinculadas e a liberação da mesa somente após a última conta. A matriz candidata permanece vazia até existir nova evidência.
+
+## Preparar schema 83 em dois commits
+
+O primeiro commit é candidato, não uma autorização de promoção: `package.json.productionBaseline` usa `level: candidate`, migration 83 pendente e referências nulas. O checker continua recusando esse estado. `recovery-compatibility.json` declara alvo 83 sem transições; `rollback-compatibility.json` exige schema 83 e restore completo. Não copie o SHA ou o resultado de schema 82 para esses campos.
+
+O workflow `validate-recovery.yml` só executa na `main`. Ele obtém o validador do SHA da `main` que recebeu o dispatch e coloca o candidato em `candidate/`. O script `scripts/validate-recovery-candidate.sh` lê o alvo de `packages/db/drizzle/meta/_journal.json` no checkout principal; lê o schema de recuperação no mesmo arquivo do candidato. Portanto, publicar o candidato apenas numa branch enquanto a `main` ainda está no schema 82 não basta para validar schema 83.
+
+Depois da revisão dos arquivos e dos checks locais, os comandos abaixo descrevem a publicação autorizada. Substitua os valores entre `<...>` por resultados reais; não os grave como evidência.
+
+```powershell
+rtk proxy git diff --cached --stat
+rtk proxy git diff --cached --check
+rtk proxy git commit -m "feat(ops): unify service accounts and bill printing"
+rtk proxy git rev-parse HEAD
+rtk proxy git push origin HEAD:main
+rtk proxy gh workflow run validate-recovery.yml --ref main -f recovery_sha=<SHA_CANDIDATO_83>
+rtk proxy gh run list --workflow validate-recovery.yml --limit 5 --json databaseId,headSha,status,conclusion,url
+rtk proxy gh run view <RUN_RECOVERY> --json status,conclusion,jobs,url
+rtk proxy gh run download <RUN_RECOVERY> --name giromesa-recovery-validation-<SHA_CANDIDATO_83> --dir scratch/recovery-0083
+```
+
+O CI do primeiro commit pode falhar nos gates que ainda fixam a evidência anterior: isso não autoriza ignorar outras falhas nem promover. O workflow de recuperação é independente desses gates de metadata. Confira sucesso do run, checksum do JSON e os vínculos: `recoveryArtifact=git:<SHA_CANDIDATO_83>`, `targetMigration=0083_linked_service_accounts`, `postgresMajors=[16,17]`, `schemaLevels=[83,83]`, upgrade legado, saúde da API, estabilidade do worker, outbox e verificações de segurança aprovados.
+
+No segundo commit, após obter essas provas:
+
+1. Copie o JSON real para `docs/evidence/recovery/<sha-curto>-validation-0083.json`; registre o SHA-256 e a URL do run sem alterar o conteúdo da evidência.
+2. Vincule `productionBaseline.artifact`, `migration.evidence` e cada `gateResults.*.evidence` a `git:<SHA_CANDIDATO_83>`. Use `software-ready`, migration `verified` e gates `passed` somente com os checks correspondentes comprovados; documente separadamente qualquer gate de metadata que tenha bloqueado o CI candidato.
+3. Autorize em `recovery-compatibility.json` o candidato real, migration/appliedAfter 83 e o novo JSON/hash/run. Preserve somente origens cobertas pelo validator e inclua o schema 82 de origem e o 83 já aplicado. Os valores `appliedBeforeWhen` devem vir do journal. Mantenha `rollback-compatibility.json.transitions=[]` enquanto não houver prova de rollback in-place.
+4. Atualize os valores fixos de release nos testes `scripts/deploy-hardening.test.mjs` e `scripts/validate-recovery-workflow.test.mjs` para a evidência real; não remova verificações para fazer o candidato parecer aprovado.
+
+```powershell
+rtk proxy pnpm production:baseline
+rtk proxy pnpm supply-chain:check
+rtk proxy node --test scripts/check-production-baseline.test.mjs scripts/deploy-hardening.test.mjs scripts/validate-recovery-workflow.test.mjs
+rtk proxy git diff --cached --check
+rtk proxy git commit -m "chore(release): authorize verified schema 83 recovery"
+rtk proxy git push origin HEAD:main
+rtk proxy gh run list --branch main --limit 8 --json databaseId,name,headSha,status,conclusion,url
+```
+
+O segundo SHA precisa concluir CI, Security e todos os jobs de `Publish pilot images`, incluindo recovery/provenance. Gere OpenAPI, clientes TS/C#, builds e bundle nativo pelos scripts existentes antes do commit que os publica. A promoção usa exclusivamente o entrypoint confiável descrito acima, com backup pré-migração completo e verificação posterior de `current`, SHA, schema 83, digests, health, reinícios e endpoints públicos. Limpeza de disco continua sendo uma operação separada, limitada aos alvos descartáveis autorizados e inventariados.
 
 ## Domínios
 

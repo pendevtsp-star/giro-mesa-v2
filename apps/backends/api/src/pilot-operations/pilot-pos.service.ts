@@ -1802,7 +1802,12 @@ export class PilotPosService {
       };
     });
     const openTabByTableId = new Map(
-      tabs.flatMap((tab) => (tab.tableId ? [[tab.tableId, tab] as const] : [])),
+      [...tabs]
+        .sort(
+          (left, right) =>
+            Number(Boolean(right.serviceRootTabId)) - Number(Boolean(left.serviceRootTabId)),
+        )
+        .flatMap((tab) => (tab.tableId ? [[tab.tableId, tab] as const] : [])),
     );
     const staffNameByIdentityId = new Map(
       staff.map(({ identityId: staffIdentityId, displayName }) => [staffIdentityId, displayName]),
@@ -5474,7 +5479,7 @@ export class PilotPosService {
   }
 
   async getTab(identityId: string, organizationId: string, unitId: string, tabId: string) {
-    await this.requireAccess(identityId, organizationId, unitId);
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [tabId]);
     const [tab] = await this.database.db
       .select()
       .from(posTabs)
@@ -5631,8 +5636,86 @@ export class PilotPosService {
     }));
     const grossPaidCents = payments.reduce((total, payment) => total + payment.amountCents, 0);
     const reversedCents = payments.reduce((total, payment) => total + payment.reversedCents, 0);
+    const rootTabId = tab.serviceRootTabId ?? tab.id;
+    const serviceTabs = await this.database.db
+      .select()
+      .from(posTabs)
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationId),
+          eq(posTabs.unitId, unitId),
+          or(eq(posTabs.id, rootTabId), eq(posTabs.serviceRootTabId, rootTabId)),
+          ne(posTabs.status, "merged"),
+        ),
+      )
+      .orderBy(posTabs.createdAt, posTabs.id);
+    await this.requireTabOperationalAccess(
+      identityId,
+      organizationId,
+      unitId,
+      serviceTabs.map((account) => account.id),
+    );
+    const relatedTabs = await Promise.all(
+      serviceTabs.map(async (account) => {
+        const state = await this.readTabPaymentState(
+          this.database.db,
+          organizationId,
+          unitId,
+          account.id,
+        );
+        return {
+          ...account,
+          ...state,
+          remainingCents: Math.max(
+            0,
+            account.totalCents - state.paidCents - state.coveredLossCents,
+          ),
+        };
+      }),
+    );
+    const service = {
+      rootTabId,
+      tableId: tab.tableId,
+      openTabCount: relatedTabs.filter((account) => account.status === "open").length,
+      totalCents: relatedTabs.reduce((sum, account) => sum + account.totalCents, 0),
+      paidCents: relatedTabs.reduce((sum, account) => sum + account.paidCents, 0),
+      reservedCents: relatedTabs.reduce((sum, account) => sum + account.reservedCents, 0),
+      coveredLossCents: relatedTabs.reduce((sum, account) => sum + account.coveredLossCents, 0),
+      remainingCents: relatedTabs.reduce((sum, account) => sum + account.remainingCents, 0),
+    };
+    const productionPrinting = this.productionPrinting;
+    if (productionPrinting) {
+      await this.database.db.transaction((tx) =>
+        productionPrinting.expireUnknownPrintCommands(tx, { organizationId, unitId }),
+      );
+    }
+    const printJobs = await this.database.db
+      .select()
+      .from(posPrintJobs)
+      .where(
+        and(
+          eq(posPrintJobs.organizationId, organizationId),
+          eq(posPrintJobs.unitId, unitId),
+          inArray(
+            posPrintJobs.tabId,
+            relatedTabs.map((account) => account.id),
+          ),
+        ),
+      )
+      .orderBy(desc(posPrintJobs.createdAt))
+      .limit(100);
     return {
       tab,
+      relatedTabs,
+      service,
+      printJobs: printJobs.map((job) => ({
+        ...job,
+        deliveryRoute: job.hubCommandId
+          ? ("cloud" as const)
+          : job.terminalId
+            ? ("local" as const)
+            : ("cashier" as const),
+      })),
       orders,
       items,
       modifiers,
@@ -6484,7 +6567,11 @@ export class PilotPosService {
             call: existing,
             duplicate: true,
             printJob: existingPrintJob ?? null,
-            deliveryRoute: existingPrintJob ? "local" : "cashier",
+            deliveryRoute: existingPrintJob?.hubCommandId
+              ? "cloud"
+              : existingPrintJob?.terminalId
+                ? "local"
+                : "cashier",
           };
         }
         if (channel === "qr_table") {
@@ -6558,7 +6645,12 @@ export class PilotPosService {
           });
         }
         let printJob: Awaited<ReturnType<PilotPosService["queuePrintJob"]>> | null = null;
-        if (call.kind === "bill" && call.tabId) {
+        const billPolicy = await this.productionPrinting?.getBillPolicy(tx, organizationId, unitId);
+        if (
+          call.kind === "bill" &&
+          call.tabId &&
+          (billPolicy?.mode ?? "notify_cashier") !== "notify_cashier"
+        ) {
           const printInput: PrintJobInput = {
             documentType: "partial_statement",
             copies,
@@ -6574,7 +6666,7 @@ export class PilotPosService {
             unitId,
             printInput,
           );
-          if (target.deliveryRoute === "local") {
+          if (target.deliveryRoute === "local" || target.deliveryRoute === "cloud") {
             printJob = await this.queuePrintJob(
               tx,
               identityId,
@@ -6589,7 +6681,7 @@ export class PilotPosService {
           call,
           duplicate: false,
           printJob,
-          deliveryRoute: printJob ? "local" : "cashier",
+          deliveryRoute: printJob?.deliveryRoute ?? "cashier",
         };
       },
     );
@@ -6724,6 +6816,15 @@ export class PilotPosService {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${tabId}`}))`,
     );
+    return this.readTabPaymentState(tx, organizationId, unitId, tabId);
+  }
+
+  private async readTabPaymentState(
+    tx: Transaction | DatabaseService["db"],
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
     const [paymentTotals, reversalTotals, reservationTotals, lossTotals] = await Promise.all([
       tx
         .select({ paidCents: sql<number>`coalesce(sum(${posTabPayments.amountCents}), 0)` })
@@ -8387,7 +8488,10 @@ export class PilotPosService {
     query: PrintJobQueryInput,
   ) {
     const printAccess = await this.printAccessScope(identityId, organizationId, unitId);
-    return this.database.db
+    await this.database.db.transaction(async (tx) => {
+      await this.productionPrinting?.expireUnknownPrintCommands(tx, { organizationId, unitId });
+    });
+    const jobs = await this.database.db
       .select()
       .from(posPrintJobs)
       .where(
@@ -8414,6 +8518,14 @@ export class PilotPosService {
         query.status === "queued" ? asc(posPrintJobs.createdAt) : desc(posPrintJobs.createdAt),
       )
       .limit(query.limit);
+    return jobs.map((job) => ({
+      ...job,
+      deliveryRoute: job.hubCommandId
+        ? ("cloud" as const)
+        : job.terminalId
+          ? ("local" as const)
+          : ("cashier" as const),
+    }));
   }
 
   async updatePrintJobStatus(
@@ -8454,7 +8566,7 @@ export class PilotPosService {
           identityId,
           current.documentType,
         );
-        if (current.documentType === "kds_ticket") {
+        if (current.documentType === "kds_ticket" || current.hubCommandId) {
           throw new ConflictException({ code: "KDS_PRINT_JOB_RESULT_VIA_HUB_REQUIRED" });
         }
         if (
@@ -8574,6 +8686,57 @@ export class PilotPosService {
             message: "Somente impressões com falha podem ser reenfileiradas.",
           });
         }
+        if (current.hubCommandId) {
+          if (!current.printerId || !this.productionPrinting)
+            throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY" });
+          const [existingRetry] = await tx
+            .select()
+            .from(posPrintJobs)
+            .where(
+              and(
+                eq(posPrintJobs.organizationId, organizationId),
+                eq(posPrintJobs.unitId, unitId),
+                eq(posPrintJobs.dispatchKey, `financial-retry:${current.id}`),
+              ),
+            )
+            .limit(1);
+          if (existingRetry)
+            return { printJob: { ...existingRetry, deliveryRoute: "cloud" as const } };
+          const [retry] = await tx
+            .insert(posPrintJobs)
+            .values({
+              organizationId,
+              unitId,
+              tabId: current.tabId,
+              serviceCallId: current.serviceCallId,
+              documentType: current.documentType,
+              copies: current.copies,
+              payload: current.payload,
+              printerId: input.printerId ?? current.printerId,
+              requestedByIdentityId: identityId,
+              reprintOfJobId: current.id,
+              dispatchKey: `financial-retry:${current.id}`,
+              reason: "Nova tentativa após falha confirmada",
+            })
+            .returning();
+          if (!retry) throw new Error("Print job retry did not return a row");
+          const printJob = await this.productionPrinting.queueFinancialJob(
+            tx,
+            retry,
+            input.printerId ?? current.printerId,
+          );
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            current.tabId,
+            "print.retried",
+            { printJobId: printJob.id, reprintOfJobId: current.id },
+            { entityType: "print_job", entityId: printJob.id },
+          );
+          return { printJob: { ...printJob, deliveryRoute: "cloud" as const } };
+        }
         const inheritedInstallationId =
           input.installationId ??
           (current.terminalId &&
@@ -8583,11 +8746,12 @@ export class PilotPosService {
             ? current.terminalId
             : undefined);
         const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, {
+          documentType: current.documentType,
           installationId: inheritedInstallationId,
           terminalId: input.terminalId ?? current.terminalId ?? undefined,
           printerId: input.printerId ?? current.printerId ?? undefined,
         });
-        const [printJob] = await tx
+        let [printJob] = await tx
           .update(posPrintJobs)
           .set({
             status: "queued",
@@ -8608,6 +8772,13 @@ export class PilotPosService {
           )
           .returning();
         if (!printJob) throw new Error("Print job retry did not return a row");
+        if (target.deliveryRoute === "cloud" && target.printerId && this.productionPrinting) {
+          printJob = await this.productionPrinting.queueFinancialJob(
+            tx,
+            printJob,
+            target.printerId,
+          );
+        }
         await this.recordEvent(
           tx,
           identityId,
@@ -8618,7 +8789,7 @@ export class PilotPosService {
           { printJobId, attempts: current.attempts },
           { entityType: "print_job", entityId: printJobId },
         );
-        return { printJob };
+        return { printJob: { ...printJob, deliveryRoute: target.deliveryRoute } };
       },
     );
   }
@@ -8708,12 +8879,20 @@ export class PilotPosService {
           )
             ? source.terminalId
             : undefined);
-        const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, {
-          installationId: inheritedInstallationId,
-          terminalId: input.terminalId ?? source.terminalId ?? undefined,
-          printerId: input.printerId ?? source.printerId ?? undefined,
-        });
-        const [printJob] = await tx
+        const target =
+          source.hubCommandId && source.printerId
+            ? {
+                deliveryRoute: "cloud" as const,
+                terminalId: null,
+                printerId: input.printerId ?? source.printerId,
+              }
+            : await this.resolvePrintTarget(tx, identityId, organizationId, unitId, {
+                documentType: source.documentType,
+                installationId: inheritedInstallationId,
+                terminalId: input.terminalId ?? source.terminalId ?? undefined,
+                printerId: input.printerId ?? source.printerId ?? undefined,
+              });
+        let [printJob] = await tx
           .insert(posPrintJobs)
           .values({
             organizationId,
@@ -8730,6 +8909,13 @@ export class PilotPosService {
           })
           .returning();
         if (!printJob) throw new Error("Print job reprint did not return a row");
+        if (target.deliveryRoute === "cloud" && target.printerId && this.productionPrinting) {
+          printJob = await this.productionPrinting.queueFinancialJob(
+            tx,
+            printJob,
+            target.printerId,
+          );
+        }
         await this.recordEvent(
           tx,
           identityId,
@@ -8740,7 +8926,7 @@ export class PilotPosService {
           { printJobId: printJob.id, reprintOfJobId: source.id, reason: input.reason },
           { entityType: "print_job", entityId: printJob.id },
         );
-        return { printJob };
+        return { printJob: { ...printJob, deliveryRoute: target.deliveryRoute } };
       },
     );
   }
@@ -8971,6 +9157,7 @@ export class PilotPosService {
       "tab.close",
       { tabId, ...input },
       async (tx) => {
+        await this.lockServiceTable(tx, organizationId, unitId, tabId);
         const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
         let singleTabGroup = tab.tableId
@@ -9045,13 +9232,28 @@ export class PilotPosService {
             .limit(1);
           groupPrimaryIsOpen = Boolean(primaryTab);
         }
-        const releasedTableIds = tab.tableId
-          ? singleTabGroup
-            ? groupPrimaryIsOpen
-              ? []
-              : singleTabGroup.tableIds
-            : [tab.tableId]
+        const [openSibling] = tab.tableId
+          ? await tx
+              .select({ id: posTabs.id })
+              .from(posTabs)
+              .where(
+                and(
+                  eq(posTabs.organizationId, organizationId),
+                  eq(posTabs.unitId, unitId),
+                  inArray(posTabs.tableId, singleTabGroup?.tableIds ?? [tab.tableId]),
+                  eq(posTabs.status, "open"),
+                ),
+              )
+              .limit(1)
           : [];
+        const releasedTableIds =
+          tab.tableId && !openSibling
+            ? singleTabGroup
+              ? groupPrimaryIsOpen
+                ? []
+                : singleTabGroup.tableIds
+              : [tab.tableId]
+            : [];
         if (releasedTableIds.length > 0) {
           await tx
             .update(posDiningTables)
@@ -9150,6 +9352,7 @@ export class PilotPosService {
       "tab.reopen",
       { tabId, reason: input.reason },
       async (tx) => {
+        await this.lockServiceTable(tx, organizationId, unitId, tabId);
         const [tab] = await tx
           .select()
           .from(posTabs)
@@ -9230,7 +9433,7 @@ export class PilotPosService {
           }
           if (singleTabGroup?.primaryTabId && singleTabGroup.primaryTabId !== tabId) {
             const [primaryTab] = await tx
-              .select({ id: posTabs.id })
+              .select({ id: posTabs.id, serviceRootTabId: posTabs.serviceRootTabId })
               .from(posTabs)
               .where(
                 and(
@@ -9241,7 +9444,10 @@ export class PilotPosService {
                 ),
               )
               .limit(1);
-            if (primaryTab) {
+            if (
+              primaryTab &&
+              (primaryTab.serviceRootTabId ?? primaryTab.id) !== (tab.serviceRootTabId ?? tab.id)
+            ) {
               throw new ConflictException({
                 code: "TABLE_NOT_AVAILABLE_FOR_REOPEN",
                 message: "O grupo de mesas já está em outro atendimento.",
@@ -9263,7 +9469,27 @@ export class PilotPosService {
           if (tables.length !== tableIds.length) {
             throw new NotFoundException({ code: "TABLE_NOT_FOUND" });
           }
-          if (tables.some((table) => !["available", "needs_cleaning"].includes(table.status))) {
+          const occupants = await tx
+            .select({
+              rootTabId: sql<string>`coalesce(${posTabs.serviceRootTabId}, ${posTabs.id})`,
+            })
+            .from(posTabs)
+            .where(
+              and(
+                eq(posTabs.organizationId, organizationId),
+                eq(posTabs.unitId, unitId),
+                inArray(posTabs.tableId, tableIds),
+                eq(posTabs.status, "open"),
+              ),
+            );
+          const sameService =
+            occupants.length > 0 &&
+            occupants.every((occupant) => occupant.rootTabId === (tab.serviceRootTabId ?? tab.id));
+          if (
+            !sameService &&
+            (occupants.length > 0 ||
+              tables.some((table) => !["available", "needs_cleaning"].includes(table.status)))
+          ) {
             throw new ConflictException({
               code: "TABLE_NOT_AVAILABLE_FOR_REOPEN",
               message: "Uma mesa do atendimento já está reservada ou ocupada.",
@@ -10904,6 +11130,7 @@ export class PilotPosService {
             );
           const ticketIds = [];
           const printJobIds: string[] = [];
+          const printWarnings: { printJobId: string; stationId: string; code: string }[] = [];
           for (const stationId of stationIds) {
             const stationItems = items.filter((item) =>
               stationIdsByProduct.get(item.productId)?.includes(stationId),
@@ -10977,7 +11204,15 @@ export class PilotPosService {
               station,
               dispatch: stationDispatch.map(({ item, stage }) => ({ item, stage })),
             });
-            if (printJob) printJobIds.push(printJob.id);
+            if (printJob) {
+              printJobIds.push(printJob.id);
+              if (printJob.lastError)
+                printWarnings.push({
+                  printJobId: printJob.id,
+                  stationId,
+                  code: printJob.lastError,
+                });
+            }
           }
           await this.recordEvent(
             tx,
@@ -11001,7 +11236,7 @@ export class PilotPosService {
             now,
             true,
           );
-          return { orderId, status: "sent", ticketIds, printJobIds };
+          return { orderId, status: "sent", ticketIds, printJobIds, printWarnings };
         },
       );
     } catch (error) {
@@ -11067,6 +11302,7 @@ export class PilotPosService {
           sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${input.tableId}`}))`,
         );
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        await this.assertServiceCanDetach(tx, organizationId, unitId, tab);
         const [activeGroup] = await tx
           .select({ id: posDiningTableGroups.id })
           .from(posDiningTableGroups)
@@ -11186,6 +11422,16 @@ export class PilotPosService {
     if (sources.length !== sourceIds.length) {
       throw new NotFoundException({ code: "SOURCE_TAB_NOT_FOUND" });
     }
+    if (
+      sources.some(
+        (source) =>
+          (source.serviceRootTabId ?? source.id) !== (target.serviceRootTabId ?? target.id),
+      )
+    ) {
+      for (const account of [target, ...sources]) {
+        await this.assertServiceCanDetach(tx, organizationId, unitId, account);
+      }
+    }
     const paymentStates = [];
     for (const mergedTabId of [...new Set([targetTabId, ...sourceIds])].sort()) {
       paymentStates.push(await this.lockTabPaymentState(tx, organizationId, unitId, mergedTabId));
@@ -11254,7 +11500,23 @@ export class PilotPosService {
     await tx
       .update(posTabs)
       .set({
-        guestCount: target.guestCount + sources.reduce((sum, source) => sum + source.guestCount, 0),
+        guestCount:
+          Math.max(
+            target.guestCount,
+            ...sources
+              .filter(
+                (source) =>
+                  (source.serviceRootTabId ?? source.id) === (target.serviceRootTabId ?? target.id),
+              )
+              .map((source) => source.guestCount),
+          ) +
+          sources
+            .filter(
+              (source) =>
+                (source.serviceRootTabId ?? source.id) !== (target.serviceRootTabId ?? target.id),
+            )
+            .reduce((sum, source) => sum + source.guestCount, 0),
+        tipCents: target.tipCents + sources.reduce((sum, source) => sum + source.tipCents, 0),
         updatedAt: new Date(),
       })
       .where(
@@ -11279,7 +11541,34 @@ export class PilotPosService {
           ),
         );
     }
-    const totals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+    let totals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+    if (
+      sources.every(
+        (source) =>
+          (source.serviceRootTabId ?? source.id) === (target.serviceRootTabId ?? target.id) &&
+          source.serviceChargeBasisPoints === target.serviceChargeBasisPoints,
+      )
+    ) {
+      const remainder =
+        target.totalCents +
+        sources.reduce((sum, source) => sum + source.totalCents, 0) -
+        totals.totalCents;
+      if (remainder !== 0) {
+        await tx
+          .update(posTabs)
+          .set({
+            serviceChargeAdjustmentCents: sql`${posTabs.serviceChargeAdjustmentCents} + ${remainder}`,
+          })
+          .where(
+            and(
+              eq(posTabs.organizationId, organizationId),
+              eq(posTabs.unitId, unitId),
+              eq(posTabs.id, target.id),
+            ),
+          );
+        totals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+      }
+    }
     await this.recordEvent(tx, identityId, organizationId, unitId, target.id, "tabs.merged", {
       sourceTabIds: sourceIds,
       sourceTableIds: releasedTableIds,
@@ -11321,6 +11610,11 @@ export class PilotPosService {
       { ...input, sourceTabIds: sourceIds },
       async (tx) => {
         const lockIds = [input.targetTabId, ...sourceIds].sort();
+        for (const id of lockIds) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${id}`}))`,
+          );
+        }
         for (const id of lockIds) {
           await tx.execute(
             sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${id}`}))`,
@@ -11940,7 +12234,12 @@ export class PilotPosService {
       movedModifierIdForSource: (sourceItemId: string, modifierId: string) => string;
     },
   ) {
-    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [sourceTabId]);
+    await this.requireTabOperationalAccess(identityId, organizationId, unitId, [
+      sourceTabId,
+      ...(input.targetTabId ? [input.targetTabId] : []),
+    ]);
+    if (input.targetTabId === sourceTabId)
+      throw new BadRequestException({ code: "SPLIT_TARGET_IS_SOURCE" });
     await this.requireScopedRole(identityId, organizationId, unitId, [
       "owner",
       "manager",
@@ -11965,13 +12264,61 @@ export class PilotPosService {
       "tab.split",
       { sourceTabId, ...input },
       async (tx) => {
-        const source = await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
+        await this.lockServiceTable(tx, organizationId, unitId, sourceTabId);
+        for (const splitTabId of [
+          sourceTabId,
+          ...(input.targetTabId ? [input.targetTabId] : []),
+        ].sort()) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${splitTabId}`}))`,
+          );
+        }
         const paymentState = await this.lockTabPaymentState(
           tx,
           organizationId,
           unitId,
           sourceTabId,
         );
+        for (const splitTabId of [
+          sourceTabId,
+          ...(input.targetTabId ? [input.targetTabId] : []),
+        ].sort()) {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${splitTabId}`}))`,
+          );
+        }
+        const source = await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
+        const existingTarget = input.targetTabId
+          ? await this.requireOpenTab(tx, organizationId, unitId, input.targetTabId)
+          : null;
+        if (existingTarget) {
+          if (
+            (existingTarget.serviceRootTabId ?? existingTarget.id) !==
+              (source.serviceRootTabId ?? source.id) ||
+            existingTarget.tableId !== source.tableId
+          ) {
+            throw new ConflictException({ code: "SPLIT_TARGET_DIFFERENT_SERVICE" });
+          }
+          if (existingTarget.serviceChargeBasisPoints !== source.serviceChargeBasisPoints) {
+            throw new ConflictException({ code: "SPLIT_SERVICE_CHARGE_RATE_MISMATCH" });
+          }
+          const targetState = await this.lockTabPaymentState(
+            tx,
+            organizationId,
+            unitId,
+            existingTarget.id,
+          );
+          if (
+            targetState.paidCents > 0 ||
+            targetState.coveredLossCents > 0 ||
+            targetState.reservedCents > 0
+          ) {
+            throw new ConflictException({
+              code: "TAB_SPLIT_FINANCIAL_STATE_CONFLICT",
+              ...targetState,
+            });
+          }
+        }
         if (
           paymentState.paidCents > 0 ||
           paymentState.coveredLossCents > 0 ||
@@ -12094,6 +12441,16 @@ export class PilotPosService {
         if (items.some(({ item }) => item.status === "canceled")) {
           throw new ConflictException({ code: "CANCELED_ITEM_CANNOT_SPLIT" });
         }
+        if (
+          items.some(({ orderStatus }) => orderStatus === "draft") &&
+          items.some(({ orderStatus }) => orderStatus !== "draft")
+        ) {
+          throw new ConflictException({
+            code: "SPLIT_MIXED_PRODUCTION_STATE",
+            message:
+              "Separe os itens ainda não enviados em uma operação própria para manter o envio à produção.",
+          });
+        }
         const [doseClubItem] = await tx
           .select({ orderItemId: doseClubRedemptions.orderItemId })
           .from(doseClubRedemptions)
@@ -12120,22 +12477,29 @@ export class PilotPosService {
             });
           }
         }
-        const [target] = await tx
-          .insert(posTabs)
-          .values({
-            id: offlineIds?.targetTabId,
-            organizationId,
-            unitId,
-            tableId: input.tableId,
-            openedByIdentityId: identityId,
-            operationalShiftId: source.operationalShiftId,
-            shiftSectionId: source.shiftSectionId,
-            responsibleIdentityId: source.responsibleIdentityId,
-            label: input.label,
-            guestCount: 1,
-            serviceChargeBasisPoints: source.serviceChargeBasisPoints,
-          })
-          .returning();
+        const [target] = existingTarget
+          ? [existingTarget]
+          : await tx
+              .insert(posTabs)
+              .values({
+                id: offlineIds?.targetTabId,
+                organizationId,
+                unitId,
+                tableId: input.tableId ?? source.tableId,
+                serviceRootTabId: input.tableId ? null : (source.serviceRootTabId ?? source.id),
+                openedByIdentityId: identityId,
+                operationalShiftId: source.operationalShiftId,
+                shiftSectionId: source.shiftSectionId,
+                responsibleIdentityId: source.responsibleIdentityId,
+                label: input.label,
+                fulfillmentType: source.fulfillmentType,
+                customerName: source.customerName,
+                customerPhone: source.customerPhone,
+                deliveryAddress: source.deliveryAddress,
+                guestCount: 1,
+                serviceChargeBasisPoints: source.serviceChargeBasisPoints,
+              })
+              .returning();
         if (!target) throw new Error("Split target tab insert did not return a row");
         const hasProductionHistory = items.some(({ orderStatus }) => orderStatus !== "draft");
         const productionAlreadyReady =
@@ -12363,7 +12727,10 @@ export class PilotPosService {
               quantity: requested.quantity,
               readyQuantity: movedReadyQuantity,
               status: movedState,
+              stage: assignment.stage,
               held: assignment.held,
+              courseHeld: assignment.courseHeld,
+              dependencyHeld: assignment.dependencyHeld,
               heldAt: assignment.heldAt,
               firedAt: assignment.firedAt,
               startedAt: movedState === "queued" ? null : assignment.startedAt,
@@ -12491,8 +12858,40 @@ export class PilotPosService {
               ),
             );
         }
-        const sourceTotals = await this.recalculateTab(tx, organizationId, unitId, sourceTabId);
-        const targetTotals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+        let sourceTotals = await this.recalculateTab(tx, organizationId, unitId, sourceTabId);
+        let targetTotals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+        const roundingRemainder =
+          source.totalCents +
+          (existingTarget?.totalCents ?? 0) -
+          sourceTotals.totalCents -
+          targetTotals.totalCents;
+        if (roundingRemainder !== 0) {
+          const adjustSource =
+            sourceTotals.serviceChargeCents + roundingRemainder >= 0 &&
+            sourceTotals.subtotalCents > 0;
+          const adjustedTabId = adjustSource ? sourceTabId : target.id;
+          await tx
+            .update(posTabs)
+            .set({
+              serviceChargeAdjustmentCents: sql`${posTabs.serviceChargeAdjustmentCents} + ${roundingRemainder}`,
+            })
+            .where(
+              and(
+                eq(posTabs.organizationId, organizationId),
+                eq(posTabs.unitId, unitId),
+                eq(posTabs.id, adjustedTabId),
+              ),
+            );
+          if (adjustSource)
+            sourceTotals = await this.recalculateTab(tx, organizationId, unitId, sourceTabId);
+          else targetTotals = await this.recalculateTab(tx, organizationId, unitId, target.id);
+        }
+        if (
+          sourceTotals.totalCents + targetTotals.totalCents !==
+          source.totalCents + (existingTarget?.totalCents ?? 0)
+        ) {
+          throw new ConflictException({ code: "TAB_SPLIT_TOTAL_CONSERVATION_FAILED" });
+        }
         const printInput: PrintJobInput = {
           documentType: "partial_statement",
           copies: input.copies ?? 1,
@@ -12569,11 +12968,22 @@ export class PilotPosService {
       async (tx) => {
         for (const tabId of [sourceTabId, input.targetTabId].sort()) {
           await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-payment:${organizationId}:${unitId}:${tabId}`}))`,
+          );
+        }
+        for (const tabId of [sourceTabId, input.targetTabId].sort()) {
+          await tx.execute(
             sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${tabId}`}))`,
           );
         }
         await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
         await this.requireOpenTab(tx, organizationId, unitId, input.targetTabId);
+        for (const movedTabId of [sourceTabId, input.targetTabId].sort()) {
+          const state = await this.lockTabPaymentState(tx, organizationId, unitId, movedTabId);
+          if (state.paidCents > 0 || state.reservedCents > 0 || state.coveredLossCents > 0) {
+            throw new ConflictException({ code: "MOVE_ITEM_HAS_PAYMENTS", ...state });
+          }
+        }
         const [payment] = await tx
           .select({ id: posTabPayments.id })
           .from(posTabPayments)
@@ -12724,7 +13134,11 @@ export class PilotPosService {
         await this.requireOpenTab(tx, organizationId, unitId, tabId);
         await tx
           .update(posTabs)
-          .set({ serviceChargeBasisPoints: input.basisPoints, updatedAt: new Date() })
+          .set({
+            serviceChargeBasisPoints: input.basisPoints,
+            serviceChargeAdjustmentCents: 0,
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(posTabs.organizationId, organizationId),
@@ -18190,6 +18604,57 @@ export class PilotPosService {
     return { ...group, tableIds: members.map((member) => member.tableId) };
   }
 
+  private async lockServiceTable(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    const [tab] = await tx
+      .select({ tableId: posTabs.tableId })
+      .from(posTabs)
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationId),
+          eq(posTabs.unitId, unitId),
+          eq(posTabs.id, tabId),
+        ),
+      )
+      .limit(1);
+    if (tab?.tableId) {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`pos-table:${organizationId}:${unitId}:${tab.tableId}`}))`,
+      );
+    }
+  }
+
+  private async assertServiceCanDetach(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tab: typeof posTabs.$inferSelect,
+  ) {
+    const [child] = await tx
+      .select({ id: posTabs.id })
+      .from(posTabs)
+      .where(
+        and(
+          eq(posTabs.organizationId, organizationId),
+          eq(posTabs.unitId, unitId),
+          eq(posTabs.serviceRootTabId, tab.serviceRootTabId ?? tab.id),
+          ne(posTabs.status, "merged"),
+        ),
+      )
+      .limit(1);
+    if (tab.serviceRootTabId || child) {
+      throw new ConflictException({
+        code: "LINKED_SERVICE_REQUIRES_SAME_ATTENDANCE",
+        message:
+          "As contas divididas pertencem ao mesmo atendimento. Finalize-as na mesa de origem.",
+      });
+    }
+  }
+
   private async requireTab(tx: Transaction, organizationId: string, unitId: string, tabId: string) {
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtext(${`pos-tab:${organizationId}:${unitId}:${tabId}`}))`,
@@ -18227,8 +18692,18 @@ export class PilotPosService {
     identityId: string,
     organizationId: string,
     unitId: string,
-    input: Pick<PrintJobInput, "installationId" | "terminalId" | "printerId">,
+    input: Pick<PrintJobInput, "installationId" | "terminalId" | "printerId"> & {
+      documentType?: string;
+    },
   ) {
+    const policy = await this.productionPrinting?.getBillPolicy(tx, organizationId, unitId);
+    if (
+      (input.documentType === undefined || input.documentType === "partial_statement") &&
+      policy?.mode === "cashier_printer" &&
+      policy.printerId
+    ) {
+      return { deliveryRoute: "cloud" as const, terminalId: null, printerId: policy.printerId };
+    }
     const cashierActor = await this.canOperateCashier(identityId, organizationId, unitId);
     if (!input.installationId) {
       return { deliveryRoute: "cashier" as const, terminalId: null, printerId: null };
@@ -18348,7 +18823,7 @@ export class PilotPosService {
           },
         }
       : basePayload;
-    const [printJob] = await tx
+    let [printJob] = await tx
       .insert(posPrintJobs)
       .values({
         organizationId,
@@ -18366,6 +18841,9 @@ export class PilotPosService {
       })
       .returning();
     if (!printJob) throw new Error("Print job insert did not return a row");
+    if (target.deliveryRoute === "cloud" && target.printerId && this.productionPrinting) {
+      printJob = await this.productionPrinting.queueFinancialJob(tx, printJob, target.printerId);
+    }
     if (input.serviceCallId) {
       await tx
         .update(posServiceCalls)
@@ -18583,9 +19061,12 @@ export class PilotPosService {
       context: {
         tabId: tab.id,
         label:
-          table?.label ??
           tab.label ??
-          (tab.displayNumber ? `Balcão #${tab.displayNumber}` : `Comanda ${tab.id.slice(0, 6)}`),
+          (tab.displayNumber
+            ? `Balcão #${tab.displayNumber}`
+            : tab.tableId && !tab.serviceRootTabId
+              ? "Principal"
+              : `Comanda ${tab.id.slice(0, 6)}`),
         displayNumber: tab.displayNumber,
         tableLabel: table?.label ?? null,
         areaName: table?.areaName ?? null,
@@ -18642,6 +19123,7 @@ export class PilotPosService {
       tx
         .select({
           serviceChargeBasisPoints: posTabs.serviceChargeBasisPoints,
+          serviceChargeAdjustmentCents: posTabs.serviceChargeAdjustmentCents,
           tipCents: posTabs.tipCents,
         })
         .from(posTabs)
@@ -18698,6 +19180,12 @@ export class PilotPosService {
       tab.tipCents,
       settings?.configuration.serviceBase ?? "net_after_discounts",
     );
+    const adjustedServiceChargeCents =
+      totals.subtotalCents > totals.discountCents
+        ? Math.max(0, totals.serviceChargeCents + tab.serviceChargeAdjustmentCents)
+        : 0;
+    totals.totalCents += adjustedServiceChargeCents - totals.serviceChargeCents;
+    totals.serviceChargeCents = adjustedServiceChargeCents;
     this.assertTabPaymentFloor(totals.totalCents, paymentState);
     await tx
       .update(posTabs)

@@ -1223,6 +1223,14 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     assert.deepEqual(split.printableTabIds, [tabId, splitTargetTabId]);
     assert.equal(split.printJobs.length, 2);
     assert.ok(split.printJobs.every((job) => job.documentType === "partial_statement"));
+    const splitPrintContexts = split.printJobs.map(
+      (job) => (job.payload as { context: { label: string; tableLabel: string } }).context,
+    );
+    assert.deepEqual(
+      splitPrintContexts.map((context) => context.label),
+      ["Principal", "Conta dividida KDS"],
+    );
+    assert.ok(splitPrintContexts.every((context) => context.tableLabel === table.label));
     const movedSplitItemId = (split.movedItemIds as string[])[0];
     assert.ok(movedSplitItemId);
     const splitTargetTab = await pos.getTab(
@@ -1233,6 +1241,11 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     );
     const splitTargetOrder = splitTargetTab.orders[0];
     assert.ok(splitTargetOrder);
+    assert.equal(splitTargetTab.tab.tableId, table.id);
+    assert.equal(splitTargetTab.tab.serviceRootTabId, tabId);
+    assert.equal(splitTargetTab.service.rootTabId, tabId);
+    assert.equal(splitTargetTab.service.openTabCount, 2);
+    assert.equal(splitTargetTab.relatedTabs.length, 2);
     const splitAssignments = await database.db
       .select({
         ticketId: posKdsTicketItems.ticketId,
@@ -1308,6 +1321,161 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       splitAlerts.some((alert) => alert.ticket.id === splitSourceTicketId),
       false,
     );
+
+    // Independent attendance exercises financial rounding, existing-account splits and final closure.
+    const [serviceTable] = await database.db
+      .insert(posDiningTables)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        roomId: room.id,
+        label: "Contas vinculadas",
+      })
+      .returning();
+    assert.ok(serviceTable);
+    const serviceOpened = await pos.openTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      "linked-open-0001",
+      { tableId: serviceTable.id, guestCount: 2 },
+    );
+    const serviceRootId = (serviceOpened.tab as { id: string }).id;
+    const serviceOrder = await pos.createOrder(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-order-0001",
+      { items: [{ productId: product.id, quantity: 4, modifierOptionIds: [] }] },
+    );
+    const serviceItem = (serviceOrder.items as { id: string }[])[0];
+    assert.ok(serviceItem);
+    await pos.setServiceCharge(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-service-rate-0001",
+      { basisPoints: 333 },
+    );
+    const initialService = await pos.getTab(identity.id, organizationA.id, unitA.id, serviceRootId);
+    const firstSplitInput = {
+      label: "Pessoa 2",
+      items: [{ orderItemId: serviceItem.id, quantity: 1 }],
+    };
+    const firstSplit = await pos.splitTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-split-0001",
+      firstSplitInput,
+    );
+    const childId = firstSplit.targetTabId as string;
+    const replaySplit = await pos.splitTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-split-0001",
+      firstSplitInput,
+    );
+    assert.equal(replaySplit.targetTabId, childId);
+    assert.equal(replaySplit.idempotentReplay, true);
+    await assert.rejects(() => pos.getTab(identity.id, organizationB.id, unitB.id, childId));
+    await assert.rejects(() =>
+      database.db.insert(posTabs).values({
+        organizationId: organizationB.id,
+        unitId: unitB.id,
+        serviceRootTabId: serviceRootId,
+        openedByIdentityId: identity.id,
+      }),
+    );
+    const afterSplit = await pos.getTab(identity.id, organizationA.id, unitA.id, childId);
+    assert.equal(afterSplit.service.totalCents, initialService.tab.totalCents);
+    assert.equal(afterSplit.service.openTabCount, 2);
+    await assert.rejects(() =>
+      pos.splitTab(
+        identity.id,
+        organizationA.id,
+        unitA.id,
+        serviceRootId,
+        "linked-outside-target",
+        { targetTabId: tabId, items: [{ orderItemId: serviceItem.id, quantity: 1 }] },
+      ),
+    );
+    const intoExisting = await pos.splitTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-existing-0001",
+      { targetTabId: childId, items: [{ orderItemId: serviceItem.id, quantity: 1 }] },
+    );
+    assert.equal(intoExisting.targetTabId, childId);
+    const beforePayments = await pos.getTab(identity.id, organizationA.id, unitA.id, serviceRootId);
+    assert.equal(beforePayments.relatedTabs.length, 2);
+    assert.equal(beforePayments.service.totalCents, initialService.tab.totalCents);
+    for (const account of beforePayments.relatedTabs) {
+      await pos.recordPayment(
+        identity.id,
+        organizationA.id,
+        unitA.id,
+        account.id,
+        `linked-payment-${account.id}`,
+        { method: "pix", amountCents: account.totalCents },
+      );
+    }
+    await assert.rejects(() =>
+      pos.splitTab(identity.id, organizationA.id, unitA.id, serviceRootId, "linked-paid-blocked", {
+        targetTabId: childId,
+        items: [{ orderItemId: serviceItem.id, quantity: 1 }],
+      }),
+    );
+    await pos.closeTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-close-root",
+      { printRequested: false },
+    );
+    const tableWhileChildOpen = await database.db
+      .select()
+      .from(posDiningTables)
+      .where(eq(posDiningTables.id, serviceTable.id));
+    assert.equal(tableWhileChildOpen[0]?.status, "occupied");
+    await pos.reopenTab(
+      identity.id,
+      organizationA.id,
+      unitA.id,
+      serviceRootId,
+      "linked-reopen-root",
+      { pin: "1234", reason: "Conferência das contas vinculadas" },
+    );
+    await Promise.all([
+      pos.closeTab(
+        identity.id,
+        organizationA.id,
+        unitA.id,
+        serviceRootId,
+        "linked-close-root-again",
+        { printRequested: false },
+      ),
+      pos.closeTab(identity.id, organizationA.id, unitA.id, childId, "linked-close-child", {
+        printRequested: false,
+      }),
+    ]);
+    const completedService = await pos.getTab(identity.id, organizationA.id, unitA.id, childId);
+    assert.equal(completedService.service.openTabCount, 0);
+    assert.equal(completedService.service.remainingCents, 0);
+    assert.equal(completedService.service.paidCents, initialService.tab.totalCents);
+    const cleanedServiceTable = await database.db
+      .select()
+      .from(posDiningTables)
+      .where(eq(posDiningTables.id, serviceTable.id));
+    assert.equal(cleanedServiceTable[0]?.status, "needs_cleaning");
 
     const [secondStation, rerouteSourceStation, inactiveStation] = await database.db
       .insert(posProductionStations)

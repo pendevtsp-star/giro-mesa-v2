@@ -69,21 +69,23 @@ public sealed class CloudPrinterCommandProcessor(
             ?? throw new CloudPrinterCommandException("CLOUD_PRINT_JOB_INVALID");
         if (string.IsNullOrWhiteSpace(input.CloudPrintJobId) || input.CloudPrintJobId.Length > 180 ||
             string.IsNullOrWhiteSpace(input.IdempotencyKey) || input.IdempotencyKey.Length > 180 ||
-            !Guid.TryParse(input.StationId, out var stationId) ||
+            (input.DocumentType == "kds_ticket" && !Guid.TryParse(input.StationId, out _)) ||
+            (input.DocumentType != "kds_ticket" && input.StationId is not null) ||
             input.StationName?.Length > 120 ||
             input.PrinterId?.Length > 80 ||
-            input.DocumentType != "kds_ticket" ||
+            input.DocumentType is not ("kds_ticket" or "partial_statement" or "payment_statement" or "final_receipt") ||
+            string.IsNullOrWhiteSpace(input.PrinterId) ||
             input.Copies is < 1 or > 5 ||
             input.Payload.ValueKind != JsonValueKind.Object)
             throw new CloudPrinterCommandException("CLOUD_PRINT_JOB_INVALID");
         var request = new PrintRequest(
             input.IdempotencyKey,
             input.PrinterId,
-            null,
+            input.DocumentType == "kds_ticket" ? null : "cashier",
             input.DocumentType,
             input.Payload.Clone(),
             input.Copies,
-            stationId.ToString(),
+            input.StationId,
             string.IsNullOrWhiteSpace(input.StationName) ? null : input.StationName.Trim());
         var execution = await printJobs.ExecuteAsync(request, cancellationToken);
         var status = CloudPrintStatus(execution.Result);
@@ -95,7 +97,8 @@ public sealed class CloudPrinterCommandProcessor(
             localPrintJobId = execution.Job.Id,
             printerId = execution.Result.PrinterId ?? execution.Job.PrinterId,
             status,
-            errorCode = status == "printed" ? null : execution.Result.ErrorCode ?? "PRINTER_RESULT_UNKNOWN",
+            errorCode = status == "printed" ? null : status == "confirmation_required"
+                ? "PRINTER_RESULT_UNKNOWN" : execution.Result.ErrorCode ?? "PRINT_FAILED",
             duplicate = execution.Result.Duplicate,
         }, JsonOptions);
     }
@@ -306,7 +309,7 @@ public sealed class CloudPrinterCommandProcessor(
     private sealed record CloudPrintJobInput(
         string CloudPrintJobId,
         string IdempotencyKey,
-        string StationId,
+        string? StationId,
         string? StationName,
         string? PrinterId,
         string DocumentType,

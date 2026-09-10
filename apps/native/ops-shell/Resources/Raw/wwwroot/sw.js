@@ -1,4 +1,4 @@
-const CACHE_NAME = "giromesa-ops-shell-v0.3.2-r1";
+const CACHE_NAME = "giromesa-ops-shell-v0.3.2-r3";
 const SCOPE_URL = new URL(self.registration.scope);
 const UUID_ROUTE_VALUE = "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const OPERATIONAL_PUSH_ROUTE = new RegExp(

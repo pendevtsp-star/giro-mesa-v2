@@ -44,12 +44,16 @@ import { routeHref } from "../../router";
 import { formatMoney } from "../../rules";
 import { QuickOrderChips } from "../salon/QuickOrderChips";
 import { currentTerminalPrinterId, readActiveTerminalProfile } from "../shell/terminal-profile";
+import { statementMatchesCurrentAccount } from "./account-printing";
 import { BrowserReceipt } from "./BrowserReceipt";
 import { type ManualPaymentMethod, manualPaymentSuccessMessage } from "./manual-payment";
 import type { PaymentAttempt } from "./pos-payments";
 import { promisedAtToIso, splitPromisedAt } from "./promisedAt";
+import { ServiceAccounts } from "./ServiceAccounts";
 import { SmartPosPaymentModal } from "./SmartPosPaymentModal";
+import { SplitConsumptionPanel } from "./SplitConsumptionPanel";
 import "./counter.css";
+import "./service-workspace.css";
 
 type DoseClubDraftSnapshot = {
   externalOfferId: string;
@@ -96,6 +100,7 @@ type DoseClubLoadState =
 
 type PrintJob = {
   id: string;
+  targetTabId?: string;
   serverId?: string;
   server?: PosPrintJob;
   mode: PrintMode;
@@ -132,7 +137,7 @@ export type PendingOrderSubmission = {
 };
 
 const printDocuments: Record<PrintMode, { documentType: PrintDocumentType; label: string }> = {
-  account: { documentType: "partial_statement", label: "Extrato parcial" },
+  account: { documentType: "partial_statement", label: "Pré-conta" },
   payments: { documentType: "payment_statement", label: "Extrato de pagamentos" },
   final: { documentType: "final_receipt", label: "Comprovante final" },
 };
@@ -152,7 +157,7 @@ function printJobFromServer(job: PosPrintJob): PrintJob {
     serverId: job.id,
     server: job,
     mode,
-    label: printDocuments[mode].label,
+    label: `${printDocuments[mode].label} · ${job.payload.context?.label ?? "Comanda"}`,
     status: job.status,
     lastError: job.lastError ?? undefined,
   };
@@ -160,10 +165,13 @@ function printJobFromServer(job: PosPrintJob): PrintJob {
 
 function printStatusLabel(job: PrintJob) {
   if (job.status === "preparing") return "Preparando documento";
-  if (job.status === "queued") return "Aguardando este terminal";
+  if (job.status === "queued")
+    return job.server?.deliveryRoute === "cloud"
+      ? "Aguardando impressora configurada"
+      : "Aguardando impressão";
   if (job.status === "printing") return "Envio iniciado; confirme antes de repetir";
   if (job.status === "confirmation_required") return "Saída enviada; confirme o papel";
-  if (job.status === "printed") return "Entregue à impressora";
+  if (job.status === "printed") return "Impressão confirmada";
   if (job.status === "fallback") return "Diálogo do sistema, sem confirmação";
   return job.lastError ? `Falhou: ${job.lastError}` : "Falhou";
 }
@@ -171,7 +179,7 @@ function printStatusLabel(job: PrintJob) {
 function printActionLabel(status: PrintJob["status"]) {
   if (status === "queued") return "Imprimir agora";
   if (status === "printing") return "Marcar não impresso";
-  if (status === "confirmation_required") return "Confirmar saída física";
+  if (status === "confirmation_required") return "Confirmar que saiu";
   if (status === "failed") return "Tentar novamente";
   return "Reimprimir";
 }
@@ -704,15 +712,7 @@ const activityLabels: Record<string, string> = {
   "tabs.merged": "Comandas unificadas",
 };
 
-export function TabWorkspace({
-  scope,
-  tabId,
-  floor,
-  initialPaymentAttemptId = null,
-  initialView = "order",
-  compactHeading = false,
-  onChanged,
-}: {
+type TabWorkspaceProps = {
   scope: PilotScope;
   tabId: string;
   floor?: PilotFloor;
@@ -720,7 +720,41 @@ export function TabWorkspace({
   initialView?: WorkspaceView;
   compactHeading?: boolean;
   onChanged: () => void;
-}) {
+};
+
+export function TabWorkspace(props: TabWorkspaceProps) {
+  const [selection, setSelection] = useState({
+    tabId: props.tabId,
+    view: props.initialView ?? "order",
+  });
+  useEffect(
+    () => setSelection({ tabId: props.tabId, view: props.initialView ?? "order" }),
+    [props.tabId, props.initialView],
+  );
+  return (
+    <TabWorkspaceSession
+      {...props}
+      key={selection.tabId}
+      tabId={selection.tabId}
+      initialView={selection.view}
+      initialPaymentAttemptId={
+        selection.tabId === props.tabId ? props.initialPaymentAttemptId : null
+      }
+      onSelectTab={(tabId, view) => setSelection({ tabId, view })}
+    />
+  );
+}
+
+function TabWorkspaceSession({
+  scope,
+  tabId,
+  floor,
+  initialPaymentAttemptId = null,
+  initialView = "order",
+  compactHeading = false,
+  onChanged,
+  onSelectTab,
+}: TabWorkspaceProps & { onSelectTab: (id: string, view: WorkspaceView) => void }) {
   const detail = useRemote(
     scope,
     () => scope.load("tab", tabId, () => api.pilot.tab(scope.organizationId, scope.unitId, tabId)),
@@ -812,13 +846,12 @@ export function TabWorkspace({
     }
   }
   const [printJobs, setPrintJobs] = useState<PrintJob[]>([]);
-  const visiblePrintJobs = printJobs.filter(
-    (job) => job.mode !== "account" || job.status !== "printed",
-  );
+  const visiblePrintJobs = printJobs.filter((job) => job.status !== "printed");
   const [browserPrintJob, setBrowserPrintJob] = useState<PosPrintJob | null>(null);
   const [reprintReasons, setReprintReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [billRequestPending, setBillRequestPending] = useState(false);
+  const billRequestInFlight = useRef(false);
   const [feedback, setFeedback] = useState("");
   const [view, setView] = useState<WorkspaceView>(initialView);
   const [draftExpanded, setDraftExpanded] = useState(false);
@@ -829,9 +862,11 @@ export function TabWorkspace({
     "large_party" | "sit_together" | "accessibility" | "operational_reorganization" | "other"
   >("sit_together");
   const [mergeReasonNote, setMergeReasonNote] = useState("");
-  const [splitItemId, setSplitItemId] = useState("");
-  const [splitQuantity, setSplitQuantity] = useState(1);
-  const [splitLabel, setSplitLabel] = useState("Conta separada");
+  const [splitOpen, setSplitOpen] = useState(false);
+  const [printingBusy, setPrintingBusy] = useState(false);
+  const printBusyRef = useRef(false);
+  const accountPanelRef = useRef<HTMLElement>(null);
+  const orderPanelRef = useRef<HTMLDivElement>(null);
   const [printSplitMethod, setPrintSplitMethod] = useState<"equal_people" | "fixed_amount">(
     "equal_people",
   );
@@ -893,6 +928,17 @@ export function TabWorkspace({
   const localPrintingEnabled = terminalPaymentMode !== "disabled";
   const cashierPaymentEnabled = terminalPaymentMode === "cashier";
   const integratedPaymentEnabled = terminalPaymentMode === "homologated_pos";
+
+  useEffect(() => {
+    if (detail.state.status !== "ready" || (view !== "order" && view !== "account")) return;
+    const frame = requestAnimationFrame(() => {
+      if (view === "account")
+        accountPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+      else if (window.matchMedia("(min-width: 760px)").matches)
+        productSearchRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [view, detail.state.status]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new tab must reset navigation even when the requested view is unchanged.
   useEffect(() => setView(initialView), [initialView, tabId]);
@@ -982,14 +1028,20 @@ export function TabWorkspace({
 
   useEffect(() => {
     let cancelled = false;
-    api.pilot
-      .printJobs(scope.organizationId, scope.unitId, { tabId, limit: 4 })
-      .then((jobs) => {
-        if (!cancelled) setPrintJobs(jobs.map(printJobFromServer));
-      })
-      .catch(() => undefined);
+    const refresh = () => {
+      if (document.visibilityState === "hidden" || printBusyRef.current) return;
+      void api.pilot
+        .printJobs(scope.organizationId, scope.unitId, { tabId, limit: 12 })
+        .then((jobs) => {
+          if (!cancelled && !printBusyRef.current) setPrintJobs(jobs.map(printJobFromServer));
+        })
+        .catch(() => undefined);
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 8000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, [scope.organizationId, scope.unitId, tabId]);
 
@@ -1040,14 +1092,13 @@ export function TabWorkspace({
       return false;
     }
     try {
-      const skipsPhysicalConfirmation = printJob.documentType === "partial_statement";
       const delivered = await api.pilot.updatePrintJobStatus(
         scope.organizationId,
         scope.unitId,
         printJob.id,
         {
-          status: skipsPhysicalConfirmation ? "printed" : "confirmation_required",
-          ...(skipsPhysicalConfirmation ? {} : { error: "PRINTER_RESULT_UNKNOWN" }),
+          status: "confirmation_required",
+          error: "PRINTER_RESULT_UNKNOWN",
           printerId: result?.printerId,
         },
         crypto.randomUUID(),
@@ -1057,9 +1108,7 @@ export function TabWorkspace({
         status: delivered.printJob.status,
       });
       setFeedback(
-        skipsPhysicalConfirmation
-          ? "Pré-conta enviada para impressão."
-          : `${printDocuments[printModeFor(printJob.documentType)].label} enviada${result?.printerId ? ` para ${result.printerId}` : ""}. Confirme a saída física antes de repetir.`,
+        `${printDocuments[printModeFor(printJob.documentType)].label} enviada. Confira o papel antes de repetir.`,
       );
     } catch {
       updateLocalPrint(localId, { status: "confirmation_required" });
@@ -1072,29 +1121,6 @@ export function TabWorkspace({
     flushSync(() => setBrowserPrintJob(printJob));
     window.print();
     try {
-      if (printJob.documentType === "partial_statement") {
-        const printing = await api.pilot.updatePrintJobStatus(
-          scope.organizationId,
-          scope.unitId,
-          printJob.id,
-          { status: "printing" },
-          crypto.randomUUID(),
-        );
-        const printed = await api.pilot.updatePrintJobStatus(
-          scope.organizationId,
-          scope.unitId,
-          printJob.id,
-          { status: "printed", printerId: printing.printJob.printerId ?? undefined },
-          crypto.randomUUID(),
-        );
-        updateLocalPrint(localId, {
-          serverId: printJob.id,
-          server: printed.printJob,
-          status: printed.printJob.status,
-        });
-        setFeedback("Pré-conta enviada para impressão.");
-        return;
-      }
       const pendingConfirmation = await api.pilot.updatePrintJobStatus(
         scope.organizationId,
         scope.unitId,
@@ -1108,7 +1134,7 @@ export function TabWorkspace({
         status: "confirmation_required",
       });
       setFeedback(
-        "Diálogo do sistema aberto com o documento oficial. Confirme a saída física na fila antes de repetir.",
+        "Diálogo de impressão aberto. Confira se saiu; cancelar o diálogo não confirma a impressão.",
       );
     } catch {
       updateLocalPrint(localId, {
@@ -1120,31 +1146,74 @@ export function TabWorkspace({
     }
   }
 
-  async function printDocument(mode: PrintMode) {
+  async function printDocument(mode: PrintMode, printTabId = tabId) {
+    if (printBusyRef.current) return;
+    const pending = printJobs.find(
+      (job) =>
+        job.mode === mode &&
+        job.server?.tabId === printTabId &&
+        ["queued", "printing", "confirmation_required"].includes(job.status),
+    );
+    if (pending && pending.status !== "queued") {
+      setFeedback("Confira a via anterior na fila antes de imprimir novamente.");
+      setView("account");
+      return;
+    }
+    if (
+      pending?.server &&
+      detail.state.status === "ready" &&
+      printTabId === tabId &&
+      mode === "account" &&
+      statementMatchesCurrentAccount(
+        pending.server,
+        detail.state.data.tab,
+        detail.state.data.items,
+        summarizeTabPayments(detail.state.data.payments).paidCents,
+      )
+    ) {
+      await reprintDocument(pending);
+      return;
+    }
     if (!localPrintingEnabled) {
       setFeedback("Este terminal encaminha pedidos de conta ao caixa e não imprime localmente.");
       return;
     }
-    const id = crypto.randomUUID();
+    printBusyRef.current = true;
+    setPrintingBusy(true);
+    const id =
+      printJobs.find((job) => !job.serverId && job.mode === mode && job.targetTabId === printTabId)
+        ?.id ?? crypto.randomUUID();
     setPrintJobs((current) =>
       [
-        { id, mode, label: printDocuments[mode].label, status: "preparing" as const },
-        ...current,
-      ].slice(0, 4),
+        {
+          id,
+          mode,
+          targetTabId: printTabId,
+          label: printDocuments[mode].label,
+          status: "preparing" as const,
+        },
+        ...current.filter((job) => job.id !== id),
+      ].slice(0, 12),
     );
     try {
       const created = await api.pilot.createPrintJob(
         scope.organizationId,
         scope.unitId,
-        tabId,
+        printTabId,
         {
           documentType: printDocuments[mode].documentType,
           copies: 1,
           printerId: currentTerminalPrinterId(scope.unitId),
+          installationId: terminalProfile?.installationId ?? scope.installationId,
+          terminalId: terminalProfile?.installationId ?? scope.installationId,
         },
         id,
       );
-      updateLocalPrint(id, { serverId: created.printJob.id, server: created.printJob });
+      updateLocalPrint(id, { ...printJobFromServer(created.printJob), id });
+      if (created.printJob.deliveryRoute === "cloud") {
+        setFeedback("Pré-conta encaminhada à impressora configurada. Acompanhe o estado abaixo.");
+        return;
+      }
       if (!shellPrintingAvailable()) {
         await deliverBrowserJob(created.printJob, id);
         return;
@@ -1156,17 +1225,27 @@ export function TabWorkspace({
         lastError: error instanceof Error ? error.message : "PRINT_QUEUE_UNAVAILABLE",
       });
       setFeedback(error instanceof Error ? error.message : "A fila térmica está indisponível.");
+    } finally {
+      printBusyRef.current = false;
+      setPrintingBusy(false);
     }
   }
 
-  async function reprintDocument(job: PrintJob) {
-    const reason = reprintReasons[job.id]?.trim() ?? "";
+  async function reprintDocument(job: PrintJob, requestedReason?: string) {
+    if (printBusyRef.current) return;
+    if (job.server?.deliveryRoute === "cloud" && job.status === "queued") {
+      setFeedback(
+        "Esta via já está na fila da impressora configurada. Aguarde ou confira a conexão do equipamento.",
+      );
+      return;
+    }
+    const reason = requestedReason ?? reprintReasons[job.id]?.trim() ?? "";
     if ((job.status === "printed" || job.status === "fallback") && reason.length < 3) {
       setFeedback("Informe o motivo da reimpressão com pelo menos 3 caracteres.");
       return;
     }
     if (!job.serverId) {
-      await printDocument(job.mode);
+      await printDocument(job.mode, job.targetTabId ?? tabId);
       return;
     }
     if (job.status === "confirmation_required") {
@@ -1189,6 +1268,8 @@ export function TabWorkspace({
       await markPrintNotDelivered(job);
       return;
     }
+    printBusyRef.current = true;
+    setPrintingBusy(true);
     updateLocalPrint(job.id, { status: "preparing" });
     try {
       const queued =
@@ -1210,11 +1291,19 @@ export function TabWorkspace({
                 crypto.randomUUID(),
               );
       updateLocalPrint(job.id, { serverId: queued.printJob.id, server: queued.printJob });
+      if (queued.printJob.deliveryRoute === "cloud") {
+        updateLocalPrint(job.id, { status: queued.printJob.status });
+        setFeedback("Via encaminhada à impressora configurada.");
+        return;
+      }
       if (shellPrintingAvailable()) await deliverThermalJob(queued.printJob, job.id);
       else await deliverBrowserJob(queued.printJob, job.id);
     } catch (error) {
       updateLocalPrint(job.id, { status: "failed" });
       setFeedback(error instanceof Error ? error.message : "Não foi possível imprimir.");
+    } finally {
+      printBusyRef.current = false;
+      setPrintingBusy(false);
     }
   }
 
@@ -1538,16 +1627,22 @@ export function TabWorkspace({
             );
             const paymentSummary = summarizeTabPayments(data.payments);
             const paidCents = paymentSummary.paidCents;
-            const remainingCents = Math.max(0, data.tab.totalCents - paidCents);
+            const currentAccount = data.relatedTabs?.find((account) => account.id === tabId);
+            const remainingCents =
+              currentAccount?.remainingCents ?? Math.max(0, data.tab.totalCents - paidCents);
+            const availablePaymentCents = Math.max(
+              0,
+              remainingCents - (currentAccount?.reservedCents ?? 0),
+            );
             const safePerPersonCount =
               Number.isInteger(perPersonCount) && perPersonCount >= 2 && perPersonCount <= 50
                 ? perPersonCount
                 : 2;
             const suggestedPaymentCents =
               paymentMode === "full"
-                ? remainingCents
+                ? availablePaymentCents
                 : paymentMode === "per_person"
-                  ? Math.round(remainingCents / safePerPersonCount)
+                  ? Math.round(availablePaymentCents / safePerPersonCount)
                   : null;
             const defaultPaymentReais =
               paymentReais === undefined
@@ -1570,7 +1665,7 @@ export function TabWorkspace({
               paymentAmountCents !== null &&
               Number.isSafeInteger(paymentAmountCents) &&
               paymentAmountCents > 0 &&
-              paymentAmountCents <= remainingCents &&
+              paymentAmountCents <= availablePaymentCents &&
               (paymentMethod !== "cash" ||
                 (cashReceivedCents !== null &&
                   Number.isSafeInteger(cashReceivedCents) &&
@@ -1600,11 +1695,35 @@ export function TabWorkspace({
               ? Math.max(0, Math.floor((Date.now() - new Date(oldestEvent).getTime()) / 60_000))
               : 0;
             const displayLabel =
-              currentTable?.label ??
+              (data.tab.serviceRootTabId ? data.tab.label : currentTable?.label) ??
               data.tab.label ??
               (data.tab.displayNumber ? `Balcão ${data.tab.displayNumber}` : "Atendimento");
             const canApproveAdjustments = ["owner", "manager"].includes(scope.profileId);
             const canAdjustCharges = ["owner", "manager", "cashier"].includes(scope.profileId);
+            const relatedAccounts = data.relatedTabs ?? [];
+            const operating = view === "order" || view === "account";
+            const pendingProductionPrints = (data.productionPrintJobs ?? []).filter(
+              (job) => job.status !== "printed",
+            );
+            const lastStatement = printJobs.find(
+              (job) =>
+                job.mode === "account" && job.server?.tabId === tabId && !job.server.payload.split,
+            );
+            const lastConfirmedStatement = printJobs.find(
+              (job) =>
+                job.mode === "account" &&
+                job.status === "printed" &&
+                job.server?.tabId === tabId &&
+                !job.server.payload.split,
+            );
+            const statementOutdated = lastStatement?.server
+              ? !statementMatchesCurrentAccount(
+                  lastStatement.server,
+                  data.tab,
+                  activeItems,
+                  paidCents,
+                )
+              : false;
             const availableTables =
               floor?.tables.filter((table) => table.active && table.status === "available") ?? [];
             const mergeTargets =
@@ -1853,22 +1972,16 @@ export function TabWorkspace({
 
             async function requestBillAndPrint() {
               const tableId = data.tab.tableId;
-              if (billRequestPending) return;
+              if (billRequestInFlight.current) return;
               if (!tableId) {
-                if (localPrintingEnabled) void printDocument("account");
-                setFeedback(
-                  !localPrintingEnabled
-                    ? "Este terminal não imprime localmente."
-                    : "Pré-conta enviada para impressão.",
-                );
+                if (localPrintingEnabled) await printDocument("account");
                 return;
               }
               if (billCall) {
-                setView("account");
-                if (localPrintingEnabled) await printDocument("account");
-                else setFeedback("A conta já está na fila do caixa.");
+                setFeedback("A conta já foi solicitada. Confira a impressão neste atendimento.");
                 return;
               }
+              billRequestInFlight.current = true;
               setBillRequestPending(true);
               try {
                 const installationId = terminalProfile?.installationId ?? scope.installationId;
@@ -1904,6 +2017,14 @@ export function TabWorkspace({
                   } else {
                     await deliverBrowserJob(requested.printJob, local.id);
                   }
+                } else if (requested.printJob && requested.deliveryRoute === "cloud") {
+                  setPrintJobs((current) =>
+                    [printJobFromServer(requested.printJob as PosPrintJob), ...current].slice(
+                      0,
+                      12,
+                    ),
+                  );
+                  setFeedback("Conta solicitada e encaminhada à impressora do caixa.");
                 } else {
                   setFeedback("Conta solicitada ao caixa.");
                 }
@@ -1912,8 +2033,33 @@ export function TabWorkspace({
                   error instanceof Error ? error.message : "Não foi possível solicitar a conta.",
                 );
               } finally {
+                billRequestInFlight.current = false;
                 setBillRequestPending(false);
               }
+            }
+
+            async function separateConsumption(input: {
+              label?: string;
+              targetTabId?: string;
+              items: Array<{ orderItemId: string; quantity: number }>;
+            }) {
+              const target = {
+                ...input,
+                installationId: terminalProfile?.installationId ?? scope.installationId,
+                terminalId: terminalProfile?.installationId ?? scope.installationId,
+                printerId: terminalProfile?.printerId ?? currentTerminalPrinterId(scope.unitId),
+              };
+              return mutate(
+                () =>
+                  scope.dispatch(
+                    "pos.tab.split_requested",
+                    pilotMutation("split-tab", { tabId, body: target }),
+                    (key) =>
+                      api.pilot.splitTab(scope.organizationId, scope.unitId, tabId, target, key),
+                  ),
+                "Consumo separado. As comandas permanecem neste atendimento.",
+                (result) => onSelectTab(result.targetTabId, "account"),
+              );
             }
 
             async function submitPrintSplit(event: FormEvent<HTMLFormElement>) {
@@ -1955,6 +2101,7 @@ export function TabWorkspace({
                 setPrintJobs((current) => [...localJobs, ...current].slice(0, 12));
                 if (shellPrintingAvailable()) {
                   for (const job of created.printJobs) {
+                    if (job.deliveryRoute === "cloud") continue;
                     await deliverThermalJob(job, job.id);
                   }
                 }
@@ -2003,7 +2150,7 @@ export function TabWorkspace({
               if (
                 !Number.isSafeInteger(amountCents) ||
                 amountCents <= 0 ||
-                amountCents > remainingCents ||
+                amountCents > availablePaymentCents ||
                 (paymentMethod === "cash" &&
                   (cashReceivedCents === null ||
                     !Number.isSafeInteger(cashReceivedCents) ||
@@ -2416,7 +2563,8 @@ export function TabWorkspace({
             return (
               <section
                 aria-label={`Comanda ${displayLabel}`}
-                className="tab-workspace attendance-cockpit"
+                className="tab-workspace attendance-cockpit service-workspace"
+                data-focus={view}
                 onKeyDown={(event) => {
                   const target = event.target as HTMLElement;
                   const editing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
@@ -2495,23 +2643,43 @@ export function TabWorkspace({
                     <span>{data.tab.serviceNotes}</span>
                   </div>
                 )}
-                <nav
-                  aria-label="Áreas do atendimento"
-                  className="workspace-tabs workspace-tabs--primary"
-                >
+                <ServiceAccounts
+                  accounts={relatedAccounts}
+                  selectedId={tabId}
+                  tableLabel={currentTable?.label ?? "Atendimento"}
+                  busy={busy || printingBusy}
+                  canReceive={cashierPaymentEnabled || integratedPaymentEnabled}
+                  canPrint={localPrintingEnabled}
+                  onSelect={onSelectTab}
+                  onPrint={(id) => void printDocument("account", id)}
+                />
+                <nav aria-label="Ações do atendimento" className="service-workspace-actions">
                   <Button
                     aria-current={view === "order" ? "page" : undefined}
-                    onClick={() => setView("order")}
+                    onClick={() => {
+                      setView("order");
+                      orderPanelRef.current?.scrollIntoView({
+                        block: "start",
+                        behavior: "instant",
+                      });
+                      productSearchRef.current?.focus();
+                    }}
                     type="button"
                   >
-                    Pedido <Badge tone="neutral">{activeItems.length}</Badge>
+                    Lançar pedido
                   </Button>
                   <Button
                     aria-current={view === "account" ? "page" : undefined}
-                    onClick={() => setView("account")}
+                    onClick={() => {
+                      setView("account");
+                      accountPanelRef.current?.scrollIntoView({
+                        block: "start",
+                        behavior: "instant",
+                      });
+                    }}
                     type="button"
                   >
-                    Conta
+                    Conta e pagamento
                     {billCall && <span className="workspace-tabs__alert" />}
                   </Button>
                   <details
@@ -2798,1634 +2966,1799 @@ export function TabWorkspace({
                     </form>
                   </details>
                 )}
-                {view === "order" && tabOpen && (
-                  <Card className="order-composer">
-                    <div className="section-title section-title--compact">
-                      <div>
-                        <p className="eyebrow">Novo pedido</p>
-                        <h3>Adicionar itens</h3>
-                      </div>
-                      <div className="order-composer__heading-actions">
-                        <small>{visibleProducts.length} produto(s)</small>
-                        <Button
-                          disabled={busy}
-                          onClick={() => {
-                            setDoseClubState({ status: "loading" });
-                            setDoseClubOpen(true);
-                          }}
-                          size="sm"
-                          type="button"
-                          variant="secondary"
-                        >
-                          Dose Club
-                        </Button>
-                      </div>
-                    </div>
-                    <Modal
-                      className="dose-club-modal"
-                      description="Consulte o saldo pré-pago do cliente vinculado a esta comanda."
-                      isOpen={doseClubOpen}
-                      onClose={() => setDoseClubOpen(false)}
-                      size="lg"
-                      title="Dose Club"
-                    >
-                      <div className="dose-club-modal__content">
-                        {doseClubState.status === "loading" && (
-                          <div className="dose-club-state" role="status">
-                            <strong>Consultando clubes do cliente…</strong>
-                            <span>O saldo será confirmado pelo Dose Club.</span>
-                          </div>
-                        )}
-                        {doseClubState.status === "error" && (
-                          <div role="alert">
-                            <Callout tone="danger">
-                              <strong>Não foi possível consultar o Dose Club</strong>
-                              <p>{doseClubState.message}</p>
-                              <Button
-                                onClick={() => {
-                                  setDoseClubState({ status: "loading" });
-                                  setDoseClubRetryKey((current) => current + 1);
-                                }}
-                                size="sm"
-                                type="button"
-                                variant="secondary"
-                              >
-                                Tentar novamente
-                              </Button>
-                            </Callout>
-                          </div>
-                        )}
-                        {doseClubState.status === "ready" &&
-                          doseClubState.memberships.length === 0 && (
-                            <div className="dose-club-state" role="status">
-                              <strong>Nenhum clube ativo encontrado</strong>
-                              <span>
-                                Vincule o cliente à comanda ou siga com a venda comum do cardápio.
-                              </span>
-                            </div>
-                          )}
-                        {doseClubState.status === "ready" &&
-                          doseClubState.memberships.length > 0 && (
-                            <div className="dose-club-memberships">
-                              {doseClubState.memberships.map((membership) => {
-                                const draftedDoses = doseClubDraftQuantity(
-                                  cart,
-                                  membership.externalClubId,
-                                );
-                                const availableForDraft = Math.max(
-                                  0,
-                                  membership.availableDoses - draftedDoses,
-                                );
-                                const eligibleProducts = membership.eligibleProducts.flatMap(
-                                  (eligibleProduct) => {
-                                    const localProduct = menu.products.find(
-                                      (item) =>
-                                        item.id === eligibleProduct.externalProductId &&
-                                        item.active &&
-                                        item.available &&
-                                        item.priceCents !== null,
-                                    );
-                                    return localProduct ? [{ eligibleProduct, localProduct }] : [];
-                                  },
-                                );
-                                return (
-                                  <article
-                                    className="dose-club-membership"
-                                    key={membership.externalClubId}
-                                  >
-                                    <header className="dose-club-membership__heading">
-                                      <div>
-                                        <strong>{membership.offer.name}</strong>
-                                        <small>
-                                          {membership.offer.type === "combo_pool"
-                                            ? "Combo compartilhado"
-                                            : "Clube individual"}
-                                        </small>
-                                      </div>
-                                      <Badge
-                                        tone={membership.availableDoses > 0 ? "success" : "warning"}
-                                      >
-                                        {membership.availableDoses > 0 ? "Ativo" : "Sem saldo"}
-                                      </Badge>
-                                    </header>
-                                    <dl className="dose-club-balance" aria-label="Saldo de doses">
-                                      <div>
-                                        <dt>Saldo</dt>
-                                        <dd>{membership.remainingDoses}</dd>
-                                      </div>
-                                      <div>
-                                        <dt>Reservadas</dt>
-                                        <dd>{membership.reservedDoses}</dd>
-                                      </div>
-                                      <div>
-                                        <dt>Disponíveis</dt>
-                                        <dd>{membership.availableDoses}</dd>
-                                      </div>
-                                      <div>
-                                        <dt>No rascunho</dt>
-                                        <dd>{draftedDoses}</dd>
-                                      </div>
-                                      <div>
-                                        <dt>Por dose</dt>
-                                        <dd>{membership.doseMl} ml</dd>
-                                      </div>
-                                    </dl>
-                                    <div className="dose-club-products">
-                                      <strong>Produtos elegíveis</strong>
-                                      {eligibleProducts.length === 0 ? (
-                                        <p>
-                                          Nenhum produto elegível está disponível no cardápio atual.
-                                        </p>
-                                      ) : (
-                                        eligibleProducts.map(
-                                          ({ eligibleProduct, localProduct }) => (
-                                            <div
-                                              className="dose-club-product"
-                                              key={eligibleProduct.externalProductId}
-                                            >
-                                              <span>
-                                                <strong>{localProduct.name}</strong>
-                                                <small>
-                                                  {eligibleProduct.brand
-                                                    ? `${eligibleProduct.brand} · `
-                                                    : ""}
-                                                  {membership.doseMl} ml · pré-pago
-                                                </small>
-                                              </span>
-                                              <Button
-                                                disabled={busy || availableForDraft <= 0}
-                                                onClick={() =>
-                                                  addDoseClubItem(
-                                                    membership,
-                                                    eligibleProduct.externalProductId,
-                                                  )
-                                                }
-                                                size="sm"
-                                                type="button"
-                                              >
-                                                Usar 1 dose
-                                              </Button>
-                                            </div>
-                                          ),
-                                        )
-                                      )}
-                                    </div>
-                                  </article>
-                                );
-                              })}
-                            </div>
-                          )}
-                        {doseClubNotice && (
-                          <Callout
-                            tone={doseClubNotice.startsWith("1 dose") ? "success" : "warning"}
-                          >
-                            <span role="status">{doseClubNotice}</span>
-                          </Callout>
-                        )}
-                      </div>
-                    </Modal>
-                    {(quickProducts.length > 0 || lastOrder.length > 0) && (
-                      <section className="quick-order-strip" aria-label="Atalhos de pedido">
-                        <div>
-                          <strong>Atalhos</strong>
-                          <small>Favoritos e itens usados recentemente</small>
-                        </div>
-                        <div className="quick-order-strip__items">
-                          {lastOrder.length > 0 && (
-                            <Button
-                              onClick={() => {
-                                setRoundSelection({});
-                                setRoundSelectionOpen(true);
-                              }}
-                              type="button"
-                            >
-                              ↻ Repor rodada
-                            </Button>
-                          )}
-                          {quickProducts.map((item) => (
-                            <Button
-                              key={item.id}
-                              onClick={() =>
-                                item.modifierGroupIds.length ? setProductId(item.id) : addItem(item)
-                              }
-                              type="button"
-                            >
-                              {favoriteProductIds.includes(item.id) && (
-                                <Icon
-                                  className="quick-order-strip__favorite"
-                                  name="star"
-                                  size={14}
-                                />
-                              )}
-                              {item.name}
-                            </Button>
-                          ))}
-                        </div>
-                      </section>
-                    )}
-                    <Modal
-                      className="repeat-round-modal"
-                      isOpen={roundSelectionOpen}
-                      onClose={() => setRoundSelectionOpen(false)}
-                      size="md"
-                      title="Repor itens da última rodada"
-                    >
-                      <div className="repeat-round-list">
-                        <p>
-                          Selecione somente o que será servido novamente. Preço, disponibilidade e
-                          estoque abaixo são os atuais; a seleção entra no rascunho antes do envio.
-                        </p>
-                        {lastOrder.map((item) => {
-                          const selectedProduct = menu.products.find(
-                            (candidate) => candidate.id === item.productId,
-                          );
-                          const selectedQuantity = roundSelection[item.id] ?? 0;
-                          const availability = item.doseClub
-                            ? { available: false, reason: "Dose pré-paga exige nova validação." }
-                            : repeatRoundItemAvailability(
-                                {
-                                  productId: item.productId,
-                                  quantity: Math.max(1, selectedQuantity),
-                                },
-                                selectedProduct,
-                                activeStationIds,
-                              );
-                          const optionCents = item.modifierOptionIds.reduce(
-                            (sum, optionId) =>
-                              sum +
-                              (menu.options.find((option) => option.id === optionId)
-                                ?.priceDeltaCents ?? 0),
-                            0,
-                          );
-                          return (
-                            <label className="repeat-round-item" key={item.id}>
-                              <input
-                                checked={selectedQuantity > 0}
-                                disabled={!availability.available}
-                                onChange={(event) =>
-                                  setRoundSelection((current) => ({
-                                    ...current,
-                                    [item.id]: event.target.checked ? item.quantity : 0,
-                                  }))
-                                }
-                                type="checkbox"
-                              />
-                              <span>
-                                <strong>{item.name}</strong>
-                                <small>
-                                  {availability.available && selectedProduct?.priceCents !== null
-                                    ? `${formatMoney((selectedProduct?.priceCents ?? 0) + optionCents)} por unidade`
-                                    : availability.reason}
-                                </small>
-                              </span>
-                              <Input
-                                aria-label={`Quantidade de ${item.name}`}
-                                disabled={!availability.available || selectedQuantity === 0}
-                                max={selectedProduct?.dailyStockRemaining ?? 99}
-                                min={1}
-                                onChange={(event) =>
-                                  setRoundSelection((current) => ({
-                                    ...current,
-                                    [item.id]: Math.max(1, Number(event.target.value) || 1),
-                                  }))
-                                }
-                                type="number"
-                                value={selectedQuantity || item.quantity}
-                              />
-                            </label>
-                          );
-                        })}
-                        <div className="repeat-round-actions">
-                          <Button onClick={() => setRoundSelectionOpen(false)} variant="ghost">
-                            Cancelar
-                          </Button>
-                          <Button
-                            disabled={!Object.values(roundSelection).some((value) => value > 0)}
-                            onClick={addSelectedRound}
-                          >
-                            Adicionar ao rascunho
-                          </Button>
-                        </div>
-                      </div>
-                    </Modal>
-                    <Label className="search-field real-product-search">
-                      <Icon aria-hidden="true" name="search" size={16} />
-                      <Input
-                        ref={productSearchRef}
-                        onChange={(event) => setProductSearch(event.target.value)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" && visibleProducts[0]) {
-                            event.preventDefault();
-                            const item = visibleProducts[0];
-                            if (item.modifierGroupIds.length === 0) addItem(item);
-                            else setProductId(item.id);
-                          }
-                        }}
-                        placeholder="Buscar produto ou descrição"
-                        value={productSearch}
-                      />
-                      <kbd>/</kbd>
-                    </Label>
-                    <div className="segmented segmented--scroll real-category-filter">
-                      <Button
-                        aria-pressed={categoryId === "all"}
-                        onClick={() => setCategoryId("all")}
-                        type="button"
-                      >
-                        Todos
-                      </Button>
-                      {menu.categories.map((category) => (
-                        <Button
-                          aria-pressed={categoryId === category.id}
-                          key={category.id}
-                          onClick={() => setCategoryId(category.id)}
-                          type="button"
-                        >
-                          {category.name}
-                        </Button>
-                      ))}
-                    </div>
-                    <div className="real-product-picker">
-                      {visibleProducts.map((item) => (
-                        <article
-                          className={`real-product-option ${
-                            productId === item.id ? "real-product-option--selected" : ""
-                          }`}
-                          key={item.id}
-                        >
-                          <Button
-                            aria-label={
-                              canReachProduction(item)
-                                ? `Adicionar ${item.name}`
-                                : `${item.name} sem estação de produção ativa`
-                            }
-                            disabled={
-                              !item.available ||
-                              item.priceCents === null ||
-                              !canReachProduction(item)
-                            }
-                            onClick={(event) => {
-                              const held = event.currentTarget.dataset.longPressed === "true";
-                              delete event.currentTarget.dataset.longPressed;
-                              if (held || item.modifierGroupIds.length > 0) {
-                                setProductId(item.id);
-                                setOptions([]);
-                              } else addItem(item);
-                            }}
-                            onContextMenu={(event) => {
-                              event.preventDefault();
-                              setProductId(item.id);
-                              setOptions([]);
-                            }}
-                            onPointerDown={(event) => {
-                              const button = event.currentTarget;
-                              const timer = window.setTimeout(() => {
-                                button.dataset.longPressed = "true";
-                                setProductId(item.id);
-                                setOptions([]);
-                              }, 450);
-                              button.dataset.holdTimer = String(timer);
-                            }}
-                            onPointerLeave={(event) =>
-                              window.clearTimeout(Number(event.currentTarget.dataset.holdTimer))
-                            }
-                            onPointerUp={(event) =>
-                              window.clearTimeout(Number(event.currentTarget.dataset.holdTimer))
-                            }
-                            type="button"
-                          >
-                            <span aria-hidden="true">{item.name.slice(0, 1)}</span>
-                            <span>
-                              <strong>{item.name}</strong>
-                              <small>
-                                {canReachProduction(item)
-                                  ? (item.description ?? "Sem descrição")
-                                  : "Configure uma estação no Catálogo"}
-                              </small>
-                            </span>
-                            <strong>
-                              {item.priceCents === null
-                                ? "Sem preço"
-                                : formatMoney(item.priceCents)}
-                            </strong>
-                          </Button>
-                          <Button
-                            aria-label={
-                              favoriteProductIds.includes(item.id)
-                                ? `Remover ${item.name} dos favoritos`
-                                : `Adicionar ${item.name} aos favoritos`
-                            }
-                            className="real-product-option__favorite"
-                            onClick={() =>
-                              setFavoriteProductIds((current) =>
-                                current.includes(item.id)
-                                  ? current.filter((id) => id !== item.id)
-                                  : [item.id, ...current].slice(0, 12),
-                              )
-                            }
-                            type="button"
-                          >
-                            <Icon
-                              className={
-                                favoriteProductIds.includes(item.id) ? "gm-icon--filled" : ""
-                              }
-                              name="star"
-                              size={18}
-                            />
-                          </Button>
-                        </article>
-                      ))}
-                    </div>
-                    {unavailableProducts.length > 0 && (
-                      <div className="substitution-list">
-                        <strong>Substituições para itens indisponíveis</strong>
-                        {unavailableProducts.map((unavailable) => {
-                          const alternative = menu.products.find(
-                            (candidate) =>
-                              candidate.categoryId === unavailable.categoryId &&
-                              candidate.id !== unavailable.id &&
-                              candidate.active &&
-                              candidate.available &&
-                              candidate.priceCents !== null,
-                          );
-                          return (
-                            <span key={unavailable.id}>
-                              {unavailable.name}:{" "}
-                              {alternative ? alternative.name : "sem alternativa"}
-                              {alternative && (
-                                <Button
-                                  onClick={() => setProductId(alternative.id)}
-                                  size="sm"
-                                  variant="ghost"
-                                >
-                                  Usar alternativa
-                                </Button>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {visibleProducts.length === 0 && (
-                      <p className="table-empty">Nenhum produto corresponde à busca.</p>
-                    )}
-                    <Modal
-                      className="product-configurator"
-                      isOpen={Boolean(product)}
-                      onClose={closeProductEditor}
-                      size="md"
-                      title={product?.name ?? "Personalizar item"}
-                    >
-                      {product && (
-                        <div className="product-configurator__content">
-                          <div className="product-configurator__summary">
-                            <span>{product.description ?? "Sem descrição"}</span>
-                            <strong>
-                              {product.priceCents === null
-                                ? "Sem preço"
-                                : formatMoney(product.priceCents)}
-                            </strong>
-                          </div>
-                          {productGroups.map((group) => (
-                            <fieldset className="modifier-group" key={group.id}>
-                              <legend>
-                                <span>{group.name}</span>
-                                <small>
-                                  Escolha {group.minimumSelections}–{group.maximumSelections}
-                                </small>
-                              </legend>
-                              {menu.options
-                                .filter((option) => option.groupId === group.id && option.active)
-                                .map((option) => (
-                                  <Label key={option.id}>
-                                    <input
-                                      className="accent-primary"
-                                      checked={options.includes(option.id)}
-                                      onChange={(event) =>
-                                        setOptions((current) =>
-                                          event.target.checked
-                                            ? [...current, option.id]
-                                            : current.filter((id) => id !== option.id),
-                                        )
-                                      }
-                                      type="checkbox"
-                                    />
-                                    <span>{option.name}</span>
-                                    {option.priceDeltaCents > 0 && (
-                                      <small>+ {formatMoney(option.priceDeltaCents)}</small>
-                                    )}
-                                  </Label>
-                                ))}
-                            </fieldset>
-                          ))}
-                          <div className="product-customization">
-                            <fieldset className="quantity-stepper product-customization__quantity">
-                              <legend className="gm-sr-only">Quantidade</legend>
-                              <Button
-                                aria-label="Diminuir quantidade"
-                                disabled={quantity <= 1}
-                                onClick={() => setQuantity((current) => Math.max(1, current - 1))}
-                                type="button"
-                              >
-                                −
-                              </Button>
-                              <strong>{quantity}</strong>
-                              <Button
-                                aria-label="Aumentar quantidade"
-                                onClick={() => setQuantity((current) => current + 1)}
-                                type="button"
-                              >
-                                +
-                              </Button>
-                            </fieldset>
-                            <Label className="product-customization__notes">
-                              Observação para a produção
-                              <Input
-                                onChange={(event) => setNotes(event.target.value)}
-                                placeholder="Ex.: sem cebola"
-                                value={notes}
-                              />
-                            </Label>
-                            <QuickOrderChips
-                              onSelectChip={(chip) =>
-                                setNotes((current) =>
-                                  current.trim() ? `${current.trim()}, ${chip}` : chip,
-                                )
-                              }
-                            />
-                            <details className="product-advanced-options" open={fullService}>
-                              <summary>
-                                Pessoa, etapa e restrições
-                                <small>{fullService ? "Serviço completo" : "Opcional"}</small>
-                              </summary>
-                              <div className="gm-form-grid product-advanced-options__fields">
-                                <Label className="gm-form-field">
-                                  <span>Pessoa/assento</span>
-                                  <Input
-                                    className="gm-form-control"
-                                    min={0}
-                                    onChange={(event) => setSeatNumber(Number(event.target.value))}
-                                    placeholder="0 = mesa"
-                                    type="number"
-                                    value={seatNumber}
-                                  />
-                                </Label>
-                                <Label className="gm-form-field">
-                                  <span>Etapa</span>
-                                  <NativeSelect
-                                    className="gm-form-control"
-                                    onChange={(event) =>
-                                      setCourse(
-                                        event.target.value as NonNullable<DraftCartItem["course"]>,
-                                      )
-                                    }
-                                    value={course}
-                                  >
-                                    <option value="anytime">Assim que pronto</option>
-                                    <option value="starter">Entrada</option>
-                                    <option value="main">Principal</option>
-                                    <option value="dessert">Sobremesa</option>
-                                  </NativeSelect>
-                                </Label>
-                                <Label className="gm-form-field product-advanced-options__restriction">
-                                  <span>Alergia/restrição</span>
-                                  <Input
-                                    className="gm-form-control"
-                                    onChange={(event) => setAllergyNote(event.target.value)}
-                                    placeholder="Destacar para a produção"
-                                    value={allergyNote}
-                                  />
-                                </Label>
-                              </div>
-                            </details>
-                            <div className="product-configurator__actions">
-                              <Button onClick={closeProductEditor} variant="ghost">
-                                Cancelar
-                              </Button>
-                              <Button
-                                disabled={quantity < 1 || !modifierSelectionValid}
-                                onClick={() => addItem()}
-                              >
-                                Adicionar {quantity} ·{" "}
-                                {formatMoney(
-                                  ((product.priceCents ?? 0) +
-                                    options.reduce(
-                                      (sum, optionId) =>
-                                        sum +
-                                        (menu.options.find((option) => option.id === optionId)
-                                          ?.priceDeltaCents ?? 0),
-                                      0,
-                                    )) *
-                                    quantity,
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </Modal>
-                    <aside
-                      aria-label="Rascunho do pedido"
-                      className="cart-preview"
-                      data-empty={cart.length === 0}
-                      data-expanded={draftExpanded}
-                    >
-                      {cart.length > 0 && (
-                        <Button
-                          aria-expanded={draftExpanded}
-                          className="cart-preview__mobile-toggle"
-                          onClick={() => setDraftExpanded((current) => !current)}
-                          type="button"
-                        >
-                          <span>
-                            <strong>Comanda</strong>
-                            <small>{cartQuantity} item(ns)</small>
-                          </span>
-                          <strong>{formatMoney(cartTotalCents)}</strong>
-                        </Button>
-                      )}
-                      <header className="cart-preview__heading">
-                        <span>
-                          <strong>Rascunho automático</strong>
-                          <small>
-                            {activePendingSubmission
-                              ? "Aguardando confirmação com a mesma referência do envio anterior."
-                              : "Preservado neste dispositivo até o envio."}
-                          </small>
-                        </span>
-                        {lastRemovedItem && (
-                          <Button
-                            onClick={() => {
-                              setCart((current) => [...current, lastRemovedItem]);
-                              setLastRemovedItem(null);
-                            }}
-                            type="button"
-                          >
-                            Desfazer remoção
-                          </Button>
-                        )}
-                      </header>
-                      {activePendingSubmission && (
-                        <Callout tone="warning">
-                          O pedido ainda não foi confirmado. Retome o mesmo envio antes de alterar
-                          os itens.
-                        </Callout>
-                      )}
-                      {storageUnavailable && (
-                        <Callout tone="warning">
-                          Este dispositivo não conseguiu salvar a continuidade. Mantenha esta tela
-                          aberta até a confirmação.
-                        </Callout>
-                      )}
-                      {cart.length === 0 && (
-                        <div className="cart-preview__empty">
-                          <strong>
-                            {activePendingSubmission
-                              ? "Pedido aguardando confirmação"
-                              : "Pedido ainda vazio"}
-                          </strong>
-                          <small>
-                            {activePendingSubmission
-                              ? "Retome o mesmo envio para confirmar o resultado antes de criar outro pedido."
-                              : "Os itens adicionados aparecem aqui antes de seguir para a produção."}
-                          </small>
-                        </div>
-                      )}
-                      {cart.map((item) => (
-                        <div className="cart-preview__item" key={item.id}>
-                          <span className="cart-preview__item-copy">
-                            <strong>{item.name}</strong>
-                            {item.doseClubSnapshot && (
-                              <span className="cart-preview__dose-club">
-                                <Badge tone="info">Dose Club</Badge>
-                                <span>{item.doseClubSnapshot.offerName}</span>
-                              </span>
-                            )}
-                            <small>
-                              {item.doseClubSnapshot
-                                ? `${item.doseClubSnapshot.doseMl} ml · pré-pago · limite ${item.doseClubSnapshot.availableDoses}`
-                                : item.notes || "Sem observação"}
-                              {item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""}
-                              {item.allergyNote && (
-                                <span className="cart-preview__allergy">
-                                  <Icon name="alert-circle" size={13} />
-                                  <b>Alergia:</b> {item.allergyNote}
-                                </span>
-                              )}
-                            </small>
-                            <b>
-                              {item.doseClub
-                                ? `Pré-pago · ${formatMoney(0)}`
-                                : formatMoney(draftItemTotal(item))}
-                            </b>
-                          </span>
-                          <span className="cart-preview__actions">
-                            <span className="quantity-stepper quantity-stepper--compact">
-                              <Button
-                                aria-label={`Diminuir ${item.name}`}
-                                onClick={() =>
-                                  item.quantity === 1
-                                    ? removeDraftItem(item)
-                                    : setCart((current) =>
-                                        current.map((candidate) =>
-                                          candidate.id === item.id
-                                            ? { ...candidate, quantity: candidate.quantity - 1 }
-                                            : candidate,
-                                        ),
-                                      )
-                                }
-                                type="button"
-                              >
-                                −
-                              </Button>
-                              <strong>{item.quantity}</strong>
-                              <Button
-                                aria-label={`Aumentar ${item.name}`}
-                                disabled={
-                                  Boolean(item.doseClub && item.doseClubSnapshot) &&
-                                  doseClubDraftQuantity(
-                                    cart,
-                                    item.doseClub?.externalClubId ?? "",
-                                  ) >= (item.doseClubSnapshot?.availableDoses ?? 0)
-                                }
-                                onClick={() =>
-                                  setCart((current) => incrementDraftItem(current, item.id))
-                                }
-                                type="button"
-                              >
-                                +
-                              </Button>
-                            </span>
-                            {!item.doseClub && (
-                              <Button
-                                onClick={() => {
-                                  setProductId(item.productId);
-                                  setQuantity(item.quantity);
-                                  setNotes(item.notes ?? "");
-                                  setSeatNumber(item.seatNumber ?? 0);
-                                  setCourse(item.course ?? "anytime");
-                                  setAllergyNote(item.allergyNote ?? "");
-                                  setOptions(item.modifierOptionIds);
-                                  setCart((current) =>
-                                    current.filter((candidate) => candidate.id !== item.id),
-                                  );
-                                }}
-                                size="sm"
-                                type="button"
-                                variant="ghost"
-                              >
-                                Observação
-                              </Button>
-                            )}
-                            <Button
-                              aria-label={`Remover ${item.name}`}
-                              onClick={() => removeDraftItem(item)}
-                              size="sm"
-                              type="button"
-                              variant="ghost"
-                            >
-                              Remover
-                            </Button>
-                          </span>
-                        </div>
-                      ))}
-                      {(cart.length > 0 || activePendingSubmission) && !compactHeading && (
-                        <div className="cart-preview__submit">
-                          {activePendingSubmission ? (
-                            <Button
-                              disabled={busy}
-                              onClick={() =>
-                                void submitCart(activePendingSubmission.sendToProduction)
-                              }
-                            >
-                              {activePendingSubmission.sendToProduction
-                                ? "Retomar envio do pedido"
-                                : "Retomar pedido em espera"}
-                            </Button>
-                          ) : (
-                            <>
-                              <Button
-                                disabled={busy}
-                                onClick={() => void submitCart(false)}
-                                size="sm"
-                                variant="secondary"
-                              >
-                                Manter em espera
-                              </Button>
-                              <Button disabled={busy} onClick={() => void submitCart(true)}>
-                                Enviar {cartQuantity} item(ns) · {formatMoney(cartTotalCents)}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </aside>
-                  </Card>
-                )}
-                {view === "order" && (
-                  <div className="data-list order-history-list">
-                    {(data.productionCourses?.length ?? 0) > 0 && (
-                      <Callout tone="info">
-                        <strong>Etapas confirmadas na cozinha</strong>
-                        <p>
-                          Controle a espera e a liberação pelos tickets reais desta comanda. Uma
-                          dependência da produção ainda pode segurar o item depois da liberação.
-                        </p>
-                        <div className="production-course-actions">
-                          {data.productionCourses?.map((entry) => (
-                            <span key={`${entry.ticketId}:${entry.course}`}>
-                              <span>
-                                <strong>{courseLabels[entry.course]}</strong>
-                                <small>
-                                  {entry.itemCount} item(ns) ·{" "}
-                                  {entry.state === "held" ? "em espera" : "liberado"}
-                                  {entry.dependencyHeld ? " · aguardando etapa anterior" : ""}
-                                </small>
-                              </span>
-                              <Button
-                                disabled={busy || entry.state === "held"}
-                                onClick={() =>
-                                  void setProductionCourseState(
-                                    entry.ticketId,
-                                    entry.course,
-                                    "held",
-                                  )
-                                }
-                                size="sm"
-                                variant="ghost"
-                              >
-                                Manter em espera
-                              </Button>
-                              <Button
-                                disabled={busy || entry.state === "fired"}
-                                onClick={() =>
-                                  void setProductionCourseState(
-                                    entry.ticketId,
-                                    entry.course,
-                                    "fired",
-                                  )
-                                }
-                                size="sm"
-                                variant="secondary"
-                              >
-                                Liberar preparo
-                              </Button>
-                            </span>
-                          ))}
-                        </div>
-                      </Callout>
-                    )}
-                    {data.orders.map((order, orderIndex) => (
-                      <article className="data-row" key={order.id}>
-                        <div>
-                          <strong>
-                            Pedido {orderIndex + 1} · {displayLabel}
-                          </strong>
-                          {order.originTableId && (
-                            <small>
-                              Origem:{" "}
-                              {floor?.tables.find((table) => table.id === order.originTableId)
-                                ?.label ?? "Mesa anterior"}
-                            </small>
-                          )}
-                          <small>
-                            {data.items
-                              .filter((item) => item.orderId === order.id)
-                              .map(
-                                (item) =>
-                                  `${item.quantity}× ${item.productName}${
-                                    item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""
-                                  }${
-                                    item.course !== "anytime"
-                                      ? ` · ${
-                                          {
-                                            starter: "entrada",
-                                            main: "principal",
-                                            dessert: "sobremesa",
-                                          }[item.course]
-                                        }`
-                                      : ""
-                                  }${item.allergyNote ? ` · atenção: ${item.allergyNote}` : ""}`,
-                              )
-                              .join(" · ") || "Sem itens"}
-                          </small>
-                        </div>
-                        <div className="data-row__end">
-                          <Badge tone={statusTone(order.status)}>
-                            {{
-                              draft: "Em espera",
-                              sent: "Enviado",
-                              preparing: "Em preparo",
-                              ready: "Pronto",
-                              served: "Servido",
-                              canceled: "Cancelado",
-                            }[order.status] ?? "Em andamento"}
-                          </Badge>
-                          {order.status === "draft" && (
-                            <Button
-                              disabled={busy}
-                              onClick={() => void releaseOrder(order.id)}
-                              size="sm"
-                            >
-                              Enviar pedido em espera ·{" "}
-                              {courseLabels[
-                                data.items.find((item) => item.orderId === order.id)?.course ??
-                                  "anytime"
-                              ].toLocaleLowerCase("pt-BR")}
-                            </Button>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                )}
-                {view === "account" && (
-                  <section className="account-overview">
-                    {ruptureItems.length > 0 && (
+                <div className="service-workspace-grid" hidden={!operating}>
+                  <div className="service-order-area" ref={orderPanelRef}>
+                    {pendingProductionPrints.length > 0 && (
                       <Callout tone="warning">
                         <strong>
-                          {ruptureItems.length} item(ns) lançado(s) ficaram indisponíveis
+                          {pendingProductionPrints.length} impressão(ões) de produção pendente(s)
                         </strong>
                         <p>
-                          Prepare um substituto no rascunho e conclua o cancelamento autorizado do
-                          item original. As duas confirmações permanecem separadas e visíveis.
+                          O pedido está registrado. Confira a impressora da estação antes de repetir
+                          o envio.
                         </p>
-                        <div className="rupture-actions">
-                          {ruptureItems.map((item) => (
-                            <Button
-                              key={item.id}
-                              onClick={() => {
-                                setRuptureItemId(item.id);
-                                setRuptureReplacementProductId("");
-                              }}
-                              size="sm"
-                              variant="secondary"
-                            >
-                              Resolver {item.productName}
-                            </Button>
-                          ))}
-                        </div>
+                        <a href={routeHref("device")}>Ver fila e diagnóstico de impressão</a>
                       </Callout>
                     )}
-                    <Modal
-                      isOpen={Boolean(ruptureItem)}
-                      onClose={() => {
-                        setRuptureItemId("");
-                        setRuptureReplacementProductId("");
-                      }}
-                      size="sm"
-                      title={
-                        ruptureItem
-                          ? `Resolver falta de ${ruptureItem.productName}`
-                          : "Resolver ruptura"
-                      }
-                    >
-                      {ruptureItem && (
-                        <div className="rupture-assistant">
-                          <p>
-                            O item original continua lançado até o cancelamento ser aprovado. O
-                            substituto será apenas adicionado ao rascunho desta comanda.
-                          </p>
-                          <Label>
-                            Substituto disponível
-                            <NativeSelect
-                              onChange={(event) =>
-                                setRuptureReplacementProductId(event.target.value)
-                              }
-                              value={ruptureReplacementProductId}
-                            >
-                              <option value="">Selecione</option>
-                              {ruptureAlternatives.map((candidate) => (
-                                <option key={candidate.id} value={candidate.id}>
-                                  {candidate.name} · {formatMoney(candidate.priceCents ?? 0)}
-                                </option>
-                              ))}
-                            </NativeSelect>
-                          </Label>
-                          {ruptureAlternatives.length === 0 && (
-                            <Callout tone="warning">
-                              <strong>Sem alternativa disponível na mesma categoria</strong>
-                              <p>Cancele o item original ou escolha outro produto pela busca.</p>
-                            </Callout>
-                          )}
-                          {ruptureReplacement?.priceCents !== null && ruptureReplacement && (
-                            <p className="rupture-difference" role="status">
-                              Diferença estimada no rascunho:{" "}
-                              <strong>
-                                {formatMoney(
-                                  ruptureReplacement.priceCents * ruptureItem.quantity -
-                                    ruptureItem.netCents,
-                                )}
-                              </strong>
-                              . Adicionais do item original não são copiados.
-                            </p>
-                          )}
-                          <div className="rupture-actions">
+                    {operating && tabOpen && (
+                      <Card className="order-composer">
+                        <div className="section-title section-title--compact">
+                          <div>
+                            <p className="eyebrow">Novo pedido</p>
+                            <h3>Adicionar itens</h3>
+                          </div>
+                          <div className="order-composer__heading-actions">
+                            <small>{visibleProducts.length} produto(s)</small>
                             <Button
-                              disabled={!ruptureReplacement}
+                              disabled={busy}
                               onClick={() => {
-                                if (!ruptureReplacement) return;
-                                setCart((current) => [
-                                  ...current,
-                                  {
-                                    id: crypto.randomUUID(),
-                                    productId: ruptureReplacement.id,
-                                    name: ruptureReplacement.name,
-                                    quantity: ruptureItem.quantity,
-                                    modifierOptionIds: [],
-                                    ...(ruptureItem.seatNumber
-                                      ? { seatNumber: ruptureItem.seatNumber }
-                                      : {}),
-                                    ...(ruptureItem.course !== "anytime"
-                                      ? { course: ruptureItem.course }
-                                      : {}),
-                                    ...(ruptureItem.allergyNote
-                                      ? { allergyNote: ruptureItem.allergyNote }
-                                      : {}),
-                                    notes: `Substituição de ${ruptureItem.productName}; aguarda cancelamento do item original.`,
-                                  },
-                                ]);
-                                setApprovalItemId(ruptureItem.id);
-                                setItemActionId(ruptureItem.id);
-                                setApprovalReason("Produto indisponível");
-                                setRuptureItemId("");
-                                setRuptureReplacementProductId("");
-                                setFeedback(
-                                  "Substituto adicionado ao rascunho. Agora confirme ou solicite o cancelamento do item original abaixo.",
-                                );
+                                setDoseClubState({ status: "loading" });
+                                setDoseClubOpen(true);
                               }}
-                            >
-                              Adicionar substituto ao rascunho
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </Modal>
-                    <div className="account-overview__metrics">
-                      <span>
-                        <small>Total</small>
-                        <strong>{formatMoney(data.tab.totalCents)}</strong>
-                      </span>
-                      <span>
-                        <small>Recebido líquido</small>
-                        <strong>{formatMoney(paidCents)}</strong>
-                        {paymentSummary.reversedCents > 0 && (
-                          <small>{formatMoney(paymentSummary.reversedCents)} estornado</small>
-                        )}
-                      </span>
-                      <span data-balance={remainingCents > 0}>
-                        <small>Saldo a receber</small>
-                        <strong>{formatMoney(remainingCents)}</strong>
-                      </span>
-                    </div>
-                    {cashierPaymentEnabled && tabOpen && remainingCents > 0 && (
-                      <form
-                        className="cashier-payment-form account-payment-desk"
-                        id={`cashier-payment-form-${tabId}`}
-                        onSubmit={submitManualPayment}
-                      >
-                        <div className="account-payment-desk__heading">
-                          <span>
-                            <small>Receber agora</small>
-                            <strong>Receber</strong>
-                          </span>
-                        </div>
-                        <div className="cashier-payment-form__fields">
-                          <Label>
-                            Forma de pagamento
-                            <NativeSelect
-                              onChange={(event) =>
-                                setPaymentMethod(event.target.value as typeof paymentMethod)
-                              }
-                              value={paymentMethod}
-                            >
-                              <option value="cash">Dinheiro</option>
-                              <option value="pix">Pix (registro manual)</option>
-                              <option value="debit_card">Débito (maquininha externa)</option>
-                              <option value="credit_card">Crédito (maquininha externa)</option>
-                              <option value="other">Outro meio de pagamento</option>
-                            </NativeSelect>
-                          </Label>
-                          <Label>
-                            Como receber
-                            <NativeSelect
-                              onChange={(event) => {
-                                const nextMode = event.target.value as AccountPaymentMode;
-                                setPaymentMode(nextMode);
-                                setPaymentReais(nextMode === "custom" ? null : undefined);
-                                setCashReceivedReais(undefined);
-                              }}
-                              value={paymentMode}
-                            >
-                              <option value="full">Conta inteira</option>
-                              <option value="per_person">Dividir valor igualmente</option>
-                              <option value="custom">Outro valor</option>
-                            </NativeSelect>
-                          </Label>
-                          {paymentMode === "per_person" && (
-                            <Label>
-                              Dividir o saldo por
-                              <Input
-                                max={50}
-                                min={2}
-                                onChange={(event) => setPerPersonCount(Number(event.target.value))}
-                                step={1}
-                                type="number"
-                                value={safePerPersonCount}
-                              />
-                            </Label>
-                          )}
-                          <Label>
-                            Valor a receber
-                            <Input
-                              min={0.01}
-                              onChange={(event) => {
-                                const next = event.target.value;
-                                if (!next) {
-                                  setPaymentMode("custom");
-                                  setPaymentReais(null);
-                                  setCashReceivedReais(undefined);
-                                  return;
-                                }
-                                setPaymentMode("custom");
-                                setPaymentReais(Number(next));
-                                setCashReceivedReais(undefined);
-                              }}
-                              step="0.01"
-                              type="number"
-                              value={defaultPaymentReais ?? ""}
-                            />
-                            {paymentMode === "per_person" && defaultPaymentReais !== null && (
-                              <small>
-                                Parcela sugerida de{" "}
-                                {formatMoney(Math.round(defaultPaymentReais * 100))}. Cada
-                                confirmação registra somente uma parcela; confira o saldo antes de
-                                receber a próxima. A conta não fica vinculada a pessoas específicas.
-                              </small>
-                            )}
-                          </Label>
-                        </div>
-                        {paymentMethod === "cash" && (
-                          <Label className="cash-change-field">
-                            <span>Valor recebido</span>
-                            <Input
-                              min={defaultPaymentReais ?? 0.01}
-                              onChange={(event) =>
-                                setCashReceivedReais(
-                                  event.target.value === "" ? null : Number(event.target.value),
-                                )
-                              }
-                              step="0.01"
-                              type="number"
-                              value={defaultCashReceivedReais ?? ""}
-                            />
-                            <strong>
-                              Troco:{" "}
-                              {formatMoney(
-                                Math.max(0, (cashReceivedCents ?? 0) - (paymentAmountCents ?? 0)),
-                              )}
-                            </strong>
-                          </Label>
-                        )}
-                        {paymentMethod !== "cash" && (
-                          <details className="account-payment-reference">
-                            <summary>Referência e confirmação externa</summary>
-                            <Label>
-                              Referência opcional
-                              <Input
-                                onChange={(event) => setPaymentReference(event.target.value)}
-                                placeholder="Ex.: identificação ou observação"
-                                value={paymentReference}
-                              />
-                            </Label>
-                            <small>Registre somente após a confirmação externa.</small>
-                          </details>
-                        )}
-                        {paymentError && (
-                          <div role="alert">
-                            <Callout tone="danger">
-                              <strong>Pagamento não registrado</strong>
-                              <p>{paymentError}</p>
-                              {(paymentError.startsWith("Abra o caixa") ||
-                                paymentError.includes("gaveta")) && (
-                                <a href={routeHref("cash")}>Abrir Contas e caixa</a>
-                              )}
-                            </Callout>
-                          </div>
-                        )}
-                      </form>
-                    )}
-                    <div className="account-overview__actions">
-                      {integratedPaymentEnabled && (
-                        <Button
-                          className="smart-pos-trigger"
-                          disabled={
-                            busy || balanceRefreshRequired || !tabOpen || remainingCents <= 0
-                          }
-                          onClick={() => setSmartPosOpen(true)}
-                          size="sm"
-                        >
-                          Cobrar {formatMoney(remainingCents)} na maquininha
-                        </Button>
-                      )}
-                    </div>
-                    {integratedPaymentEnabled &&
-                      integratedAttempt &&
-                      ["created", "processing", "unknown"].includes(integratedAttempt.status) && (
-                        <Callout tone={integratedAttempt.status === "unknown" ? "warning" : "info"}>
-                          <strong>
-                            {integratedAttempt.status === "unknown"
-                              ? "Pagamento precisa de conferência"
-                              : "Pagamento em andamento"}
-                          </strong>
-                          <p>
-                            {formatMoney(integratedAttempt.amountCents)} · Não cobre novamente antes
-                            de confirmar o resultado.
-                          </p>
-                          <Button
-                            onClick={() => setSmartPosOpen(true)}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            Reabrir pagamento
-                          </Button>
-                        </Callout>
-                      )}
-                    {printAttention && (
-                      <Callout tone={printAttention.status === "failed" ? "danger" : "warning"}>
-                        <strong>Impressão precisa de conferência</strong>
-                        <p>{printStatusLabel(printAttention)}. Abra Impressões para resolver.</p>
-                      </Callout>
-                    )}
-                    {localPrintingEnabled && (
-                      <details className="account-disclosure account-print-disclosure">
-                        <summary>
-                          Impressões{visiblePrintJobs.length ? ` (${visiblePrintJobs.length})` : ""}
-                        </summary>
-                        <div className="account-print-actions">
-                          <Button
-                            disabled={busy || billRequestPending || !tabOpen}
-                            onClick={() => void requestBillAndPrint()}
-                            size="sm"
-                            type="button"
-                            variant="secondary"
-                          >
-                            {data.tab.tableId && billCall
-                              ? "Reimprimir pré-conta"
-                              : billRequestPending
-                                ? "Solicitando…"
-                                : data.tab.tableId
-                                  ? "Pedir conta e imprimir"
-                                  : "Imprimir pré-conta"}
-                          </Button>
-                          {data.tab.tableId && !billCall && (
-                            <Button
-                              onClick={() => void printDocument("account")}
                               size="sm"
                               type="button"
-                              variant="ghost"
+                              variant="secondary"
                             >
-                              Só imprimir pré-conta
+                              Dose Club
                             </Button>
-                          )}
-                          <Button
-                            disabled={data.payments.length === 0}
-                            onClick={() => void printDocument("payments")}
-                            size="sm"
-                            type="button"
-                            variant="ghost"
-                          >
-                            Extrato de pagamentos
-                          </Button>
-                        </div>
-                        {tabOpen && remainingCents > 0 && (
-                          <form className="print-split-form" onSubmit={submitPrintSplit}>
-                            <strong>Dividir pré-conta</strong>
-                            <NativeSelect
-                              aria-label="Forma da divisão impressa"
-                              onChange={(event) =>
-                                setPrintSplitMethod(event.target.value as typeof printSplitMethod)
-                              }
-                              value={printSplitMethod}
-                            >
-                              <option value="equal_people">Dividir igualmente por pessoas</option>
-                              <option value="fixed_amount">Vias por valor fixo</option>
-                            </NativeSelect>
-                            <Label>
-                              Quantidade de vias
-                              <Input
-                                max={50}
-                                min={2}
-                                onChange={(event) =>
-                                  setPrintSplitPartCount(Number(event.target.value))
-                                }
-                                type="number"
-                                value={printSplitPartCount}
-                              />
-                            </Label>
-                            {printSplitMethod === "fixed_amount" && (
-                              <Label>
-                                Valor sugerido por via
-                                <Input
-                                  min={0.01}
-                                  onChange={(event) =>
-                                    setPrintSplitFixedReais(Number(event.target.value))
-                                  }
-                                  step="0.01"
-                                  type="number"
-                                  value={printSplitFixedReais}
-                                />
-                              </Label>
-                            )}
-                            <Button
-                              disabled={
-                                busy ||
-                                printSplitPartCount < 2 ||
-                                (printSplitMethod === "fixed_amount" && printSplitFixedReais <= 0)
-                              }
-                              size="sm"
-                              type="submit"
-                            >
-                              Criar e imprimir vias
-                            </Button>
-                            <small>
-                              Valores divididos sobre o saldo. Imprimir não registra pagamento.
-                            </small>
-                          </form>
-                        )}
-                        {visiblePrintJobs.length > 0 && (
-                          <div aria-label="Fila de impressão" className="print-queue" role="status">
-                            {visiblePrintJobs.map((job) => (
-                              <span key={job.id}>
-                                <strong>{job.label}</strong>
-                                <small>{printStatusLabel(job)}</small>
-                                {(job.status === "printed" || job.status === "fallback") && (
-                                  <Input
-                                    aria-label={`Motivo da reimpressão de ${job.label}`}
-                                    maxLength={500}
-                                    minLength={3}
-                                    onChange={(event) =>
-                                      setReprintReasons((current) => ({
-                                        ...current,
-                                        [job.id]: event.target.value,
-                                      }))
-                                    }
-                                    placeholder="Motivo obrigatório para reimprimir"
-                                    value={reprintReasons[job.id] ?? ""}
-                                  />
-                                )}
-                                {job.status !== "preparing" && (
-                                  <div className="print-queue__actions">
-                                    <Button
-                                      disabled={
-                                        (job.status === "printed" || job.status === "fallback") &&
-                                        (reprintReasons[job.id]?.trim().length ?? 0) < 3
-                                      }
-                                      onClick={() => void reprintDocument(job)}
-                                      type="button"
-                                    >
-                                      {printActionLabel(job.status)}
-                                    </Button>
-                                    {job.status === "confirmation_required" && (
-                                      <Button
-                                        onClick={() => void markPrintNotDelivered(job)}
-                                        type="button"
-                                        variant="secondary"
-                                      >
-                                        Marcar não impresso
-                                      </Button>
-                                    )}
-                                  </div>
-                                )}
-                              </span>
-                            ))}
                           </div>
-                        )}
-                      </details>
-                    )}
-                    <details className="account-disclosure account-items-disclosure">
-                      <summary>Itens e pagamentos da conta</summary>
-                      {data.payments.length > 0 && (
-                        <section className="account-payments" aria-label="Pagamentos registrados">
-                          <strong>Pagamentos</strong>
-                          {data.payments.map((payment) => (
-                            <span key={payment.id}>
-                              <span>
-                                <b>
-                                  {
-                                    {
-                                      cash: "Dinheiro",
-                                      credit_card: "Crédito",
-                                      debit_card: "Débito",
-                                      pix: "Pix",
-                                      other: "Outro",
-                                    }[payment.method]
-                                  }
-                                  {payment.financialStatus === "reversed" && (
-                                    <Badge tone="danger">Estornado</Badge>
-                                  )}
-                                </b>
-                                <small>
-                                  {new Date(payment.createdAt).toLocaleString("pt-BR")}
-                                  {payment.reference ? ` · ${payment.reference}` : ""}
-                                </small>
-                              </span>
-                              <span>
-                                <strong>{formatMoney(payment.amountCents)}</strong>
-                                {payment.financialStatus === "reversed" && (
-                                  <small>Líquido {formatMoney(payment.netAmountCents)}</small>
-                                )}
-                              </span>
-                            </span>
-                          ))}
-                        </section>
-                      )}
-                      <div className="account-lines">
-                        {activeItems.map((item) => (
-                          <div className="account-line-group" key={item.id}>
-                            <div className="account-line">
-                              <span>
-                                <strong>
-                                  {item.quantity}× {item.productName}
-                                </strong>
-                                <small>{item.status === "draft" ? "Em espera" : "Lançado"}</small>
-                                {approvalStatusForItem(item.id) && (
-                                  <Badge tone={approvalStatusForItem(item.id)?.tone}>
-                                    {approvalStatusForItem(item.id)?.label}
-                                  </Badge>
-                                )}
-                              </span>
-                              <strong>{formatMoney(item.netCents)}</strong>
-                              {tabOpen && (
-                                <Button
-                                  aria-expanded={itemActionId === item.id}
-                                  aria-label={`Ações para ${item.productName}`}
-                                  onClick={() => {
-                                    setApprovalItemId(item.id);
-                                    setItemActionId((current) =>
-                                      current === item.id ? "" : item.id,
+                        </div>
+                        <Modal
+                          className="dose-club-modal"
+                          description="Consulte o saldo pré-pago do cliente vinculado a esta comanda."
+                          isOpen={doseClubOpen}
+                          onClose={() => setDoseClubOpen(false)}
+                          size="lg"
+                          title="Dose Club"
+                        >
+                          <div className="dose-club-modal__content">
+                            {doseClubState.status === "loading" && (
+                              <div className="dose-club-state" role="status">
+                                <strong>Consultando clubes do cliente…</strong>
+                                <span>O saldo será confirmado pelo Dose Club.</span>
+                              </div>
+                            )}
+                            {doseClubState.status === "error" && (
+                              <div role="alert">
+                                <Callout tone="danger">
+                                  <strong>Não foi possível consultar o Dose Club</strong>
+                                  <p>{doseClubState.message}</p>
+                                  <Button
+                                    onClick={() => {
+                                      setDoseClubState({ status: "loading" });
+                                      setDoseClubRetryKey((current) => current + 1);
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                    variant="secondary"
+                                  >
+                                    Tentar novamente
+                                  </Button>
+                                </Callout>
+                              </div>
+                            )}
+                            {doseClubState.status === "ready" &&
+                              doseClubState.memberships.length === 0 && (
+                                <div className="dose-club-state" role="status">
+                                  <strong>Nenhum clube ativo encontrado</strong>
+                                  <span>
+                                    Vincule o cliente à comanda ou siga com a venda comum do
+                                    cardápio.
+                                  </span>
+                                </div>
+                              )}
+                            {doseClubState.status === "ready" &&
+                              doseClubState.memberships.length > 0 && (
+                                <div className="dose-club-memberships">
+                                  {doseClubState.memberships.map((membership) => {
+                                    const draftedDoses = doseClubDraftQuantity(
+                                      cart,
+                                      membership.externalClubId,
                                     );
+                                    const availableForDraft = Math.max(
+                                      0,
+                                      membership.availableDoses - draftedDoses,
+                                    );
+                                    const eligibleProducts = membership.eligibleProducts.flatMap(
+                                      (eligibleProduct) => {
+                                        const localProduct = menu.products.find(
+                                          (item) =>
+                                            item.id === eligibleProduct.externalProductId &&
+                                            item.active &&
+                                            item.available &&
+                                            item.priceCents !== null,
+                                        );
+                                        return localProduct
+                                          ? [{ eligibleProduct, localProduct }]
+                                          : [];
+                                      },
+                                    );
+                                    return (
+                                      <article
+                                        className="dose-club-membership"
+                                        key={membership.externalClubId}
+                                      >
+                                        <header className="dose-club-membership__heading">
+                                          <div>
+                                            <strong>{membership.offer.name}</strong>
+                                            <small>
+                                              {membership.offer.type === "combo_pool"
+                                                ? "Combo compartilhado"
+                                                : "Clube individual"}
+                                            </small>
+                                          </div>
+                                          <Badge
+                                            tone={
+                                              membership.availableDoses > 0 ? "success" : "warning"
+                                            }
+                                          >
+                                            {membership.availableDoses > 0 ? "Ativo" : "Sem saldo"}
+                                          </Badge>
+                                        </header>
+                                        <dl
+                                          className="dose-club-balance"
+                                          aria-label="Saldo de doses"
+                                        >
+                                          <div>
+                                            <dt>Saldo</dt>
+                                            <dd>{membership.remainingDoses}</dd>
+                                          </div>
+                                          <div>
+                                            <dt>Reservadas</dt>
+                                            <dd>{membership.reservedDoses}</dd>
+                                          </div>
+                                          <div>
+                                            <dt>Disponíveis</dt>
+                                            <dd>{membership.availableDoses}</dd>
+                                          </div>
+                                          <div>
+                                            <dt>No rascunho</dt>
+                                            <dd>{draftedDoses}</dd>
+                                          </div>
+                                          <div>
+                                            <dt>Por dose</dt>
+                                            <dd>{membership.doseMl} ml</dd>
+                                          </div>
+                                        </dl>
+                                        <div className="dose-club-products">
+                                          <strong>Produtos elegíveis</strong>
+                                          {eligibleProducts.length === 0 ? (
+                                            <p>
+                                              Nenhum produto elegível está disponível no cardápio
+                                              atual.
+                                            </p>
+                                          ) : (
+                                            eligibleProducts.map(
+                                              ({ eligibleProduct, localProduct }) => (
+                                                <div
+                                                  className="dose-club-product"
+                                                  key={eligibleProduct.externalProductId}
+                                                >
+                                                  <span>
+                                                    <strong>{localProduct.name}</strong>
+                                                    <small>
+                                                      {eligibleProduct.brand
+                                                        ? `${eligibleProduct.brand} · `
+                                                        : ""}
+                                                      {membership.doseMl} ml · pré-pago
+                                                    </small>
+                                                  </span>
+                                                  <Button
+                                                    disabled={busy || availableForDraft <= 0}
+                                                    onClick={() =>
+                                                      addDoseClubItem(
+                                                        membership,
+                                                        eligibleProduct.externalProductId,
+                                                      )
+                                                    }
+                                                    size="sm"
+                                                    type="button"
+                                                  >
+                                                    Usar 1 dose
+                                                  </Button>
+                                                </div>
+                                              ),
+                                            )
+                                          )}
+                                        </div>
+                                      </article>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            {doseClubNotice && (
+                              <Callout
+                                tone={doseClubNotice.startsWith("1 dose") ? "success" : "warning"}
+                              >
+                                <span role="status">{doseClubNotice}</span>
+                              </Callout>
+                            )}
+                          </div>
+                        </Modal>
+                        {(quickProducts.length > 0 || lastOrder.length > 0) && (
+                          <section className="quick-order-strip" aria-label="Atalhos de pedido">
+                            <div>
+                              <strong>Atalhos</strong>
+                              <small>Favoritos e itens usados recentemente</small>
+                            </div>
+                            <div className="quick-order-strip__items">
+                              {lastOrder.length > 0 && (
+                                <Button
+                                  onClick={() => {
+                                    setRoundSelection({});
+                                    setRoundSelectionOpen(true);
                                   }}
                                   type="button"
                                 >
-                                  Mais
+                                  ↻ Repor rodada
+                                </Button>
+                              )}
+                              {quickProducts.map((item) => (
+                                <Button
+                                  key={item.id}
+                                  onClick={() =>
+                                    item.modifierGroupIds.length
+                                      ? setProductId(item.id)
+                                      : addItem(item)
+                                  }
+                                  type="button"
+                                >
+                                  {favoriteProductIds.includes(item.id) && (
+                                    <Icon
+                                      className="quick-order-strip__favorite"
+                                      name="star"
+                                      size={14}
+                                    />
+                                  )}
+                                  {item.name}
+                                </Button>
+                              ))}
+                            </div>
+                          </section>
+                        )}
+                        <Modal
+                          className="repeat-round-modal"
+                          isOpen={roundSelectionOpen}
+                          onClose={() => setRoundSelectionOpen(false)}
+                          size="md"
+                          title="Repor itens da última rodada"
+                        >
+                          <div className="repeat-round-list">
+                            <p>
+                              Selecione somente o que será servido novamente. Preço, disponibilidade
+                              e estoque abaixo são os atuais; a seleção entra no rascunho antes do
+                              envio.
+                            </p>
+                            {lastOrder.map((item) => {
+                              const selectedProduct = menu.products.find(
+                                (candidate) => candidate.id === item.productId,
+                              );
+                              const selectedQuantity = roundSelection[item.id] ?? 0;
+                              const availability = item.doseClub
+                                ? {
+                                    available: false,
+                                    reason: "Dose pré-paga exige nova validação.",
+                                  }
+                                : repeatRoundItemAvailability(
+                                    {
+                                      productId: item.productId,
+                                      quantity: Math.max(1, selectedQuantity),
+                                    },
+                                    selectedProduct,
+                                    activeStationIds,
+                                  );
+                              const optionCents = item.modifierOptionIds.reduce(
+                                (sum, optionId) =>
+                                  sum +
+                                  (menu.options.find((option) => option.id === optionId)
+                                    ?.priceDeltaCents ?? 0),
+                                0,
+                              );
+                              return (
+                                <label className="repeat-round-item" key={item.id}>
+                                  <input
+                                    checked={selectedQuantity > 0}
+                                    disabled={!availability.available}
+                                    onChange={(event) =>
+                                      setRoundSelection((current) => ({
+                                        ...current,
+                                        [item.id]: event.target.checked ? item.quantity : 0,
+                                      }))
+                                    }
+                                    type="checkbox"
+                                  />
+                                  <span>
+                                    <strong>{item.name}</strong>
+                                    <small>
+                                      {availability.available &&
+                                      selectedProduct?.priceCents !== null
+                                        ? `${formatMoney((selectedProduct?.priceCents ?? 0) + optionCents)} por unidade`
+                                        : availability.reason}
+                                    </small>
+                                  </span>
+                                  <Input
+                                    aria-label={`Quantidade de ${item.name}`}
+                                    disabled={!availability.available || selectedQuantity === 0}
+                                    max={selectedProduct?.dailyStockRemaining ?? 99}
+                                    min={1}
+                                    onChange={(event) =>
+                                      setRoundSelection((current) => ({
+                                        ...current,
+                                        [item.id]: Math.max(1, Number(event.target.value) || 1),
+                                      }))
+                                    }
+                                    type="number"
+                                    value={selectedQuantity || item.quantity}
+                                  />
+                                </label>
+                              );
+                            })}
+                            <div className="repeat-round-actions">
+                              <Button onClick={() => setRoundSelectionOpen(false)} variant="ghost">
+                                Cancelar
+                              </Button>
+                              <Button
+                                disabled={!Object.values(roundSelection).some((value) => value > 0)}
+                                onClick={addSelectedRound}
+                              >
+                                Adicionar ao rascunho
+                              </Button>
+                            </div>
+                          </div>
+                        </Modal>
+                        <Label className="search-field real-product-search">
+                          <Icon aria-hidden="true" name="search" size={16} />
+                          <Input
+                            ref={productSearchRef}
+                            onChange={(event) => setProductSearch(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && visibleProducts[0]) {
+                                event.preventDefault();
+                                const item = visibleProducts[0];
+                                if (item.modifierGroupIds.length === 0) addItem(item);
+                                else setProductId(item.id);
+                              }
+                            }}
+                            placeholder="Buscar produto ou descrição"
+                            value={productSearch}
+                          />
+                          <kbd>/</kbd>
+                        </Label>
+                        <div className="segmented segmented--scroll real-category-filter">
+                          <Button
+                            aria-pressed={categoryId === "all"}
+                            onClick={() => setCategoryId("all")}
+                            type="button"
+                          >
+                            Todos
+                          </Button>
+                          {menu.categories.map((category) => (
+                            <Button
+                              aria-pressed={categoryId === category.id}
+                              key={category.id}
+                              onClick={() => setCategoryId(category.id)}
+                              type="button"
+                            >
+                              {category.name}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="real-product-picker">
+                          {visibleProducts.map((item) => (
+                            <article
+                              className={`real-product-option ${
+                                productId === item.id ? "real-product-option--selected" : ""
+                              }`}
+                              key={item.id}
+                            >
+                              <Button
+                                aria-label={
+                                  canReachProduction(item)
+                                    ? `Adicionar ${item.name}`
+                                    : `${item.name} sem estação de produção ativa`
+                                }
+                                disabled={
+                                  !item.available ||
+                                  item.priceCents === null ||
+                                  !canReachProduction(item)
+                                }
+                                onClick={(event) => {
+                                  const held = event.currentTarget.dataset.longPressed === "true";
+                                  delete event.currentTarget.dataset.longPressed;
+                                  if (held || item.modifierGroupIds.length > 0) {
+                                    setProductId(item.id);
+                                    setOptions([]);
+                                  } else addItem(item);
+                                }}
+                                onContextMenu={(event) => {
+                                  event.preventDefault();
+                                  setProductId(item.id);
+                                  setOptions([]);
+                                }}
+                                onPointerDown={(event) => {
+                                  const button = event.currentTarget;
+                                  const timer = window.setTimeout(() => {
+                                    button.dataset.longPressed = "true";
+                                    setProductId(item.id);
+                                    setOptions([]);
+                                  }, 450);
+                                  button.dataset.holdTimer = String(timer);
+                                }}
+                                onPointerLeave={(event) =>
+                                  window.clearTimeout(Number(event.currentTarget.dataset.holdTimer))
+                                }
+                                onPointerUp={(event) =>
+                                  window.clearTimeout(Number(event.currentTarget.dataset.holdTimer))
+                                }
+                                type="button"
+                              >
+                                <span aria-hidden="true">{item.name.slice(0, 1)}</span>
+                                <span>
+                                  <strong>{item.name}</strong>
+                                  <small>
+                                    {canReachProduction(item)
+                                      ? (item.description ?? "Sem descrição")
+                                      : "Configure uma estação no Catálogo"}
+                                  </small>
+                                </span>
+                                <strong>
+                                  {item.priceCents === null
+                                    ? "Sem preço"
+                                    : formatMoney(item.priceCents)}
+                                </strong>
+                              </Button>
+                              <Button
+                                aria-label={
+                                  favoriteProductIds.includes(item.id)
+                                    ? `Remover ${item.name} dos favoritos`
+                                    : `Adicionar ${item.name} aos favoritos`
+                                }
+                                className="real-product-option__favorite"
+                                onClick={() =>
+                                  setFavoriteProductIds((current) =>
+                                    current.includes(item.id)
+                                      ? current.filter((id) => id !== item.id)
+                                      : [item.id, ...current].slice(0, 12),
+                                  )
+                                }
+                                type="button"
+                              >
+                                <Icon
+                                  className={
+                                    favoriteProductIds.includes(item.id) ? "gm-icon--filled" : ""
+                                  }
+                                  name="star"
+                                  size={18}
+                                />
+                              </Button>
+                            </article>
+                          ))}
+                        </div>
+                        {unavailableProducts.length > 0 && (
+                          <div className="substitution-list">
+                            <strong>Substituições para itens indisponíveis</strong>
+                            {unavailableProducts.map((unavailable) => {
+                              const alternative = menu.products.find(
+                                (candidate) =>
+                                  candidate.categoryId === unavailable.categoryId &&
+                                  candidate.id !== unavailable.id &&
+                                  candidate.active &&
+                                  candidate.available &&
+                                  candidate.priceCents !== null,
+                              );
+                              return (
+                                <span key={unavailable.id}>
+                                  {unavailable.name}:{" "}
+                                  {alternative ? alternative.name : "sem alternativa"}
+                                  {alternative && (
+                                    <Button
+                                      onClick={() => setProductId(alternative.id)}
+                                      size="sm"
+                                      variant="ghost"
+                                    >
+                                      Usar alternativa
+                                    </Button>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {visibleProducts.length === 0 && (
+                          <p className="table-empty">Nenhum produto corresponde à busca.</p>
+                        )}
+                        <Modal
+                          className="product-configurator"
+                          isOpen={Boolean(product)}
+                          onClose={closeProductEditor}
+                          size="md"
+                          title={product?.name ?? "Personalizar item"}
+                        >
+                          {product && (
+                            <div className="product-configurator__content">
+                              <div className="product-configurator__summary">
+                                <span>{product.description ?? "Sem descrição"}</span>
+                                <strong>
+                                  {product.priceCents === null
+                                    ? "Sem preço"
+                                    : formatMoney(product.priceCents)}
+                                </strong>
+                              </div>
+                              {productGroups.map((group) => (
+                                <fieldset className="modifier-group" key={group.id}>
+                                  <legend>
+                                    <span>{group.name}</span>
+                                    <small>
+                                      Escolha {group.minimumSelections}–{group.maximumSelections}
+                                    </small>
+                                  </legend>
+                                  {menu.options
+                                    .filter(
+                                      (option) => option.groupId === group.id && option.active,
+                                    )
+                                    .map((option) => (
+                                      <Label key={option.id}>
+                                        <input
+                                          className="accent-primary"
+                                          checked={options.includes(option.id)}
+                                          onChange={(event) =>
+                                            setOptions((current) =>
+                                              event.target.checked
+                                                ? [...current, option.id]
+                                                : current.filter((id) => id !== option.id),
+                                            )
+                                          }
+                                          type="checkbox"
+                                        />
+                                        <span>{option.name}</span>
+                                        {option.priceDeltaCents > 0 && (
+                                          <small>+ {formatMoney(option.priceDeltaCents)}</small>
+                                        )}
+                                      </Label>
+                                    ))}
+                                </fieldset>
+                              ))}
+                              <div className="product-customization">
+                                <fieldset className="quantity-stepper product-customization__quantity">
+                                  <legend className="gm-sr-only">Quantidade</legend>
+                                  <Button
+                                    aria-label="Diminuir quantidade"
+                                    disabled={quantity <= 1}
+                                    onClick={() =>
+                                      setQuantity((current) => Math.max(1, current - 1))
+                                    }
+                                    type="button"
+                                  >
+                                    −
+                                  </Button>
+                                  <strong>{quantity}</strong>
+                                  <Button
+                                    aria-label="Aumentar quantidade"
+                                    onClick={() => setQuantity((current) => current + 1)}
+                                    type="button"
+                                  >
+                                    +
+                                  </Button>
+                                </fieldset>
+                                <Label className="product-customization__notes">
+                                  Observação para a produção
+                                  <Input
+                                    onChange={(event) => setNotes(event.target.value)}
+                                    placeholder="Ex.: sem cebola"
+                                    value={notes}
+                                  />
+                                </Label>
+                                <QuickOrderChips
+                                  onSelectChip={(chip) =>
+                                    setNotes((current) =>
+                                      current.trim() ? `${current.trim()}, ${chip}` : chip,
+                                    )
+                                  }
+                                />
+                                <details className="product-advanced-options" open={fullService}>
+                                  <summary>
+                                    Pessoa, etapa e restrições
+                                    <small>{fullService ? "Serviço completo" : "Opcional"}</small>
+                                  </summary>
+                                  <div className="gm-form-grid product-advanced-options__fields">
+                                    <Label className="gm-form-field">
+                                      <span>Pessoa/assento</span>
+                                      <Input
+                                        className="gm-form-control"
+                                        min={0}
+                                        onChange={(event) =>
+                                          setSeatNumber(Number(event.target.value))
+                                        }
+                                        placeholder="0 = mesa"
+                                        type="number"
+                                        value={seatNumber}
+                                      />
+                                    </Label>
+                                    <Label className="gm-form-field">
+                                      <span>Etapa</span>
+                                      <NativeSelect
+                                        className="gm-form-control"
+                                        onChange={(event) =>
+                                          setCourse(
+                                            event.target.value as NonNullable<
+                                              DraftCartItem["course"]
+                                            >,
+                                          )
+                                        }
+                                        value={course}
+                                      >
+                                        <option value="anytime">Assim que pronto</option>
+                                        <option value="starter">Entrada</option>
+                                        <option value="main">Principal</option>
+                                        <option value="dessert">Sobremesa</option>
+                                      </NativeSelect>
+                                    </Label>
+                                    <Label className="gm-form-field product-advanced-options__restriction">
+                                      <span>Alergia/restrição</span>
+                                      <Input
+                                        className="gm-form-control"
+                                        onChange={(event) => setAllergyNote(event.target.value)}
+                                        placeholder="Destacar para a produção"
+                                        value={allergyNote}
+                                      />
+                                    </Label>
+                                  </div>
+                                </details>
+                                <div className="product-configurator__actions">
+                                  <Button onClick={closeProductEditor} variant="ghost">
+                                    Cancelar
+                                  </Button>
+                                  <Button
+                                    disabled={quantity < 1 || !modifierSelectionValid}
+                                    onClick={() => addItem()}
+                                  >
+                                    Adicionar {quantity} ·{" "}
+                                    {formatMoney(
+                                      ((product.priceCents ?? 0) +
+                                        options.reduce(
+                                          (sum, optionId) =>
+                                            sum +
+                                            (menu.options.find((option) => option.id === optionId)
+                                              ?.priceDeltaCents ?? 0),
+                                          0,
+                                        )) *
+                                        quantity,
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </Modal>
+                        <aside
+                          aria-label="Rascunho do pedido"
+                          className="cart-preview"
+                          data-empty={cart.length === 0}
+                          data-expanded={draftExpanded}
+                        >
+                          {cart.length > 0 && (
+                            <Button
+                              aria-expanded={draftExpanded}
+                              className="cart-preview__mobile-toggle"
+                              onClick={() => setDraftExpanded((current) => !current)}
+                              type="button"
+                            >
+                              <span>
+                                <strong>Comanda</strong>
+                                <small>{cartQuantity} item(ns)</small>
+                              </span>
+                              <strong>{formatMoney(cartTotalCents)}</strong>
+                            </Button>
+                          )}
+                          <header className="cart-preview__heading">
+                            <span>
+                              <strong>Rascunho automático</strong>
+                              <small>
+                                {activePendingSubmission
+                                  ? "Aguardando confirmação com a mesma referência do envio anterior."
+                                  : "Preservado neste dispositivo até o envio."}
+                              </small>
+                            </span>
+                            {lastRemovedItem && (
+                              <Button
+                                onClick={() => {
+                                  setCart((current) => [...current, lastRemovedItem]);
+                                  setLastRemovedItem(null);
+                                }}
+                                type="button"
+                              >
+                                Desfazer remoção
+                              </Button>
+                            )}
+                          </header>
+                          {activePendingSubmission && (
+                            <Callout tone="warning">
+                              O pedido ainda não foi confirmado. Retome o mesmo envio antes de
+                              alterar os itens.
+                            </Callout>
+                          )}
+                          {storageUnavailable && (
+                            <Callout tone="warning">
+                              Este dispositivo não conseguiu salvar a continuidade. Mantenha esta
+                              tela aberta até a confirmação.
+                            </Callout>
+                          )}
+                          {cart.length === 0 && (
+                            <div className="cart-preview__empty">
+                              <strong>
+                                {activePendingSubmission
+                                  ? "Pedido aguardando confirmação"
+                                  : "Pedido ainda vazio"}
+                              </strong>
+                              <small>
+                                {activePendingSubmission
+                                  ? "Retome o mesmo envio para confirmar o resultado antes de criar outro pedido."
+                                  : "Os itens adicionados aparecem aqui antes de seguir para a produção."}
+                              </small>
+                            </div>
+                          )}
+                          {cart.map((item) => (
+                            <div className="cart-preview__item" key={item.id}>
+                              <span className="cart-preview__item-copy">
+                                <strong>{item.name}</strong>
+                                {item.doseClubSnapshot && (
+                                  <span className="cart-preview__dose-club">
+                                    <Badge tone="info">Dose Club</Badge>
+                                    <span>{item.doseClubSnapshot.offerName}</span>
+                                  </span>
+                                )}
+                                <small>
+                                  {item.doseClubSnapshot
+                                    ? `${item.doseClubSnapshot.doseMl} ml · pré-pago · limite ${item.doseClubSnapshot.availableDoses}`
+                                    : item.notes || "Sem observação"}
+                                  {item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""}
+                                  {item.allergyNote && (
+                                    <span className="cart-preview__allergy">
+                                      <Icon name="alert-circle" size={13} />
+                                      <b>Alergia:</b> {item.allergyNote}
+                                    </span>
+                                  )}
+                                </small>
+                                <b>
+                                  {item.doseClub
+                                    ? `Pré-pago · ${formatMoney(0)}`
+                                    : formatMoney(draftItemTotal(item))}
+                                </b>
+                              </span>
+                              <span className="cart-preview__actions">
+                                <span className="quantity-stepper quantity-stepper--compact">
+                                  <Button
+                                    aria-label={`Diminuir ${item.name}`}
+                                    onClick={() =>
+                                      item.quantity === 1
+                                        ? removeDraftItem(item)
+                                        : setCart((current) =>
+                                            current.map((candidate) =>
+                                              candidate.id === item.id
+                                                ? { ...candidate, quantity: candidate.quantity - 1 }
+                                                : candidate,
+                                            ),
+                                          )
+                                    }
+                                    type="button"
+                                  >
+                                    −
+                                  </Button>
+                                  <strong>{item.quantity}</strong>
+                                  <Button
+                                    aria-label={`Aumentar ${item.name}`}
+                                    disabled={
+                                      Boolean(item.doseClub && item.doseClubSnapshot) &&
+                                      doseClubDraftQuantity(
+                                        cart,
+                                        item.doseClub?.externalClubId ?? "",
+                                      ) >= (item.doseClubSnapshot?.availableDoses ?? 0)
+                                    }
+                                    onClick={() =>
+                                      setCart((current) => incrementDraftItem(current, item.id))
+                                    }
+                                    type="button"
+                                  >
+                                    +
+                                  </Button>
+                                </span>
+                                {!item.doseClub && (
+                                  <Button
+                                    onClick={() => {
+                                      setProductId(item.productId);
+                                      setQuantity(item.quantity);
+                                      setNotes(item.notes ?? "");
+                                      setSeatNumber(item.seatNumber ?? 0);
+                                      setCourse(item.course ?? "anytime");
+                                      setAllergyNote(item.allergyNote ?? "");
+                                      setOptions(item.modifierOptionIds);
+                                      setCart((current) =>
+                                        current.filter((candidate) => candidate.id !== item.id),
+                                      );
+                                    }}
+                                    size="sm"
+                                    type="button"
+                                    variant="ghost"
+                                  >
+                                    Observação
+                                  </Button>
+                                )}
+                                <Button
+                                  aria-label={`Remover ${item.name}`}
+                                  onClick={() => removeDraftItem(item)}
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  Remover
+                                </Button>
+                              </span>
+                            </div>
+                          ))}
+                          {(cart.length > 0 || activePendingSubmission) && !compactHeading && (
+                            <div className="cart-preview__submit">
+                              {activePendingSubmission ? (
+                                <Button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void submitCart(activePendingSubmission.sendToProduction)
+                                  }
+                                >
+                                  {activePendingSubmission.sendToProduction
+                                    ? "Retomar envio do pedido"
+                                    : "Retomar pedido em espera"}
+                                </Button>
+                              ) : (
+                                <>
+                                  <Button
+                                    disabled={busy}
+                                    onClick={() => void submitCart(false)}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    Manter em espera
+                                  </Button>
+                                  <Button disabled={busy} onClick={() => void submitCart(true)}>
+                                    Enviar {cartQuantity} item(ns) · {formatMoney(cartTotalCents)}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </aside>
+                      </Card>
+                    )}
+                    {operating && (
+                      <div className="data-list order-history-list">
+                        {(data.productionCourses?.length ?? 0) > 0 && (
+                          <Callout tone="info">
+                            <strong>Etapas confirmadas na cozinha</strong>
+                            <p>
+                              Controle a espera e a liberação pelos tickets reais desta comanda. Uma
+                              dependência da produção ainda pode segurar o item depois da liberação.
+                            </p>
+                            <div className="production-course-actions">
+                              {data.productionCourses?.map((entry) => (
+                                <span key={`${entry.ticketId}:${entry.course}`}>
+                                  <span>
+                                    <strong>{courseLabels[entry.course]}</strong>
+                                    <small>
+                                      {entry.itemCount} item(ns) ·{" "}
+                                      {entry.state === "held" ? "em espera" : "liberado"}
+                                      {entry.dependencyHeld ? " · aguardando etapa anterior" : ""}
+                                    </small>
+                                  </span>
+                                  <Button
+                                    disabled={busy || entry.state === "held"}
+                                    onClick={() =>
+                                      void setProductionCourseState(
+                                        entry.ticketId,
+                                        entry.course,
+                                        "held",
+                                      )
+                                    }
+                                    size="sm"
+                                    variant="ghost"
+                                  >
+                                    Manter em espera
+                                  </Button>
+                                  <Button
+                                    disabled={busy || entry.state === "fired"}
+                                    onClick={() =>
+                                      void setProductionCourseState(
+                                        entry.ticketId,
+                                        entry.course,
+                                        "fired",
+                                      )
+                                    }
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    Liberar preparo
+                                  </Button>
+                                </span>
+                              ))}
+                            </div>
+                          </Callout>
+                        )}
+                        {data.orders.map((order, orderIndex) => (
+                          <article className="data-row" key={order.id}>
+                            <div>
+                              <strong>
+                                Pedido {orderIndex + 1} · {displayLabel}
+                              </strong>
+                              {order.originTableId && (
+                                <small>
+                                  Origem:{" "}
+                                  {floor?.tables.find((table) => table.id === order.originTableId)
+                                    ?.label ?? "Mesa anterior"}
+                                </small>
+                              )}
+                              <small>
+                                {data.items
+                                  .filter((item) => item.orderId === order.id)
+                                  .map(
+                                    (item) =>
+                                      `${item.quantity}× ${item.productName}${
+                                        item.seatNumber ? ` · pessoa ${item.seatNumber}` : ""
+                                      }${
+                                        item.course !== "anytime"
+                                          ? ` · ${
+                                              {
+                                                starter: "entrada",
+                                                main: "principal",
+                                                dessert: "sobremesa",
+                                              }[item.course]
+                                            }`
+                                          : ""
+                                      }${item.allergyNote ? ` · atenção: ${item.allergyNote}` : ""}`,
+                                  )
+                                  .join(" · ") || "Sem itens"}
+                              </small>
+                            </div>
+                            <div className="data-row__end">
+                              <Badge tone={statusTone(order.status)}>
+                                {{
+                                  draft: "Em espera",
+                                  sent: "Enviado",
+                                  preparing: "Em preparo",
+                                  ready: "Pronto",
+                                  served: "Servido",
+                                  canceled: "Cancelado",
+                                }[order.status] ?? "Em andamento"}
+                              </Badge>
+                              {order.status === "draft" && (
+                                <Button
+                                  disabled={busy}
+                                  onClick={() => void releaseOrder(order.id)}
+                                  size="sm"
+                                >
+                                  Enviar pedido em espera ·{" "}
+                                  {courseLabels[
+                                    data.items.find((item) => item.orderId === order.id)?.course ??
+                                      "anytime"
+                                  ].toLocaleLowerCase("pt-BR")}
                                 </Button>
                               )}
                             </div>
-                            {itemActionId === item.id && (
-                              <form
-                                className="approval-form approval-form--inline"
-                                onSubmit={(event) => event.preventDefault()}
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {operating && (
+                    <section
+                      aria-label={`Conta de ${displayLabel}`}
+                      className="account-overview service-account-area"
+                      ref={accountPanelRef}
+                    >
+                      <header className="service-account-heading">
+                        <div>
+                          <small>Comanda em foco</small>
+                          <h3>{displayLabel}</h3>
+                        </div>
+                        <Badge
+                          tone={!tabOpen ? "neutral" : remainingCents === 0 ? "success" : "info"}
+                        >
+                          {!tabOpen
+                            ? "Encerrada"
+                            : remainingCents === 0
+                              ? data.tab.totalCents === 0
+                                ? "Sem consumo"
+                                : "Quitada"
+                              : "Em atendimento"}
+                        </Badge>
+                      </header>
+                      {ruptureItems.length > 0 && (
+                        <Callout tone="warning">
+                          <strong>
+                            {ruptureItems.length} item(ns) lançado(s) ficaram indisponíveis
+                          </strong>
+                          <p>
+                            Prepare um substituto no rascunho e conclua o cancelamento autorizado do
+                            item original. As duas confirmações permanecem separadas e visíveis.
+                          </p>
+                          <div className="rupture-actions">
+                            {ruptureItems.map((item) => (
+                              <Button
+                                key={item.id}
+                                onClick={() => {
+                                  setRuptureItemId(item.id);
+                                  setRuptureReplacementProductId("");
+                                }}
+                                size="sm"
+                                variant="secondary"
                               >
-                                <div className="approval-form__heading">
-                                  <span>Ajustar item</span>
-                                  <strong>{item.productName}</strong>
-                                  <Button onClick={() => setItemActionId("")} type="button">
-                                    Fechar
-                                  </Button>
-                                </div>
-                                <p>
-                                  {canApproveAdjustments
-                                    ? "Autorize com seu código gerencial ou encaminhe para outro responsável."
-                                    : "Envie a solicitação; o gerente aprova no próprio dispositivo com o código dele."}
-                                </p>
+                                Resolver {item.productName}
+                              </Button>
+                            ))}
+                          </div>
+                        </Callout>
+                      )}
+                      <Modal
+                        isOpen={Boolean(ruptureItem)}
+                        onClose={() => {
+                          setRuptureItemId("");
+                          setRuptureReplacementProductId("");
+                        }}
+                        size="sm"
+                        title={
+                          ruptureItem
+                            ? `Resolver falta de ${ruptureItem.productName}`
+                            : "Resolver ruptura"
+                        }
+                      >
+                        {ruptureItem && (
+                          <div className="rupture-assistant">
+                            <p>
+                              O item original continua lançado até o cancelamento ser aprovado. O
+                              substituto será apenas adicionado ao rascunho desta comanda.
+                            </p>
+                            <Label>
+                              Substituto disponível
+                              <NativeSelect
+                                onChange={(event) =>
+                                  setRuptureReplacementProductId(event.target.value)
+                                }
+                                value={ruptureReplacementProductId}
+                              >
+                                <option value="">Selecione</option>
+                                {ruptureAlternatives.map((candidate) => (
+                                  <option key={candidate.id} value={candidate.id}>
+                                    {candidate.name} · {formatMoney(candidate.priceCents ?? 0)}
+                                  </option>
+                                ))}
+                              </NativeSelect>
+                            </Label>
+                            {ruptureAlternatives.length === 0 && (
+                              <Callout tone="warning">
+                                <strong>Sem alternativa disponível na mesma categoria</strong>
+                                <p>Cancele o item original ou escolha outro produto pela busca.</p>
+                              </Callout>
+                            )}
+                            {ruptureReplacement?.priceCents !== null && ruptureReplacement && (
+                              <p className="rupture-difference" role="status">
+                                Diferença estimada no rascunho:{" "}
+                                <strong>
+                                  {formatMoney(
+                                    ruptureReplacement.priceCents * ruptureItem.quantity -
+                                      ruptureItem.netCents,
+                                  )}
+                                </strong>
+                                . Adicionais do item original não são copiados.
+                              </p>
+                            )}
+                            <div className="rupture-actions">
+                              <Button
+                                disabled={!ruptureReplacement}
+                                onClick={() => {
+                                  if (!ruptureReplacement) return;
+                                  setCart((current) => [
+                                    ...current,
+                                    {
+                                      id: crypto.randomUUID(),
+                                      productId: ruptureReplacement.id,
+                                      name: ruptureReplacement.name,
+                                      quantity: ruptureItem.quantity,
+                                      modifierOptionIds: [],
+                                      ...(ruptureItem.seatNumber
+                                        ? { seatNumber: ruptureItem.seatNumber }
+                                        : {}),
+                                      ...(ruptureItem.course !== "anytime"
+                                        ? { course: ruptureItem.course }
+                                        : {}),
+                                      ...(ruptureItem.allergyNote
+                                        ? { allergyNote: ruptureItem.allergyNote }
+                                        : {}),
+                                      notes: `Substituição de ${ruptureItem.productName}; aguarda cancelamento do item original.`,
+                                    },
+                                  ]);
+                                  setApprovalItemId(ruptureItem.id);
+                                  setItemActionId(ruptureItem.id);
+                                  setApprovalReason("Produto indisponível");
+                                  setRuptureItemId("");
+                                  setRuptureReplacementProductId("");
+                                  setFeedback(
+                                    "Substituto adicionado ao rascunho. Agora confirme ou solicite o cancelamento do item original abaixo.",
+                                  );
+                                }}
+                              >
+                                Adicionar substituto ao rascunho
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </Modal>
+                      <div className="account-overview__metrics">
+                        <span>
+                          <small>Total</small>
+                          <strong>{formatMoney(data.tab.totalCents)}</strong>
+                        </span>
+                        <span>
+                          <small>Recebido</small>
+                          <strong>{formatMoney(paidCents)}</strong>
+                          {paymentSummary.reversedCents > 0 && (
+                            <small>{formatMoney(paymentSummary.reversedCents)} estornado</small>
+                          )}
+                        </span>
+                        <span data-balance={remainingCents > 0}>
+                          <small>Saldo a receber</small>
+                          <strong>{formatMoney(remainingCents)}</strong>
+                        </span>
+                      </div>
+                      {currentAccount && currentAccount.reservedCents > 0 && (
+                        <Callout tone="warning">
+                          {formatMoney(currentAccount.reservedCents)} em cobrança. Aguarde o
+                          resultado antes de repetir.
+                        </Callout>
+                      )}
+                      {tabOpen && remainingCents > 0 && view !== "account" && (
+                        <Button
+                          disabled={busy || balanceRefreshRequired}
+                          onClick={() =>
+                            terminalPaymentMode === "disabled"
+                              ? void requestBillAndPrint()
+                              : openReceive()
+                          }
+                          type="button"
+                        >
+                          {terminalPaymentMode === "disabled"
+                            ? "Pedir conta ao caixa"
+                            : `Receber ${formatMoney(remainingCents)}`}
+                        </Button>
+                      )}
+                      <div className="service-account-shortcuts">
+                        {localPrintingEnabled && (
+                          <Button
+                            disabled={busy || printingBusy || !tabOpen || activeItems.length === 0}
+                            onClick={() => void printDocument("account")}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            {printingBusy ? "Preparando…" : "Imprimir pré-conta"}
+                          </Button>
+                        )}
+                        {canAdjustCharges && tabOpen && (
+                          <Button
+                            disabled={busy || activeItems.length === 0}
+                            onClick={() => setSplitOpen((value) => !value)}
+                            aria-expanded={splitOpen}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            Separar consumo
+                          </Button>
+                        )}
+                      </div>
+                      {splitOpen && (
+                        <SplitConsumptionPanel
+                          items={activeItems}
+                          accounts={relatedAccounts}
+                          currentId={tabId}
+                          busy={busy}
+                          disabledReason={
+                            paidCents > 0 ||
+                            (currentAccount?.reservedCents ?? 0) > 0 ||
+                            (currentAccount?.coveredLossCents ?? 0) > 0
+                              ? "A separação deve ocorrer antes de pagamentos ou cobranças em andamento."
+                              : undefined
+                          }
+                          onConfirm={separateConsumption}
+                          onClose={() => setSplitOpen(false)}
+                        />
+                      )}
+                      {cashierPaymentEnabled &&
+                        tabOpen &&
+                        remainingCents > 0 &&
+                        view === "account" && (
+                          <form
+                            className="cashier-payment-form account-payment-desk"
+                            id={`cashier-payment-form-${tabId}`}
+                            onSubmit={submitManualPayment}
+                          >
+                            <div className="account-payment-desk__heading">
+                              <span>
+                                <small>Receber agora</small>
+                                <strong>{displayLabel}</strong>
+                              </span>
+                            </div>
+                            <div className="cashier-payment-form__fields">
+                              <Label>
+                                Forma de pagamento
+                                <NativeSelect
+                                  onChange={(event) =>
+                                    setPaymentMethod(event.target.value as typeof paymentMethod)
+                                  }
+                                  value={paymentMethod}
+                                >
+                                  <option value="cash">Dinheiro</option>
+                                  <option value="pix">Pix (registro manual)</option>
+                                  <option value="debit_card">Débito (maquininha externa)</option>
+                                  <option value="credit_card">Crédito (maquininha externa)</option>
+                                  <option value="other">Outro meio de pagamento</option>
+                                </NativeSelect>
+                              </Label>
+                              <Label>
+                                Como receber
+                                <NativeSelect
+                                  onChange={(event) => {
+                                    const nextMode = event.target.value as AccountPaymentMode;
+                                    setPaymentMode(nextMode);
+                                    setPaymentReais(nextMode === "custom" ? null : undefined);
+                                    setCashReceivedReais(undefined);
+                                  }}
+                                  value={paymentMode}
+                                >
+                                  <option value="full">Conta inteira</option>
+                                  <option value="per_person">Dividir valor igualmente</option>
+                                  <option value="custom">Outro valor</option>
+                                </NativeSelect>
+                              </Label>
+                              {paymentMode === "per_person" && (
                                 <Label>
-                                  Motivo
+                                  Dividir o saldo por
                                   <Input
-                                    list={`adjustment-reasons-${tabId}`}
-                                    minLength={3}
-                                    onChange={(event) => setApprovalReason(event.target.value)}
-                                    value={approvalReason}
-                                  />
-                                </Label>
-                                <datalist id={`adjustment-reasons-${tabId}`}>
-                                  {adjustmentReasons.map((reason) => (
-                                    <option key={reason} value={reason} />
-                                  ))}
-                                </datalist>
-                                <Label>
-                                  Desconto em reais
-                                  <Input
-                                    min={0}
+                                    max={50}
+                                    min={2}
                                     onChange={(event) =>
-                                      setDiscountReais(Number(event.target.value))
+                                      setPerPersonCount(Number(event.target.value))
                                     }
-                                    step="0.01"
+                                    step={1}
                                     type="number"
-                                    value={discountReais}
+                                    value={safePerPersonCount}
                                   />
                                 </Label>
-                                {canApproveAdjustments && (
+                              )}
+                              <Label>
+                                Valor a receber
+                                <Input
+                                  min={0.01}
+                                  onChange={(event) => {
+                                    const next = event.target.value;
+                                    if (!next) {
+                                      setPaymentMode("custom");
+                                      setPaymentReais(null);
+                                      setCashReceivedReais(undefined);
+                                      return;
+                                    }
+                                    setPaymentMode("custom");
+                                    setPaymentReais(Number(next));
+                                    setCashReceivedReais(undefined);
+                                  }}
+                                  step="0.01"
+                                  type="number"
+                                  value={defaultPaymentReais ?? ""}
+                                />
+                                {paymentMode === "per_person" && defaultPaymentReais !== null && (
+                                  <small>
+                                    Parcela sugerida de{" "}
+                                    {formatMoney(Math.round(defaultPaymentReais * 100))}. Cada
+                                    confirmação registra somente uma parcela; confira o saldo antes
+                                    de receber a próxima. A conta não fica vinculada a pessoas
+                                    específicas.
+                                  </small>
+                                )}
+                              </Label>
+                            </div>
+                            {paymentMethod === "cash" && (
+                              <Label className="cash-change-field">
+                                <span>Valor recebido</span>
+                                <Input
+                                  min={defaultPaymentReais ?? 0.01}
+                                  onChange={(event) =>
+                                    setCashReceivedReais(
+                                      event.target.value === "" ? null : Number(event.target.value),
+                                    )
+                                  }
+                                  step="0.01"
+                                  type="number"
+                                  value={defaultCashReceivedReais ?? ""}
+                                />
+                                <strong>
+                                  Troco:{" "}
+                                  {formatMoney(
+                                    Math.max(
+                                      0,
+                                      (cashReceivedCents ?? 0) - (paymentAmountCents ?? 0),
+                                    ),
+                                  )}
+                                </strong>
+                              </Label>
+                            )}
+                            {paymentMethod !== "cash" && (
+                              <details className="account-payment-reference">
+                                <summary>Referência e confirmação externa</summary>
+                                <Label>
+                                  Referência opcional
+                                  <Input
+                                    onChange={(event) => setPaymentReference(event.target.value)}
+                                    placeholder="Ex.: identificação ou observação"
+                                    value={paymentReference}
+                                  />
+                                </Label>
+                                <small>Registre somente após a confirmação externa.</small>
+                              </details>
+                            )}
+                            {paymentError && (
+                              <div role="alert">
+                                <Callout tone="danger">
+                                  <strong>Pagamento não registrado</strong>
+                                  <p>{paymentError}</p>
+                                  {(paymentError.startsWith("Abra o caixa") ||
+                                    paymentError.includes("gaveta")) && (
+                                    <a href={routeHref("cash")}>Abrir Contas e caixa</a>
+                                  )}
+                                </Callout>
+                              </div>
+                            )}
+                            <Button disabled={busy || !manualPaymentReady} type="submit">
+                              Confirmar {formatMoney(paymentAmountCents ?? 0)}
+                            </Button>
+                          </form>
+                        )}
+                      <div className="account-overview__actions">
+                        {integratedPaymentEnabled && view === "account" && (
+                          <Button
+                            className="smart-pos-trigger"
+                            disabled={
+                              busy || balanceRefreshRequired || !tabOpen || remainingCents <= 0
+                            }
+                            onClick={() => setSmartPosOpen(true)}
+                            size="sm"
+                          >
+                            Cobrar {formatMoney(remainingCents)} na maquininha
+                          </Button>
+                        )}
+                      </div>
+                      {integratedPaymentEnabled &&
+                        integratedAttempt &&
+                        ["created", "processing", "unknown"].includes(integratedAttempt.status) && (
+                          <Callout
+                            tone={integratedAttempt.status === "unknown" ? "warning" : "info"}
+                          >
+                            <strong>
+                              {integratedAttempt.status === "unknown"
+                                ? "Pagamento precisa de conferência"
+                                : "Pagamento em andamento"}
+                            </strong>
+                            <p>
+                              {formatMoney(integratedAttempt.amountCents)} · Não cobre novamente
+                              antes de confirmar o resultado.
+                            </p>
+                            <Button
+                              onClick={() => setSmartPosOpen(true)}
+                              size="sm"
+                              variant="secondary"
+                            >
+                              Reabrir pagamento
+                            </Button>
+                          </Callout>
+                        )}
+                      {printAttention && (
+                        <Callout tone={printAttention.status === "failed" ? "danger" : "warning"}>
+                          <strong>Impressão precisa de conferência</strong>
+                          <p>{printStatusLabel(printAttention)}. Abra Impressões para resolver.</p>
+                        </Callout>
+                      )}
+                      {localPrintingEnabled && (
+                        <section
+                          aria-label="Impressões da comanda"
+                          className="account-print-disclosure"
+                        >
+                          <header>
+                            <strong>Impressão</strong>
+                          </header>
+                          {statementOutdated && (
+                            <Callout tone="warning">
+                              Conta alterada após a última via. Imprima uma pré-conta atualizada.
+                            </Callout>
+                          )}
+                          <div className="account-print-actions">
+                            {lastConfirmedStatement && (
+                              <Button
+                                disabled={busy || printingBusy}
+                                onClick={() =>
+                                  void reprintDocument(
+                                    lastConfirmedStatement,
+                                    "Reimpressão da última via solicitada pelo operador",
+                                  )
+                                }
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                Reimprimir última via
+                              </Button>
+                            )}
+                            <Button
+                              disabled={printingBusy || data.payments.length === 0}
+                              onClick={() => void printDocument("payments")}
+                              size="sm"
+                              type="button"
+                              variant="ghost"
+                            >
+                              Extrato de pagamentos
+                            </Button>
+                          </div>
+                          {tabOpen && remainingCents > 0 && (
+                            <details className="account-disclosure">
+                              <summary>Dividir valor da pré-conta</summary>
+                              <form className="print-split-form" onSubmit={submitPrintSplit}>
+                                <small>
+                                  Cria sugestões de valor para a mesma conta. Para separar itens,
+                                  use Separar consumo.
+                                </small>
+                                <NativeSelect
+                                  aria-label="Forma da divisão impressa"
+                                  onChange={(event) =>
+                                    setPrintSplitMethod(
+                                      event.target.value as typeof printSplitMethod,
+                                    )
+                                  }
+                                  value={printSplitMethod}
+                                >
+                                  <option value="equal_people">
+                                    Dividir igualmente por pessoas
+                                  </option>
+                                  <option value="fixed_amount">Vias por valor fixo</option>
+                                </NativeSelect>
+                                <Label>
+                                  Quantidade de vias
+                                  <Input
+                                    max={50}
+                                    min={2}
+                                    onChange={(event) =>
+                                      setPrintSplitPartCount(Number(event.target.value))
+                                    }
+                                    type="number"
+                                    value={printSplitPartCount}
+                                  />
+                                </Label>
+                                {printSplitMethod === "fixed_amount" && (
                                   <Label>
-                                    Seu código gerencial
+                                    Valor sugerido por via
                                     <Input
-                                      autoComplete="one-time-code"
-                                      inputMode="numeric"
-                                      maxLength={8}
-                                      minLength={4}
+                                      min={0.01}
                                       onChange={(event) =>
-                                        setApprovalPin(event.target.value.replace(/\D/g, ""))
+                                        setPrintSplitFixedReais(Number(event.target.value))
                                       }
-                                      type="password"
-                                      value={approvalPin}
+                                      step="0.01"
+                                      type="number"
+                                      value={printSplitFixedReais}
                                     />
                                   </Label>
                                 )}
-                                <div className="dialog-actions">
-                                  {!canApproveAdjustments && (
-                                    <>
-                                      <Button
-                                        disabled={
-                                          busy ||
-                                          !approvalItemId ||
-                                          approvalReason.trim().length < 3 ||
-                                          discountReais <= 0
-                                        }
-                                        onClick={() =>
-                                          void mutate(
-                                            () =>
-                                              api.pilot.requestApproval(
-                                                scope.organizationId,
-                                                scope.unitId,
-                                                tabId,
-                                                {
-                                                  itemId: approvalItemId,
-                                                  action: "discount",
-                                                  discountCents: Math.round(discountReais * 100),
-                                                  reason: approvalReason.trim(),
-                                                },
-                                                crypto.randomUUID(),
-                                              ),
-                                            "Desconto enviado para aprovação.",
-                                          )
-                                        }
-                                        size="sm"
-                                        variant="secondary"
-                                      >
-                                        Solicitar desconto
-                                      </Button>
-                                      <Button
-                                        disabled={
-                                          busy ||
-                                          !approvalItemId ||
-                                          approvalReason.trim().length < 3
-                                        }
-                                        onClick={() =>
-                                          void mutate(
-                                            () =>
-                                              api.pilot.requestApproval(
-                                                scope.organizationId,
-                                                scope.unitId,
-                                                tabId,
-                                                {
-                                                  itemId: approvalItemId,
-                                                  action: "cancel",
-                                                  reason: approvalReason.trim(),
-                                                },
-                                                crypto.randomUUID(),
-                                              ),
-                                            "Cancelamento enviado para aprovação.",
-                                          )
-                                        }
-                                        size="sm"
-                                        variant="danger"
-                                      >
-                                        Solicitar cancelamento
-                                      </Button>
-                                    </>
+                                <Button
+                                  disabled={
+                                    busy ||
+                                    printSplitPartCount < 2 ||
+                                    (printSplitMethod === "fixed_amount" &&
+                                      printSplitFixedReais <= 0)
+                                  }
+                                  size="sm"
+                                  type="submit"
+                                >
+                                  Criar vias
+                                </Button>
+                                <small>
+                                  Valores divididos sobre o saldo. Imprimir não registra pagamento.
+                                </small>
+                              </form>
+                            </details>
+                          )}
+                          {visiblePrintJobs.length > 0 && (
+                            <div
+                              aria-label="Fila de impressão"
+                              className="print-queue"
+                              role="status"
+                            >
+                              {visiblePrintJobs.map((job) => (
+                                <span key={job.id}>
+                                  <strong>{job.label}</strong>
+                                  <small>{printStatusLabel(job)}</small>
+                                  {(job.status === "printed" || job.status === "fallback") && (
+                                    <Input
+                                      aria-label={`Motivo da reimpressão de ${job.label}`}
+                                      maxLength={500}
+                                      minLength={3}
+                                      onChange={(event) =>
+                                        setReprintReasons((current) => ({
+                                          ...current,
+                                          [job.id]: event.target.value,
+                                        }))
+                                      }
+                                      placeholder="Motivo obrigatório para reimprimir"
+                                      value={reprintReasons[job.id] ?? ""}
+                                    />
                                   )}
-                                  {canApproveAdjustments && (
-                                    <>
+                                  {job.status !== "preparing" && (
+                                    <div className="print-queue__actions">
                                       <Button
                                         disabled={
-                                          busy ||
-                                          !approvalItemId ||
-                                          approvalPin.length < 4 ||
-                                          approvalReason.trim().length < 3 ||
-                                          discountReais <= 0
+                                          printingBusy ||
+                                          (job.server?.deliveryRoute === "cloud" &&
+                                            job.status !== "failed") ||
+                                          ((job.status === "printed" ||
+                                            job.status === "fallback") &&
+                                            (reprintReasons[job.id]?.trim().length ?? 0) < 3)
                                         }
-                                        onClick={() =>
-                                          void mutate(
-                                            () =>
-                                              scope.dispatch(
-                                                "pos.item.discount_requested",
-                                                pilotMutation("discount-item", {
-                                                  itemId: approvalItemId,
-                                                  body: {
+                                        onClick={() => void reprintDocument(job)}
+                                        type="button"
+                                      >
+                                        {job.server?.deliveryRoute === "cloud" &&
+                                        job.status !== "failed"
+                                          ? "Acompanhar na impressora"
+                                          : printActionLabel(job.status)}
+                                      </Button>
+                                      {job.status === "confirmation_required" &&
+                                        job.server?.deliveryRoute !== "cloud" && (
+                                          <Button
+                                            onClick={() => void markPrintNotDelivered(job)}
+                                            type="button"
+                                            variant="secondary"
+                                          >
+                                            Marcar não impresso
+                                          </Button>
+                                        )}
+                                    </div>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {printJobs.some((job) => job.status === "printed") && (
+                            <details className="account-disclosure">
+                              <summary>Impressões confirmadas</summary>
+                              <div className="print-queue">
+                                {printJobs
+                                  .filter((job) => job.status === "printed")
+                                  .map((job) => (
+                                    <span key={job.id}>
+                                      <strong>{job.label}</strong>
+                                      <small>
+                                        {job.server
+                                          ? new Date(
+                                              job.server.printedAt ?? job.server.createdAt,
+                                            ).toLocaleString("pt-BR")
+                                          : "Confirmada"}
+                                      </small>
+                                    </span>
+                                  ))}
+                              </div>
+                            </details>
+                          )}
+                        </section>
+                      )}
+                      <strong>Consumo</strong>
+                      <details className="account-disclosure account-items-disclosure" open>
+                        <summary>Itens e pagamentos da conta</summary>
+                        {data.payments.length > 0 && (
+                          <section className="account-payments" aria-label="Pagamentos registrados">
+                            <strong>Pagamentos</strong>
+                            {data.payments.map((payment) => (
+                              <span key={payment.id}>
+                                <span>
+                                  <b>
+                                    {
+                                      {
+                                        cash: "Dinheiro",
+                                        credit_card: "Crédito",
+                                        debit_card: "Débito",
+                                        pix: "Pix",
+                                        other: "Outro",
+                                      }[payment.method]
+                                    }
+                                    {payment.financialStatus === "reversed" && (
+                                      <Badge tone="danger">Estornado</Badge>
+                                    )}
+                                  </b>
+                                  <small>
+                                    {new Date(payment.createdAt).toLocaleString("pt-BR")}
+                                    {payment.reference ? ` · ${payment.reference}` : ""}
+                                  </small>
+                                </span>
+                                <span>
+                                  <strong>{formatMoney(payment.amountCents)}</strong>
+                                  {payment.financialStatus === "reversed" && (
+                                    <small>Líquido {formatMoney(payment.netAmountCents)}</small>
+                                  )}
+                                </span>
+                              </span>
+                            ))}
+                          </section>
+                        )}
+                        <div className="account-lines">
+                          {activeItems.map((item) => (
+                            <div className="account-line-group" key={item.id}>
+                              <div className="account-line">
+                                <span>
+                                  <strong>
+                                    {item.quantity}× {item.productName}
+                                  </strong>
+                                  <small>{item.status === "draft" ? "Em espera" : "Lançado"}</small>
+                                  {approvalStatusForItem(item.id) && (
+                                    <Badge tone={approvalStatusForItem(item.id)?.tone}>
+                                      {approvalStatusForItem(item.id)?.label}
+                                    </Badge>
+                                  )}
+                                </span>
+                                <strong>{formatMoney(item.netCents)}</strong>
+                                {tabOpen && (
+                                  <Button
+                                    aria-expanded={itemActionId === item.id}
+                                    aria-label={`Ações para ${item.productName}`}
+                                    onClick={() => {
+                                      setApprovalItemId(item.id);
+                                      setItemActionId((current) =>
+                                        current === item.id ? "" : item.id,
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    Mais
+                                  </Button>
+                                )}
+                              </div>
+                              {itemActionId === item.id && (
+                                <form
+                                  className="approval-form approval-form--inline"
+                                  onSubmit={(event) => event.preventDefault()}
+                                >
+                                  <div className="approval-form__heading">
+                                    <span>Ajustar item</span>
+                                    <strong>{item.productName}</strong>
+                                    <Button onClick={() => setItemActionId("")} type="button">
+                                      Fechar
+                                    </Button>
+                                  </div>
+                                  <p>
+                                    {canApproveAdjustments
+                                      ? "Autorize com seu código gerencial ou encaminhe para outro responsável."
+                                      : "Envie a solicitação; o gerente aprova no próprio dispositivo com o código dele."}
+                                  </p>
+                                  <Label>
+                                    Motivo
+                                    <Input
+                                      list={`adjustment-reasons-${tabId}`}
+                                      minLength={3}
+                                      onChange={(event) => setApprovalReason(event.target.value)}
+                                      value={approvalReason}
+                                    />
+                                  </Label>
+                                  <datalist id={`adjustment-reasons-${tabId}`}>
+                                    {adjustmentReasons.map((reason) => (
+                                      <option key={reason} value={reason} />
+                                    ))}
+                                  </datalist>
+                                  <Label>
+                                    Desconto em reais
+                                    <Input
+                                      min={0}
+                                      onChange={(event) =>
+                                        setDiscountReais(Number(event.target.value))
+                                      }
+                                      step="0.01"
+                                      type="number"
+                                      value={discountReais}
+                                    />
+                                  </Label>
+                                  {canApproveAdjustments && (
+                                    <Label>
+                                      Seu código gerencial
+                                      <Input
+                                        autoComplete="one-time-code"
+                                        inputMode="numeric"
+                                        maxLength={8}
+                                        minLength={4}
+                                        onChange={(event) =>
+                                          setApprovalPin(event.target.value.replace(/\D/g, ""))
+                                        }
+                                        type="password"
+                                        value={approvalPin}
+                                      />
+                                    </Label>
+                                  )}
+                                  <div className="dialog-actions">
+                                    {!canApproveAdjustments && (
+                                      <>
+                                        <Button
+                                          disabled={
+                                            busy ||
+                                            !approvalItemId ||
+                                            approvalReason.trim().length < 3 ||
+                                            discountReais <= 0
+                                          }
+                                          onClick={() =>
+                                            void mutate(
+                                              () =>
+                                                api.pilot.requestApproval(
+                                                  scope.organizationId,
+                                                  scope.unitId,
+                                                  tabId,
+                                                  {
+                                                    itemId: approvalItemId,
+                                                    action: "discount",
                                                     discountCents: Math.round(discountReais * 100),
-                                                    approval: {
-                                                      approverMembershipId: scope.membershipId,
-                                                      pin: approvalPin,
-                                                      reason: approvalReason.trim(),
-                                                    },
+                                                    reason: approvalReason.trim(),
                                                   },
-                                                }),
-                                                (key) =>
-                                                  api.pilot.discountItem(
-                                                    scope.organizationId,
-                                                    scope.unitId,
-                                                    approvalItemId,
-                                                    {
+                                                  crypto.randomUUID(),
+                                                ),
+                                              "Desconto enviado para aprovação.",
+                                            )
+                                          }
+                                          size="sm"
+                                          variant="secondary"
+                                        >
+                                          Solicitar desconto
+                                        </Button>
+                                        <Button
+                                          disabled={
+                                            busy ||
+                                            !approvalItemId ||
+                                            approvalReason.trim().length < 3
+                                          }
+                                          onClick={() =>
+                                            void mutate(
+                                              () =>
+                                                api.pilot.requestApproval(
+                                                  scope.organizationId,
+                                                  scope.unitId,
+                                                  tabId,
+                                                  {
+                                                    itemId: approvalItemId,
+                                                    action: "cancel",
+                                                    reason: approvalReason.trim(),
+                                                  },
+                                                  crypto.randomUUID(),
+                                                ),
+                                              "Cancelamento enviado para aprovação.",
+                                            )
+                                          }
+                                          size="sm"
+                                          variant="danger"
+                                        >
+                                          Solicitar cancelamento
+                                        </Button>
+                                      </>
+                                    )}
+                                    {canApproveAdjustments && (
+                                      <>
+                                        <Button
+                                          disabled={
+                                            busy ||
+                                            !approvalItemId ||
+                                            approvalPin.length < 4 ||
+                                            approvalReason.trim().length < 3 ||
+                                            discountReais <= 0
+                                          }
+                                          onClick={() =>
+                                            void mutate(
+                                              () =>
+                                                scope.dispatch(
+                                                  "pos.item.discount_requested",
+                                                  pilotMutation("discount-item", {
+                                                    itemId: approvalItemId,
+                                                    body: {
                                                       discountCents: Math.round(
                                                         discountReais * 100,
                                                       ),
@@ -4435,69 +4768,86 @@ export function TabWorkspace({
                                                         reason: approvalReason.trim(),
                                                       },
                                                     },
-                                                    key,
-                                                  ),
-                                              ),
-                                            "Desconto aprovado e aplicado.",
-                                          )
-                                        }
-                                        size="sm"
-                                        variant="secondary"
-                                      >
-                                        Aplicar desconto
-                                      </Button>
-                                      <Button
-                                        disabled={
-                                          busy ||
-                                          !approvalItemId ||
-                                          approvalPin.length < 4 ||
-                                          approvalReason.trim().length < 3
-                                        }
-                                        onClick={() =>
-                                          void mutate(
-                                            () =>
-                                              scope.dispatch(
-                                                "pos.item.cancel_requested",
-                                                pilotMutation("cancel-item", {
-                                                  itemId: approvalItemId,
-                                                  approval: {
-                                                    approverMembershipId: scope.membershipId,
-                                                    pin: approvalPin,
-                                                    reason: approvalReason.trim(),
-                                                  },
-                                                }),
-                                                (key) =>
-                                                  api.pilot.cancelItem(
-                                                    scope.organizationId,
-                                                    scope.unitId,
-                                                    approvalItemId,
-                                                    {
+                                                  }),
+                                                  (key) =>
+                                                    api.pilot.discountItem(
+                                                      scope.organizationId,
+                                                      scope.unitId,
+                                                      approvalItemId,
+                                                      {
+                                                        discountCents: Math.round(
+                                                          discountReais * 100,
+                                                        ),
+                                                        approval: {
+                                                          approverMembershipId: scope.membershipId,
+                                                          pin: approvalPin,
+                                                          reason: approvalReason.trim(),
+                                                        },
+                                                      },
+                                                      key,
+                                                    ),
+                                                ),
+                                              "Desconto aprovado e aplicado.",
+                                            )
+                                          }
+                                          size="sm"
+                                          variant="secondary"
+                                        >
+                                          Aplicar desconto
+                                        </Button>
+                                        <Button
+                                          disabled={
+                                            busy ||
+                                            !approvalItemId ||
+                                            approvalPin.length < 4 ||
+                                            approvalReason.trim().length < 3
+                                          }
+                                          onClick={() =>
+                                            void mutate(
+                                              () =>
+                                                scope.dispatch(
+                                                  "pos.item.cancel_requested",
+                                                  pilotMutation("cancel-item", {
+                                                    itemId: approvalItemId,
+                                                    approval: {
                                                       approverMembershipId: scope.membershipId,
                                                       pin: approvalPin,
                                                       reason: approvalReason.trim(),
                                                     },
-                                                    key,
-                                                  ),
-                                              ),
-                                            "Item cancelado com aprovação.",
-                                          )
-                                        }
-                                        size="sm"
-                                        variant="danger"
-                                      >
-                                        Cancelar item
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              </form>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                  </section>
-                )}
+                                                  }),
+                                                  (key) =>
+                                                    api.pilot.cancelItem(
+                                                      scope.organizationId,
+                                                      scope.unitId,
+                                                      approvalItemId,
+                                                      {
+                                                        approverMembershipId: scope.membershipId,
+                                                        pin: approvalPin,
+                                                        reason: approvalReason.trim(),
+                                                      },
+                                                      key,
+                                                    ),
+                                                ),
+                                              "Item cancelado com aprovação.",
+                                            )
+                                          }
+                                          size="sm"
+                                          variant="danger"
+                                        >
+                                          Cancelar item
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </form>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </section>
+                  )}
+                </div>
                 {tabOpen && view !== "order" && view !== "activity" && (
                   <section className={`workspace-tools workspace-tools--${view}`}>
                     {view === "table" && (
@@ -4714,82 +5064,6 @@ export function TabWorkspace({
                             Unificar aqui
                           </Button>
                         </form>
-                        <details className="account-disclosure" hidden={view !== "account"}>
-                          <summary>Separar item em outra comanda</summary>
-                          <form
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              if (splitItemId)
-                                void mutate(
-                                  () =>
-                                    scope.dispatch(
-                                      "pos.tab.split_requested",
-                                      pilotMutation("split-tab", {
-                                        tabId,
-                                        body: {
-                                          label: splitLabel.trim() || "Conta separada",
-                                          items: [
-                                            { orderItemId: splitItemId, quantity: splitQuantity },
-                                          ],
-                                        },
-                                      }),
-                                      (key) =>
-                                        api.pilot.splitTab(
-                                          scope.organizationId,
-                                          scope.unitId,
-                                          tabId,
-                                          {
-                                            label: splitLabel.trim() || "Conta separada",
-                                            items: [
-                                              { orderItemId: splitItemId, quantity: splitQuantity },
-                                            ],
-                                          },
-                                          key,
-                                        ),
-                                    ),
-                                  (result) =>
-                                    `Item separado em nova comanda. ${result.printJobs.length} via(s) foram criadas na fila de impressão.`,
-                                  (result) => {
-                                    const localJobs = result.printJobs.map(printJobFromServer);
-                                    setPrintJobs((current) =>
-                                      [...localJobs, ...current].slice(0, 12),
-                                    );
-                                  },
-                                );
-                            }}
-                          >
-                            <h3>Separar item</h3>
-                            <Input
-                              aria-label="Nome da nova comanda"
-                              maxLength={120}
-                              onChange={(event) => setSplitLabel(event.target.value)}
-                              placeholder="Nome da nova comanda"
-                              value={splitLabel}
-                            />
-                            <NativeSelect
-                              aria-label="Item a separar"
-                              onChange={(event) => setSplitItemId(event.target.value)}
-                              value={splitItemId}
-                            >
-                              <option value="">Selecione</option>
-                              {activeItems.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.quantity}× {item.productName}
-                                </option>
-                              ))}
-                            </NativeSelect>
-                            <Input
-                              aria-label="Quantidade a separar"
-                              min={1}
-                              onChange={(event) => setSplitQuantity(Number(event.target.value))}
-                              type="number"
-                              value={splitQuantity}
-                            />
-                            <Button disabled={busy || !splitItemId} size="sm" type="submit">
-                              Separar
-                            </Button>
-                          </form>
-                        </details>
                         <details
                           className="account-disclosure"
                           hidden={view !== "account" || !canAdjustCharges}
@@ -5248,20 +5522,23 @@ export function TabWorkspace({
                             </Button>
                           </>
                         ))}
-                      {!cart.length && data.tab.tableId && (
-                        <Button
-                          disabled={busy || billRequestPending || Boolean(billCall)}
-                          onClick={() => void requestBillAndPrint()}
-                          size="sm"
-                          variant={billCall ? "ghost" : "secondary"}
-                        >
-                          {billCall
-                            ? "Conta solicitada"
-                            : billRequestPending
-                              ? "Solicitando…"
-                              : "Pedir conta"}
-                        </Button>
-                      )}
+                      {!cart.length &&
+                        data.tab.tableId &&
+                        remainingCents > 0 &&
+                        (view !== "account" || terminalPaymentMode === "disabled") && (
+                          <Button
+                            disabled={busy || billRequestPending || Boolean(billCall)}
+                            onClick={() => void requestBillAndPrint()}
+                            size="sm"
+                            variant={billCall ? "ghost" : "secondary"}
+                          >
+                            {billCall
+                              ? "Conta solicitada"
+                              : billRequestPending
+                                ? "Solicitando…"
+                                : "Pedir conta"}
+                          </Button>
+                        )}
                       {!cart.length && remainingCents > 0 && view !== "account" && (
                         <Button
                           disabled={busy || balanceRefreshRequired}
@@ -5280,23 +5557,26 @@ export function TabWorkspace({
                               : "Receber no caixa"}
                         </Button>
                       )}
-                      {view === "account" && cashierPaymentEnabled && remainingCents > 0 && (
-                        <Button
-                          className="service-action-dock__confirm"
-                          disabled={busy || !manualPaymentReady}
-                          form={`cashier-payment-form-${tabId}`}
-                          size="sm"
-                          type="submit"
-                        >
-                          Confirmar {formatMoney(paymentAmountCents ?? 0)}
-                        </Button>
-                      )}
+                      {view === "account" &&
+                        !splitOpen &&
+                        cashierPaymentEnabled &&
+                        remainingCents > 0 && (
+                          <Button
+                            className="service-action-dock__confirm"
+                            disabled={busy || !manualPaymentReady}
+                            form={`cashier-payment-form-${tabId}`}
+                            size="sm"
+                            type="submit"
+                          >
+                            Confirmar {formatMoney(paymentAmountCents ?? 0)}
+                          </Button>
+                        )}
                       {closesWithoutConsumption && (
                         <Button
                           disabled={busy}
                           onClick={() =>
                             window.confirm(
-                              `Fechar ${displayLabel} sem consumo? A mesa seguirá para limpeza.`,
+                              `Encerrar ${displayLabel} sem consumo? A mesa só será liberada quando todas as comandas forem encerradas.`,
                             ) &&
                             void mutate(
                               () => closeTabWithReturnableCheck({ printRequested: false }),
@@ -5306,7 +5586,7 @@ export function TabWorkspace({
                           size="sm"
                           variant="danger"
                         >
-                          {data.tab.tableId ? "Encerrar mesa" : "Encerrar sem consumo"}
+                          Encerrar sem consumo
                         </Button>
                       )}
                       {data.tab.totalCents > 0 &&
@@ -5342,15 +5622,12 @@ export function TabWorkspace({
                                 )
                               }
                               size="sm"
-                              variant="danger"
+                              variant="secondary"
                             >
                               Encerrar sem imprimir
                             </Button>
                           </>
                         )}
-                      <Button onClick={() => setView("table")} size="sm" variant="ghost">
-                        Dados e ações
-                      </Button>
                     </div>
                   </footer>
                 )}

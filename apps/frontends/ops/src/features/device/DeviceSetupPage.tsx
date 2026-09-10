@@ -11,6 +11,7 @@ import {
   type ShellPaymentPairingResult,
 } from "../counter/pos-payment-bridge";
 import { type PaymentCapabilities, paymentBlockReason, posPayments } from "../counter/pos-payments";
+import { BillPrintingSettingsPanel } from "./BillPrintingSettings";
 import { ProductionPrintersPanel } from "./ProductionPrintersPanel";
 import { SmartPosAdminPanel } from "./SmartPosAdminPanel";
 import "./device.css";
@@ -239,6 +240,13 @@ export function DeviceSetupPage({
         runtime={runtime}
         unitId={unitId}
       />
+      {canManage && (
+        <BillPrintingSettingsPanel
+          key={`${organizationId}:${unitId}`}
+          organizationId={organizationId}
+          unitId={unitId}
+        />
+      )}
 
       {runtime.embedded && (
         <NativePairingCard onPaired={() => setPairingRevision((value) => value + 1)} />

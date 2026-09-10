@@ -3537,6 +3537,77 @@
   padding: 0;
   top: auto;
 }
+.salon-attendance-layout {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.salon-attendance-tables {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.salon-attendance-tables > strong,
+.salon-attendance-tables__list {
+  display: none;
+}
+.salon-attendance-tables__select {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.salon-attendance-tables__select select {
+  min-height: 44px;
+}
+.salon-service-modal.salon-service-modal--attendance .gm-modal {
+  height: 96dvh;
+  max-height: 96dvh;
+  max-width: 1600px;
+  width: 98vw;
+}
+@media (min-width: 1280px) {
+  .salon-attendance-layout:has(.salon-attendance-tables) {
+    grid-template-columns: 136px minmax(0, 1fr);
+  }
+  .salon-attendance-tables {
+    align-self: start;
+    position: sticky;
+    top: 0;
+  }
+  .salon-attendance-tables > strong {
+    display: block;
+  }
+  .salon-attendance-tables__select {
+    display: none;
+  }
+  .salon-attendance-tables__list {
+    display: grid;
+    gap: 6px;
+    max-height: 72dvh;
+    overflow-y: auto;
+  }
+  .salon-attendance-tables__list .gm-button {
+    align-items: start;
+    display: grid;
+    gap: 4px;
+    justify-content: stretch;
+    min-height: 52px;
+    text-align: start;
+  }
+  .salon-attendance-tables__list small {
+    color: var(--gm-muted);
+    font-weight: 400;
+  }
+}
+@media (max-width: 640px) {
+  .salon-service-modal.salon-service-modal--attendance .gm-modal {
+    border-radius: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    width: 100vw;
+  }
+}
 .tab-metadata-details {
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);

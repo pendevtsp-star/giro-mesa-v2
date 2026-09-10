@@ -135,6 +135,27 @@ public sealed class CloudPrinterCommandProcessorTests : IAsyncLifetime
         }
     }
 
+    [Theory]
+    [InlineData("partial_statement")]
+    [InlineData("payment_statement")]
+    [InlineData("final_receipt")]
+    public async Task FinancialCloudDocumentsUseDurableKeysWithoutAProductionStation(string documentType)
+    {
+        var gateway = new RecordingPrinterGateway();
+        var (store, _, processor) = await CreateProcessorAsync(CreateOptions(withStaticPrinter: true), gateway);
+        var payload = new { cloudPrintJobId = "cloud-bill", idempotencyKey = "cloud-bill-stable", printerId = "kitchen", documentType, copies = 1,
+            payload = new { schemaVersion = 2, tab = new { label = "Mesa 7" }, totals = new { totalCents = 1234 }, items = Array.Empty<object>(), payments = Array.Empty<object>() } };
+        var firstId = Guid.NewGuid().ToString();
+        var secondId = Guid.NewGuid().ToString();
+        await store.SaveCloudCommandsAsync([Command(firstId, "print_job.execute", payload)]);
+        Assert.Equal(1, await processor.ProcessPendingAsync());
+        await store.SaveCloudCommandsAsync([Command(secondId, "print_job.execute", payload)]);
+        Assert.Equal(1, await processor.ProcessPendingAsync());
+        Assert.Equal(1, gateway.CallCount);
+        Assert.Equal("printed", (await store.GetCloudCommandStateAsync(firstId))?.Result?.GetProperty("status").GetString());
+        Assert.True((await store.GetCloudCommandStateAsync(secondId))!.Result!.Value.GetProperty("duplicate").GetBoolean());
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync()

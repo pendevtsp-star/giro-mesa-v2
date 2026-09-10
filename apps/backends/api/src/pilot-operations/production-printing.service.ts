@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { isIP } from "node:net";
 import type {
+  BillPrintingPolicy,
   CloudCommandResult,
   CreateProductionPrinterInput,
   KdsTicketPrintPayloadV1,
   ManualKdsTicketPrintInput,
+  PrintDocumentPayloadV2,
   PrinterConfigurationArchiveCommandV1,
   PrinterConfigurationCommandV1,
   PrinterConnectionProbeCommandV1,
@@ -23,6 +25,7 @@ import {
   hubCommands,
   hubHeartbeats,
   outboxEvents,
+  posBillPrintingPolicies,
   posDiningTables,
   posIdempotencyReceipts,
   posKdsTerminalProfiles,
@@ -64,6 +67,20 @@ const PRINT_COMMAND_TTL_MS = 10 * 60_000;
 const PRINTER_TEST_TTL_MS = 5 * 60_000;
 const PRINTER_CONNECTION_PROBE_TTL_MS = 30_000;
 const PRINTER_CONFIGURATION_TTL_MS = 7 * 24 * 60 * 60_000;
+
+export function printerDeliveryIssue(
+  printer: Pick<
+    PrinterRow,
+    "applyStatus" | "appliedRevision" | "revision" | "lastStatus" | "lastError" | "lastTestAt"
+  >,
+  hubOnline: boolean,
+) {
+  if (!hubOnline) return "EDGE_HUB_OFFLINE";
+  if (printer.applyStatus !== "applied" || printer.appliedRevision !== printer.revision)
+    return "PRINTER_CONFIGURATION_PENDING";
+  if (printer.lastStatus !== "online") return printer.lastError ?? "PRINTER_TEST_REQUIRED";
+  return null;
+}
 
 function isAllowedPrinterIpv4(value: string) {
   const [first = 0, second = 0] = value.split(".").map(Number);
@@ -174,6 +191,86 @@ export class ProductionPrintingService {
         online: Boolean(hub.lastSeenAt && hub.lastSeenAt.getTime() > onlineThreshold),
       })),
     };
+  }
+
+  async getBillPolicy(
+    tx: Transaction | DatabaseService["db"],
+    organizationId: string,
+    unitId: string,
+  ): Promise<BillPrintingPolicy> {
+    const [policy] = await tx
+      .select()
+      .from(posBillPrintingPolicies)
+      .where(
+        and(
+          eq(posBillPrintingPolicies.organizationId, organizationId),
+          eq(posBillPrintingPolicies.unitId, unitId),
+        ),
+      )
+      .limit(1);
+    return policy
+      ? { mode: policy.mode, printerId: policy.printerId, revision: policy.revision }
+      : { mode: "notify_cashier", printerId: null, revision: 0 };
+  }
+
+  async readBillPolicy(identityId: string, organizationId: string, unitId: string) {
+    await this.requireManage(identityId, organizationId, unitId);
+    return { policy: await this.getBillPolicy(this.database.db, organizationId, unitId) };
+  }
+
+  async updateBillPolicy(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    key: string,
+    input: BillPrintingPolicy,
+  ) {
+    await this.requireManage(identityId, organizationId, unitId);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      key,
+      "bill-printing.policy",
+      input,
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`bill-print-policy:${organizationId}:${unitId}`}))`,
+        );
+        const current = await this.getBillPolicy(tx, organizationId, unitId);
+        if (current.revision !== input.revision)
+          throw new ConflictException({ code: "BILL_PRINTING_POLICY_VERSION_CONFLICT" });
+        if (input.printerId) {
+          const printer = await this.lockPrinter(tx, organizationId, unitId, input.printerId);
+          if (!printer.active || !printer.documentTypes.includes("partial_statement"))
+            throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY" });
+          await this.requireActiveHub(tx, organizationId, unitId, printer.hubId);
+        }
+        const policy = {
+          mode: input.mode,
+          printerId: input.printerId,
+          revision: current.revision + 1,
+        };
+        await tx
+          .insert(posBillPrintingPolicies)
+          .values({ organizationId, unitId, ...policy })
+          .onConflictDoUpdate({
+            target: posBillPrintingPolicies.unitId,
+            set: { ...policy, updatedAt: new Date() },
+          });
+        await this.recordLifecycle(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "bill_printing.policy_updated",
+          "unit",
+          unitId,
+          policy,
+        );
+        return { policy };
+      },
+    );
   }
 
   async probePrinterConnection(
@@ -549,7 +646,8 @@ export class ProductionPrintingService {
             ),
           )
           .limit(1);
-        if (policyReference || fallbackReference) {
+        const billPolicy = await this.getBillPolicy(tx, organizationId, unitId);
+        if (policyReference || fallbackReference || billPolicy.printerId === printerId) {
           throw new ConflictException({
             code: "PRODUCTION_PRINTER_IN_USE",
             stationId: policyReference?.id,
@@ -1022,7 +1120,7 @@ export class ProductionPrintingService {
               eq(posPrintJobs.organizationId, organizationId),
               eq(posPrintJobs.unitId, unitId),
               eq(posPrintJobs.id, printJobId),
-              eq(posPrintJobs.documentType, "kds_ticket"),
+              sql`${posPrintJobs.hubCommandId} is not null`,
             ),
           )
           .for("update")
@@ -1160,7 +1258,7 @@ export class ProductionPrintingService {
 
   async expireUnknownPrintCommands(
     tx: Transaction,
-    hub: { id: string; organizationId: string; unitId: string },
+    hub: { id?: string; organizationId: string; unitId: string },
     now = new Date(),
   ) {
     const expired = await tx
@@ -1171,7 +1269,7 @@ export class ProductionPrintingService {
         and(
           eq(hubCommands.organizationId, hub.organizationId),
           eq(hubCommands.unitId, hub.unitId),
-          eq(hubCommands.hubId, hub.id),
+          ...(hub.id ? [eq(hubCommands.hubId, hub.id)] : []),
           eq(hubCommands.type, "print_job.execute"),
           isNull(hubCommands.acknowledgedAt),
           lte(hubCommands.expiresAt, now),
@@ -1226,7 +1324,6 @@ export class ProductionPrintingService {
           eq(posPrintJobs.organizationId, hub.organizationId),
           eq(posPrintJobs.unitId, hub.unitId),
           eq(posPrintJobs.hubCommandId, commandId),
-          eq(posPrintJobs.documentType, "kds_ticket"),
           ...(result.cloudPrintJobId ? [eq(posPrintJobs.id, result.cloudPrintJobId)] : []),
         ),
       )
@@ -1256,6 +1353,31 @@ export class ProductionPrintingService {
         updatedAt: now,
       })
       .where(eq(posPrintJobs.id, job.id));
+    if (job.printerId) {
+      await tx
+        .update(posProductionPrinters)
+        .set({
+          lastStatus:
+            result.status === "printed"
+              ? "online"
+              : result.status === "failed"
+                ? "error"
+                : "confirmation_required",
+          lastError,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(posProductionPrinters.organizationId, hub.organizationId),
+            eq(posProductionPrinters.unitId, hub.unitId),
+            eq(posProductionPrinters.id, job.printerId),
+            eq(posProductionPrinters.hubId, hub.id),
+            ...(result.status === "printed"
+              ? [lte(posProductionPrinters.updatedAt, job.createdAt)]
+              : []),
+          ),
+        );
+    }
     await this.recordLifecycle(
       tx,
       null,
@@ -1264,7 +1386,7 @@ export class ProductionPrintingService {
       `print_job.${result.status}`,
       "print_job",
       job.id,
-      { commandId, errorCode: lastError, documentType: "kds_ticket" },
+      { commandId, errorCode: lastError, documentType: job.documentType },
     );
   }
 
@@ -1473,7 +1595,6 @@ export class ProductionPrintingService {
       if (!existing) throw new ConflictException({ code: "PRINT_JOB_IDEMPOTENCY_CONFLICT" });
       return existing;
     }
-    const commandId = randomUUID();
     const commandPayload: PrintJobExecuteCommandV1 = {
       cloudPrintJobId: inserted.id,
       idempotencyKey: input.dispatchKey,
@@ -1484,22 +1605,8 @@ export class ProductionPrintingService {
       copies: input.copies,
       printerId: input.printer.id,
     };
-    await tx.insert(hubCommands).values({
-      id: commandId,
-      organizationId: input.organizationId,
-      unitId: input.unitId,
-      hubId: input.printer.hubId,
-      idempotencyKey: `print-job:${inserted.id}`,
-      type: "print_job.execute",
-      source: "operations",
-      payload: commandPayload as unknown as Record<string, unknown>,
-      expiresAt: new Date(Date.now() + PRINT_COMMAND_TTL_MS),
-    });
-    const [job] = await tx
-      .update(posPrintJobs)
-      .set({ hubCommandId: commandId, updatedAt: new Date() })
-      .where(eq(posPrintJobs.id, inserted.id))
-      .returning();
+    const job = await this.queueCloudCommand(tx, inserted, input.printer, commandPayload);
+    const commandId = job.hubCommandId;
     await tx.insert(posTabEvents).values({
       organizationId: input.organizationId,
       unitId: input.unitId,
@@ -1528,9 +1635,74 @@ export class ProductionPrintingService {
         stationId: input.station.id,
         commandId,
         copies: input.copies,
+        errorCode: job.lastError,
       },
     );
-    return job ?? inserted;
+    return job;
+  }
+
+  async queueFinancialJob(
+    tx: Transaction,
+    job: typeof posPrintJobs.$inferSelect,
+    printerId: string,
+  ) {
+    if (job.documentType === "kds_ticket")
+      throw new BadRequestException({ code: "FINANCIAL_PRINT_JOB_REQUIRED" });
+    const printer = await this.lockPrinter(tx, job.organizationId, job.unitId, printerId);
+    if (!printer.active || !printer.documentTypes.includes(job.documentType))
+      throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY", printerId });
+    await this.requireActiveHub(tx, job.organizationId, job.unitId, printer.hubId);
+    return this.queueCloudCommand(tx, job, printer, {
+      cloudPrintJobId: job.id,
+      idempotencyKey: `print-job:${job.id}`,
+      documentType: job.documentType,
+      payload: job.payload as unknown as PrintDocumentPayloadV2,
+      copies: job.copies,
+      printerId,
+    });
+  }
+
+  private async queueCloudCommand(
+    tx: Transaction,
+    job: typeof posPrintJobs.$inferSelect,
+    printer: PrinterRow,
+    payload: PrintJobExecuteCommandV1,
+  ) {
+    if (job.hubCommandId) return job;
+    const [heartbeat] = await tx
+      .select({ lastSeenAt: hubHeartbeats.lastSeenAt })
+      .from(hubHeartbeats)
+      .where(
+        and(
+          eq(hubHeartbeats.organizationId, job.organizationId),
+          eq(hubHeartbeats.unitId, job.unitId),
+          eq(hubHeartbeats.hubId, printer.hubId),
+        ),
+      )
+      .limit(1);
+    const lastError = printerDeliveryIssue(
+      printer,
+      Boolean(heartbeat && heartbeat.lastSeenAt.getTime() > Date.now() - HUB_ONLINE_WINDOW_MS),
+    );
+    const commandId = randomUUID();
+    await tx.insert(hubCommands).values({
+      id: commandId,
+      organizationId: job.organizationId,
+      unitId: job.unitId,
+      hubId: printer.hubId,
+      idempotencyKey: `print-job:${job.id}`,
+      type: "print_job.execute",
+      source: "operations",
+      payload: payload as unknown as Record<string, unknown>,
+      expiresAt: new Date(Date.now() + PRINT_COMMAND_TTL_MS),
+    });
+    const [updated] = await tx
+      .update(posPrintJobs)
+      .set({ hubCommandId: commandId, printerId: printer.id, lastError, updatedAt: new Date() })
+      .where(eq(posPrintJobs.id, job.id))
+      .returning();
+    if (!updated) throw new ConflictException({ code: "PRINT_JOB_NOT_FOUND" });
+    return updated;
   }
 
   private async buildTicketPayload(
@@ -1772,7 +1944,10 @@ export class ProductionPrintingService {
       : [];
     const kdsConfigured = Boolean(kds);
     const printerConfigured = Boolean(
-      printer && printer.applyStatus === "applied" && printer.appliedRevision === printer.revision,
+      printer &&
+        printer.applyStatus === "applied" &&
+        printer.appliedRevision === printer.revision &&
+        printer.lastStatus === "online",
     );
     const hubOnline = Boolean(heartbeat);
     const issues: Array<

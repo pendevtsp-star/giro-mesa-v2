@@ -17,7 +17,7 @@ import { InternalKeyGuard } from "../billing/internal-key.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
 
-export const RELEASE_SCHEMA_VERSION = 82;
+export const RELEASE_SCHEMA_VERSION = 83;
 export const RELEASE_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -130,6 +130,8 @@ export class DatabaseReadinessService {
           financeAttachments: string | null;
           settlementPayments: boolean;
           deliveryFailures: boolean;
+          linkedAccounts: boolean;
+          billPrintingPolicy: string | null;
         }
       | undefined;
     try {
@@ -144,6 +146,8 @@ export class DatabaseReadinessService {
         financeAttachments: string | null;
         settlementPayments: boolean;
         deliveryFailures: boolean;
+        linkedAccounts: boolean;
+        billPrintingPolicy: string | null;
       }>(
         sql`select
           to_regclass('public.management_time_tracking_settings')::text as management,
@@ -161,7 +165,11 @@ export class DatabaseReadinessService {
           (select count(*) = 2 from pg_enum e
             join pg_type t on t.oid = e.enumtypid join pg_namespace n on n.oid = t.typnamespace
             where n.nspname = 'public' and t.typname = 'growth_delivery_status'
-              and e.enumlabel in ('delivery_failed', 'returned')) as "deliveryFailures"`,
+              and e.enumlabel in ('delivery_failed', 'returned')) as "deliveryFailures",
+          (select count(*) = 2 from information_schema.columns
+            where table_schema = 'public' and table_name = 'pos_tabs'
+              and column_name in ('service_root_tab_id', 'service_charge_adjustment_cents')) as "linkedAccounts",
+          to_regclass('public.pos_bill_printing_policies')::text as "billPrintingPolicy"`,
       );
     } catch (error) {
       this.logger.error(
@@ -184,6 +192,8 @@ export class DatabaseReadinessService {
       !readiness?.financeAttachments ? "management_finance_attachments" : null,
       !readiness?.settlementPayments ? "management_waiter_settlements.payment_columns" : null,
       !readiness?.deliveryFailures ? "growth_delivery_status.failure_states" : null,
+      !readiness?.linkedAccounts ? "pos_tabs.linked_service_columns" : null,
+      !readiness?.billPrintingPolicy ? "pos_bill_printing_policies" : null,
     ].filter((value): value is string => Boolean(value));
     if (missingRelations.length > 0) {
       throw new ServiceUnavailableException({

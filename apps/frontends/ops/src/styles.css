@@ -12,20 +12,32 @@
 
 /* Operational drawers must outrank the unlayered modal defaults from @giromesa/ui. */
 @media (min-width: 761px) {
-  .salon-service-modal:not(.salon-service-modal--compact).gm-modal-backdrop[open],
   .counter-modal.gm-modal-backdrop[open] {
     align-items: stretch;
     justify-content: flex-end;
     padding: 0;
   }
 
-  .salon-service-modal:not(.salon-service-modal--compact) .gm-modal,
   .counter-modal .gm-modal {
     border-radius: var(--gm-radius-lg) 0 0 var(--gm-radius-lg);
     height: 100dvh;
     max-height: none;
     max-width: min(720px, 100vw);
     width: min(720px, 100vw);
+  }
+}
+
+@media (min-width: 761px) {
+  .salon-service-modal--attendance.gm-modal-backdrop[open] {
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+  }
+  .salon-service-modal--attendance .gm-modal {
+    width: min(1600px, calc(100vw - 24px));
+    max-width: none;
+    height: calc(100dvh - 24px);
+    max-height: none;
   }
 }
 

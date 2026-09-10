@@ -7876,6 +7876,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/bill-policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_readBillPolicy[0]"];
+    put: operations["ProductionPrintingController_updateBillPolicy[0]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printing/bill-policy": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["ProductionPrintingController_readBillPolicy[1]"];
+    put: operations["ProductionPrintingController_updateBillPolicy[1]"];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/production-printers/connection-probes": {
     parameters: {
       query?: never;
@@ -34194,6 +34226,8 @@ export interface operations {
           printerId?: string;
           /** Format: uuid */
           tableId?: string;
+          /** Format: uuid */
+          targetTabId?: string;
           label?: string;
           items: {
             /** Format: uuid */
@@ -34235,6 +34269,8 @@ export interface operations {
           printerId?: string;
           /** Format: uuid */
           tableId?: string;
+          /** Format: uuid */
+          targetTabId?: string;
           label?: string;
           items: {
             /** Format: uuid */
@@ -42407,6 +42443,144 @@ export interface operations {
               updatedAt: string;
             };
             idempotentReplay?: boolean;
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_readBillPolicy[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            policy: {
+              /** @enum {string} */
+              mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+              printerId: string | null;
+              revision: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updateBillPolicy[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+          printerId: string | null;
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            policy: {
+              /** @enum {string} */
+              mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+              printerId: string | null;
+              revision: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_readBillPolicy[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            policy: {
+              /** @enum {string} */
+              mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+              printerId: string | null;
+              revision: number;
+            };
+          };
+        };
+      };
+    };
+  };
+  "ProductionPrintingController_updateBillPolicy[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "Idempotency-Key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** @enum {string} */
+          mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+          printerId: string | null;
+          revision: number;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            policy: {
+              /** @enum {string} */
+              mode: "notify_cashier" | "cashier_printer" | "local_terminal";
+              printerId: string | null;
+              revision: number;
+            };
           };
         };
       };

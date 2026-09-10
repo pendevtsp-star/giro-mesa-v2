@@ -1,4 +1,7 @@
 import {
+  type BillPrintingPolicy,
+  billPrintingPolicyResponseSchema,
+  billPrintingPolicySchema,
   type CreateProductionPrinterInput,
   createProductionPrinterSchema,
   idempotencyKeySchema,
@@ -62,6 +65,36 @@ export class ProductionPrintingController {
     @Param("unitId", ParseUUIDPipe) unitId: string,
   ) {
     return this.productionPrinting.listPrinters(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Get("production-printing/bill-policy")
+  @ApiOkResponse({ schema: toOpenApiSchema(billPrintingPolicyResponseSchema) })
+  readBillPolicy(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+  ) {
+    return this.productionPrinting.readBillPolicy(request.auth.identityId, organizationId, unitId);
+  }
+
+  @Put("production-printing/bill-policy")
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  @ApiBody({ schema: toOpenApiSchema(billPrintingPolicySchema) })
+  @ApiOkResponse({ schema: toOpenApiSchema(billPrintingPolicyResponseSchema) })
+  updateBillPolicy(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Headers("idempotency-key") key: string | undefined,
+    @Body(new ZodPipe(billPrintingPolicySchema)) body: BillPrintingPolicy,
+  ) {
+    return this.productionPrinting.updateBillPolicy(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      this.idempotencyKey(key),
+      body,
+    );
   }
 
   @Post("production-printers/connection-probes")

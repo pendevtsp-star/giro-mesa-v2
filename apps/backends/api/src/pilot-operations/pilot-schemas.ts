@@ -1122,6 +1122,7 @@ export const detachTableGroupSchema = z.object({ tableId: id });
 export const splitTabSchema = printTargetSchema
   .extend({
     tableId: id.optional(),
+    targetTabId: id.optional(),
     label: z.string().trim().max(120).optional(),
     items: z
       .array(z.object({ orderItemId: id, quantity: z.number().int().min(1).max(500) }))
@@ -1129,7 +1130,11 @@ export const splitTabSchema = printTargetSchema
       .max(500),
     copies: z.number().int().min(1).max(5).optional(),
   })
-  .strict();
+  .strict()
+  .refine((input) => !(input.tableId && input.targetTabId), {
+    message: "Escolha uma mesa ou uma comanda existente.",
+    path: ["targetTabId"],
+  });
 
 export const serviceChargeSchema = z.object({ basisPoints: z.number().int().min(0).max(10_000) });
 export const tipSchema = z.object({ tipCents: cents });
