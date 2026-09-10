@@ -7,32 +7,36 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     title: "Entender a visão geral",
     steps: [
       "Use os indicadores como atalhos para a área correspondente.",
-      "Dados reais são atualizados por evento ou pela atualização periódica de segurança.",
+      "Confira o horário da última atualização antes de tomar uma decisão.",
     ],
   },
   device: {
-    title: "Administrar SmartPOS e instalar a PWA",
+    title: "Configurar as maquininhas e o aplicativo",
     steps: [
-      "Gerentes pareiam o APK por código temporário e acompanham saúde e certificação.",
-      "O financeiro consulta conciliação; aprovação e kill switch permanecem no servidor.",
-      "No navegador comum, instale a PWA somente para disponibilizar o atendimento.",
+      "O gerente conecta a maquininha por um código temporário e confere se ela está autorizada para pagamentos.",
+      "O financeiro confere os recebimentos e as divergências de pagamento.",
+      "No navegador, use a opção de instalar o aplicativo para acessar o atendimento com mais facilidade.",
     ],
-    warning: "A PWA isolada não acessa o SDK de pagamento da maquininha.",
+    warning:
+      "Instalar pelo navegador não habilita pagamentos integrados. A maquininha precisa do aplicativo e da integração aprovados pelo fornecedor.",
   },
   salon: {
     title: "Atender uma mesa",
     steps: [
       "Selecione uma mesa livre e informe o número de pessoas.",
-      "Adicione produtos e complementos; salve o pedido como rascunho.",
-      "Revise o rascunho e envie à produção.",
+      "Adicione produtos e complementos; o rascunho fica salvo neste dispositivo.",
+      "Revise e envie à produção. Aguarde a confirmação de envio.",
+      "Use Conta e pagamento para separar consumo, imprimir a pré-conta e receber sem sair do atendimento.",
     ],
-    warning: "Transferências, divisões e cancelamentos só valem após confirmação do servidor.",
+    warning:
+      "Se houver falha de conexão, confira os pedidos pendentes antes de tentar lançar os mesmos itens novamente.",
   },
   counter: {
     title: "Abrir pedido no balcão",
     steps: [
       "Informe uma identificação curta para retirada ou consumo local.",
-      "Monte o pedido, salve e envie à produção.",
+      "Monte o pedido, revise e envie à produção.",
+      "Confira a conta selecionada antes de imprimir ou receber.",
     ],
   },
   catalog: {
@@ -49,7 +53,7 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
       "Selecione mesas reais, valide o QR e escolha o formato de saída.",
       "Marque o lote como impresso somente após confirmar a produção física.",
     ],
-    warning: "Ao rotacionar um QR, placas antigas daquela mesa deixam de funcionar.",
+    warning: "Ao renovar o código de uma mesa, as placas antigas deixam de funcionar.",
   },
   kds: {
     title: "Movimentar a produção",
@@ -66,12 +70,13 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     title: "Consultar estoque",
     steps: [
       "Priorize itens abaixo do mínimo.",
-      "Use saldos persistidos como referência operacional.",
+      "Selecione o setor para conferir o saldo correto.",
+      "Para mover itens, informe origem e destino; o recebimento deve ser conferido no setor de destino.",
     ],
   },
   purchases: {
     title: "Acompanhar compras",
-    steps: ["Revise total e prazo.", "Aprovações ficam registradas no servidor."],
+    steps: ["Revise total e prazo.", "Confirme o recebimento após conferir as mercadorias."],
   },
   finance: {
     title: "Ler o financeiro",
@@ -102,23 +107,24 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
   },
   people: {
     title: "Acompanhar equipe",
-    steps: ["Confira pessoas ativas e ponto aberto.", "Saídas registram o horário no servidor."],
+    steps: ["Confira pessoas ativas e ponto aberto.", "Registre a saída ao encerrar o expediente."],
   },
   "waiter-settlements": {
     title: "Fechar valores da equipe",
     steps: [
       "Pré-visualize o período antes de gerar o fechamento.",
-      "Confira serviço, partnership e perdas operacionais separadamente.",
+      "Confira taxa de serviço e comissões por pessoa antes de aprovar.",
+      "Perdas operacionais são informativas e não são descontadas do valor a pagar à equipe.",
     ],
     warning: "Aprovação, pagamento e reversões exigem justificativa e ficam auditados.",
   },
   delivery: {
-    title: "Configurar delivery próprio",
+    title: "Acompanhar entregas",
     steps: [
       "Confira zonas, taxas e pedido mínimo.",
-      "Use somente provedores explicitamente homologados.",
+      "Acompanhe os pedidos, confira o endereço e avance conforme a entrega acontecer.",
     ],
-    warning: "Ainda não existe uma lista autenticada de pedidos de delivery nesta versão.",
+    warning: "Confirme a disponibilidade do serviço contratado antes de usar entregas integradas.",
   },
   reservations: {
     title: "Recepcionar clientes",
@@ -137,7 +143,7 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
   multiunit: {
     title: "Interpretar o consolidado",
     steps: [
-      "Compare unidades usando registros persistidos.",
+      "Compare os resultados registrados em cada unidade.",
       "Use conciliação financeira para números contábeis.",
     ],
   },
@@ -145,8 +151,8 @@ const helpTopics: Record<RouteId, { title: string; steps: string[]; warning?: st
     title: "Acompanhar assinatura e cobranças",
     steps: [
       "Confira o plano, o ciclo e a próxima renovação da organização.",
-      "Use somente o checkout hospedado para assinar, regularizar ou fazer upgrade.",
-      "Aguarde a confirmação do pagamento pelo servidor antes de considerar o plano atualizado.",
+      "Use a página de pagamento para assinar, regularizar ou mudar de plano.",
+      "Aguarde a confirmação do pagamento antes de considerar o plano atualizado.",
     ],
   },
   settings: {

@@ -10,12 +10,21 @@ import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fa
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
 import { AuthService } from "./auth/auth.service.js";
+import { sessionToken } from "./auth/session.guard.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
+import { TerminalSessionService } from "./auth/terminal-session.service.js";
 import { configuredTrustProxy, corsConfiguration, isAllowedRealtimeOrigin } from "./common/cors.js";
 import { addZodRequestBodies } from "./common/openapi-zod.js";
-import { requestRateLimit, requestRateLimitKey } from "./common/rate-limit.js";
+import {
+  publicTableRateLimitSlug,
+  requestRateLimit,
+  validatedRequestRateLimitKey,
+} from "./common/rate-limit.js";
 import { DatabaseReadinessService, MetricsService } from "./health/health.module.js";
-import { TABLE_SESSION_COOKIE_NAME } from "./public-menu/table-session-token.js";
+import {
+  TABLE_SESSION_COOKIE_NAME,
+  verifyTableSessionToken,
+} from "./public-menu/table-session-token.js";
 import { RealtimeService } from "./realtime/realtime.service.js";
 
 export const shouldExposeOpenApi = (environment = process.env.NODE_ENV) =>
@@ -34,19 +43,30 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
     },
   });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter);
+  const auth = app.get(AuthService);
+  const terminalSessions = app.get(TerminalSessionService);
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(rateLimit, {
     max: (request) => requestRateLimit(request.method, request.url).max,
-    keyGenerator: (request) => {
+    keyGenerator: async (request) => {
       const bucket = requestRateLimit(request.method, request.url).bucket;
-      return requestRateLimitKey(
+      if (bucket === "public-table-read" || bucket === "public-table-write") {
+        const slug = publicTableRateLimitSlug(request.url);
+        return validatedRequestRateLimitKey({
+          bucket,
+          ip: request.ip,
+          credential: request.cookies[TABLE_SESSION_COOKIE_NAME],
+          authenticate: async (token) => Boolean(slug && verifyTableSessionToken(token, slug)),
+        });
+      }
+      return validatedRequestRateLimitKey({
         bucket,
-        request.ip,
-        bucket.startsWith("public-table-")
-          ? request.cookies[TABLE_SESSION_COOKIE_NAME]
-          : (request.cookies[SESSION_COOKIE_NAME] ?? request.headers.authorization),
-      );
+        ip: request.ip,
+        credential: sessionToken(request.headers.authorization, request.cookies),
+        authenticate: async (token) =>
+          Boolean((await auth.authenticate(token)) ?? (await terminalSessions.authenticate(token))),
+      });
     },
     timeWindow: "1 minute",
   });
@@ -89,7 +109,6 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
     fastify.get("/openapi.json", async () => document);
   }
 
-  const auth = app.get(AuthService);
   const realtime = app.get(RealtimeService);
   const realtimeHandler = async (
     socket: Parameters<typeof realtime.attach>[0],

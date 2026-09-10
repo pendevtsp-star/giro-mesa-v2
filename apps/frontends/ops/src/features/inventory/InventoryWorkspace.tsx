@@ -87,6 +87,73 @@ interface ItemSummary {
   zero: boolean;
 }
 
+export function inventoryItemSummaries(data: InventoryData, locationId = "all"): ItemSummary[] {
+  return data.items.map((item) => {
+    const balances = data.balances.filter(
+      (balance) =>
+        balance.inventoryItemId === item.id &&
+        (locationId === "all" || balance.locationId === locationId),
+    );
+    const quantity = balances.reduce((sum, balance) => sum + balance.quantity, 0);
+    const reservedQuantity = balances.reduce((sum, balance) => sum + balance.reservedQuantity, 0);
+    const blockedQuantity = balances.reduce((sum, balance) => sum + balance.blockedQuantity, 0);
+    const availableQuantity = balances.reduce((sum, balance) => sum + balance.availableQuantity, 0);
+    const inTransitQuantity =
+      locationId === "all"
+        ? data.inTransitBalances
+            .filter((balance) => balance.inventoryItemId === item.id)
+            .reduce((sum, balance) => sum + balance.quantity, 0)
+        : data.transfers
+            .filter(
+              (transfer) =>
+                transfer.inventoryItemId === item.id &&
+                transfer.destinationLocationId === locationId &&
+                ["in_transit", "partially_received"].includes(transfer.status),
+            )
+            .reduce(
+              (sum, transfer) =>
+                sum +
+                Math.max(
+                  0,
+                  transfer.quantity - transfer.quantityReceived - transfer.quantityDivergent,
+                ),
+              0,
+            );
+    const valueCents = balances.reduce(
+      (sum, balance) => sum + balance.quantity * (balance.averageCostCents ?? 0),
+      0,
+    );
+    const minimum =
+      data.locationItemSettings.find(
+        (setting) => setting.inventoryItemId === item.id && setting.locationId === locationId,
+      )?.minimumQuantity ?? item.minimumQuantity;
+    return {
+      item,
+      quantity,
+      reservedQuantity,
+      blockedQuantity,
+      availableQuantity,
+      inTransitQuantity,
+      valueCents,
+      averageCostCents: quantity > 0 ? Math.round(valueCents / quantity) : null,
+      low: item.active && availableQuantity > 0 && availableQuantity <= minimum,
+      zero: item.active && availableQuantity <= 0,
+    };
+  });
+}
+
+export function inventoryPrerequisites(
+  data: Pick<InventoryData, "items" | "locations" | "balances">,
+) {
+  const locations = data.locations.filter((location) => location.active).length;
+  const hasItems = data.items.some((item) => item.active);
+  return {
+    canCount: locations > 0 && hasItems,
+    canTransfer: locations > 1 && hasItems,
+    hasPosition: locations > 0 && hasItems && data.balances.length > 0,
+  };
+}
+
 function movementLabel(type: string): string {
   const labels: Record<string, string> = {
     count: "Contagem",
@@ -203,42 +270,12 @@ export function InventoryWorkspace({
     const [inventoryItemId, locationId] = key.split(":");
     return { inventoryItemId: inventoryItemId ?? "", locationId: locationId ?? "" };
   });
-  const summaries = useMemo<ItemSummary[]>(
-    () =>
-      data.items.map((item) => {
-        const balances = data.balances.filter((balance) => balance.inventoryItemId === item.id);
-        const quantity = balances.reduce((sum, balance) => sum + balance.quantity, 0);
-        const reservedQuantity = balances.reduce(
-          (sum, balance) => sum + balance.reservedQuantity,
-          0,
-        );
-        const blockedQuantity = balances.reduce((sum, balance) => sum + balance.blockedQuantity, 0);
-        const availableQuantity = balances.reduce(
-          (sum, balance) => sum + balance.availableQuantity,
-          0,
-        );
-        const inTransitQuantity = data.inTransitBalances
-          .filter((balance) => balance.inventoryItemId === item.id)
-          .reduce((sum, balance) => sum + balance.quantity, 0);
-        const valueCents = balances.reduce(
-          (sum, balance) => sum + balance.quantity * (balance.averageCostCents ?? 0),
-          0,
-        );
-        return {
-          item,
-          quantity,
-          reservedQuantity,
-          blockedQuantity,
-          inTransitQuantity,
-          availableQuantity,
-          valueCents,
-          averageCostCents: quantity > 0 ? Math.round(valueCents / quantity) : null,
-          low: item.active && availableQuantity > 0 && availableQuantity <= item.minimumQuantity,
-          zero: item.active && availableQuantity <= 0,
-        };
-      }),
-    [data.balances, data.inTransitBalances, data.items],
+  const summaries = useMemo(() => inventoryItemSummaries(data), [data]);
+  const sectorSummaries = useMemo(
+    () => (locationFilter === "all" ? summaries : inventoryItemSummaries(data, locationFilter)),
+    [data, locationFilter, summaries],
   );
+  const { canCount, canTransfer, hasPosition } = inventoryPrerequisites(data);
   const lowCount = summaries.filter((summary) => summary.low).length;
   const zeroCount = summaries.filter((summary) => summary.zero).length;
   const stockValue = summaries.reduce((sum, summary) => sum + summary.valueCents, 0);
@@ -248,7 +285,7 @@ export function InventoryWorkspace({
     return days <= 7;
   });
   const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
-  const visibleSummaries = summaries.filter((summary) => {
+  const visibleSummaries = sectorSummaries.filter((summary) => {
     const statusMatches =
       statusFilter === "all" ||
       (statusFilter === "zero" && summary.zero) ||
@@ -260,6 +297,15 @@ export function InventoryWorkspace({
       data.balances.some(
         (balance) =>
           balance.inventoryItemId === summary.item.id && balance.locationId === locationFilter,
+      ) ||
+      data.locationItemSettings.some(
+        (setting) =>
+          setting.inventoryItemId === summary.item.id && setting.locationId === locationFilter,
+      ) ||
+      data.transfers.some(
+        (transfer) =>
+          transfer.inventoryItemId === summary.item.id &&
+          transfer.destinationLocationId === locationFilter,
       );
     return (
       statusMatches &&
@@ -287,13 +333,25 @@ export function InventoryWorkspace({
             title="Itens zerados"
             value={zeroCount}
             icon="alert-circle"
-            footer={zeroCount ? "Ação imediata" : "Operação normal"}
+            footer={
+              !hasPosition
+                ? "Cadastre os saldos para avaliar"
+                : zeroCount
+                  ? "Ação imediata"
+                  : "Operação normal"
+            }
           />
           <StatCard
             title="Abaixo do mínimo"
             value={lowCount}
             icon="arrow-down"
-            footer={lowCount ? "Revisar reposição" : "Sem rupturas previstas"}
+            footer={
+              !hasPosition
+                ? "Cadastre os saldos para avaliar"
+                : lowCount
+                  ? "Revisar reposição"
+                  : "Sem rupturas previstas"
+            }
           />
           <StatCard
             title="Validades críticas"
@@ -307,7 +365,7 @@ export function InventoryWorkspace({
       <div className="inventory-command-bar gm-toolbar">
         <Badge tone={realtimeStatus === "live" ? "success" : "warning"}>
           {realtimeStatus === "live"
-            ? "Saldo ao vivo"
+            ? "Atualizações conectadas"
             : realtimeStatus === "polling"
               ? "Atualização periódica"
               : "Conectando"}
@@ -353,10 +411,15 @@ export function InventoryWorkspace({
           </div>
         </details>
         <div className="inventory-command-bar__actions">
-          <Button onClick={() => onOpen("event")} size="sm">
+          <Button disabled={!canCount} onClick={() => onOpen("event")} size="sm">
             <Icon name="check" size={15} /> Contar / ajustar
           </Button>
-          <Button onClick={() => onOpen("transfer")} size="sm" variant="secondary">
+          <Button
+            disabled={!canTransfer}
+            onClick={() => onOpen("transfer")}
+            size="sm"
+            variant="secondary"
+          >
             <Icon name="refresh" size={15} /> Transferir
           </Button>
           <Button onClick={() => onOpen("item")} size="sm" variant="secondary">
@@ -377,14 +440,23 @@ export function InventoryWorkspace({
           </span>
         </div>
       ) : view !== "shift" ? (
-        <div className="inventory-system-status" role="status">
-          <Icon name="check" size={18} />
+        <div
+          className={`inventory-system-status${data.automation.lastProcessedAt ? "" : " inventory-system-status--neutral"}`}
+          role="status"
+        >
+          <Icon name={data.automation.lastProcessedAt ? "check" : "clock"} size={18} />
           <span>
-            <strong>Baixa automática operacional</strong>
+            <strong>
+              {data.automation.lastProcessedAt
+                ? "Baixa automática operacional"
+                : "Baixa automática sem execução registrada"}
+            </strong>
             <small>
               {data.automation.pending
                 ? `${data.automation.pending} evento(s) na fila.`
-                : "Fila processada."}{" "}
+                : data.automation.lastProcessedAt
+                  ? "Fila processada."
+                  : "Nenhum evento processado nesta unidade."}{" "}
               {data.automation.lastProcessedAt
                 ? `Última execução ${dateLabel(data.automation.lastProcessedAt)}.`
                 : ""}
@@ -393,20 +465,23 @@ export function InventoryWorkspace({
         </div>
       ) : null}
 
-      {(!data.locations.length || !data.items.length || !data.balances.length) && (
+      {!hasPosition && (
         <Card className="inventory-onboarding">
           <div>
             <p className="eyebrow">Configuração inicial</p>
             <h2>Prepare o estoque em três passos</h2>
-            <p>Conclua a base operacional antes de configurar as fichas técnicas.</p>
+            <p>
+              Cadastre setores e itens, depois registre o saldo inicial. Transferências precisam de
+              dois setores ativos.
+            </p>
           </div>
           <ol>
             <li data-complete={data.locations.length > 0}>
               <span>1</span>
-              <strong>Criar locais</strong>
+              <strong>Criar setores</strong>
               <small>Depósito, cozinha e bar.</small>
               <Button onClick={() => onOpen("location")} size="sm" variant="secondary">
-                {data.locations.length ? "Adicionar outro" : "Criar local"}
+                {data.locations.length ? "Adicionar outro" : "Criar setor"}
               </Button>
             </li>
             <li data-complete={data.items.length > 0}>
@@ -439,7 +514,7 @@ export function InventoryWorkspace({
         </Card>
       )}
 
-      {view === "shift" && (
+      {view === "shift" && hasPosition && (
         <div className="inventory-shift-grid">
           <Card className="inventory-priority-card">
             <div className="inventory-section-header">
@@ -556,9 +631,17 @@ export function InventoryWorkspace({
               </>
             ) : (
               <EmptyState
-                description="Nenhuma contagem vencida foi retornada."
+                description={
+                  data.countSchedules.length
+                    ? "Consulte as contagens e a última conferência antes de fechar o turno."
+                    : "Defina a contagem dos setores em Planejamento."
+                }
                 icon="✓"
-                title="Contagens em dia"
+                title={
+                  data.countSchedules.length
+                    ? "Nenhuma contagem vencida"
+                    : "Contagem ainda não programada"
+                }
               />
             )}
           </Card>
@@ -1146,7 +1229,7 @@ export function InventoryWorkspace({
             <div className="inventory-filters">
               <SearchField
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar item, SKU ou código"
+                placeholder="Buscar item, código interno ou código de barras"
                 value={query}
               />
               <NativeSelect
@@ -1193,7 +1276,8 @@ export function InventoryWorkspace({
                   <div className="inventory-balance-row__identity">
                     <strong>{summary.item.name}</strong>
                     <small>
-                      {kindLabels[itemKind(summary.item)]} · {summary.item.sku ?? "Sem SKU"} ·{" "}
+                      {kindLabels[itemKind(summary.item)]} ·{" "}
+                      {summary.item.sku ?? "Sem código interno"} ·{" "}
                       {summary.item.purchaseUnit
                         ? `Compra em ${summary.item.purchaseUnit}`
                         : `Estoque em ${summary.item.unit}`}
@@ -1228,7 +1312,9 @@ export function InventoryWorkspace({
                       {data.balances
                         .filter(
                           (balance) =>
-                            balance.inventoryItemId === summary.item.id && balance.quantity !== 0,
+                            balance.inventoryItemId === summary.item.id &&
+                            balance.quantity !== 0 &&
+                            (locationFilter === "all" || balance.locationId === locationFilter),
                         )
                         .map((balance) => (
                           <span key={balance.locationId}>
@@ -1601,7 +1687,7 @@ export function InventoryWorkspace({
                 <div key={item.id}>
                   <span>
                     <strong>{item.name}</strong>
-                    <small>{item.sku ?? "Sem SKU"}</small>
+                    <small>{item.sku ?? "Sem código interno"}</small>
                   </span>
                   <Badge tone={item.active ? "success" : "neutral"}>
                     {item.active ? "Ativo" : "Inativo"}

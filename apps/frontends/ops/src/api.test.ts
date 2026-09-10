@@ -71,6 +71,37 @@ describe("compatibilidade e erros do serviço", () => {
     ).toBe("A senha atual não confere. Referência: request-pin-password.");
   });
 
+  it.each([
+    ["TRANSFER_DISTINCT_RECEIVER_REQUIRED", "Outra pessoa precisa conferir esta transferência."],
+    ["INVENTORY_COUNT_DUAL_CONTROL_REQUIRED", "A conferência precisa ser feita por outra pessoa."],
+    ["INVENTORY_REVIEW_DUAL_CONTROL_REQUIRED", "A conferência precisa ser feita por outra pessoa."],
+    ["RETURNABLE_INCIDENT_DUAL_CONTROL", "A conferência precisa ser feita por outra pessoa."],
+  ])("explica a separação entre autor e conferente em %s", (code, message) => {
+    expect(operationalApiErrorMessage(403, undefined, "request-review", undefined, code)).toBe(
+      `${message} Referência: request-review.`,
+    );
+  });
+
+  it("orienta uma nova contagem quando o saldo mudou", () => {
+    expect(
+      operationalApiErrorMessage(
+        409,
+        undefined,
+        undefined,
+        undefined,
+        "INVENTORY_COUNT_STALE_BALANCE",
+      ),
+    ).toBe(
+      "O saldo mudou desde o início desta contagem. Refaça a contagem com o saldo atualizado.",
+    );
+  });
+
+  it("preserva a orientação de permissão para uma recusa sem regra específica", () => {
+    expect(operationalApiErrorMessage(403, undefined, undefined, undefined, "FORBIDDEN")).toBe(
+      "Seu perfil não possui permissão para esta operação.",
+    );
+  });
+
   it("aceita a identidade de release compatível", () => {
     expect(
       apiCompatibilityError({

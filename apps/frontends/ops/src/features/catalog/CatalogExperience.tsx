@@ -98,10 +98,9 @@ export function CatalogExperience({
   const [viewMode, setViewMode] = useState<"list" | "grid" | "table">("list");
 
   // Dados Fiscais Form State
-  const [productNcm, setProductNcm] = useState("2106.90.90");
-  const [productCfop, setProductCfop] = useState("5.102");
+  const [productNcm, setProductNcm] = useState("");
+  const [productCfop, setProductCfop] = useState("");
   const productCest = "";
-  const productOrigin = 0;
 
   async function updateProductInlinePrice(productId: string, newPriceCents: number) {
     const product = catalog.products.find((candidate) => candidate.id === productId);
@@ -665,7 +664,6 @@ export function CatalogExperience({
   const [editingProductReason, setEditingProductReason] = useState("");
   const [productType, setProductType] = useState<"prepared" | "resale">("prepared");
   const [eanBarcode, setEanBarcode] = useState("");
-  const [currentStockUnits, setCurrentStockUnits] = useState("");
   const autoDeductStock = true;
 
   // Ficha Técnica & Markup Builder State
@@ -710,7 +708,7 @@ export function CatalogExperience({
     const suggestedPrice = Math.round(totalCostCents * targetMarkup);
     setPrice((suggestedPrice / 100).toFixed(2).replace(".", ","));
     setFeedback(
-      `Preço sugerido de R$ ${(suggestedPrice / 100).toFixed(2).replace(".", ",")} (Markup ${targetMarkup.toFixed(1)}x) aplicado!`,
+      `Preço sugerido de R$ ${(suggestedPrice / 100).toFixed(2).replace(".", ",")} (${targetMarkup.toFixed(1)} vezes o custo) aplicado.`,
     );
   }
 
@@ -1535,8 +1533,7 @@ export function CatalogExperience({
         costCents,
         productType,
         autoDeductStock: productType === "resale" ? autoDeductStock : undefined,
-        dailyStock:
-          stockLimit ?? (currentStockUnits.trim() ? parseInt(currentStockUnits, 10) : null),
+        dailyStock: stockLimit,
         tags: selectedTags,
         suggestedProductIds: suggestedProducts,
         sizes: productSizes.map((size, index) => ({
@@ -1558,7 +1555,6 @@ export function CatalogExperience({
           ncm: productNcm.replace(/\D/g, "") || undefined,
           cfop: productCfop.replace(/\D/g, "") || undefined,
           cest: productCest.replace(/\D/g, "") || undefined,
-          origin: productOrigin,
         },
         available: true,
         availabilitySchedule: schedule,
@@ -1586,7 +1582,8 @@ export function CatalogExperience({
       setImageUrl("");
       setImageFileName("");
       setEanBarcode("");
-      setCurrentStockUnits("");
+      setProductNcm("");
+      setProductCfop("");
       setProductType("prepared");
       setRecipeIngredients([]);
       setSelectedTags([]);
@@ -1674,7 +1671,7 @@ export function CatalogExperience({
             <Icon name="plus" size={18} />
           </summary>
           <form className="action-form" onSubmit={(event) => void createCategory(event)}>
-            <Label>
+            <Label className="gm-field items-stretch">
               Nome
               <Input
                 minLength={2}
@@ -1697,7 +1694,7 @@ export function CatalogExperience({
             <Icon name="plus" size={18} />
           </summary>
           <form className="action-form" onSubmit={(event) => void createStation(event)}>
-            <Label>
+            <Label className="gm-field items-stretch">
               Nome
               <Input
                 minLength={2}
@@ -1723,7 +1720,7 @@ export function CatalogExperience({
           <Icon name="plus" size={18} />
         </summary>
         <form className="action-form" onSubmit={(event) => void createAllergen(event)}>
-          <Label>
+          <Label className="gm-field items-stretch">
             Nome do Alergênico
             <Input
               minLength={2}
@@ -1814,7 +1811,7 @@ export function CatalogExperience({
           <Icon name="plus" size={18} />
         </summary>
         <form className="action-form" onSubmit={(event) => void _createModifierGroup(event)}>
-          <Label>
+          <Label className="gm-field items-stretch">
             Nome do Grupo
             <Input
               minLength={2}
@@ -1825,7 +1822,7 @@ export function CatalogExperience({
             />
           </Label>
           <div style={{ display: "flex", gap: "8px" }}>
-            <Label className="catalog-grow">
+            <Label className="gm-field items-stretch catalog-grow">
               Mínimo
               <Input
                 type="number"
@@ -1834,7 +1831,7 @@ export function CatalogExperience({
                 onChange={(e) => setModifierMin(parseInt(e.target.value, 10) || 0)}
               />
             </Label>
-            <Label className="catalog-grow">
+            <Label className="gm-field items-stretch catalog-grow">
               Máximo
               <Input
                 type="number"
@@ -1844,7 +1841,7 @@ export function CatalogExperience({
               />
             </Label>
           </div>
-          <Label className="action-form__wide">
+          <Label className="gm-field items-stretch action-form__wide">
             Opções (Nome, Preço em centavos - uma por linha)
             <Textarea
               rows={3}
@@ -1957,7 +1954,7 @@ export function CatalogExperience({
             </Button>
           </div>
 
-          <Label>
+          <Label className="gm-field items-stretch">
             Nome do Produto
             <Input
               minLength={2}
@@ -1974,7 +1971,7 @@ export function CatalogExperience({
 
           {productType === "resale" && (
             <>
-              <Label>
+              <Label className="gm-field items-stretch">
                 Código de Barras / EAN
                 <Input
                   value={eanBarcode}
@@ -1982,20 +1979,21 @@ export function CatalogExperience({
                   placeholder="Ex: 7896045506216"
                 />
               </Label>
-              <Label>
-                Estoque Físico Atual (Unidades)
+              <Label className="gm-field items-stretch">
+                Limite diário de venda (opcional)
                 <Input
                   type="number"
                   min="0"
-                  value={currentStockUnits}
-                  onChange={(e) => setCurrentStockUnits(e.target.value)}
+                  value={dailyStockLimit}
+                  onChange={(e) => setDailyStockLimit(e.target.value)}
                   placeholder="Ex: 48"
                 />
+                <small>Renova a cada dia. Controle o saldo físico por setor em Estoque.</small>
               </Label>
             </>
           )}
 
-          <Label>
+          <Label className="gm-field items-stretch">
             Preço Salão (R$)
             <Input
               inputMode="decimal"
@@ -2006,8 +2004,8 @@ export function CatalogExperience({
               value={price}
             />
           </Label>
-          <Label>
-            Preço Delivery (Opcional)
+          <Label className="gm-field items-stretch">
+            Preço para entrega (opcional)
             <Input
               inputMode="decimal"
               data-currency="brl"
@@ -2016,7 +2014,7 @@ export function CatalogExperience({
               value={deliveryPrice}
             />
           </Label>
-          <Label>
+          <Label className="gm-field items-stretch">
             {productType === "resale"
               ? "Custo de Compra Unitário (R$)"
               : "Custo Unitário / Insumos (R$)"}
@@ -2028,7 +2026,7 @@ export function CatalogExperience({
               value={cost}
             />
           </Label>
-          <Label>
+          <Label className="gm-field items-stretch">
             Categoria
             <NativeSelect
               onChange={(event) => setCategoryId(event.target.value)}
@@ -2075,7 +2073,7 @@ export function CatalogExperience({
             </div>
           </div>
 
-          <Label className="action-form__wide">
+          <Label className="gm-field items-stretch action-form__wide">
             Descrição do Prato / Item
             <Textarea
               onChange={(event) => setDescription(event.target.value)}
@@ -2085,7 +2083,7 @@ export function CatalogExperience({
             />
           </Label>
 
-          <Label className="action-form__wide">
+          <Label className="gm-field items-stretch action-form__wide">
             Foto do Prato (Opcional)
             <input
               className="border-input bg-background"
@@ -2159,7 +2157,7 @@ export function CatalogExperience({
                 <summary>
                   <div className="catalog-inline-center-8">
                     <Icon name="finance" size={15} />
-                    <span>Ficha Técnica Gastronômica & Simulador de Markup</span>
+                    <span>Ficha técnica e sugestão de preço</span>
                   </div>
                   {recipeIngredients.length > 0 && (
                     <span
@@ -2296,7 +2294,7 @@ export function CatalogExperience({
                           }}
                         >
                           <div className="catalog-inline-center-8">
-                            <span className="catalog-ink">Markup Alvo:</span>
+                            <span className="catalog-ink">Multiplicar o custo por:</span>
                             <div className="catalog-inline-4">
                               {[2.5, 3.0, 3.5, 4.0].map((m) => (
                                 <Button
@@ -2363,7 +2361,7 @@ export function CatalogExperience({
               </summary>
               <div className="catalog-sub-accordion__content">
                 <div className="catalog-grid-2">
-                  <Label style={{ margin: 0 }}>
+                  <Label className="gm-field items-stretch" style={{ margin: 0 }}>
                     Tempo de Preparo Estimado (min)
                     <Input
                       type="number"
@@ -2377,16 +2375,18 @@ export function CatalogExperience({
                       placeholder="Ex: 15"
                     />
                   </Label>
-                  <Label style={{ margin: 0 }}>
-                    Limite Diário de Porções (Opcional)
-                    <Input
-                      type="number"
-                      min="1"
-                      onChange={(event) => setDailyStockLimit(event.target.value)}
-                      value={dailyStockLimit}
-                      placeholder="Ex: 25 porções/dia"
-                    />
-                  </Label>
+                  {productType === "prepared" && (
+                    <Label className="gm-field items-stretch" style={{ margin: 0 }}>
+                      Limite Diário de Porções (Opcional)
+                      <Input
+                        type="number"
+                        min="1"
+                        onChange={(event) => setDailyStockLimit(event.target.value)}
+                        value={dailyStockLimit}
+                        placeholder="Ex: 25 porções/dia"
+                      />
+                    </Label>
+                  )}
                 </div>
 
                 <div
@@ -2401,7 +2401,7 @@ export function CatalogExperience({
                     Agendamento de Disponibilidade por Horário (Opcional)
                   </span>
                   <div className="catalog-schedule-grid">
-                    <Label className="catalog-small-copy">
+                    <Label className="gm-field items-stretch catalog-small-copy">
                       Início
                       <Input
                         type="time"
@@ -2414,7 +2414,7 @@ export function CatalogExperience({
                         }}
                       />
                     </Label>
-                    <Label className="catalog-small-copy">
+                    <Label className="gm-field items-stretch catalog-small-copy">
                       Término
                       <Input
                         type="time"
@@ -2427,7 +2427,7 @@ export function CatalogExperience({
                         }}
                       />
                     </Label>
-                    <Label className="catalog-small-copy">
+                    <Label className="gm-field items-stretch catalog-small-copy">
                       Dias
                       <NativeSelect
                         value={scheduleDays}
@@ -2559,7 +2559,7 @@ export function CatalogExperience({
               <summary>
                 <div className="catalog-inline-center-8">
                   <Icon name="finance" size={15} />
-                  <span>Dados Fiscais para NFC-e / SAT (Opcional)</span>
+                  <span>Dados fiscais do produto</span>
                 </div>
                 {productNcm && <span className="catalog-text-positive">NCM: {productNcm}</span>}
               </summary>
@@ -2570,7 +2570,7 @@ export function CatalogExperience({
                     <Input
                       value={productNcm}
                       onChange={(e) => setProductNcm(e.target.value)}
-                      placeholder="Ex: 2106.90.90"
+                      placeholder="Informe o NCM validado pela contabilidade"
                       className="catalog-control-34"
                     />
                   </Label>
@@ -2581,6 +2581,7 @@ export function CatalogExperience({
                       onChange={(e) => setProductCfop(e.target.value)}
                       className="catalog-control-34"
                     >
+                      <option value="">Selecione o CFOP validado</option>
                       <option value="5.102">5.102 - Revenda de Mercadoria</option>
                       <option value="5.101">5.101 - Produção do Estabelecimento</option>
                       <option value="5.405">5.405 - Venda com Subst. Tributária</option>
@@ -2588,32 +2589,10 @@ export function CatalogExperience({
                   </Label>
                 </div>
 
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "6px" }}>
-                  <span className="catalog-muted-072">Atalhos Rápidos de NCM:</span>
-                  {[
-                    { label: "Pratos & Lanches (2106.90.90)", code: "2106.90.90" },
-                    { label: "Chopes & Cervejas (2203.00.00)", code: "2203.00.00" },
-                    { label: "Refrigerantes & Sucos (2202.10.00)", code: "2202.10.00" },
-                    { label: "Sobremesas & Doces (1905.90.90)", code: "1905.90.90" },
-                  ].map((preset) => (
-                    <Button
-                      key={preset.code}
-                      type="button"
-                      onClick={() => setProductNcm(preset.code)}
-                      style={{
-                        fontSize: "0.7rem",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        border: "1px solid var(--gm-border)",
-                        background: "var(--gm-surface)",
-                        color: "var(--gm-ink)",
-                        cursor: "pointer",
-                      }}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
+                <p className="catalog-muted-072">
+                  Preencha com a orientação da contabilidade. Antes de emitir notas, revise a
+                  classificação completa e as pendências no módulo Fiscal.
+                </p>
               </div>
             </details>
 
@@ -2622,7 +2601,7 @@ export function CatalogExperience({
               <summary>
                 <div className="catalog-inline-center-8">
                   <Icon name="catalog" size={15} />
-                  <span>Selos Promocionais & Venda Sugerida (Cross-Sell)</span>
+                  <span>Destaques e sugestões de produtos</span>
                 </div>
                 {(selectedTags.length > 0 || suggestedProducts.length > 0) && (
                   <span style={{ fontSize: "0.74rem", color: "var(--gm-brand)", fontWeight: 700 }}>

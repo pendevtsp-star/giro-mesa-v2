@@ -34,7 +34,7 @@ type Resource<T> =
 const incidentLabels: Record<SmartPosHealth["incidents"][number]["kind"], string> = {
   unknown_attempt: "Resultado desconhecido",
   stale_processing: "Processamento antigo",
-  offline_device: "Terminal offline",
+  offline_device: "Terminal sem conexão",
   reconciliation_divergence: "Divergência de conciliação",
 };
 
@@ -180,7 +180,10 @@ function PairingCard({ organizationId, unitId }: { organizationId: string; unitI
         <div>
           <p className="eyebrow">Pareamento</p>
           <h2>Adicionar SmartPOS</h2>
-          <p>O código é temporário e não concede autoridade de aprovação ao navegador.</p>
+          <p>
+            Use o código temporário para vincular a maquininha. Pagamentos dependem da confirmação
+            da adquirente.
+          </p>
         </div>
         <Badge tone={expired ? "danger" : pairing ? "warning" : "neutral"}>
           {expired ? "Expirado" : pairing ? `${secondsLeft}s` : "Não gerado"}
@@ -252,7 +255,7 @@ function HealthPanel({ health }: { health: SmartPosHealth }) {
   const metrics = [
     ["Desconhecidos", health.summary.unknownAttempts],
     ["Processando há muito tempo", health.summary.staleProcessingAttempts],
-    ["Terminais offline", health.summary.offlineDevices],
+    ["Terminais sem conexão", health.summary.offlineDevices],
     ["Divergências", health.summary.reconciliationDivergences],
   ] as const;
   return (
@@ -275,7 +278,7 @@ function HealthPanel({ health }: { health: SmartPosHealth }) {
       {health.incidents.length === 0 ? (
         <Callout tone="success">
           <strong>Nenhuma exceção aberta</strong>
-          <p>A leitura do servidor não encontrou pendências operacionais.</p>
+          <p>Nenhuma pendência encontrada na última consulta.</p>
         </Callout>
       ) : (
         <ul className="smartpos-incident-list" aria-label="Incidentes de pagamento">
@@ -338,7 +341,8 @@ function DevicesPanel({ devices }: { devices: SmartPosDevice[] }) {
           <p className="eyebrow">Terminais</p>
           <h2>Diagnóstico e certificação</h2>
           <p>
-            Kill switch e certificação são informados pelo servidor e não podem ser alterados aqui.
+            Para suspender ou liberar cobranças e verificar a certificação, entre em contato com o
+            suporte.
           </p>
         </div>
         <Badge tone="neutral">{devices.length} cadastrado(s)</Badge>
@@ -404,12 +408,12 @@ function DevicesPanel({ devices }: { devices: SmartPosDevice[] }) {
                     <dd>{device.capabilities.methods.join(", ") || "Nenhum"}</dd>
                   </div>
                   <div>
-                    <dt>Kill switch</dt>
+                    <dt>Suspensão de cobranças</dt>
                     <dd>
                       {device.capabilities.killSwitch.enabled ||
                       device.certification?.killSwitchEnabled
-                        ? "Ativo pelo servidor"
-                        : "Desligado"}
+                        ? "Ativa — procure o suporte"
+                        : "Não acionada"}
                     </dd>
                   </div>
                 </dl>
@@ -417,7 +421,7 @@ function DevicesPanel({ devices }: { devices: SmartPosDevice[] }) {
                   device.capabilities.killSwitch.reason ||
                   device.certification?.killSwitchReason) && (
                   <Callout tone="warning">
-                    <strong>Motivo informado pelo servidor</strong>
+                    <strong>Motivo da indisponibilidade</strong>
                     <p>
                       {device.capabilities.killSwitch.reason ??
                         device.certification?.killSwitchReason ??
@@ -449,7 +453,10 @@ function ReconciliationPanel({
         <div>
           <p className="eyebrow">Conciliação</p>
           <h2>Recebimentos do provedor</h2>
-          <p>Consulta financeira; divergências não são confirmadas pelo navegador.</p>
+          <p>
+            Confira os valores com o extrato da adquirente. Divergências precisam ser verificadas
+            antes de considerar o recebimento confirmado.
+          </p>
         </div>
         <Label htmlFor="smartpos-reconciliation-filter">
           Status
@@ -571,7 +578,7 @@ function HomologationPanel({
           <h2>Execução e evidência</h2>
           <p>
             Execute os cenários no terminal e registre o resultado. Roteiro completo não significa
-            terminal homologado: certificação e liberação continuam separadas e internas.
+            terminal homologado: aguarde a certificação e a liberação pelo suporte.
           </p>
         </div>
         <Badge tone="neutral">{runs.length} execução(ões)</Badge>
@@ -812,8 +819,8 @@ export function SmartPosAdminPanel({
           <p className="eyebrow">Gestão SmartPOS</p>
           <h2>Terminais, saúde e conciliação</h2>
           <p>
-            Estado financeiro vem do servidor. O navegador não aprova, recusa ou suspende
-            pagamentos.
+            Aguarde a confirmação da adquirente antes de considerar um pagamento concluído. Se o
+            resultado estiver desconhecido, confira a cobrança antes de tentar novamente.
           </p>
         </div>
         <Button onClick={() => setRevision((value) => value + 1)} size="sm" variant="secondary">

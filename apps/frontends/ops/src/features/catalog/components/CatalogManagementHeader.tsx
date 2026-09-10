@@ -40,8 +40,8 @@ type HeaderLink = Omit<HeaderAction, "onClick"> & { href: string };
 
 const LANGUAGE_OPTIONS: Array<{ label: string; title: string; value: CatalogLanguage }> = [
   { label: "🇧🇷 PT", title: "Cardápio em Português", value: "pt" },
-  { label: "🇺🇸 EN", title: "English menu preview", value: "en" },
-  { label: "🇪🇸 ES", title: "Menú en Español", value: "es" },
+  { label: "🇺🇸 EN", title: "Cardápio em inglês", value: "en" },
+  { label: "🇪🇸 ES", title: "Cardápio em espanhol", value: "es" },
 ];
 
 function HeaderActionButton({ disabled, icon, label, onClick, title }: HeaderAction) {
@@ -93,13 +93,13 @@ export function CatalogManagementHeader({
     },
     {
       icon: "list",
-      label: `Opcionais & Modificadores (${groupCount})`,
+      label: `Adicionais e opções (${groupCount})`,
       onClick: onOpenModifiers,
       title: "Gerenciar grupos de complementos, adicionais e ponto da carne",
     },
     {
       icon: "finance",
-      label: `Combos & Promoções (${comboCount})`,
+      label: `Combos e promoções (${comboCount})`,
       onClick: onOpenPromotions,
       title: "Gerenciar combos especiais e promoções de Happy Hour",
     },
@@ -110,13 +110,13 @@ export function CatalogManagementHeader({
   const secondaryActions: Array<HeaderAction | HeaderLink> = [
     {
       icon: "finance",
-      label: "Matriz BCG",
+      label: "Desempenho dos produtos",
       onClick: onOpenMatrix,
       title: "Matriz de Engenharia de Cardápio (BCG)",
     },
     {
       icon: "catalog",
-      label: "Etiquetas / Tags",
+      label: "Etiquetas",
       onClick: onOpenLabels,
       title: "Gerar etiquetas de vitrine e placas de mesa",
     },
@@ -134,7 +134,7 @@ export function CatalogManagementHeader({
     },
     {
       icon: "settings",
-      label: "Identidade & Branding",
+      label: "Identidade visual",
       href: brandingHref,
       title: "Personalizar nome, cores, slogan e avisos do estabelecimento",
     },

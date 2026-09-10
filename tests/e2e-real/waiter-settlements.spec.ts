@@ -53,7 +53,7 @@ function settlement(status = "preview") {
         orderCount: 35,
         grossSalesCents: 125_000,
         discountCents: 5_000,
-        canceledCents: 0,
+        canceledCents: 5_000,
         receivedCents: 132_000,
         serviceChargeCents: 12_000,
         tipCents: 0,
@@ -137,11 +137,102 @@ test("fechamento da equipe funciona sem overflow no celular e no desktop", async
   await expect(page.getByRole("heading", { level: 1, name: "Fechamento da equipe" })).toBeVisible();
   await expect(page.getByText("Ana Souza").first()).toBeVisible();
   await page.getByRole("button", { name: "Pré-visualizar" }).click();
-  await expect(page.getByText("Prévia não persistida")).toBeVisible();
+  await expect(page.getByText("Prévia — ainda não registrada")).toBeVisible();
   await expect(page.getByText("R$ 144,00").first()).toBeVisible();
+  await page.getByText("Ver valores detalhados", { exact: true }).first().click();
+  const details = page.getByRole("region", { name: "Valores detalhados do fechamento" }).first();
+  await expect(details.getByRole("row").nth(1).getByRole("cell").nth(4)).toHaveText("R$ 1.200,00");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(page.getByRole("button", { name: "Perdas" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+});
+
+test("filtros e erro de recálculo invalidam a prévia antes de gerar fechamento", async ({
+  page,
+}) => {
+  await mockApi(page);
+  let failPreview = false;
+  let created: unknown = null;
+  await page.route("**/v1/**/waiter-settlements/settlements/preview", async (route) => {
+    if (failPreview) {
+      await route.fulfill({ status: 503, json: { message: "Falha ao recalcular a apuração" } });
+      return;
+    }
+    const input = route.request().postDataJSON();
+    await route.fulfill({
+      json: {
+        ...settlement(),
+        periodFrom: input.from,
+        periodTo: input.to,
+        operationalShiftId: input.operationalShiftId ?? null,
+      },
+    });
+  });
+  await page.route("**/v1/**/waiter-settlements/settlements", async (route) => {
+    created = route.request().postDataJSON();
+    await route.fulfill({ json: settlement("closed") });
+  });
+  await page.goto("/#/waiter-settlements");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const calculate = page.getByRole("button", { name: "Pré-visualizar" });
+  const generate = page.getByRole("button", { name: "Gerar fechamento" });
+  await page.getByLabel("Data inicial").fill("2026-08-01");
+  await page.getByLabel("Data final").fill("2026-08-20");
+  await calculate.click();
+  await expect(generate).toBeEnabled();
+  await page.getByLabel("Data inicial").fill("2026-08-02");
+  await expect(generate).toHaveCount(0);
+  await calculate.click();
+  await expect(generate).toBeEnabled();
+  await page.getByLabel("Data final").fill("2026-08-21");
+  await expect(generate).toHaveCount(0);
+  await calculate.click();
+  await expect(generate).toBeEnabled();
+  await page.getByLabel("Turno (opcional)").selectOption("00000000-0000-4000-8000-000000000030");
+  await expect(generate).toHaveCount(0);
+  await calculate.click();
+  await expect(generate).toBeEnabled();
+  failPreview = true;
+  await calculate.click();
+  await expect(
+    page.getByText("O servidor não conseguiu concluir a consulta. Tente novamente em instantes."),
+  ).toBeVisible();
+  await expect(generate).toHaveCount(0);
+  expect(created).toBeNull();
+  failPreview = false;
+  await calculate.click();
+  await expect(generate).toBeEnabled();
+  await generate.click();
+  await expect(page.getByText("Fechamento gerado e registrado para conferência.")).toBeVisible();
+  expect(created).toEqual({
+    from: "2026-08-02",
+    to: "2026-08-21",
+    operationalShiftId: "00000000-0000-4000-8000-000000000030",
+  });
+});
+
+test("resposta atrasada não restaura prévia de filtros abandonados", async ({ page }) => {
+  await mockApi(page);
+  let releaseResponse!: () => void;
+  const delayedResponse = new Promise<void>((resolve) => {
+    releaseResponse = resolve;
+  });
+  await page.route("**/v1/**/waiter-settlements/settlements/preview", async (route) => {
+    await delayedResponse;
+    await route.fulfill({ json: settlement() });
+  });
+  await page.goto("/#/waiter-settlements");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const requestStarted = page.waitForRequest((request) =>
+    request.url().endsWith("/settlements/preview"),
+  );
+  await page.getByRole("button", { name: "Pré-visualizar" }).click();
+  await requestStarted;
+  await page.getByLabel("Data inicial").fill("2026-08-01");
+  releaseResponse();
+  await expect(page.getByRole("button", { name: "Pré-visualizar" })).toBeEnabled();
+  await expect(page.getByText("Prévia — ainda não registrada")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Gerar fechamento" })).toHaveCount(0);
 });

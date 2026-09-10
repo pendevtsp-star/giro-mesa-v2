@@ -104,6 +104,21 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     assert.equal(fallback.displayName, "Marca do cardápio");
     assert.match(fallback.wifiNotice ?? "", /Casa QR/);
 
+    assert.equal(fallback.presenceProtection, "session_only");
+    const publicTable = new PublicTableService(database, {} as PilotPosService);
+    const sessionOnlyBatch = await catalog.createTableQrPrintBatch(
+      identity.id,
+      organization.id,
+      unit.id,
+      "qr-batch-session-only-0001",
+      { format: "sticker", output: "png", includeWifi: false, tableIds: [table.id] },
+    );
+    const sessionOnlyUrl = new URL(sessionOnlyBatch.tables[0]?.url ?? "");
+    const sessionOnlyToken = new URLSearchParams(sessionOnlyUrl.hash.slice(1)).get("mesa");
+    assert.ok(sessionOnlyToken);
+    const openedWithoutPresenceCode = await publicTable.openSession(slug, sessionOnlyToken, {});
+    assert.equal(openedWithoutPresenceCode.response.tableLabel, "Mesa 01");
+
     const settingsInput = {
       expectedRevision: 0,
       displayName: "Placas da Casa QR",
@@ -157,6 +172,7 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     assert.equal(tested.tableLabel, "Mesa 01");
 
     await catalog.rotateTableQr(identity.id, organization.id, unit.id, table.id, "qr-rotate-0001");
+    await assert.rejects(() => publicTable.openSession(slug, sessionOnlyToken, {}));
     await assert.rejects(() =>
       catalog.markTableQrPrintBatchPrinted(
         identity.id,
@@ -195,7 +211,6 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     const currentUrl = new URL(currentBatch.tables[0]?.url ?? "");
     const tableToken = new URLSearchParams(currentUrl.hash.slice(1)).get("mesa");
     assert.ok(tableToken);
-    const publicTable = new PublicTableService(database, {} as PilotPosService);
     const wrongPresenceCode = lifecycle.presence.code === "000000" ? "000001" : "000000";
     await assert.rejects(() =>
       publicTable.openSession(slug, tableToken, { presenceCode: wrongPresenceCode }),
@@ -205,7 +220,7 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     });
     assert.equal(opened.response.tableLabel, "Mesa 01");
     const withMetrics = await catalog.tableQrLifecycle(identity.id, organization.id, unit.id);
-    assert.equal(withMetrics.tables[0]?.scanCount, 1);
+    assert.equal(withMetrics.tables[0]?.scanCount, 2);
     assert.ok(withMetrics.tables[0]?.lastScannedAt);
   } finally {
     if (createdOrganizationId) {

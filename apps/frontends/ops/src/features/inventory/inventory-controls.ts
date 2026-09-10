@@ -27,6 +27,31 @@ export interface InventoryCountSession {
   lines: InventoryControlLine[];
 }
 
+export function inventoryCountContext(
+  data: InventoryControlsData,
+  locationId: string,
+  identityId?: string,
+) {
+  const open = data.countSessions.find(
+    (session) => session.locationId === locationId && session.status === "open",
+  );
+  const submitted = data.countSessions.find(
+    (session) => session.locationId === locationId && session.status === "submitted",
+  );
+  const distinctReviewer =
+    data.policies.find((policy) => policy.locationId === locationId)
+      ?.requireDistinctCountReviewer ?? true;
+  return {
+    open,
+    submitted,
+    canSubmit: !!identityId && open?.startedByIdentityId === identityId,
+    canReview:
+      data.capabilities.canReviewCount &&
+      !!identityId &&
+      (!distinctReviewer || submitted?.startedByIdentityId !== identityId),
+  };
+}
+
 export interface InventoryControlsData {
   policies: Array<{
     locationId: string;

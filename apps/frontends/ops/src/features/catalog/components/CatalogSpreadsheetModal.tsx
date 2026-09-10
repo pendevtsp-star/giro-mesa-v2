@@ -128,7 +128,7 @@ export function CatalogSpreadsheetModal({
                     <th>Item</th>
                     <th>Categoria</th>
                     <th>Preço Salão</th>
-                    <th>Preço Delivery</th>
+                    <th>Preço para entrega</th>
                     <th>NCM</th>
                   </tr>
                 </thead>

@@ -7,6 +7,7 @@ const identityId = "c1111111-1111-4111-8111-111111111111";
 const locationId = "d1111111-1111-4111-8111-111111111111";
 const itemId = "e1111111-1111-4111-8111-111111111111";
 const lotId = "f1111111-1111-4111-8111-111111111111";
+const destinationId = "d2222222-2222-4222-8222-222222222222";
 
 async function mockInventory(page: Page) {
   await page.addInitScript(
@@ -227,6 +228,7 @@ async function mockInventory(page: Page) {
       return json({
         locations: [
           { id: locationId, name: "Freezer do bar", code: "FRZ", kind: "freezer", active: true },
+          { id: destinationId, name: "Bar", code: "BAR", kind: "bar", active: true },
         ],
         items: [
           {
@@ -339,5 +341,71 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    await inventoryTabs.getByRole("button", { name: /^Saldos/ }).click();
+    await moreAreas.locator("summary").click();
+    const cards = page.locator(".inventory-observability .gm-stat-card");
+    await expect(cards).toHaveCount(4);
+    const positions = await cards.evaluateAll((elements) =>
+      elements.map((element) => ({
+        x: element.getBoundingClientRect().x,
+        y: element.getBoundingClientRect().y,
+      })),
+    );
+    expect(Math.abs(positions[0].y - positions[1].y)).toBeLessThan(2);
+    if (width === 375) expect(positions[2].y).toBeGreaterThan(positions[0].y);
+    else expect(Math.abs(positions[0].y - positions[3].y)).toBeLessThan(2);
+    await expect(page.locator(".inventory-system-status--neutral")).toContainText(
+      "sem execução registrada",
+    );
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`inventory-balances-${width}-${theme}.png`),
+      fullPage: true,
+    });
   }
+});
+
+test("envia a lista de transferência após limpar os campos de inclusão", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "A jornada cobre o formulário nativo.");
+  await mockInventory(page);
+  const commands: unknown[] = [];
+  await page.route("**/management/inventory/transfers/batches", (route) => {
+    commands.push(route.request().postDataJSON());
+    return route.fulfill({
+      status: 200,
+      json: { batchId: "batch", status: "in_transit", transfers: [] },
+    });
+  });
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:3112/#/inventory");
+  await page.getByRole("button", { name: "Transferir", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Transferir entre locais" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("combobox", { name: /^Origem/ }).selectOption(locationId);
+  await dialog.getByRole("combobox", { name: /^Destino/ }).selectOption(destinationId);
+  await dialog.getByRole("combobox", { name: /^Item de estoque/ }).selectOption(itemId);
+  await dialog.getByRole("combobox", { name: /^Lote/ }).selectOption(lotId);
+  await dialog.getByLabel("Quantidade", { exact: true }).fill("1,5");
+  await dialog.getByLabel("Motivo", { exact: true }).fill("Reposição do bar");
+  await dialog.getByRole("button", { name: "Adicionar item à transferência" }).click();
+  await expect(dialog.getByRole("combobox", { name: /^Item de estoque/ })).toHaveValue("");
+  await expect(dialog.getByLabel("Quantidade", { exact: true })).toHaveValue("");
+  await expect(dialog.getByRole("combobox", { name: /^Origem/ })).toBeDisabled();
+  await dialog.getByRole("combobox", { name: /^Item de estoque/ }).selectOption(itemId);
+  await expect(dialog.getByRole("button", { name: "Enviar 1 item(ns)" })).toBeDisabled();
+  await dialog.getByRole("button", { name: "Limpar item em edição" }).click();
+  await dialog.getByRole("button", { name: "Enviar 1 item(ns)" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(commands).toEqual([
+    {
+      sourceLocationId: locationId,
+      destinationLocationId: destinationId,
+      reason: "Reposição do bar",
+      lines: [{ inventoryItemId: itemId, lotId, quantity: "1.5" }],
+    },
+  ]);
 });

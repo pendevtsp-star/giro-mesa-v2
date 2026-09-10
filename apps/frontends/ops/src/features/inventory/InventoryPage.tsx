@@ -108,7 +108,13 @@ function mergeReturnables(inventory: InventoryData, returnables: ReturnablesData
   } satisfies InventoryData;
 }
 
-export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
+export function RealInventoryPage({
+  scope,
+  identityId,
+}: {
+  scope: ManagementScope;
+  identityId?: string;
+}) {
   const { organizationId, unitId } = scope;
   const remote = useRemote(scope, api.management.inventory, parseInventory);
   const returnables = useRemote(scope, api.management.returnables, parseReturnables);
@@ -310,7 +316,9 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                 data,
                 returnables.state.status === "ready" ? returnables.state.data : null,
               )}
-              controls={<InventoryControls inventory={data} scope={scope} />}
+              controls={
+                <InventoryControls inventory={data} scope={scope} identityId={identityId} />
+              }
               returnablesPanel={
                 <ReturnablesWorkspace
                   inventory={data}
@@ -629,6 +637,22 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
             />
             <TransferResolutionModal
               busy={busy}
+              itemName={
+                data.items.find((item) => item.id === selectedTransfer?.inventoryItemId)?.name
+              }
+              itemUnit={
+                data.items.find((item) => item.id === selectedTransfer?.inventoryItemId)?.unit
+              }
+              sourceName={
+                data.locations.find(
+                  (location) => location.id === selectedTransfer?.sourceLocationId,
+                )?.name
+              }
+              destinationName={
+                data.locations.find(
+                  (location) => location.id === selectedTransfer?.destinationLocationId,
+                )?.name
+              }
               onClose={closeDialog}
               onSubmit={(body) =>
                 selectedTransfer
@@ -642,7 +666,7 @@ export function RealInventoryPage({ scope }: { scope: ManagementScope }) {
                           operationalKey("inventory-transfer-resolution"),
                         ),
                       body.decision === "received"
-                        ? "Transferência recebida e saldo liberado no destino."
+                        ? "Recebimento registrado e saldo atualizado no destino."
                         : "Transferência cancelada e saldo devolvido à origem.",
                     )
                   : Promise.resolve(false)

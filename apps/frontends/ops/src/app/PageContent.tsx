@@ -122,7 +122,7 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   },
   inventory: {
     title: "Estoque",
-    description: "Saldos, rupturas, consumo e reposição.",
+    description: "Saldos por setor, itens em falta, consumo e reposição.",
   },
   purchases: {
     title: "Compras",
@@ -150,15 +150,15 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   },
   "waiter-settlements": {
     title: "Fechamento da equipe",
-    description: "Apuração de vendas, serviço, partnership e perdas operacionais.",
+    description: "Vendas, taxa de serviço, comissões e ocorrências por pessoa.",
   },
   delivery: {
-    title: "Delivery",
+    title: "Entregas",
     description: "Pedidos operacionais e zonas próprias desta unidade.",
   },
   reservations: {
     title: "Recepção e espera",
-    description: "Agenda, recepção e transições operacionais confirmadas.",
+    description: "Reservas, fila de espera e chegada dos clientes.",
   },
   crm: {
     title: "Clientes e campanhas",
@@ -166,7 +166,7 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   },
   multiunit: {
     title: "Multiunidade",
-    description: "Resumo consolidado dos registros persistidos na organização.",
+    description: "Compare vendas e resultados das suas unidades.",
   },
   billing: {
     title: "Assinatura e cobrança",
@@ -267,7 +267,7 @@ export function PageContent({
     case "cash":
       return <RealCashPage scope={managementScope} />;
     case "inventory":
-      return <RealInventoryPage scope={managementScope} />;
+      return <RealInventoryPage scope={managementScope} identityId={session.identityId} />;
     case "purchases":
       return <RealPurchasesPage scope={managementScope} />;
     case "finance":

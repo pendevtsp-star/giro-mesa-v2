@@ -1482,14 +1482,30 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   )}
                 </Card>
               </>
+            ) : activeView === "shift" && !selectedRegister ? (
+              <Card>
+                <EmptyState
+                  description={
+                    data.capabilities.canManageRegisters
+                      ? 'Use "Adicionar gaveta" acima para cadastrar a primeira gaveta. Depois, selecione-a para abrir o turno.'
+                      : "Peça ao responsável pela unidade para cadastrar uma gaveta. Depois, selecione-a para consultar o turno."
+                  }
+                  icon="$"
+                  title="Cadastre uma gaveta para começar"
+                />
+              </Card>
             ) : activeView === "shift" ? (
               /* HERO CARD DE ABERTURA DE CAIXA COM CHIPS RÁPIDOS */
               <Card className="cash-hero-card cash-hero-card--opening">
                 <div className="cash-hero-card__header">
                   <div className="cash-hero-card__badge-row">
                     <StatusDot tone="neutral" />
-                    <span className="cash-hero-card__status">Gaveta Fechada</span>
-                    <Badge tone="neutral">Disponível para Abertura</Badge>
+                    <span className="cash-hero-card__status">
+                      {selectedRegister?.active ? "Gaveta Fechada" : "Gaveta inativa"}
+                    </span>
+                    {selectedRegister?.active && data.capabilities.canOpen && (
+                      <Badge tone="neutral">Disponível para Abertura</Badge>
+                    )}
                   </div>
                   <h2 className="cash-hero-card__title">
                     {selectedRegister
@@ -1570,10 +1586,14 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                       </small>
                     </div>
                   </div>
-                ) : (
+                ) : selectedRegister && !data.capabilities.canOpen ? (
                   <p className="cash-hero-card__permission-msg">
                     Seu perfil de acesso pode consultar o histórico de fechamentos, mas não possui
                     permissão para abrir turnos nesta gaveta.
+                  </p>
+                ) : (
+                  <p className="cash-hero-card__permission-msg">
+                    Esta gaveta está inativa. Selecione uma gaveta ativa para abrir o turno.
                   </p>
                 )}
               </Card>

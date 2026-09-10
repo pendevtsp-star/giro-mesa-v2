@@ -15,6 +15,7 @@ import type {
   ReturnablePosition,
   StockLocation,
 } from "../../management.shared";
+import { inventoryQuantity as numberInput, validInventoryQuantity } from "./inventory-input";
 
 export interface SelectOption {
   id: string;
@@ -29,10 +30,6 @@ export interface InventoryEventLineDraft {
   locationId: string;
   lotId?: string;
   quantity: string;
-}
-
-function numberInput(value: string): string {
-  return value.replace(",", ".");
 }
 
 function productionInputDraft() {
@@ -340,7 +337,7 @@ export function ItemModal({
             </NativeSelect>
           </Label>
           <Label className="gm-form-field">
-            <span>SKU interno</span>
+            <span>Código interno</span>
             <Input maxLength={80} onChange={(e) => setSku(e.target.value)} value={sku} />
           </Label>
           <Label className="gm-form-field">
@@ -450,6 +447,12 @@ export function ItemModal({
                   </option>
                 ))}
               </NativeSelect>
+              {containers.length === 0 && (
+                <small>
+                  Nenhum vasilhame disponível. Em Novo item, escolha o tipo Vasilhame retornável e
+                  cadastre o vasilhame primeiro. Depois, volte a esta bebida para vinculá-lo.
+                </small>
+              )}
               <small>A venda gera retorno previsto; o saldo físico só muda após conferência.</small>
             </Label>
           )}
@@ -849,7 +852,6 @@ export function TransferModal({
                 setItemId(e.target.value);
                 setLotId("");
               }}
-              required
               value={itemId}
             >
               <option value="">Selecione</option>
@@ -865,6 +867,7 @@ export function TransferModal({
           <Label className="gm-form-field">
             <span>Origem</span>
             <NativeSelect
+              disabled={lines.length > 0}
               onChange={(e) => {
                 setSourceId(e.target.value);
                 setLotId("");
@@ -902,7 +905,7 @@ export function TransferModal({
           {availableLots.length > 0 && (
             <Label className="gm-form-field">
               <span>Lote</span>
-              <NativeSelect onChange={(e) => setLotId(e.target.value)} required value={lotId}>
+              <NativeSelect onChange={(e) => setLotId(e.target.value)} value={lotId}>
                 <option value="">Selecione</option>
                 {availableLots.map((lot) => (
                   <option key={lot.id} value={lot.id}>
@@ -917,7 +920,6 @@ export function TransferModal({
             <Input
               inputMode="decimal"
               onChange={(e) => setQuantity(e.target.value)}
-              required
               value={quantity}
             />
           </Label>
@@ -934,7 +936,13 @@ export function TransferModal({
         <Button
           type="button"
           variant="secondary"
-          disabled={!itemId || !quantity || (availableLots.length > 0 && !lotId)}
+          disabled={
+            busy ||
+            !sourceId ||
+            !itemId ||
+            !validInventoryQuantity(quantity) ||
+            (availableLots.length > 0 && !lotId)
+          }
           onClick={() => {
             setLines((current) => [
               ...current,
@@ -952,6 +960,24 @@ export function TransferModal({
         >
           Adicionar item à transferência
         </Button>
+        {(itemId || quantity || lotId) && lines.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setItemId("");
+              setQuantity("");
+              setLotId("");
+            }}
+          >
+            Limpar item em edição
+          </Button>
+        )}
+        {lines.length > 0 && (
+          <p className="inventory-context-note">
+            Para mudar a origem, remova os itens da lista. Confira a lista antes de enviar.
+          </p>
+        )}
         {lines.length > 0 && (
           <ul className="inventory-draft-list">
             {lines.map((line) => (
@@ -985,7 +1011,10 @@ export function TransferModal({
               !destinationId ||
               sourceId === destinationId ||
               reason.trim().length < 3 ||
-              lines.length === 0
+              lines.length === 0 ||
+              !!itemId ||
+              !!quantity ||
+              !!lotId
             }
             type="submit"
           >
@@ -1616,12 +1645,20 @@ export function InventoryReviewModal({
 
 export function TransferResolutionModal({
   transfer,
+  itemName,
+  itemUnit,
+  sourceName,
+  destinationName,
   open,
   busy,
   onClose,
   onSubmit,
 }: {
   transfer: InventoryTransfer | null;
+  itemName?: string;
+  itemUnit?: string;
+  sourceName?: string;
+  destinationName?: string;
   open: boolean;
   busy: boolean;
   onClose: () => void;
@@ -1654,7 +1691,7 @@ export function TransferResolutionModal({
     setNote("");
   }, [open, transfer]);
   return (
-    <Modal isOpen={open} onClose={onClose} size="sm" title="Resolver transferência">
+    <Modal isOpen={open} onClose={onClose} size="sm" title="Conferir transferência">
       <form
         className="gm-form-stack"
         onSubmit={(event) => {
@@ -1680,11 +1717,18 @@ export function TransferResolutionModal({
           });
         }}
       >
+        {itemName && (
+          <p className="inventory-context-note">
+            <strong>{itemName}</strong>
+            <br />
+            {sourceName ?? "Origem"} → {destinationName ?? "Destino"}
+          </p>
+        )}
         <p className="inventory-context-note">
           {transfer
             ? `${(
                 transfer.quantity - transfer.quantityReceived - transfer.quantityDivergent
-              ).toLocaleString("pt-BR")} unidade(s) aguardam conferência.`
+              ).toLocaleString("pt-BR")} ${itemUnit ?? "unidade(s)"} aguardam conferência.`
             : "Confira o recebimento físico antes de concluir."}
         </p>
         <Label className="gm-form-field">

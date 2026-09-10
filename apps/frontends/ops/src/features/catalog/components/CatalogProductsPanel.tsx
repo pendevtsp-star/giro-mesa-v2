@@ -249,7 +249,7 @@ function ProductTable({
             <th>Status</th>
             <th>Item / Prato</th>
             <th>Preço Salão (R$)</th>
-            <th>Preço Delivery (R$)</th>
+            <th>Preço para entrega (R$)</th>
             <th>CMV %</th>
             <th>Margem</th>
             <th className="catalog-products-table__actions-heading">Ações Rápidas</th>
@@ -304,7 +304,7 @@ function ProductTable({
                     defaultValue={product.deliveryPriceCents}
                     onCommit={(priceCents) => onUpdateDeliveryPrice(product.id, priceCents)}
                     placeholder="—"
-                    title="Preço Delivery: digite e clique fora para salvar"
+                    title="Preço para entrega: digite e clique fora para salvar"
                   />
                 </td>
                 <td>

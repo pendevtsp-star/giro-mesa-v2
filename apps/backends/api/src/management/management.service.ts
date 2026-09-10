@@ -4726,7 +4726,23 @@ export class ManagementService {
           .from(managementInventoryCountSessionLines)
           .where(eq(managementInventoryCountSessionLines.sessionId, sessionId));
         if (input.decision === "approved") {
-          const countedItemIds = [...new Set(sessionLines.map((line) => line.inventoryItemId))];
+          const countedItemIds = [
+            ...new Set(sessionLines.map((line) => line.inventoryItemId)),
+          ].sort();
+          // Lock the position before checking its snapshot version. Otherwise a sale
+          // can commit between this check and applyStockMovement, applying a stale delta.
+          // Materializing absent zero positions also protects concurrent first receipts.
+          await tx
+            .insert(managementStockBalances)
+            .values(
+              countedItemIds.map((inventoryItemId) => ({
+                organizationId,
+                unitId,
+                locationId: session.locationId,
+                inventoryItemId,
+              })),
+            )
+            .onConflictDoNothing();
           const currentBalances = await tx
             .select({
               inventoryItemId: managementStockBalances.inventoryItemId,
@@ -4741,7 +4757,9 @@ export class ManagementService {
                 eq(managementStockBalances.locationId, session.locationId),
                 inArray(managementStockBalances.inventoryItemId, countedItemIds),
               ),
-            );
+            )
+            .orderBy(managementStockBalances.inventoryItemId)
+            .for("update");
           const balanceByItem = new Map(
             currentBalances.map((balance) => [balance.inventoryItemId, balance]),
           );

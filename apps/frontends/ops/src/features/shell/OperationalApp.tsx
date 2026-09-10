@@ -63,7 +63,7 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: NavGroup
   { route: "table-qrs", label: "QR das mesas", icon: "grid", group: "Gestão" },
   { route: "kds", label: "Produção KDS", icon: "kds", group: "Operação" },
   { route: "cash", label: "Contas e caixa", icon: "cash", group: "Operação" },
-  { route: "delivery", label: "Delivery", icon: "delivery", group: "Operação" },
+  { route: "delivery", label: "Entregas", icon: "delivery", group: "Operação" },
   {
     route: "reservations",
     label: "Recepção e espera",
@@ -83,7 +83,7 @@ const navItems: { route: RouteId; label: string; icon: IconName; group: NavGroup
     icon: "clock",
     group: "Gestão",
   },
-  { route: "crm", label: "Clientes & CRM", icon: "crm", group: "Gestão" },
+  { route: "crm", label: "Clientes e campanhas", icon: "crm", group: "Gestão" },
   { route: "multiunit", label: "Multiunidade", icon: "multiunit", group: "Administração" },
   { route: "billing", label: "Assinatura e cobrança", icon: "finance", group: "Administração" },
   { route: "settings", label: "Configurações", icon: "settings", group: "Administração" },

@@ -5744,7 +5744,7 @@ export class PilotPosService {
     offlineIds?: { tabId: string },
   ) {
     this.assertPromisedAtNotPast(input.promisedAt);
-    await this.requireScopedCapability(
+    const scopedRoles = await this.requireScopedCapability(
       identityId,
       organizationId,
       unitId,
@@ -6047,6 +6047,39 @@ export class PilotPosService {
           tableGroup?.responsibleIdentityId ??
           sectionPrimary?.identityId ??
           identityId;
+        const canOpenAcrossShiftSections = scopedRoles.some(
+          (row) =>
+            (row.unitId === null || row.unitId === unitId) &&
+            (["owner", "manager", "cashier"].includes(row.role) ||
+              (Boolean(input.reservationId || input.waitlistEntryId) &&
+                row.role === "receptionist")),
+        );
+        if (shiftSection && activeShift && !canOpenAcrossShiftSections) {
+          const [shiftStaff] = await tx
+            .select({ identityId: posShiftSectionStaff.identityId })
+            .from(posShiftSectionStaff)
+            .where(
+              and(
+                eq(posShiftSectionStaff.organizationId, organizationId),
+                eq(posShiftSectionStaff.unitId, unitId),
+                eq(posShiftSectionStaff.shiftId, activeShift.id),
+                eq(posShiftSectionStaff.shiftSectionId, shiftSection.id),
+                eq(posShiftSectionStaff.identityId, identityId),
+              ),
+            )
+            .limit(1);
+          const canOperateTable =
+            sectionPrimary?.identityId === identityId ||
+            tableGroup?.responsibleIdentityId === identityId ||
+            Boolean(shiftStaff);
+          if (!canOperateTable) {
+            throw new ForbiddenException({
+              code: "TABLE_OUTSIDE_OPERATIONAL_ASSIGNMENT",
+              tableId: input.tableId,
+              shiftSectionId: shiftSection.id,
+            });
+          }
+        }
         const [settlementSettings] = await tx
           .select({ configuration: managementSettlementSettings.configuration })
           .from(managementSettlementSettings)

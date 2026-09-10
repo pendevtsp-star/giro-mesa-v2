@@ -1,0 +1,47 @@
+{
+  "status": "completed",
+  "profile": "f1-local",
+  "startedAt": "2026-09-10T22:58:15.229Z",
+  "completedAt": "2026-09-10T23:04:20.134Z",
+  "environment": {
+    "apiUrl": "http://127.0.0.1:3217",
+    "node": "v24.18.0",
+    "platform": "win32-x64",
+    "logicalCpuCount": 16,
+    "totalMemoryBytes": 21144035328,
+    "apiBuildSha": "local",
+    "schemaVersion": 83
+  },
+  "workload": {
+    "tables": 120,
+    "authenticatedSessions": 12,
+    "steadyStateDurationSeconds": 300,
+    "totalElapsedSeconds": 364.872,
+    "requests": 6437,
+    "requestsPerSecond": 17.641803152886492,
+    "readRequests": 6318,
+    "readRequestsPerSecond": 17.31566138262185,
+    "writeRequests": 119,
+    "writeRequestsPerSecond": 0.32614177026464075,
+    "readP95Ms": 121.68349999999919,
+    "writeP95Ms": 253.4042999999947,
+    "failures": 0,
+    "failureRate": 0
+  },
+  "conservation": {
+    "expectedTables": 120,
+    "persistedTables": 120,
+    "expectedOpenTabs": 120,
+    "persistedOpenTabs": 120,
+    "lostResponseRetryReplayed": true,
+    "independentSessionCount": 12
+  },
+  "thresholds": {
+    "readP95UnderMs": 300,
+    "writeP95UnderMs": 500,
+    "failureRateUnder": 0.001,
+    "passed": true
+  },
+  "failures": [],
+  "evidenceDirectory": "C:\\Users\\maxue\\projetos_programação\\giro_mesa_v2\\tests\\e2e-live\\.runtime\\f1\\2026-09-10T22-58-15.229Z"
+}

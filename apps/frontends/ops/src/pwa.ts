@@ -126,7 +126,7 @@ export function initializePwa() {
     serviceWorker: false,
     notifications,
     update: supported ? "checking" : "error",
-    message: supported ? null : "Este navegador não oferece instalação PWA.",
+    message: supported ? null : "Este navegador não permite instalar o GiroMesa.",
   });
 
   window.addEventListener("beforeinstallprompt", (event) => {
@@ -146,7 +146,7 @@ export function initializePwa() {
   if (!import.meta.env.PROD) {
     publish({
       update: "current",
-      message: "A instalação PWA é validada no build publicado.",
+      message: "Para instalar o GiroMesa, acesse a versão publicada.",
     });
     return;
   }

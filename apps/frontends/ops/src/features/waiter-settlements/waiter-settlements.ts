@@ -102,6 +102,7 @@ export interface SettlementLine {
 
 export interface WaiterSettlement {
   id: string | null;
+  operationalShiftId: string | null;
   periodFrom: string;
   periodTo: string;
   status: SettlementStatus | "preview";
@@ -260,6 +261,7 @@ export function parseSettlement(value: unknown, preview = false): WaiterSettleme
   return {
     id: optionalString(item.id),
     periodFrom: requiredString(item.periodFrom),
+    operationalShiftId: optionalString(item.operationalShiftId),
     periodTo: requiredString(item.periodTo),
     status: preview ? "preview" : oneOf(item.status, ["closed", "approved", "paid", "canceled"]),
     unassignedGrossCents: integer(item.unassignedGrossCents),

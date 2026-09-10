@@ -665,6 +665,12 @@ export function operationalApiErrorMessage(
         "Um produto deste pedido está ligado a mais de um item de estoque. Corrija o vínculo em Estoque e tente novamente.",
       INVENTORY_PRODUCT_ALREADY_LINKED:
         "Este produto já está ligado a outro item de revenda ativo.",
+      TRANSFER_DISTINCT_RECEIVER_REQUIRED: "Outra pessoa precisa conferir esta transferência.",
+      INVENTORY_COUNT_DUAL_CONTROL_REQUIRED: "A conferência precisa ser feita por outra pessoa.",
+      INVENTORY_REVIEW_DUAL_CONTROL_REQUIRED: "A conferência precisa ser feita por outra pessoa.",
+      RETURNABLE_INCIDENT_DUAL_CONTROL: "A conferência precisa ser feita por outra pessoa.",
+      INVENTORY_COUNT_STALE_BALANCE:
+        "O saldo mudou desde o início desta contagem. Refaça a contagem com o saldo atualizado.",
       PRODUCTION_STATION_DELIVERY_DISABLED:
         "A estação deste pedido está impedida de receber produção. Ajuste a política da estação e tente novamente.",
       PERSON_ACCESS_CHANGED:

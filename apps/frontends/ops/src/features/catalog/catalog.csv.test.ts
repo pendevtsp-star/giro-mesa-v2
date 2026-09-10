@@ -92,7 +92,9 @@ describe("CSV do catálogo", () => {
   });
 
   it("gera um modelo importável e rejeita CSV malformado", () => {
-    expect(parseCatalogCsv(catalogCsvTemplate())).toHaveLength(1);
+    expect(parseCatalogCsv(catalogCsvTemplate())).toEqual([
+      expect.objectContaining({ ncm: null, cfop: null }),
+    ]);
     expect(() => parseCatalogCsv('Nome,Categoria,Preco_Salao\n"Produto,Pratos,19.999')).toThrow(
       "aspas não fechadas",
     );

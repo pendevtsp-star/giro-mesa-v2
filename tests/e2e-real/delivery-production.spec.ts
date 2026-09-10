@@ -315,7 +315,7 @@ async function openDelivery(
     window.location.hash = "#/delivery";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Delivery" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Entregas" })).toBeVisible();
 }
 
 async function forceRealtimeFallback(page: Page) {

@@ -944,7 +944,9 @@ export function RealKdsPage({
     const data = remote.state.data;
     if (!data.capabilities.terminalProfileRead) {
       setTerminalProfileStatus("local");
-      setTerminalProfileMessage("Servidor sem perfil de terminal; fallback local ativo.");
+      setTerminalProfileMessage(
+        "As preferências deste KDS estão salvas somente neste dispositivo.",
+      );
       return;
     }
     const loadKey = `${scope.organizationId}:${scope.unitId}:${terminalInstallationId}`;

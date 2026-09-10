@@ -30,6 +30,7 @@ import {
 } from "../../management.shared";
 import { formatMoney } from "../../rules";
 import { BarcodeScanModal } from "./InventoryModals";
+import { inventoryQuantity, validInventoryQuantity } from "./inventory-input";
 import "./returnables.css";
 
 interface ReturnablesWorkspaceProps {
@@ -481,7 +482,7 @@ function ReturnablesReady({
                       lines: selected.map((custody) => ({
                         issueMovementId: custody.id,
                         locationId: returnLocationId,
-                        quantity: quantities[custody.id] ?? "0",
+                        quantity: inventoryQuantity(quantities[custody.id] ?? "0"),
                         note: returnNote.trim(),
                       })),
                     },
@@ -573,10 +574,11 @@ function ReturnablesReady({
                   !returnLocationId ||
                   returnNote.trim().length < 3 ||
                   selected.some((custody) => {
-                    const quantity = Number(
-                      String(quantities[custody.id] ?? "0").replace(",", "."),
+                    const input = quantities[custody.id] ?? "";
+                    return (
+                      !validInventoryQuantity(input) ||
+                      Number(inventoryQuantity(input)) > custody.openQuantity
                     );
-                    return quantity <= 0 || quantity > custody.openQuantity;
                   })
                 }
                 type="submit"

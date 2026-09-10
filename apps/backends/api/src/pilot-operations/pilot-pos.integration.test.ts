@@ -161,7 +161,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     const createScopedActor = async (
       emailPrefix: string,
       displayName: string,
-      role: "cashier" | "receptionist" | "busser",
+      role: "cashier" | "receptionist" | "busser" | "waiter",
     ) => {
       const [actor] = await database.db
         .insert(identities)
@@ -181,6 +181,11 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       return actor;
     };
     const cashierIdentity = await createScopedActor("pilot-cashier", "Pilot Cashier", "cashier");
+    const unassignedWaiterIdentity = await createScopedActor(
+      "pilot-unassigned-waiter",
+      "Pilot Unassigned Waiter",
+      "waiter",
+    );
     const receptionistIdentity = await createScopedActor(
       "pilot-receptionist",
       "Pilot Receptionist",
@@ -2435,6 +2440,70 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       (section) => section.name === "Praça varanda atualizada",
     );
     assert.ok(shiftSection && targetShiftSection);
+    await assert.rejects(
+      () =>
+        pos.openTab(
+          unassignedWaiterIdentity.id,
+          organizationA.id,
+          unitA.id,
+          "open-outside-shift-section-0001",
+          { tableId: varandaTable.id, guestCount: 2 },
+        ),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "TABLE_OUTSIDE_OPERATIONAL_ASSIGNMENT",
+    );
+    for (const [idempotencyKey, responsibleIdentityId] of [
+      ["open-outside-shift-section-self-0001", unassignedWaiterIdentity.id],
+      ["open-outside-shift-section-primary-0001", supportIdentity.id],
+    ] as const) {
+      await assert.rejects(
+        () =>
+          pos.openTab(unassignedWaiterIdentity.id, organizationA.id, unitA.id, idempotencyKey, {
+            tableId: varandaTable.id,
+            guestCount: 2,
+            responsibleIdentityId,
+          }),
+        (error: unknown) =>
+          (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+          "TABLE_OUTSIDE_OPERATIONAL_ASSIGNMENT",
+      );
+    }
+    await pos.updateShiftSectionCoverage(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+      shift.id,
+      targetShiftSection.id,
+      { active: true },
+    );
+    const supportedOpen = await pos.openTab(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+      "open-supported-shift-section-0001",
+      { tableId: varandaTable.id, guestCount: 2 },
+    );
+    assert.equal(
+      (supportedOpen.tab as { responsibleIdentityId: string }).responsibleIdentityId,
+      supportIdentity.id,
+    );
+    await pos.closeTab(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+      (supportedOpen.tab as { id: string }).id,
+      "close-supported-shift-section-0001",
+      { printRequested: false },
+    );
+    await pos.updateShiftSectionCoverage(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+      shift.id,
+      targetShiftSection.id,
+      { active: false },
+    );
     await pos.updateShiftSectionAssignment(
       identity.id,
       organizationA.id,

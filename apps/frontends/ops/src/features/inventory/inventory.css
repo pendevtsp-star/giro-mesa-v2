@@ -58,6 +58,12 @@
   margin: 0;
 }
 
+.inventory-workspace .inventory-system-status--neutral {
+  background: var(--gm-surface);
+  border-color: var(--gm-border);
+  color: var(--gm-muted);
+}
+
 @media (max-width: 900px) {
   .inventory-shift-grid {
     grid-template-columns: 1fr;
@@ -65,6 +71,43 @@
 }
 
 @media (max-width: 480px) {
+  .inventory-workspace .inventory-observability {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--gm-space-2);
+  }
+
+  .inventory-observability .gm-stat-card {
+    min-width: 0;
+    padding: var(--gm-space-3);
+    gap: var(--gm-space-2);
+  }
+
+  .inventory-observability .gm-stat-card__header {
+    align-items: flex-start;
+    gap: var(--gm-space-1);
+  }
+
+  .inventory-observability .gm-stat-card__title {
+    font-size: var(--gm-font-sm);
+    text-transform: none;
+  }
+
+  .inventory-observability .gm-stat-card__icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  .inventory-observability .gm-stat-card__value {
+    font-size: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  .inventory-observability .gm-stat-card__footer {
+    font-size: var(--gm-font-sm);
+    margin-top: 0;
+  }
+
   .inventory-more-views,
   .inventory-more-views > summary,
   .inventory-shift-actions .gm-button {

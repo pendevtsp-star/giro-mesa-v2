@@ -264,7 +264,9 @@ export function DeviceSetupPage({
         <Card className="device-setup__card">
           <div className="device-setup__heading">
             <div>
-              <h2>{runtime.embedded ? "Aplicativo SmartPOS" : "Instalar neste dispositivo"}</h2>
+              <h2>
+                {runtime.embedded ? "Aplicativo da maquininha" : "Instalar neste dispositivo"}
+              </h2>
             </div>
             <Badge tone={runtime.embedded || pwa.install === "installed" ? "success" : "info"}>
               {runtime.embedded ? "Aplicativo conectado" : installLabel(pwa.install)}
@@ -393,7 +395,7 @@ export function DeviceSetupPage({
                   <strong>Pagamento direto bloqueado</strong>
                   <p>
                     {!runtime.embedded
-                      ? "Abra o GiroMesa no aplicativo homologado da maquininha para usar a cobrança integrada. Nenhum pagamento será confirmado sem retorno do provedor."
+                      ? "Abra o GiroMesa no aplicativo homologado da maquininha para usar a cobrança integrada. Aguarde a confirmação da adquirente antes de considerar o pagamento concluído."
                       : (paymentBlockReason(payment.data.reason) ??
                         "Esta instalação ainda não possui provedor homologado. Cartão e Pix não serão registrados manualmente.")}
                   </p>
@@ -404,10 +406,10 @@ export function DeviceSetupPage({
                   <strong>Aplicativo ainda não pode cobrar</strong>
                   <p>
                     {!nativeMatchesBackend
-                      ? "Configuração, provedor ou métodos do aplicativo divergem do servidor."
+                      ? "A configuração da maquininha não corresponde ao cadastro aprovado. Peça ao suporte para conferir antes de cobrar."
                       : nativePayment?.errorCode
                         ? `O aplicativo não liberou a cobrança. Referência para o suporte: ${nativePayment.errorCode}.`
-                        : "O servidor liberou a integração, mas o aplicativo da maquininha ainda não confirmou que pode cobrar."}
+                        : "A integração foi liberada, mas a maquininha ainda não está pronta para cobrar. Confira novamente ou procure o suporte."}
                   </p>
                 </Callout>
               )}

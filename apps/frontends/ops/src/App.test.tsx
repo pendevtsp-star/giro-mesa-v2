@@ -50,7 +50,7 @@ describe("experiência operacional", () => {
     expect(atendimentoHtml).toContain('href="#/counter"');
     expect(atendimentoHtml).toContain("Balcão e retirada");
     expect(atendimentoHtml).toContain('href="#/delivery"');
-    expect(atendimentoHtml).toContain("Delivery");
+    expect(atendimentoHtml).toContain("Entregas");
     expect(atendimentoHtml).not.toContain('href="#/cash"');
 
     const operacaoHtml = ownerHtml.slice(

@@ -2255,6 +2255,101 @@ test("Recepção senta em mesa compatível e abre a comanda na mesma requisiçã
   ]);
 });
 
+test("Cardápio cadastra revenda com limite diário e limpa classificação fiscal entre produtos", async ({
+  page,
+}) => {
+  const requests: Array<Record<string, unknown>> = [];
+  await page.setViewportSize({ width: 375, height: 812 });
+  await mockProductionApi(page);
+  await page.route("**/pilot/catalog/products", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    requests.push(route.request().postDataJSON());
+    await route.fulfill({ status: 201, json: { id: `created-product-${requests.length}` } });
+  });
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/catalog";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.locator("#new-product-details > summary").click();
+  const form = page.locator("#new-product-details form");
+  await form.getByRole("button", { name: "Produto de Revenda (Bebidas / Estoque Direto)" }).click();
+  await form.getByText("Dados fiscais do produto", { exact: true }).click();
+  const ncm = form.getByLabel("NCM (Nomenclatura Comum do Mercosul)");
+  const cfop = form.getByLabel("CFOP Padrão");
+  await expect(ncm).toHaveValue("");
+  await expect(cfop).toHaveValue("");
+  const dailyLimit = form.getByLabel(/Limite diário de venda/);
+  await expect(dailyLimit).toHaveCount(1);
+  await expect(form.getByLabel(/Limite Diário de Porções|Quantidade em Estoque/i)).toHaveCount(0);
+  await expect(
+    form.getByText("Renova a cada dia. Controle o saldo físico por setor em Estoque."),
+  ).toBeVisible();
+
+  for (const field of [
+    form.getByLabel("Nome do Produto"),
+    dailyLimit,
+    form.getByLabel("Preço Salão (R$)"),
+    ncm,
+    cfop,
+  ]) {
+    const bounds = await field.evaluate((input) => {
+      const label = input.closest("label");
+      if (!label) throw new Error("Campo sem rótulo associado");
+      const textNode = Array.from(label.childNodes).find(
+        (node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim(),
+      );
+      if (!textNode) throw new Error("Rótulo sem texto");
+      const range = document.createRange();
+      range.selectNodeContents(textNode);
+      const text = range.getBoundingClientRect();
+      const control = input.getBoundingClientRect();
+      return {
+        labelBottom: text.bottom,
+        inputTop: control.top,
+        left: control.left,
+        right: control.right,
+        viewport: window.innerWidth,
+      };
+    });
+    expect(bounds.labelBottom).toBeLessThanOrEqual(bounds.inputTop);
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(bounds.viewport);
+  }
+
+  await form.getByLabel("Nome do Produto").fill("Água mineral teste");
+  await form.getByLabel("Preço Salão (R$)").fill("6,50");
+  await dailyLimit.fill("48");
+  await form.getByRole("button", { name: "Cozinha", exact: true }).click();
+  await form.getByRole("button", { name: "Criar produto", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(1);
+  expect(requests[0]).toMatchObject({
+    name: "Água mineral teste",
+    productType: "resale",
+    priceCents: 650,
+    dailyStock: 48,
+    fiscal: {},
+  });
+  expect(requests[0].fiscal).toEqual({});
+  expect(requests[0]).not.toHaveProperty("stockQuantity");
+  await expect(form.getByLabel("Nome do Produto")).toHaveValue("");
+
+  await form.getByLabel("Nome do Produto").fill("Produto com classificação validada");
+  await form.getByLabel("Preço Salão (R$)").fill("10,00");
+  await ncm.fill("2201.10.00");
+  await cfop.selectOption("5.102");
+  await form.getByRole("button", { name: "Cozinha", exact: true }).click();
+  await form.getByRole("button", { name: "Criar produto", exact: true }).click();
+  await expect.poll(() => requests.length).toBe(2);
+  expect(requests[1].fiscal).toEqual({ ncm: "22011000", cfop: "5102" });
+  await expect(form.getByLabel("Nome do Produto")).toHaveValue("");
+  await expect(ncm).toHaveValue("");
+  await expect(cfop).toHaveValue("");
+});
+
 test("Cardápio real mantém a interface completa e as integrações reais", async ({ page }) => {
   const requests: Array<{ body: unknown; headers: Record<string, string> }> = [];
   const priceUpdates: unknown[] = [];
@@ -2277,20 +2372,16 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     "justify-content",
     "flex-start",
   );
-  for (const primaryAction of [
-    "Novo produto",
-    "Conferir como cliente",
-    "Opcionais & Modificadores",
-  ]) {
+  for (const primaryAction of ["Novo produto", "Conferir como cliente", "Adicionais e opções"]) {
     await expect(page.getByText(primaryAction, { exact: false }).first()).toBeVisible();
   }
   await expect(page.getByText("Importar CSV", { exact: false }).first()).toBeHidden();
   await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
   for (const secondaryAction of [
     "Importar CSV",
-    "Matriz BCG",
+    "Desempenho dos produtos",
     "Planilha CSV",
-    "Identidade & Branding",
+    "Identidade visual",
     "Gerar PDF / Imprimir",
     "Reordenar Categorias",
     "Reajuste em Lote",
@@ -2299,9 +2390,9 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     await expect(page.getByText(secondaryAction, { exact: false }).first()).toBeVisible();
   }
   for (const availableButton of [
-    "Matriz BCG",
+    "Desempenho dos produtos",
     "Conferir como cliente",
-    "Opcionais & Modificadores",
+    "Adicionais e opções",
     "Planilha CSV",
     "Gerar PDF / Imprimir",
     "Reordenar Categorias",
@@ -2309,7 +2400,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   ]) {
     await expect(page.getByRole("button", { name: new RegExp(availableButton) })).toBeEnabled();
   }
-  await expect(page.getByRole("link", { name: /Identidade & Branding/ })).toBeEnabled();
+  await expect(page.getByRole("link", { name: /Identidade visual/ })).toBeEnabled();
   await expect(page.getByRole("link", { name: /Abrir QR das mesas/ })).toBeEnabled();
   await expect(page.locator('.catalog-management-header__import input[type="file"]')).toBeEnabled();
   await expect(page.getByText("Filtro de Dieta & Segurança:")).toBeVisible();
@@ -2319,10 +2410,10 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
 
   await page.locator("#new-product-details > summary").click();
   await expect(page.getByRole("button", { name: "Produto Preparado / Cozinha" })).toBeEnabled();
-  await expect(page.getByLabel("Preço Delivery (Opcional)")).toBeEnabled();
+  await expect(page.getByLabel("Preço para entrega (opcional)")).toBeEnabled();
   await expect(page.getByLabel("Custo Unitário / Insumos (R$)")).toBeEnabled();
   await expect(page.getByLabel("Foto do Prato (Opcional)")).toBeEnabled();
-  await expect(page.getByText("Dados Fiscais para NFC-e / SAT")).toBeVisible();
+  await expect(page.getByText("Dados fiscais do produto")).toBeVisible();
   await page.locator("#new-product-details > summary").click();
 
   await page.getByRole("button", { name: "Tabela com edição rápida de preços" }).click();
@@ -2339,7 +2430,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     stationIds: ["station-1"],
   });
 
-  await page.getByRole("button", { name: /Combos & Promoções \(0\)/ }).click();
+  await page.getByRole("button", { name: /Combos e promoções \(0\)/ }).click();
 
   const dialog = page.getByRole("dialog", {
     name: "Gestão de Combos & Promoções de Horário",

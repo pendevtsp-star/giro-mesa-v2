@@ -20,7 +20,7 @@ import {
   roleBindings,
   units,
 } from "@giromesa/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
@@ -1001,6 +1001,157 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
     );
     assert.equal(controls.temperatureReadings[0]?.status, "critical");
     assert.ok(controls.countSessions.some((session) => session.id === blindCount.id));
+
+    await context.test(
+      "rejects a count approval when stock changes while the reviewer waits for its lock",
+      async () => {
+        const countLocation = await management.createStockLocation(
+          identity.id,
+          organization.id,
+          unit.id,
+          randomUUID(),
+          { name: "Setor de concorrência", code: `CNT${randomInt(1000, 9999)}` },
+        );
+        await database.db.insert(managementStockBalances).values({
+          organizationId: organization.id,
+          unitId: unit.id,
+          locationId: countLocation.id,
+          inventoryItemId: container.id,
+          quantity: "10",
+          version: 1,
+          averageCostCents: 500,
+        });
+        const session = await management.startBlindInventoryCount(
+          inventoryIdentity.id,
+          organization.id,
+          unit.id,
+          randomUUID(),
+          { locationId: countLocation.id, reason: "Conferência concorrente" },
+        );
+        await management.submitBlindInventoryCount(
+          inventoryIdentity.id,
+          organization.id,
+          unit.id,
+          session.id,
+          randomUUID(),
+          {
+            lines: session.lines.map((line) => ({
+              lineId: line.id,
+              countedQuantity: line.inventoryItemId === container.id ? "8" : "0",
+            })),
+            offline: false,
+          },
+        );
+
+        let releaseBlocker = () => {};
+        const release = new Promise<void>((resolve) => {
+          releaseBlocker = resolve;
+        });
+        let signalLocked = (_pid: number) => {};
+        const locked = new Promise<number>((resolve) => {
+          signalLocked = resolve;
+        });
+        // A real second transaction changes stock without committing. The reviewer must
+        // wait for this lock before comparing versions, not after comparing them.
+        const blocker = database.db.transaction(async (tx) => {
+          const [row] = await tx.execute<{ pid: number }>(sql`select pg_backend_pid() as pid`);
+          assert.ok(row);
+          await tx
+            .update(managementStockBalances)
+            .set({ quantity: "9", version: 2 })
+            .where(
+              and(
+                eq(managementStockBalances.organizationId, organization.id),
+                eq(managementStockBalances.unitId, unit.id),
+                eq(managementStockBalances.locationId, countLocation.id),
+                eq(managementStockBalances.inventoryItemId, container.id),
+              ),
+            );
+          signalLocked(row.pid);
+          await release;
+        });
+        const pid = await Promise.race([
+          locked,
+          blocker.then(() => {
+            throw new Error("Stock blocker ended before acquiring its lock");
+          }),
+        ]);
+        const review = management
+          .reviewBlindInventoryCount(
+            reviewerIdentity.id,
+            organization.id,
+            unit.id,
+            session.id,
+            randomUUID(),
+            { decision: "approved", note: "Revisão durante movimentação concorrente" },
+          )
+          .then(
+            (result) => ({ result, error: null }),
+            (error: unknown) => ({ result: null, error }),
+          );
+        try {
+          const deadline = Date.now() + 10_000;
+          let waiting = false;
+          while (Date.now() < deadline && !waiting) {
+            const [row] = await database.db.execute<{ waiting: boolean }>(
+              sql`select exists(select 1 from pg_stat_activity where ${pid} = any(pg_blocking_pids(pid))) as waiting`,
+            );
+            waiting = row?.waiting === true;
+            if (!waiting) await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          assert.equal(
+            waiting,
+            true,
+            "Reviewer must actually wait for the concurrent stock transaction",
+          );
+        } finally {
+          releaseBlocker();
+          await blocker;
+        }
+        const outcome = await review;
+        assert.ok(
+          outcome.error && hasCode("INVENTORY_COUNT_STALE_BALANCE")(outcome.error),
+          `Expected stale-count rejection, got ${JSON.stringify(outcome.result)}`,
+        );
+        const [balance] = await database.db
+          .select({ quantity: managementStockBalances.quantity })
+          .from(managementStockBalances)
+          .where(
+            and(
+              eq(managementStockBalances.organizationId, organization.id),
+              eq(managementStockBalances.unitId, unit.id),
+              eq(managementStockBalances.locationId, countLocation.id),
+              eq(managementStockBalances.inventoryItemId, container.id),
+            ),
+          );
+        assert.equal(
+          balance?.quantity,
+          "9.000",
+          "The stale count must not apply its old delta to the new stock",
+        );
+        const countMovements = await database.db
+          .select({ id: managementInventoryMovements.id })
+          .from(managementInventoryMovements)
+          .where(
+            and(
+              eq(managementInventoryMovements.organizationId, organization.id),
+              inArray(
+                managementInventoryMovements.sourceId,
+                session.lines.map((line) => line.id),
+              ),
+            ),
+          );
+        assert.equal(countMovements.length, 0);
+        await management.reviewBlindInventoryCount(
+          reviewerIdentity.id,
+          organization.id,
+          unit.id,
+          session.id,
+          randomUUID(),
+          { decision: "rejected", note: "Nova contagem necessária após alteração do saldo" },
+        );
+      },
+    );
 
     const defaultReturnablePolicy = await management.returnablePolicy(
       reviewerIdentity.id,

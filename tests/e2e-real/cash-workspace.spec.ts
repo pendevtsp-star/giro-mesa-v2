@@ -33,7 +33,10 @@ const reviewedShift = {
   tenderBreakdown: [],
 };
 
-async function mockCashApi(page: Page) {
+async function mockCashApi(
+  page: Page,
+  options: { registers?: "empty" | "closed" | "inactive"; canOpen?: boolean } = {},
+) {
   await mockCompatibleApiHealth(page, "cash-workspace-e2e");
   await page.addInitScript(
     ({ identityId, organizationId, unitId }) => {
@@ -94,7 +97,7 @@ async function mockCashApi(page: Page) {
         pendingTransfers: [],
         adjustments: [],
         capabilities: {
-          canOpen: true,
+          canOpen: options.canOpen ?? true,
           canMove: true,
           canClose: true,
           canReview: true,
@@ -191,12 +194,68 @@ async function mockCashApi(page: Page) {
           },
         ],
         pendingTabs: [],
+        ...(options.registers
+          ? {
+              registers:
+                options.registers === "empty"
+                  ? []
+                  : [
+                      {
+                        id: mainRegisterId,
+                        name: "Caixa principal",
+                        active: options.registers !== "inactive",
+                        openShiftId: null,
+                      },
+                    ],
+              shifts: [],
+              entries: [],
+            }
+          : {}),
       });
       return;
     }
     await json({});
   });
 }
+
+for (const canOpen of [true, false]) {
+  test(`caixa sem gavetas orienta cadastro sem alegar falta de permissão (canOpen=${canOpen})`, async ({
+    page,
+  }) => {
+    await mockCashApi(page, { registers: "empty", canOpen });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/#/cash");
+    await expect(page.getByText("Nenhuma gaveta cadastrada", { exact: true })).toBeVisible();
+    await expect(page.getByText("Cadastre uma gaveta para começar", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Use "Adicionar gaveta" acima/)).toBeVisible();
+    await expect(page.getByText(/permissão para abrir turnos nesta gaveta/)).toHaveCount(0);
+    await expect(page.getByText(/Defina o fundo de troco/)).toHaveCount(0);
+    await expect(page.getByText("Disponível para Abertura", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Abrir turno", exact: true })).toHaveCount(0);
+  });
+}
+
+test("caixa distingue gaveta inativa de falta de permissão para abrir turno", async ({ page }) => {
+  await mockCashApi(page, { registers: "inactive", canOpen: true });
+  await page.goto("/#/cash");
+  await expect(
+    page.getByText("Esta gaveta está inativa. Selecione uma gaveta ativa para abrir o turno."),
+  ).toBeVisible();
+  await expect(page.getByText(/permissão para abrir turnos nesta gaveta/)).toHaveCount(0);
+  await expect(page.getByText("Disponível para Abertura", { exact: true })).toHaveCount(0);
+});
+
+test("caixa mantém aviso de permissão quando uma gaveta existe e o perfil não pode abrir", async ({
+  page,
+}) => {
+  await mockCashApi(page, { registers: "closed", canOpen: false });
+  await page.goto("/#/cash");
+  await expect(
+    page.getByRole("heading", { name: "Abertura de Caixa — Caixa principal" }),
+  ).toBeVisible();
+  await expect(page.getByText(/permissão para abrir turnos nesta gaveta/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Abrir turno", exact: true })).toHaveCount(0);
+});
 
 test("caixa separa turno, extrato, histórico e configurações por tarefa", async ({ page }) => {
   await mockCashApi(page);

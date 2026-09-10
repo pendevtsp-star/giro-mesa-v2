@@ -22,7 +22,12 @@ import {
   useRemote,
 } from "../../management.shared";
 import { formatMoney } from "../../rules";
-import { type InventoryControlsData, parseInventoryControls } from "./inventory-controls";
+import {
+  type InventoryControlsData,
+  inventoryCountContext,
+  parseInventoryControls,
+} from "./inventory-controls";
+import { inventoryQuantity, validInventoryQuantity } from "./inventory-input";
 import { printInventoryLabels } from "./inventory-labels";
 import {
   clearRejectedInventoryActions,
@@ -45,9 +50,11 @@ type RequestReason = (action: ReasonAction) => void;
 export function InventoryControls({
   inventory,
   scope,
+  identityId,
 }: {
   inventory: InventoryData;
   scope: ManagementScope;
+  identityId?: string;
 }) {
   const remote = useRemote(scope, api.management.inventoryControls, parseInventoryControls);
   const [busy, setBusy] = useState(false);
@@ -137,6 +144,7 @@ export function InventoryControls({
           <div className="inventory-overview-grid">
             <BlindCountCard
               busy={busy}
+              identityId={identityId}
               data={data}
               inventory={inventory}
               onRun={run}
@@ -381,23 +389,38 @@ function BlindCountCard({
   onRun,
   onQueued,
   scope,
+  identityId,
 }: ControlCardProps & {
+  identityId?: string;
   onQueued: (status: ReturnType<typeof inventoryOfflineStatus>) => void;
   onRequestReason: RequestReason;
 }) {
-  const [locationId, setLocationId] = useState(inventory.locations[0]?.id ?? "");
+  const [locationId, setLocationId] = useState(
+    inventory.locations.find((location) => location.active)?.id ?? "",
+  );
   const [scheduleId, setScheduleId] = useState("");
   const [reason, setReason] = useState("Conferência operacional do setor");
   const [counts, setCounts] = useState<Record<string, string>>({});
-  const open = data.countSessions.find((session) => session.status === "open");
-  const submitted = data.countSessions.find((session) => session.status === "submitted");
+  const { open, submitted, canSubmit, canReview } = inventoryCountContext(
+    data,
+    locationId,
+    identityId,
+  );
+  const creator = inventory.inventoryOperators.find(
+    (operator) => operator.id === (open ?? submitted)?.startedByIdentityId,
+  )?.name;
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (open) {
+      if (
+        !canSubmit ||
+        open.lines.some((line) => !validInventoryQuantity(counts[line.id] ?? "", true))
+      )
+        return;
       const body = {
         lines: open.lines.map((line) => ({
           lineId: line.id,
-          countedQuantity: counts[line.id] ?? "0",
+          countedQuantity: inventoryQuantity(counts[line.id] ?? "0"),
         })),
         capturedAt: new Date().toISOString(),
         offline: !navigator.onLine,
@@ -448,27 +471,47 @@ function BlindCountCard({
         </Badge>
       </div>
       <form className="gm-form-stack" onSubmit={submit}>
+        <Label>
+          <span>Setor da contagem</span>
+          <NativeSelect
+            required
+            value={locationId}
+            onChange={(event) => {
+              setLocationId(event.target.value);
+              setScheduleId("");
+            }}
+          >
+            <option value="">Selecione o setor</option>
+            {inventory.locations
+              .filter(
+                (location) =>
+                  location.active ||
+                  data.countSessions.some(
+                    (session) =>
+                      session.locationId === location.id &&
+                      ["open", "submitted"].includes(session.status),
+                  ),
+              )
+              .map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+          </NativeSelect>
+        </Label>
+        {(open || submitted) && (
+          <p className="inventory-context-note">
+            Iniciada por{" "}
+            {creator ??
+              ((open ?? submitted)?.startedByIdentityId === identityId ? "você" : "outro operador")}
+            .
+            {open && !canSubmit
+              ? " Apenas quem iniciou pode enviar esta contagem. Escolha outro setor para iniciar uma nova."
+              : ""}
+          </p>
+        )}
         {!open && !submitted && (
           <>
-            <Label>
-              <span>Setor</span>
-              <NativeSelect
-                required
-                value={locationId}
-                onChange={(event) => {
-                  setLocationId(event.target.value);
-                  setScheduleId("");
-                }}
-              >
-                {inventory.locations
-                  .filter((item) => item.active)
-                  .map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-              </NativeSelect>
-            </Label>
             <Label>
               <span>Escopo</span>
               <NativeSelect
@@ -496,7 +539,10 @@ function BlindCountCard({
                 onChange={(event) => setReason(event.target.value)}
               />
             </Label>
-            <Button disabled={busy || !locationId} type="submit">
+            <Button
+              disabled={busy || !locationId || !inventory.items.some((item) => item.active)}
+              type="submit"
+            >
               Iniciar sem exibir saldo
             </Button>
           </>
@@ -514,6 +560,7 @@ function BlindCountCard({
                   {line.lotId ? ` · ${lotBy(inventory, line.lotId)}` : ""}
                 </span>
                 <Input
+                  disabled={!canSubmit}
                   inputMode="decimal"
                   min="0"
                   required
@@ -525,7 +572,14 @@ function BlindCountCard({
                 />
               </Label>
             ))}
-            <Button disabled={busy || open.lines.some((line) => !counts[line.id])} type="submit">
+            <Button
+              disabled={
+                busy ||
+                !canSubmit ||
+                open.lines.some((line) => !validInventoryQuantity(counts[line.id] ?? "", true))
+              }
+              type="submit"
+            >
               Enviar conferência
             </Button>
           </>
@@ -539,25 +593,32 @@ function BlindCountCard({
             {submitted.lines.map((line) => (
               <p key={line.id}>
                 <strong>{itemBy(inventory, line.inventoryItemId)}</strong> · esperado{" "}
-                {line.expectedQuantity} · contado {line.countedQuantity} · diferença{" "}
-                {line.differenceQuantity}
+                {line.expectedQuantity?.toLocaleString("pt-BR")} · contado{" "}
+                {line.countedQuantity?.toLocaleString("pt-BR")} · diferença{" "}
+                {line.differenceQuantity?.toLocaleString("pt-BR")}
               </p>
             ))}
             <div className="inventory-command-bar__actions">
               <Button
-                disabled={busy || !data.capabilities.canReviewCount}
+                disabled={busy || !canReview}
                 onClick={() => reviewCount(onRequestReason, onRun, scope, submitted.id, "approved")}
               >
                 Aprovar e aplicar
               </Button>
               <Button
-                disabled={busy || !data.capabilities.canReviewCount}
+                disabled={busy || !canReview}
                 onClick={() => reviewCount(onRequestReason, onRun, scope, submitted.id, "rejected")}
                 variant="secondary"
               >
                 Rejeitar
               </Button>
             </div>
+            {!canReview && (
+              <p className="inventory-context-note">
+                A revisão exige um gerente autorizado e, quando o duplo controle está ativo,
+                diferente de quem contou.
+              </p>
+            )}
           </>
         )}
       </form>

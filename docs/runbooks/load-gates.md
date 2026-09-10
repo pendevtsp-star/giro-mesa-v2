@@ -76,6 +76,65 @@ rtk proxy k6 run load/k6-multitenant.js
 
 O public QR não usa os cookies. Operação e multitenancy falham antes de iniciar se uma variável de sessão estiver ausente. O harness não possui fallback para segredo em arquivo ou valor padrão.
 
+## Probe local F1: 120 mesas e 12 terminais
+
+`load/f1-local.mjs` mede o cenário F1 contra a API local já servida em `127.0.0.1:3217`.
+Ele não usa Docker, WSL ou k6, não inicia nem reinicia serviços e recusa outro host ou porta. O probe:
+
+- cria uma organização/unidade exclusiva e 120 mesas em quatro lotes de 30;
+- abre 12 autenticações HTTP independentes do mesmo owner, cada uma com cookie e `x-device-id` próprios;
+- distribui dez mesas exclusivas para cada terminal e mantém 12 loops concorrentes de leitura;
+- descarta em um proxy TCP local a resposta de uma abertura já confirmada pela API, repete a mesma chave idempotente e exige replay;
+- consulta novamente a API e exige 120 mesas e 120 comandas raiz abertas no tenant do probe.
+
+Defina a chave interna da instância local apenas no ambiente do processo. Ela e os cookies não são
+gravados nos artefatos:
+
+```powershell
+$env:F1_API_URL = "http://127.0.0.1:3217"
+$env:F1_INTERNAL_API_KEY = "<chave interna exclusiva da API local>"
+$env:F1_DURATION_SECONDS = "60"
+$env:F1_THINK_TIME_MS = "1000"
+rtk node load/f1-local.mjs
+```
+
+Depois que o processo terminar e o exit code tiver sido registrado, remova a chave do shell:
+
+```powershell
+Remove-Item Env:F1_INTERNAL_API_KEY
+```
+
+A duração aceita de 10 a 600 segundos. O resumo sanitizado e a fixture sem credenciais ficam em
+`tests/e2e-live/.runtime/f1/<timestamp>/`. Registre duração real, vazão, p95 de leitura e escrita,
+falhas, contagens finais e o SHA/schema retornado por `/health`. O gate usa p95 menor que 300 ms para
+leituras, p95 menor que 500 ms para escritas e taxa de falhas menor que 0,1%.
+
+O limite sensível de autenticação permanece em dez tentativas por IP por minuto. O runner usa a sessão
+emitida pelo cadastro como a primeira das 12 e espera o `Retry-After` ao preparar as demais. Esse tempo
+de preparação não conta como carga operacional. O think time padrão de 1 segundo mantém o loop dentro
+do ritmo humano previsto; o resumo separa vazão de leitura e escrita. As 12 sessões ainda representam
+um único owner, portanto este perfil não comprova 12 identidades de garçom nem atribuições de praça.
+Uma falha antes do resumo gera `prefix-failed.json` e não produz resultado de capacidade.
+
+### Resultado local F1 de 2026-09-10
+
+O probe de cinco minutos em PostgreSQL 17 e API local, schema 83, concluiu com 120 mesas e 120
+comandas raiz persistidas. As 12 sessões do mesmo owner sustentaram 6.318 leituras em 300 segundos
+(21,06 leituras/s), com p95 de 121,68 ms. As 119 escritas medidas foram exclusivamente a rajada
+inicial de abertura das outras mesas, antes do steady state, com p95 de 253,40 ms; o steady state não
+enviou pedidos nem outras mutações. O runner observou zero respostas HTTP com falha nessa execução e
+confirmou replay idempotente após descartar uma resposta já confirmada pela API.
+
+Esses números não demonstram capacidade sustentada de pedidos ou pagamentos. Também não comprovam 12
+identidades de garçom, comportamento da VPS ou ausência de perda. O artefato sanitizado está em
+`tests/e2e-live/.runtime/f1/2026-09-10T22-58-15.229Z/summary.json`. A execução prefixada anterior, com
+think time de 250 ms, foi reprovada por 429 compartilhado entre sessões e está preservada no diretório
+`2026-09-10T22-40-22.439Z`; ela não gerou métricas válidas de capacidade.
+
+Esse probe comprova somente o comportamento observado na máquina e na API locais durante aquela
+execução. Ele não mede a infraestrutura da VPS, não substitui `target`, `spike` ou `soak` e não
+autoriza afirmar ausência de perda em outros padrões de falha.
+
 ## Target, spike e soak
 
 Troque `K6_PROFILE` pelo profile aprovado e use uma fixture completa, gerada para o ambiente descartável. Antes de `spike` ou `soak`, execute e aprove `smoke` e `target` no mesmo artefato. Não rode os perfis pesados em laptop compartilhado ou VPS piloto.

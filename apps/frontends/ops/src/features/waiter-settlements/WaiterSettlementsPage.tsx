@@ -24,7 +24,7 @@ import {
   TableRow,
   Textarea,
 } from "@giromesa/ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useRef, useState } from "react";
 import { ApiClientError, api } from "../../api";
 import {
   currencyToCents,
@@ -67,7 +67,7 @@ async function attachmentBase64(file: File) {
 const areaItems = [
   { id: "settlements", label: "Apurações" },
   { id: "losses", label: "Perdas" },
-  { id: "partnership", label: "Partnership" },
+  { id: "partnership", label: "Comissões por faixa" },
   { id: "settings", label: "Regras" },
 ] satisfies Array<{ id: Area; label: string }>;
 
@@ -130,6 +130,7 @@ function SettlementsArea({
   const [to, setTo] = useState(initial.to);
   const [operationalShiftId, setOperationalShiftId] = useState("");
   const [preview, setPreview] = useState<WaiterSettlement | null>(null);
+  const previewRevision = useRef(0);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [transition, setTransition] = useState<{
@@ -138,8 +139,16 @@ function SettlementsArea({
   } | null>(null);
   const cashRemote = useRemote(scope, api.management.cashShifts, parseCash);
 
+  function invalidatePreview() {
+    previewRevision.current += 1;
+    setPreview(null);
+    setFeedback("Filtros alterados. Calcule uma nova prévia antes de gerar o fechamento.");
+  }
+
   async function loadPreview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const revision = ++previewRevision.current;
+    setPreview(null);
     setBusy(true);
     setFeedback("");
     try {
@@ -148,22 +157,27 @@ function SettlementsArea({
         scope.unitId,
         { from, to, operationalShiftId: operationalShiftId || undefined },
       );
-      setPreview(parseSettlement(payload, true));
+      if (revision === previewRevision.current) setPreview(parseSettlement(payload, true));
     } catch (error) {
-      setFeedback(errorMessage(error));
+      if (revision === previewRevision.current) setFeedback(errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
   async function createSettlement() {
+    if (!preview || busy || preview.blockers.length > 0) return;
     setBusy(true);
     setFeedback("");
     try {
       await api.management.createWaiterSettlement(
         scope.organizationId,
         scope.unitId,
-        { from, to, operationalShiftId: operationalShiftId || undefined },
+        {
+          from: preview.periodFrom,
+          to: preview.periodTo,
+          operationalShiftId: preview.operationalShiftId || undefined,
+        },
         operationalKey("waiter-settlement"),
       );
       setPreview(null);
@@ -219,7 +233,10 @@ function SettlementsArea({
               <Input
                 id="settlement-from"
                 max={to}
-                onChange={(event) => setFrom(event.target.value)}
+                onChange={(event) => {
+                  setFrom(event.target.value);
+                  invalidatePreview();
+                }}
                 required
                 type="date"
                 value={from}
@@ -229,7 +246,10 @@ function SettlementsArea({
               <Input
                 id="settlement-to"
                 min={from}
-                onChange={(event) => setTo(event.target.value)}
+                onChange={(event) => {
+                  setTo(event.target.value);
+                  invalidatePreview();
+                }}
                 required
                 type="date"
                 value={to}
@@ -238,7 +258,10 @@ function SettlementsArea({
             <FormField htmlFor="settlement-shift" label="Turno (opcional)">
               <NativeSelect
                 id="settlement-shift"
-                onChange={(event) => setOperationalShiftId(event.target.value)}
+                onChange={(event) => {
+                  setOperationalShiftId(event.target.value);
+                  invalidatePreview();
+                }}
                 value={operationalShiftId}
               >
                 <option value="">Todos os turnos</option>
@@ -284,7 +307,10 @@ function SettlementsArea({
               ) : null
             }
             settlement={preview}
-            title="Prévia não persistida"
+            shiftLabel={
+              data.operationalShifts.find((shift) => shift.id === preview.operationalShiftId)?.label
+            }
+            title="Prévia — ainda não registrada"
           />
         </>
       )}
@@ -294,7 +320,7 @@ function SettlementsArea({
           <div className="grid gap-1.5">
             <CardTitle>Fechamentos registrados</CardTitle>
             <CardDescription>
-              Aprovação e pagamento usam a fotografia das regras vigente na geração.
+              Aprovação e pagamento usam os valores registrados na geração do fechamento.
             </CardDescription>
           </div>
           <Button className="print:hidden" onClick={() => window.print()} size="sm" variant="ghost">
@@ -348,6 +374,10 @@ function SettlementsArea({
                 }
                 key={settlement.id ?? `${settlement.periodFrom}:${settlement.periodTo}`}
                 settlement={settlement}
+                shiftLabel={
+                  data.operationalShifts.find((shift) => shift.id === settlement.operationalShiftId)
+                    ?.label
+                }
               />
             ))
           ) : (
@@ -526,10 +556,12 @@ function SettlementsArea({
 function SettlementCard({
   actions,
   settlement,
+  shiftLabel,
   title,
 }: {
   actions?: React.ReactNode;
   settlement: WaiterSettlement;
+  shiftLabel?: string;
   title?: string;
 }) {
   const payable = settlement.lines.reduce((total, line) => total + line.payableCents, 0);
@@ -540,6 +572,12 @@ function SettlementCard({
           <CardTitle>
             {title ?? `${dateLabel(settlement.periodFrom)} a ${dateLabel(settlement.periodTo)}`}
           </CardTitle>
+          <CardDescription>
+            {dateLabel(settlement.periodFrom)} a {dateLabel(settlement.periodTo)} ·{" "}
+            {settlement.operationalShiftId
+              ? (shiftLabel ?? "Turno selecionado")
+              : "Todos os turnos"}
+          </CardDescription>
           <CardDescription>
             {settlement.lines.length} profissional(is) · Total {formatMoney(payable)}
           </CardDescription>
@@ -555,67 +593,103 @@ function SettlementCard({
           {actions}
         </div>
       </CardHeader>
-      <CardContent className="overflow-x-auto">
+      <CardContent className="grid min-w-0 gap-3">
         {settlement.warnings.length > 0 && (
           <Alert className="mb-3">
             <AlertTitle>Confira antes de continuar</AlertTitle>
             <AlertDescription>{settlement.warnings.join(" ")}</AlertDescription>
           </Alert>
         )}
+        {settlement.lines.length > 0 && (
+          <ul className="grid min-w-0 gap-3 md:grid-cols-2" aria-label="Resumo por profissional">
+            {settlement.lines.map((line) => (
+              <li
+                key={line.personIdentityId}
+                className="grid min-w-0 gap-2 rounded-lg border border-border p-3"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <strong className="min-w-0 break-words font-medium">{line.personName}</strong>
+                  <span className="font-semibold">A pagar {formatMoney(line.payableCents)}</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Serviço rateado {formatMoney(line.serviceShareCents)} + comissão por faixa{" "}
+                  {formatMoney(line.partnershipCents)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Perdas informativas: {formatMoney(line.operationalLossCents)} · sem desconto do
+                  valor a pagar
+                </p>
+                {!line.eligibleForPayment && <Badge tone="neutral">Somente informativo</Badge>}
+              </li>
+            ))}
+          </ul>
+        )}
         {settlement.lines.length ? (
-          <Table className="min-w-[1120px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Profissional</TableHead>
-                <TableHead>Comandas / pedidos</TableHead>
-                <TableHead>Venda bruta</TableHead>
-                <TableHead>Descontos</TableHead>
-                <TableHead>Venda líquida</TableHead>
-                <TableHead>Recebido</TableHead>
-                <TableHead>Serviço calculado</TableHead>
-                <TableHead>Rateio do serviço</TableHead>
-                <TableHead>Gorjetas</TableHead>
-                <TableHead>Partnership</TableHead>
-                <TableHead>Perdas (informativo)</TableHead>
-                <TableHead>A pagar</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {settlement.lines.map((line) => (
-                <TableRow key={line.personId ?? line.personIdentityId}>
-                  <TableCell>
-                    <strong className="block font-medium">{line.personName}</strong>
-                    <small className="text-muted-foreground">
-                      {line.roleLabel ?? "Função não informada"}
-                    </small>
-                    {!line.eligibleForPayment && <Badge tone="neutral">Somente informativo</Badge>}
-                  </TableCell>
-                  <TableCell>
-                    {line.tabCount} / {line.orderCount}
-                  </TableCell>
-                  <TableCell>{formatMoney(line.grossSalesCents)}</TableCell>
-                  <TableCell>{formatMoney(line.discountCents)}</TableCell>
-                  <TableCell>
-                    {formatMoney(
-                      Math.max(0, line.grossSalesCents - line.discountCents - line.canceledCents),
-                    )}
-                  </TableCell>
-                  <TableCell>{formatMoney(line.receivedCents)}</TableCell>
-                  <TableCell>{formatMoney(line.serviceChargeCents)}</TableCell>
-                  <TableCell>{formatMoney(line.serviceShareCents)}</TableCell>
-                  <TableCell>{formatMoney(line.tipCents)}</TableCell>
-                  <TableCell>{formatMoney(line.partnershipCents)}</TableCell>
-                  <TableCell>{formatMoney(line.operationalLossCents)}</TableCell>
-                  <TableCell className="font-semibold">{formatMoney(line.payableCents)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <details className="min-w-0 rounded-lg border border-border p-3">
+            <summary className="cursor-pointer text-sm font-medium">Ver valores detalhados</summary>
+            <section
+              className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring"
+              aria-label="Valores detalhados do fechamento"
+              // biome-ignore lint/a11y/noNoninteractiveTabindex: keyboard users need horizontal scrolling of the table.
+              tabIndex={0}
+            >
+              <Table className="min-w-[1120px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Profissional</TableHead>
+                    <TableHead>Comandas / pedidos</TableHead>
+                    <TableHead>Venda bruta</TableHead>
+                    <TableHead>Descontos</TableHead>
+                    <TableHead>Venda líquida</TableHead>
+                    <TableHead>Recebido</TableHead>
+                    <TableHead>Serviço calculado</TableHead>
+                    <TableHead>Rateio do serviço</TableHead>
+                    <TableHead>Gorjetas</TableHead>
+                    <TableHead>Comissão por faixa</TableHead>
+                    <TableHead>Perdas (informativo)</TableHead>
+                    <TableHead>A pagar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {settlement.lines.map((line) => (
+                    <TableRow key={line.personId ?? line.personIdentityId}>
+                      <TableCell>
+                        <strong className="block font-medium">{line.personName}</strong>
+                        <small className="text-muted-foreground">
+                          {line.roleLabel ?? "Função não informada"}
+                        </small>
+                        {!line.eligibleForPayment && (
+                          <Badge tone="neutral">Somente informativo</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {line.tabCount} / {line.orderCount}
+                      </TableCell>
+                      <TableCell>{formatMoney(line.grossSalesCents)}</TableCell>
+                      <TableCell>{formatMoney(line.discountCents)}</TableCell>
+                      <TableCell>
+                        {formatMoney(Math.max(0, line.grossSalesCents - line.discountCents))}
+                      </TableCell>
+                      <TableCell>{formatMoney(line.receivedCents)}</TableCell>
+                      <TableCell>{formatMoney(line.serviceChargeCents)}</TableCell>
+                      <TableCell>{formatMoney(line.serviceShareCents)}</TableCell>
+                      <TableCell>{formatMoney(line.tipCents)}</TableCell>
+                      <TableCell>{formatMoney(line.partnershipCents)}</TableCell>
+                      <TableCell>{formatMoney(line.operationalLossCents)}</TableCell>
+                      <TableCell className="font-semibold">
+                        {formatMoney(line.payableCents)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </section>
+          </details>
         ) : (
           <EmptyState
             description="Não há vendas atribuíveis no período selecionado."
             icon="◇"
-            title="Apuração sem linhas"
+            title="Nenhuma venda para apurar"
           />
         )}
       </CardContent>
@@ -875,7 +949,7 @@ function LossesArea({ data, onRefresh, scope }: AreaProps) {
 function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
   const initial: PartnershipPlan = data.partnershipPlan ?? {
     id: null,
-    name: "Partnership",
+    name: "Comissões por faixa",
     effectiveFrom: defaultSettlementPeriod(data.configuration).from,
     active: true,
     tiers: [{ minimumCents: 0, maximumCents: null, rewardType: "percentage", rewardValue: 0 }],
@@ -904,7 +978,7 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
         { name: plan.name.trim(), effectiveFrom: plan.effectiveFrom, tiers: plan.tiers },
         operationalKey("partnership-plan"),
       );
-      setFeedback("Plano de partnership salvo com nova vigência.");
+      setFeedback("Plano de comissões salvo para a vigência informada.");
       onRefresh();
     } catch (error) {
       setFeedback(errorMessage(error));
@@ -916,8 +990,11 @@ function PartnershipArea({ data, onRefresh, scope }: AreaProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Plano de partnership</CardTitle>
-        <CardDescription>Faixas contínuas e versionadas por data de vigência.</CardDescription>
+        <CardTitle>Comissões por faixa</CardTitle>
+        <CardDescription>
+          Configure as faixas acordadas com a equipe. Salvar na mesma vigência atualiza o plano para
+          novas apurações; fechamentos já registrados mantêm seus valores.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={save}>
@@ -1121,9 +1198,7 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
     <Card>
       <CardHeader>
         <CardTitle>Regras do fechamento</CardTitle>
-        <CardDescription>
-          Escolhas simples, aplicadas e fotografadas em cada apuração.
-        </CardDescription>
+        <CardDescription>As regras utilizadas ficam registradas em cada apuração.</CardDescription>
       </CardHeader>
       <CardContent>
         <form className="grid gap-4" onSubmit={save}>
@@ -1132,7 +1207,7 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
               <span>
                 <strong className="block text-sm">Sugerir taxa de serviço</strong>
                 <small className="text-muted-foreground">
-                  Afeta somente novas comandas de mesa; retirada, balcão e delivery permanecem sem
+                  Afeta somente novas comandas de mesa; retirada, balcão e entregas permanecem sem
                   taxa.
                 </small>
               </span>
@@ -1263,7 +1338,7 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
             </FormField>
             <SelectSetting
               id="partnership-base"
-              label="Base do partnership"
+              label="Base da comissão"
               onChange={(value) =>
                 update("partnershipBase", value as SettlementConfiguration["partnershipBase"])
               }
@@ -1299,33 +1374,11 @@ function SettingsArea({ data, onRefresh, scope }: AreaProps) {
                 ["ignore", "Ignorar"],
               ]}
             />
-            <SelectSetting
-              id="cancellation-treatment"
-              label="Cancelamentos"
-              onChange={(value) =>
-                update(
-                  "cancellationTreatment",
-                  value as SettlementConfiguration["cancellationTreatment"],
-                )
-              }
-              value={settings.cancellationTreatment}
-              options={[
-                ["exclude", "Excluir"],
-                ["deduct", "Deduzir da base"],
-              ]}
-            />
-            <SelectSetting
-              id="refund-treatment"
-              label="Estornos"
-              onChange={(value) =>
-                update("refundTreatment", value as SettlementConfiguration["refundTreatment"])
-              }
-              value={settings.refundTreatment}
-              options={[
-                ["deduct", "Deduzir da base"],
-                ["informational", "Somente informativo"],
-              ]}
-            />
+            <p className="text-sm text-muted-foreground md:col-span-2">
+              Perdas e ocorrências são informativas e não reduzem a comissão nem o valor a pagar. A
+              base “Recebido” usa os recebimentos líquidos de estornos financeiros confirmados.
+              Itens cancelados já estão fora das vendas e não geram um segundo desconto.
+            </p>
             <SelectSetting
               id="period-mode"
               label="Período padrão"

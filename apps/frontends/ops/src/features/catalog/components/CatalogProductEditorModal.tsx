@@ -303,7 +303,7 @@ export function CatalogProductEditorModal({
               </Label>
 
               <Label className="gm-field">
-                Preço Delivery (R$)
+                Preço para entrega (R$)
                 <Input
                   data-currency="brl"
                   value={editingProductDeliveryPrice}
@@ -482,7 +482,7 @@ export function CatalogProductEditorModal({
                     <Label className="gm-field catalog-field--compact">
                       CFOP
                       <Input
-                        value={editingProduct.cfop || "5.102"}
+                        value={editingProduct.cfop || ""}
                         onChange={(e) =>
                           setEditingProduct({ ...editingProduct, cfop: e.target.value })
                         }

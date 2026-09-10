@@ -32,6 +32,7 @@ import { and, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { ManagementService } from "./management.service.js";
+import { csvCell } from "./management-report.rules.js";
 import {
   allocateCents,
   normalizeSettlementConfig,
@@ -67,7 +68,6 @@ type AggregationOrderRow = {
   tabTotalCents: number | string;
   paidCents: number | string;
   operationalLossCents: number | string;
-  refundCents: number | string;
 };
 
 type PreviewSource = {
@@ -83,7 +83,6 @@ type PreviewSource = {
   serviceChargeCents: number;
   tipCents: number;
   operationalLossCents: number;
-  refundCents: number;
   orderCount: number;
 };
 
@@ -128,9 +127,9 @@ function cents(value: number | string | null | undefined) {
   return Number(value ?? 0);
 }
 
-function csvCell(value: unknown) {
-  const text = String(value ?? "");
-  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+function settlementCsvCell(value: unknown) {
+  // Spreadsheet imports can ignore leading whitespace before interpreting a formula.
+  return csvCell(typeof value === "string" && /^\s*[=+\-@]/.test(value) ? `'${value}` : value);
 }
 
 @Injectable()
@@ -946,8 +945,7 @@ export class ManagementSettlementsService {
          group by reversals.organization_id,reversals.unit_id,payments.tab_id
       ), losses as (
         select organization_id, unit_id, tab_id,
-               coalesce(sum(amount_cents),0)::int loss_cents,
-               coalesce(sum(amount_cents) filter (where type in ('refund','chargeback')),0)::int refund_cents
+               coalesce(sum(amount_cents),0)::int loss_cents
           from management_operational_losses
          where organization_id=${organizationId}::uuid and status='approved'
          group by organization_id,unit_id,tab_id
@@ -960,7 +958,7 @@ export class ManagementSettlementsService {
              tabs.service_charge_cents as "tabServiceChargeCents", tabs.tip_cents as "tabTipCents",
              tabs.total_cents as "tabTotalCents",
              greatest(coalesce(payments.paid_cents,0)-coalesce(reversals.reversed_cents,0),0)::int as "paidCents",
-             coalesce(losses.loss_cents,0)::int as "operationalLossCents", coalesce(losses.refund_cents,0)::int as "refundCents"
+              coalesce(losses.loss_cents,0)::int as "operationalLossCents"
         from pos_tabs tabs
         join units source_unit on source_unit.organization_id=tabs.organization_id and source_unit.id=tabs.unit_id
         left join pos_orders orders on orders.organization_id=tabs.organization_id and orders.unit_id=tabs.unit_id and orders.tab_id=tabs.id
@@ -972,7 +970,7 @@ export class ManagementSettlementsService {
          and timezone(source_unit.timezone,tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
          ${unitFilter} ${shiftFilter} ${eligibility}
        group by tabs.id,tabs.unit_id,tabs.responsible_identity_id,orders.id,orders.created_by_identity_id,
-                tabs.service_charge_cents,tabs.tip_cents,tabs.total_cents,payments.paid_cents,reversals.reversed_cents,losses.loss_cents,losses.refund_cents
+                tabs.service_charge_cents,tabs.tip_cents,tabs.total_cents,payments.paid_cents,reversals.reversed_cents,losses.loss_cents
        order by tabs.id,orders.id
     `);
     const byTab = new Map<string, AggregationOrderRow[]>();
@@ -1030,7 +1028,6 @@ export class ManagementSettlementsService {
       const service = allocateCents(cents(first.tabServiceChargeCents), serviceWeights);
       const tips = allocateCents(cents(first.tabTipCents), weights);
       const losses = allocateCents(cents(first.operationalLossCents), weights);
-      const refunds = allocateCents(cents(first.refundCents), weights);
       sources.push(
         ...raw.map((source) => ({
           ...source,
@@ -1038,7 +1035,6 @@ export class ManagementSettlementsService {
           serviceChargeCents: service.get(source.key) ?? 0,
           tipCents: tips.get(source.key) ?? 0,
           operationalLossCents: losses.get(source.key) ?? 0,
-          refundCents: refunds.get(source.key) ?? 0,
         })),
       );
     }
@@ -1073,7 +1069,7 @@ export class ManagementSettlementsService {
       if (!current || person.unitId === unitId || (!current.active && person.active))
         personByIdentity.set(person.identityId, person);
     }
-    const lineMap = new Map<string, PreviewLine & { tabIds: Set<string>; refundCents: number }>();
+    const lineMap = new Map<string, PreviewLine & { tabIds: Set<string> }>();
     let unassignedGrossCents = 0;
     for (const source of sources) {
       if (!source.identityId) {
@@ -1101,7 +1097,6 @@ export class ManagementSettlementsService {
         operationalLossCents: 0,
         payableCents: 0,
         tabIds: new Set<string>(),
-        refundCents: 0,
       };
       line.tabIds.add(source.tabId);
       line.orderCount += source.orderCount;
@@ -1112,7 +1107,6 @@ export class ManagementSettlementsService {
       line.serviceChargeCents += source.serviceChargeCents;
       line.tipCents += source.tipCents;
       line.operationalLossCents += source.operationalLossCents;
-      line.refundCents += source.refundCents;
       lineMap.set(source.identityId, line);
     }
     const internalLines = [...lineMap.values()];
@@ -1134,8 +1128,8 @@ export class ManagementSettlementsService {
         ? (serviceShares.get(line.personIdentityId) ?? 0)
         : 0;
       const discount = configuration.discountTreatment === "deduct" ? line.discountCents : 0;
-      const canceled = configuration.cancellationTreatment === "deduct" ? line.canceledCents : 0;
-      const salesNet = Math.max(0, line.grossSalesCents - discount - canceled);
+      // The source query already excludes canceled items from gross sales and discounts.
+      const salesNet = Math.max(0, line.grossSalesCents - discount);
       const rawBase =
         configuration.partnershipBase === "gross"
           ? line.grossSalesCents
@@ -1144,10 +1138,9 @@ export class ManagementSettlementsService {
             : configuration.partnershipBase === "received"
               ? line.receivedCents
               : salesNet;
-      line.partnershipBaseCents = Math.max(
-        0,
-        rawBase - (configuration.refundTreatment === "deduct" ? line.refundCents : 0),
-      );
+      // Operational incidents are informational, including legacy refundTreatment="deduct".
+      // The received base already reflects approved POS reversals; never deduct them twice.
+      line.partnershipBaseCents = rawBase;
       line.partnershipCents =
         line.eligibleForPayment && plan
           ? partnershipRewardCents(
@@ -1161,7 +1154,7 @@ export class ManagementSettlementsService {
         : 0;
     }
     const lines = internalLines
-      .map(({ tabIds: _tabIds, refundCents: _refundCents, ...line }) => line)
+      .map(({ tabIds: _tabIds, ...line }) => line)
       .sort((left, right) => left.personName.localeCompare(right.personName));
     return {
       id: null,
@@ -1227,6 +1220,11 @@ export class ManagementSettlementsService {
       "settlement.create",
       period,
       async (tx) => {
+        // All units and period shapes share this lock, including shift/month closures.
+        // A source can belong to only one non-canceled financial settlement.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`waiter-settlement-sources:${organizationId}`}))`,
+        );
         const preview = await this.buildPreview(tx, organizationId, unitId, period);
         if (preview.blockers.length > 0)
           throw new ConflictException({
@@ -1256,6 +1254,37 @@ export class ManagementSettlementsService {
             code: "WAITER_SETTLEMENT_PERIOD_ALREADY_CLOSED",
             settlementId: duplicate.id,
           });
+        const tabIds = [...new Set(preview.sources.map((source) => source.tabId))];
+        if (tabIds.length > 0) {
+          const [overlap] = await tx
+            .select({ settlementId: managementWaiterSettlements.id })
+            .from(managementWaiterSettlementSources)
+            .innerJoin(
+              managementWaiterSettlements,
+              and(
+                eq(
+                  managementWaiterSettlements.organizationId,
+                  managementWaiterSettlementSources.organizationId,
+                ),
+                eq(managementWaiterSettlements.id, managementWaiterSettlementSources.settlementId),
+              ),
+            )
+            .where(
+              and(
+                eq(managementWaiterSettlementSources.organizationId, organizationId),
+                inArray(managementWaiterSettlementSources.tabId, tabIds),
+                inArray(managementWaiterSettlements.status, ["closed", "approved", "paid"]),
+              ),
+            )
+            .limit(1);
+          if (overlap)
+            throw new ConflictException({
+              code: "WAITER_SETTLEMENT_SOURCES_ALREADY_CLOSED",
+              message:
+                "Há comandas já incluídas em outro fechamento. Confira o fechamento existente antes de gerar novamente.",
+              settlementId: overlap.settlementId,
+            });
+        }
         const settlementId = randomUUID();
         const lineIds = new Map(preview.lines.map((line) => [line.personIdentityId, randomUUID()]));
         await tx.insert(managementWaiterSettlements).values({
@@ -1289,23 +1318,15 @@ export class ManagementSettlementsService {
         );
         if (attributableSources.length > 0) {
           await tx.insert(managementWaiterSettlementSources).values(
-            attributableSources.map(
-              ({
-                key,
-                identityId,
-                refundCents: _refundCents,
-                orderCount: _orderCount,
-                ...source
-              }) => ({
-                id: randomUUID(),
-                organizationId,
-                unitId,
-                settlementId,
-                settlementLineId: lineIds.get(identityId as string) as string,
-                sourceKey: key,
-                ...source,
-              }),
-            ),
+            attributableSources.map(({ key, identityId, orderCount: _orderCount, ...source }) => ({
+              id: randomUUID(),
+              organizationId,
+              unitId,
+              settlementId,
+              settlementLineId: lineIds.get(identityId as string) as string,
+              sourceKey: key,
+              ...source,
+            })),
           );
         }
         await this.record(
@@ -1650,9 +1671,9 @@ export class ManagementSettlementsService {
       "Serviço",
       "Gorjetas",
       "Rateio do serviço",
-      "Base partnership",
-      "Partnership",
-      "Perdas operacionais",
+      "Base da comissão",
+      "Comissão por faixa",
+      "Perdas operacionais (informativo)",
       "A pagar",
       "Status",
     ];
@@ -1674,7 +1695,7 @@ export class ManagementSettlementsService {
       line.payableCents,
       settlement.status,
     ]);
-    const content = `\ufeff${[columns, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
+    const content = `\ufeff${[columns, ...rows].map((row) => row.map(settlementCsvCell).join(";")).join("\r\n")}`;
     return {
       filename: `fechamento-garcons-${settlement.periodFrom}-${settlement.periodTo}.csv`,
       content,
