@@ -169,14 +169,17 @@ public sealed class CloudSyncWorker(
             ParsePayload(item.Payload),
             item.Version,
             item.OccurredAt)).ToArray();
+        var metadata = new Dictionary<string, object>
+        {
+            ["capabilities"] = new[] { "financial_print_jobs_v1" },
+        };
+        if (snapshotRevision is not null) metadata["snapshotRevision"] = snapshotRevision;
         using var response = await httpClient.PostAsJsonAsync(
             "/api/v1/sync/batches",
             new SyncBatch(
                 1,
                 HubVersion(),
-                snapshotRevision is null
-                    ? new Dictionary<string, object>()
-                    : new Dictionary<string, object> { ["snapshotRevision"] = snapshotRevision },
+                metadata,
                 acknowledgedCommandIds,
                 commandResults,
                 outboundEvents),

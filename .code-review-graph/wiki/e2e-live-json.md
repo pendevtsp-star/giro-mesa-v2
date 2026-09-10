@@ -12,7 +12,6 @@ Directory-based community: tests/e2e-live
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| test:abre, movimenta e fecha um caixa pela UI com API e PostgreSQL reais@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-live/cash-live.spec.ts | 5-78 |
 | json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-live/salon-live.spec.ts | 5-10 |
 | test:opera, unifica, divide e imprime com API compilada e PostgreSQL reais@L12 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-live/salon-live.spec.ts | 12-206 |
 | openTable | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-live/salon-live.spec.ts | 144-152 |
@@ -25,36 +24,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `getByRole` (33 edge(s))
-- `click` (27 edge(s))
-- `expect` (26 edge(s))
-- `toBeVisible` (18 edge(s))
-- `getByText` (13 edge(s))
-- `post` (12 edge(s))
-- `getByLabel` (9 edge(s))
-- `slice` (6 edge(s))
-- `fill` (6 edge(s))
+- `getByRole` (20 edge(s))
+- `click` (15 edge(s))
+- `expect` (14 edge(s))
+- `post` (10 edge(s))
+- `toBeVisible` (9 edge(s))
 - `locator` (6 edge(s))
-- `randomUUID` (5 edge(s))
-- `now` (4 edge(s))
+- `getByText` (6 edge(s))
 - `filter` (4 edge(s))
-- `toBe` (3 edge(s))
-- `ok` (3 edge(s))
+- `slice` (4 edge(s))
+- `randomUUID` (4 edge(s))
+- `get` (3 edge(s))
+- `now` (2 edge(s))
+- `map` (2 edge(s))
+- `press` (2 edge(s))
+- `toBeHidden` (2 edge(s))
 
 ### Incoming
 
-- `getByRole` (30 edge(s))
-- `click` (25 edge(s))
-- `expect` (24 edge(s))
-- `toBeVisible` (17 edge(s))
-- `getByText` (13 edge(s))
-- `post` (12 edge(s))
-- `getByLabel` (9 edge(s))
-- `slice` (6 edge(s))
-- `fill` (6 edge(s))
-- `randomUUID` (5 edge(s))
+- `getByRole` (17 edge(s))
+- `click` (13 edge(s))
+- `expect` (12 edge(s))
+- `post` (10 edge(s))
+- `toBeVisible` (8 edge(s))
+- `getByText` (6 edge(s))
 - `locator` (5 edge(s))
-- `now` (4 edge(s))
-- `first` (3 edge(s))
+- `slice` (4 edge(s))
+- `randomUUID` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e-live/salon-live.spec.ts` (3 edge(s))
 - `get` (3 edge(s))
+- `filter` (3 edge(s))
+- `now` (2 edge(s))
+- `map` (2 edge(s))
+- `press` (2 edge(s))

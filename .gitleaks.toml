@@ -4,6 +4,14 @@ title = "GiroMesa gitleaks policy"
 useDefault = true
 
 [[allowlists]]
+description = "Synthetic credentials for the localhost-only unified service test"
+regexTarget = "secret"
+regexes = [
+  '''^unified-e2e-internal-key$''',
+  '''^unified-e2e-qr-secret-at-least-32-bytes$''',
+]
+
+[[allowlists]]
 description = "Known synthetic Stripe-shaped redaction fixture"
 regexTarget = "secret"
 regexes = ['''^sk_live_1234567890abcdef$''']

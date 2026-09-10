@@ -19,14 +19,6 @@ Directory-based community: apps/frontends
 | Page | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/app/page.tsx | 1-12 |
 | PrivacyPage | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/app/privacidade/page.tsx | 1-23 |
 | CategoryNav | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/CategoryNav.tsx | 1-41 |
-| HubState | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/MenuHeader.tsx | 5-5 |
-| MenuHeader | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/MenuHeader.tsx | 7-100 |
-| AddressState | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/OrderFlow.tsx | 6-14 |
-| OrderOptionsState | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/OrderFlow.tsx | 16-19 |
-| OrderFlow | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/OrderFlow.tsx | 21-295 |
-| setField | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/OrderFlow.tsx | 65-66 |
-| submit | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/OrderFlow.tsx | 67-70 |
-| ProductCard | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/ProductCard.tsx | 4-34 |
 | ProductList | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/ProductList.tsx | 4-38 |
 | applyTheme | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/ThemeSelector.tsx | 18-21 |
 | ThemeSelector | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/components/menu/ThemeSelector.tsx | 23-65 |
@@ -62,8 +54,16 @@ Directory-based community: apps/frontends
 | isPublicSubmissionAccepted | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/public-contracts.ts | 25-32 |
 | readCouponValidation | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/public-contracts.ts | 34-48 |
 | MutationAttempt | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/public-contracts.ts | 50-50 |
+| resolveMutationAttempt | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/public-contracts.ts | 52-58 |
+| test:normaliza e resolve a preferência visual do cardápio@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/theme.test.ts | 5-11 |
+| ThemePreference | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/theme.ts | 1-1 |
+| normalizeThemePreference | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/theme.ts | 5-7 |
+| resolveTheme | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/customer/lib/theme.ts | 9-11 |
+| describe:shared report scope@L4 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/App.test.ts | 4-12 |
+| it:requires organization and unit together@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/App.test.ts | 5-11 |
+| ErrorBoundary | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/ErrorBoundary.tsx | 4-32 |
 
-*... and 1186 more members.*
+*... and 1171 more members.*
 
 ## Execution Flows
 
@@ -77,20 +77,20 @@ Directory-based community: apps/frontends
 ### Outgoing
 
 - `expect` (597 edge(s))
-- `useState` (419 edge(s))
-- `map` (385 edge(s))
-- `Button` (305 edge(s))
-- `Label` (216 edge(s))
+- `useState` (409 edge(s))
+- `map` (374 edge(s))
+- `Button` (292 edge(s))
 - `toBe` (213 edge(s))
-- `Input` (189 edge(s))
-- `filter` (180 edge(s))
+- `Label` (202 edge(s))
+- `filter` (178 edge(s))
+- `Input` (176 edge(s))
 - `trim` (173 edge(s))
 - `String` (138 edge(s))
-- `NativeSelect` (115 edge(s))
+- `NativeSelect` (114 edge(s))
 - `stringify` (104 edge(s))
 - `toEqual` (97 edge(s))
-- `find` (93 edge(s))
 - `get` (93 edge(s))
+- `find` (90 edge(s))
 
 ### Incoming
 
@@ -105,7 +105,7 @@ Directory-based community: apps/frontends
 - `toMatchObject` (59 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/salon/FloorPlan.tsx` (56 edge(s))
 - `stringContaining` (55 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/counter/CounterWorkspace.tsx::TabWorkspace` (44 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/counter/CounterWorkspace.tsx::TabWorkspaceSession` (47 edge(s))
 - `stubGlobal` (43 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/site/lib/commercial.ts` (42 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/shell/OperationalApp.tsx` (33 edge(s))

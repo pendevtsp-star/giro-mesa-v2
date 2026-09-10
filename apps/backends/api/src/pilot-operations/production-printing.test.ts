@@ -6,7 +6,11 @@ import {
   productionPrinterConnectionProbeInputSchema,
   productionPrintPolicyInputSchema,
 } from "@giromesa/contracts";
-import { isPrivatePrinterAddress, printerDeliveryIssue } from "./production-printing.service.js";
+import {
+  isPrivatePrinterAddress,
+  printerDeliveryIssue,
+  supportsFinancialPrintJobs,
+} from "./production-printing.service.js";
 
 const printer = {
   hubId: crypto.randomUUID(),
@@ -25,6 +29,13 @@ const printer = {
 } as const;
 
 describe("production printing contracts", () => {
+  it("requires an explicit financial cloud capability rather than printer health or version", () => {
+    assert.equal(supportsFinancialPrintJobs(undefined), false);
+    assert.equal(supportsFinancialPrintJobs({ version: "99.0", online: true }), false);
+    assert.equal(supportsFinancialPrintJobs({ capabilities: "financial_print_jobs_v1" }), false);
+    assert.equal(supportsFinancialPrintJobs({ capabilities: ["kds_ticket"] }), false);
+    assert.equal(supportsFinancialPrintJobs({ capabilities: ["financial_print_jobs_v1"] }), true);
+  });
   it("validates the cashier policy and exposes offline, unapplied and untested printers", () => {
     assert.equal(
       billPrintingPolicySchema.safeParse({ mode: "cashier_printer", printerId: null, revision: 0 })

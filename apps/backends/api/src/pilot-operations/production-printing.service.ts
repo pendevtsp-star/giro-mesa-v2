@@ -82,6 +82,13 @@ export function printerDeliveryIssue(
   return null;
 }
 
+export function supportsFinancialPrintJobs(metadata: Record<string, unknown> | null | undefined) {
+  return (
+    Array.isArray(metadata?.capabilities) &&
+    metadata.capabilities.includes("financial_print_jobs_v1")
+  );
+}
+
 function isAllowedPrinterIpv4(value: string) {
   const [first = 0, second = 0] = value.split(".").map(Number);
   return (
@@ -245,6 +252,7 @@ export class ProductionPrintingService {
           if (!printer.active || !printer.documentTypes.includes("partial_statement"))
             throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY" });
           await this.requireActiveHub(tx, organizationId, unitId, printer.hubId);
+          await this.requireFinancialPrintingHub(tx, organizationId, unitId, printer.hubId);
         }
         const policy = {
           mode: input.mode,
@@ -1652,6 +1660,7 @@ export class ProductionPrintingService {
     if (!printer.active || !printer.documentTypes.includes(job.documentType))
       throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY", printerId });
     await this.requireActiveHub(tx, job.organizationId, job.unitId, printer.hubId);
+    await this.requireFinancialPrintingHub(tx, job.organizationId, job.unitId, printer.hubId);
     return this.queueCloudCommand(tx, job, printer, {
       cloudPrintJobId: job.id,
       idempotencyKey: `print-job:${job.id}`,
@@ -1703,6 +1712,32 @@ export class ProductionPrintingService {
       .returning();
     if (!updated) throw new ConflictException({ code: "PRINT_JOB_NOT_FOUND" });
     return updated;
+  }
+
+  private async requireFinancialPrintingHub(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    hubId: string,
+  ) {
+    const [heartbeat] = await tx
+      .select({ metadata: hubHeartbeats.metadata })
+      .from(hubHeartbeats)
+      .where(
+        and(
+          eq(hubHeartbeats.organizationId, organizationId),
+          eq(hubHeartbeats.unitId, unitId),
+          eq(hubHeartbeats.hubId, hubId),
+        ),
+      )
+      .limit(1);
+    if (!supportsFinancialPrintJobs(heartbeat?.metadata))
+      throw new ConflictException({
+        code: "EDGE_HUB_FINANCIAL_PRINT_UPDATE_REQUIRED",
+        message:
+          "Atualize o Conector neste computador e aguarde a conexão para ativar a pré-conta automática. Você pode continuar usando Avisar o caixa.",
+        hubId,
+      });
   }
 
   private async buildTicketPayload(

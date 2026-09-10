@@ -433,6 +433,8 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         {
             CallCount += 1;
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            Assert.Contains("financial_print_jobs_v1", body.RootElement.GetProperty("metadata")
+                .GetProperty("capabilities").EnumerateArray().Select(value => value.GetString()));
             object response;
             if (CallCount == 1)
             {

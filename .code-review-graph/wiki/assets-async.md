@@ -63,7 +63,7 @@ Directory-based community: apps/native
 | PairingPayload | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 551-551 |
 | HubCommandResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 552-552 |
 
-*... and 563 more members.*
+*... and 539 more members.*
 
 ## Execution Flows
 
@@ -89,11 +89,11 @@ Directory-based community: apps/native
 - `Append` (24 edge(s))
 - `ToString` (23 edge(s))
 - `Equals` (22 edge(s))
-- `Error` (21 edge(s))
 - `call` (19 edge(s))
-- `slice` (18 edge(s))
-- `map` (15 edge(s))
+- `Error` (16 edge(s))
+- `slice` (14 edge(s))
 - `forEach` (13 edge(s))
+- `map` (13 edge(s))
 - `indexOf` (13 edge(s))
 - `Add` (12 edge(s))
 - `isArray` (12 edge(s))
@@ -105,14 +105,14 @@ Directory-based community: apps/native
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/purify-es-ChwZkWde.js` (69 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/browser-Cpc4qo6y.js` (46 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/Program.cs` (46 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/settings-gFJVDQd3.js` (24 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceApiClient.cs` (18 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs` (15 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPayments.cs` (12 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosResultOutbox.cs` (9 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-B1r1QY-I.js::e` (8 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-DQQ_NYFW.js` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-BhWyYKw6.js::e` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-CwbZoUGP.js` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/AndroidStubs.cs` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceSecurity.cs` (7 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPaymentContracts.cs` (7 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-B1r1QY-I.js::Rn` (6 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-BhWyYKw6.js::Rn` (6 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/rolldown-runtime-hePW80VL.js` (5 edge(s))

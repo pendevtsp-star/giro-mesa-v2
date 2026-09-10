@@ -345,6 +345,30 @@ it("keeps one desired default per Edge Hub and ignores stale printer-test result
       .update(posProductionPrinters)
       .set({ documentTypes: ["kds_ticket", "partial_statement"] })
       .where(eq(posProductionPrinters.id, restoredA.id));
+    await assert.rejects(
+      service.updateBillPolicy(owner.id, organization.id, unit.id, `bill-policy-old-hub-${runId}`, {
+        mode: "cashier_printer",
+        printerId: restoredA.id,
+        revision: 0,
+      }),
+      (error: unknown) => errorCode(error) === "EDGE_HUB_FINANCIAL_PRINT_UPDATE_REQUIRED",
+    );
+    const notificationPolicy = await service.updateBillPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      `bill-policy-notify-${runId}`,
+      {
+        mode: "notify_cashier",
+        printerId: null,
+        revision: 0,
+      },
+    );
+    assert.equal(notificationPolicy.policy.mode, "notify_cashier");
+    await database.db
+      .update(hubHeartbeats)
+      .set({ metadata: { capabilities: ["financial_print_jobs_v1"] } })
+      .where(eq(hubHeartbeats.hubId, hubA.id));
     const configuredPolicy = await service.updateBillPolicy(
       owner.id,
       organization.id,
@@ -353,10 +377,10 @@ it("keeps one desired default per Edge Hub and ignores stale printer-test result
       {
         mode: "cashier_printer",
         printerId: restoredA.id,
-        revision: 0,
+        revision: 1,
       },
     );
-    assert.equal(configuredPolicy.policy.revision, 1);
+    assert.equal(configuredPolicy.policy.revision, 2);
     assert.deepEqual(
       (await service.readBillPolicy(owner.id, organization.id, unit.id)).policy,
       configuredPolicy.policy,
@@ -393,7 +417,26 @@ it("keeps one desired default per Edge Hub and ignores stale printer-test result
       })
       .returning();
     assert.ok(initial);
-    await database.db.delete(hubHeartbeats).where(eq(hubHeartbeats.hubId, hubA.id));
+    await database.db
+      .update(hubHeartbeats)
+      .set({ metadata: {} })
+      .where(eq(hubHeartbeats.hubId, hubA.id));
+    await assert.rejects(
+      database.db.transaction((tx) => service.queueFinancialJob(tx, initial, restoredA.id)),
+      (error: unknown) => errorCode(error) === "EDGE_HUB_FINANCIAL_PRINT_UPDATE_REQUIRED",
+    );
+    assert.equal(
+      (await database.db.select().from(posPrintJobs).where(eq(posPrintJobs.id, initial.id)))[0]
+        ?.hubCommandId,
+      null,
+    );
+    await database.db
+      .update(hubHeartbeats)
+      .set({
+        metadata: { capabilities: ["financial_print_jobs_v1"] },
+        lastSeenAt: new Date(Date.now() - 5 * 60_000),
+      })
+      .where(eq(hubHeartbeats.hubId, hubA.id));
     const queued = await database.db.transaction((tx) =>
       service.queueFinancialJob(tx, initial, restoredA.id),
     );

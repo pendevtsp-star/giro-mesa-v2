@@ -34,7 +34,9 @@ O teste real dedicado usa `tests/e2e-live/unified-service.config.ts` e `unified-
 
 Em Dispositivo/Impressão, a política por unidade define `notify_cashier` (avisar o caixa, padrão), `cashier_printer` (impressora cadastrada no caixa via Edge Hub) ou `local_terminal` (perfil local autorizado). A política tem revisão para detectar alterações concorrentes. Ela não altera o destino dos comprovantes de pagamento ou de fechamento.
 
-Em `cashier_printer`, o job e seu comando cloud persistem mesmo quando o Hub está offline; a fila mostra o diagnóstico. Reconectar não pode duplicar a via. Um comando expirado exige conferência do resultado; o navegador não pode confirmar nem reivindicar o job cloud. Falha confirmada permite nova tentativa auditada; resultado desconhecido exige resolução explícita antes disso.
+Em `cashier_printer`, o Conector precisa anunciar `financial_print_jobs_v1` no heartbeat. Uma instalação antiga recebe a orientação para atualizar e pode continuar usando `notify_cashier`; versão textual ou conexão online não comprovam suporte. Com a capacidade já anunciada, o job e seu comando cloud persistem mesmo quando o Hub está offline; a fila mostra o diagnóstico. Reconectar não pode duplicar a via. Um comando expirado exige conferência do resultado; o navegador não pode confirmar nem reivindicar o job cloud. Falha confirmada permite nova tentativa auditada; resultado desconhecido exige resolução explícita antes disso.
+
+O workflow `publish-edge-hub.yml` exige certificado de assinatura e gera o instalador assinado do commit escolhido. A publicação na VPS/GitHub não atualiza os computadores do restaurante: execute a opção Reparar do instalador atualizado e confirme o anúncio da capacidade antes de habilitar a pré-conta cloud. Sem certificado ou homologação física, essa integração permanece pendente; não distribua um executável sem assinatura como substituto.
 
 ## Gate físico 58 e 80 mm
 

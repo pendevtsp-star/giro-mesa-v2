@@ -63,7 +63,7 @@ Directory-based community: apps/backends
 | verifyStepUp | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 529-591 |
 | revoke | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 593-605 |
 
-*... and 2461 more members.*
+*... and 2358 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (1796 edge(s))
-- `equal` (1018 edge(s))
-- `where` (945 edge(s))
-- `from` (729 edge(s))
-- `values` (622 edge(s))
-- `select` (597 edge(s))
-- `insert` (573 edge(s))
-- `and` (556 edge(s))
-- `Param` (437 edge(s))
-- `ParseUUIDPipe` (418 edge(s))
-- `returning` (361 edge(s))
-- `limit` (348 edge(s))
-- `ok` (311 edge(s))
-- `map` (293 edge(s))
-- `set` (240 edge(s))
+- `eq` (1608 edge(s))
+- `equal` (984 edge(s))
+- `where` (882 edge(s))
+- `from` (687 edge(s))
+- `values` (604 edge(s))
+- `select` (580 edge(s))
+- `insert` (562 edge(s))
+- `and` (506 edge(s))
+- `Param` (408 edge(s))
+- `ParseUUIDPipe` (389 edge(s))
+- `returning` (344 edge(s))
+- `limit` (317 edge(s))
+- `ok` (304 edge(s))
+- `map` (282 edge(s))
+- `update` (221 edge(s))
 
 ### Incoming
 
-- `equal` (1013 edge(s))
-- `ok` (306 edge(s))
-- `eq` (298 edge(s))
-- `values` (298 edge(s))
-- `insert` (298 edge(s))
-- `where` (242 edge(s))
-- `returning` (211 edge(s))
-- `deepEqual` (206 edge(s))
-- `randomUUID` (206 edge(s))
-- `safeParse` (178 edge(s))
-- `from` (168 edge(s))
-- `select` (147 edge(s))
-- `rejects` (98 edge(s))
+- `equal` (979 edge(s))
+- `ok` (299 edge(s))
+- `values` (291 edge(s))
+- `insert` (291 edge(s))
+- `eq` (287 edge(s))
+- `where` (234 edge(s))
+- `returning` (206 edge(s))
+- `deepEqual` (204 edge(s))
+- `randomUUID` (203 edge(s))
+- `safeParse` (169 edge(s))
+- `from` (162 edge(s))
+- `select` (141 edge(s))
+- `rejects` (95 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-pos.controller.ts` (93 edge(s))
-- `delete` (77 edge(s))
+- `delete` (75 edge(s))
