@@ -3,6 +3,19 @@ import { expect, test } from "@playwright/test";
 test("QR acompanha preparo e entrega, recupera rede e preserva alergia em 375 px", async ({
   page,
 }, testInfo) => {
+  async function expectCenteredDialog(centerVertically = true) {
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 812 });
+      const box = await page.getByRole("dialog").boundingBox();
+      if (!box) throw new Error("O diálogo deve estar visível");
+      expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThanOrEqual(1);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.y + box.height).toBeLessThanOrEqual(812);
+      if (centerVertically) {
+        expect(Math.abs(box.y + box.height / 2 - 406)).toBeLessThanOrEqual(1);
+      }
+    }
+  }
   let status = "draft";
   let failed = false;
   let reads = 0;
@@ -54,6 +67,7 @@ test("QR acompanha preparo e entrega, recupera rede e preserva alergia em 375 px
   await page.goto("/m/teste");
   await page.getByRole("button", { name: /Prato de teste/ }).click();
   await expect(page.getByRole("dialog").locator(".product-hero")).toHaveCount(0);
+  await expectCenteredDialog();
   for (const label of ["Alguma observação?", "Alergia alimentar"]) {
     const field = page.getByLabel(label);
     await expect(field).toBeVisible();
@@ -63,6 +77,7 @@ test("QR acompanha preparo e entrega, recupera rede e preserva alergia em 375 px
   await page.getByRole("button", { name: /Adicionar.*29,90/ }).click();
   await page.getByRole("button", { name: /Ver seleção/ }).click();
   await expect(page.getByRole("dialog", { name: "Revisar pedido" })).toContainText("Mesa 12");
+  await expectCenteredDialog(false);
   await page.getByRole("button", { name: "Solicitar confirmação" }).click();
   await expect(page.getByRole("heading", { name: "Aguardando confirmação" })).toBeVisible();
   expect(submitted).toMatchObject({ items: [{ allergyNote: "Amendoim" }] });

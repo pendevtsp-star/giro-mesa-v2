@@ -16,6 +16,7 @@ As páginas abertas de produção foram inspecionadas antes da alteração. Muta
 - KDS: seis tickets reais em duas estações; início de preparo, bloqueio de conclusão por alergia pendente, confirmação de ciência, conclusão e recarga mantendo o estado. Tela cheia inspecionada no Opera desktop e em viewport de 375 px.
 - Cardápio: publicação real de oito produtos, busca combinada com categoria, detalhes, inclusão na seleção e revisão do carrinho. Inspeção clara/escura e a 375 px. Nenhum pedido público foi enviado.
 - Os testes visuais revelaram e corrigiram dois problemas de cascata: resumo por item ainda visível na tela cheia e campos do modal de produto espremidos horizontalmente.
+- A conferência após o deploy identificou o reset de margem deslocando os diálogos para o canto no desktop. A margem automática foi restaurada para produto e carrinho; a jornada existente verifica a centralização em 375 e 1440 px.
 
 ## Verificação reproduzível
 

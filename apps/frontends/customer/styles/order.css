@@ -1,5 +1,6 @@
 .product-dialog,
 .cart-dialog {
+  margin: auto;
   width: min(620px, calc(100% - 24px));
   max-height: calc(100dvh - 28px);
   border-radius: 22px;
