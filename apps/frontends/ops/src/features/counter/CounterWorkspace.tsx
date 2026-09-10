@@ -3391,6 +3391,7 @@ function TabWorkspaceSession({
                                   window.clearTimeout(Number(event.currentTarget.dataset.holdTimer))
                                 }
                                 type="button"
+                                variant="ghost"
                               >
                                 <span aria-hidden="true">{item.name.slice(0, 1)}</span>
                                 <span>
@@ -3422,6 +3423,7 @@ function TabWorkspaceSession({
                                   )
                                 }
                                 type="button"
+                                variant="ghost"
                               >
                                 <Icon
                                   className={
