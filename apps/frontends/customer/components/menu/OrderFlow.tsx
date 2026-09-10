@@ -281,7 +281,7 @@ export function OrderFlow({
         )}
       </div>
       <p className="service-note">
-        O servidor confirma preços, disponibilidade, pedido mínimo e taxa antes de registrar.
+        Preços, disponibilidade e taxas serão conferidos ao confirmar o pedido.
       </p>
       <Button
         className="place-order"

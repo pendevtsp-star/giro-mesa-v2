@@ -53,6 +53,12 @@ test("QR acompanha preparo e entrega, recupera rede e preserva alergia em 375 px
   });
   await page.goto("/m/teste");
   await page.getByRole("button", { name: /Prato de teste/ }).click();
+  await expect(page.getByRole("dialog").locator(".product-hero")).toHaveCount(0);
+  for (const label of ["Alguma observação?", "Alergia alimentar"]) {
+    const field = page.getByLabel(label);
+    await expect(field).toBeVisible();
+    expect((await field.boundingBox())?.width).toBeGreaterThan(220);
+  }
   await page.getByLabel("Alergia alimentar").fill("Amendoim");
   await page.getByRole("button", { name: /Adicionar.*29,90/ }).click();
   await page.getByRole("button", { name: /Ver seleção/ }).click();

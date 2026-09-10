@@ -1,22 +1,19 @@
 @media (max-width: 520px) {
   html {
-    background: var(--paper);
-  }
-  .menu-app {
-    box-shadow: none;
+    background: var(--gm-paper);
   }
   .restaurant-header {
     min-height: auto;
-    padding: 20px 18px;
+    padding: 14px 16px;
     grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
   }
   .restaurant-mark {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
   }
   .restaurant-header h1 {
-    font-size: 1.35rem;
+    font-size: 1.25rem;
   }
   .restaurant-header__controls {
     width: 100%;
@@ -36,17 +33,23 @@
     grid-template-columns: 1fr;
   }
   .menu-card {
-    grid-template-columns: 104px minmax(0, 1fr);
-    min-height: 132px;
+    grid-template-columns: 92px minmax(0, 1fr);
+    min-height: 116px;
   }
   .food-visual {
     height: 100%;
-    min-height: 132px;
-    font-size: 48px;
+    min-height: 116px;
   }
   .menu-card-copy {
-    min-height: 132px;
+    min-height: 116px;
     padding: 13px;
+  }
+  .menu-card--text-only {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .menu-card--text-only .menu-card-copy {
+    min-height: 96px;
   }
   .product-hero {
     height: 210px;
@@ -65,8 +68,8 @@
     margin-inline: 10px;
   }
   .public-services {
-    margin-inline: 14px;
-    padding: 18px;
+    margin-inline: 0;
+    padding: 18px 14px;
   }
   .service-grid {
     grid-template-columns: 1fr;

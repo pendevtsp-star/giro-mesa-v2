@@ -53,25 +53,24 @@ test("abre, movimenta e fecha um caixa pela UI com API e PostgreSQL reais", asyn
     page.getByRole("button", { name: "Selecionar Caixa E2E principal, fechado" }),
   ).toBeVisible();
 
-  await page.getByLabel("Fundo de caixa (R$)").fill("100,00");
-  await page.getByRole("button", { name: "Abrir caixa" }).click();
-  await expect(page.getByText("Caixa aberto.", { exact: true })).toBeVisible();
+  await page.getByLabel("Fundo de troco inicial (R$)").fill("100,00");
+  await page.getByRole("button", { name: "Abrir turno" }).click();
+  await expect(page.getByText("Caixa aberto com sucesso.", { exact: true })).toBeVisible();
   await page.getByLabel("Ações da gaveta Caixa E2E principal").click();
   await expect(page.getByRole("button", { name: "Desativar" })).toBeDisabled();
   await expect(page.getByText("Feche o caixa para desativar.")).toBeVisible();
 
-  await page.getByText("Suprimento ou sangria", { exact: true }).click();
-  await page.getByLabel("Tipo").selectOption("supply");
-  await page.getByLabel("Valor", { exact: true }).fill("10,00");
-  await page.getByLabel("Motivo", { exact: true }).first().fill("Reforço E2E");
-  await page.getByRole("button", { name: "Registrar movimento" }).click();
+  await page.getByRole("button", { name: "Suprimento", exact: true }).click();
+  await page.getByLabel("Valor (R$)").fill("10,00");
+  await page.getByLabel("Motivo auditável").fill("Reforço E2E");
+  await page.getByRole("button", { name: "Registrar Suprimento" }).click();
   await expect(page.getByText("Suprimento registrado.", { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByText("R$ 110,00", { exact: true }).first()).toBeVisible();
-  await page.getByText("Fechar caixa", { exact: true }).click();
+  await page.getByRole("button", { name: "Fechar caixa" }).click();
   await page.getByLabel("Dinheiro contado").fill("110,00");
-  await page.getByRole("button", { name: "Revisar contagem" }).click();
+  await page.getByRole("button", { name: "Revisar Contagem e Fechar Caixa" }).click();
   await page.getByRole("button", { name: "Confirmar fechamento" }).click();
   await expect(page.getByRole("heading", { name: "Resultado da conferência" })).toBeVisible();
   await expect(page.getByText("Sem diferença", { exact: true })).toBeVisible();

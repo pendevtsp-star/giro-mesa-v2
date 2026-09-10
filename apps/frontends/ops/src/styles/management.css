@@ -897,6 +897,7 @@
   min-width: 0;
 }
 .kds-workspace:fullscreen {
+  align-content: start;
   background: var(--gm-paper);
   min-height: 100dvh;
   overflow: auto;
@@ -3335,4 +3336,28 @@
   .kds-availability-products li .gm-button {
     width: 100%;
   }
+}
+
+.kds-workspace:fullscreen .kds-tabs,
+.kds-workspace:fullscreen .kds-metrics,
+.kds-workspace:fullscreen .kds-all-day,
+.kds-workspace:fullscreen .kds-capacity-alert,
+.kds-workspace:fullscreen .kds-shortcuts,
+.kds-workspace:fullscreen .kds-terminal-actions,
+.kds-workspace:fullscreen [data-kds-refresh],
+.kds-workspace:fullscreen [data-kds-current="true"],
+.kds-workspace:fullscreen .kds-operational-context .gm-badge {
+  display: none;
+}
+.kds-workspace:fullscreen .kds-command-bar {
+  align-items: center;
+  border-bottom: 1px solid var(--gm-border);
+  flex-direction: row;
+  padding-bottom: var(--gm-space-2);
+}
+.kds-workspace:fullscreen .kds-toolbar-actions {
+  width: auto;
+}
+.kds-workspace:fullscreen .kds-main-layout {
+  grid-template-columns: minmax(0, 1fr);
 }

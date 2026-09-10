@@ -47,6 +47,7 @@ async function mockKdsApi(page: Page) {
   const state = {
     acknowledgedAttention: false,
     attentionEnabled: false,
+    productionGridEnabled: false,
     availabilityMutations: [] as Array<{
       available: boolean;
       reason: string;
@@ -222,7 +223,29 @@ async function mockKdsApi(page: Page) {
           revision: String(state.revision),
           serverTime: now.toISOString(),
           operationServiceMode: "full_service",
+          productionGrid: state.productionGridEnabled
+            ? [
+                {
+                  stationId: ids.kitchen,
+                  productId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+                  productName: "Risoto de cogumelos",
+                  totalQuantity: 1,
+                  queuedQuantity: 1,
+                  preparingQuantity: 0,
+                  readyQuantity: 0,
+                  heldQuantity: 0,
+                  assignments: [],
+                },
+              ]
+            : [],
+          demand: {
+            state: "normal",
+            suggestedDelayMinutes: 0,
+            automatic: false,
+            channels: [{ channel: "dine_in", activeOrders: 1, suggestedDelayMinutes: 0 }],
+          },
           capabilities: {
+            productionGrid: state.productionGridEnabled,
             ticketTransition: true,
             itemTransition: true,
             partialReady: true,
@@ -931,6 +954,53 @@ test("KDS mantém acessibilidade, dark mode e ausência de overflow nos pontos c
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(accessibility.violations).toEqual([]);
+});
+
+test("KDS em tela cheia prioriza tickets e preserva alertas e ações", async ({ page }) => {
+  const apiState = await mockKdsApi(page);
+  apiState.attentionEnabled = true;
+  apiState.productionGridEnabled = true;
+  apiState.freshness = "stale";
+  await enterKds(page);
+
+  const rhythm = page
+    .locator("details")
+    .filter({ has: page.getByText("Ritmo da operação", { exact: true }) });
+  await expect(rhythm).not.toHaveAttribute("open", "");
+  await expect(page.getByRole("heading", { name: "Produção por item" })).toBeVisible();
+  for (const width of [375, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.fullscreenElement?.classList.contains("kds-workspace")),
+      )
+      .toBe(true);
+    await expect(page.getByRole("button", { name: "Sair da tela cheia" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Navegação da produção KDS" })).toBeHidden();
+    await expect(page.getByRole("region", { name: "Indicadores da produção" })).toBeHidden();
+    await expect(page.getByLabel("Produção total", { exact: true })).toBeHidden();
+    await expect(rhythm).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Produção por item" })).toBeHidden();
+    await expect(page.getByText("Atalhos de teclado", { exact: true })).toBeHidden();
+    await expect(page.locator("[data-kds-ticket]").first()).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Dados atrasados" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Confirmar ciência de alergia em Risoto de cogumelos" }),
+    ).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole("button", { name: "Sair da tela cheia" }).click();
+    await expect.poll(() => page.evaluate(() => document.fullscreenElement === null)).toBe(true);
+    await expect(rhythm).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
+  const ticket = page.locator(`[data-kds-ticket="${ids.kitchenTicket}"]`);
+  await ticket.getByRole("button", { name: "Iniciar preparo" }).click();
+  await expect.poll(() => apiState.statuses.get(ids.kitchenTicket)).toBe("preparing");
+  await expect(ticket.getByRole("button", { name: "Marcar ticket pronto" })).toBeDisabled();
+  await page.keyboard.press("f");
+  await expect(page.getByRole("button", { name: "Tela cheia", exact: true })).toBeVisible();
 });
 
 test("KDS deixa explícito quando a leitura está atrasada", async ({ page }) => {

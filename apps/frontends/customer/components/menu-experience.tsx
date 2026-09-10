@@ -805,12 +805,6 @@ export function MenuExperience({
         open={openState?.open}
         tableAuthorized={session.status === "ready"}
         tableLabel={session.status === "ready" ? session.tableLabel : undefined}
-        onInfo={() =>
-          setNotice({
-            tone: "success",
-            text: "Cardápio e informações publicados por esta unidade.",
-          })
-        }
       />
       <PublicActions
         sessionStatus={session.status}

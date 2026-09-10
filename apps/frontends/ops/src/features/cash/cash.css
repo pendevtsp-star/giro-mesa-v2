@@ -2,6 +2,10 @@
   max-width: 1160px;
 }
 
+.cash-page [hidden] {
+  display: none;
+}
+
 /* ==========================================================================
    GAVETAS FÍSICAS (Hardware & Ponto de Venda)
    ========================================================================== */
@@ -1410,5 +1414,136 @@
 
   .cash-entry > strong:last-child {
     grid-column: 2;
+  }
+}
+
+.cash-workspace-tabs {
+  display: flex;
+  gap: var(--gm-space-1);
+  padding: var(--gm-space-1);
+  overflow-x: auto;
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-lg);
+}
+
+.cash-workspace-tabs__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: var(--gm-space-2) var(--gm-space-4);
+  gap: var(--gm-space-2);
+  color: var(--gm-muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--gm-radius-md);
+  font: inherit;
+  font-size: var(--gm-font-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cash-workspace-tabs__item:hover {
+  color: var(--gm-ink);
+  background: var(--gm-surface);
+}
+
+.cash-workspace-tabs__item[data-active="true"] {
+  color: var(--gm-action);
+  background: var(--gm-surface);
+  box-shadow: var(--gm-shadow-xs);
+}
+
+.cash-workspace-tabs__item:focus-visible {
+  outline: 3px solid var(--gm-focus);
+  outline-offset: 1px;
+}
+
+.cash-settings {
+  display: grid;
+  gap: var(--gm-space-5);
+}
+
+.cash-settings__form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+  align-items: end;
+  gap: var(--gm-space-3);
+}
+
+.cash-settings__form label,
+.cash-terminal-list label {
+  display: grid;
+  min-width: 0;
+  gap: var(--gm-space-2);
+  color: var(--gm-ink);
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+}
+
+.cash-settings__form button {
+  justify-self: start;
+}
+
+.cash-terminal-list > label {
+  padding: var(--gm-space-3);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: var(--gm-radius-md);
+}
+
+.cash-terminal__select-label {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-2xs);
+  font-weight: 700;
+}
+
+.cash-inline-empty {
+  margin: var(--gm-space-3) 0 0;
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+}
+
+.cash-hero-card--opening {
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-4);
+}
+
+.cash-hero-card__title {
+  font-size: var(--gm-font-xl);
+}
+
+.cash-hero-card__body {
+  max-width: 760px;
+  gap: var(--gm-space-3);
+}
+
+.cash-action-card {
+  gap: var(--gm-space-3);
+  box-shadow: var(--gm-shadow-sm);
+}
+
+.cash-closure-form {
+  gap: var(--gm-space-3);
+}
+
+.cash-closure-step {
+  padding: var(--gm-space-3);
+}
+
+@media (max-width: 640px) {
+  .cash-workspace-tabs__item {
+    flex: 1 0 auto;
+    padding-inline: var(--gm-space-3);
+  }
+
+  .cash-settings__form {
+    grid-template-columns: 1fr;
+  }
+
+  .cash-settings__form button {
+    width: 100%;
   }
 }

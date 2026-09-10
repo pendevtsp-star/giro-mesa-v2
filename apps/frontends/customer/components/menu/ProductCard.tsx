@@ -6,19 +6,18 @@ export function ProductCard({ item, onOpen }: { item: MenuItem; onOpen: () => vo
     <Button
       type="button"
       variant="ghost"
-      className="menu-card"
+      className={`menu-card${item.imageUrl ? "" : " menu-card--text-only"}`}
       onClick={onOpen}
       aria-label={`${item.name}, ${formatMoney(item.priceCents)}${item.available ? "" : ", indisponível"}`}
     >
-      <span className={`food-visual food-${item.id}`} aria-hidden="true">
-        {item.imageUrl ? (
-          // biome-ignore lint/performance/noImgElement: the API media host is configured at runtime.
+      {item.imageUrl && (
+        <span className={`food-visual food-${item.id}`} aria-hidden="true">
+          {/* biome-ignore lint/performance/noImgElement: the API media host is configured at runtime. */}
           <img src={item.imageUrl} alt="" loading="lazy" decoding="async" />
-        ) : (
-          item.visual
-        )}
-      </span>
+        </span>
+      )}
       <span className="menu-card-copy">
+        {!item.available && <span className="sold-out">Indisponível agora</span>}
         <span className="item-name">{item.name}</span>
         <span className="item-description">{item.description}</span>
         <span className="item-meta">
@@ -27,7 +26,6 @@ export function ProductCard({ item, onOpen }: { item: MenuItem; onOpen: () => vo
             <small key={tag}>{tag}</small>
           ))}
         </span>
-        {!item.available && <span className="sold-out">Indisponível agora</span>}
       </span>
     </Button>
   );

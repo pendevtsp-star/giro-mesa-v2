@@ -1,5 +1,5 @@
-import { Button } from "@giromesa/ui";
 import Image from "next/image";
+import type { PublicMenuBranding } from "../../lib/api";
 import { ThemeSelector } from "./ThemeSelector";
 
 type HubState = "checking" | "online" | "offline";
@@ -10,14 +10,12 @@ export function MenuHeader({
   open,
   tableAuthorized,
   tableLabel,
-  onInfo,
 }: {
   hub: HubState;
   branding?: PublicMenuBranding;
   open?: boolean;
   tableAuthorized: boolean;
   tableLabel?: string;
-  onInfo: () => void;
 }) {
   return (
     <>
@@ -44,27 +42,21 @@ export function MenuHeader({
         <div className="restaurant-header__content">
           <p>Cardápio digital</p>
           <h1>{branding?.displayName ?? "Cardápio da unidade"}</h1>
-          <span>{branding?.slogan ?? "Consulte os dados informados pela equipe"}</span>
+          {branding?.slogan && <span>{branding.slogan}</span>}
           {open !== undefined && (
             <strong className={`business-status ${open ? "open" : "closed"}`}>
               {open ? "Aberto agora" : "Fechado agora"}
             </strong>
           )}
           {branding?.openingHours && (
-            <small className="business-hours">{branding.openingHours}</small>
+            <details className="business-hours">
+              <summary className="business-hours-summary">Ver horários</summary>
+              <small className="business-hours-copy">{branding.openingHours}</small>
+            </details>
           )}
         </div>
         <div className="restaurant-header__controls">
           <ThemeSelector />
-          <Button
-            type="button"
-            variant="ghost"
-            className="icon-button"
-            aria-label="Ver informações do restaurante"
-            onClick={onInfo}
-          >
-            i
-          </Button>
         </div>
       </header>
 
@@ -86,17 +78,16 @@ export function MenuHeader({
         </div>
       )}
       {(branding?.notice || branding?.address || branding?.phone || branding?.instagram) && (
-        <section className="brand-details" aria-label="Informações do estabelecimento">
+        <details className="brand-details">
+          <summary className="brand-details-summary">Informações da unidade</summary>
           {branding.notice && <p className="brand-notice">{branding.notice}</p>}
           <div>
             {branding.address && <span>{branding.address}</span>}
             {branding.phone && <span>Telefone: {branding.phone}</span>}
             {branding.instagram && <span>Instagram: {branding.instagram}</span>}
           </div>
-        </section>
+        </details>
       )}
     </>
   );
 }
-
-import type { PublicMenuBranding } from "../../lib/api";

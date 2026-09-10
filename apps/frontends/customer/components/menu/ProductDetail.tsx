@@ -43,20 +43,24 @@ export function ProductDetail({
       onClose={onDismiss}
     >
       {selected && (
-        <div className="dialog-shell">
-          <div className={`product-hero food-${selected.id}`}>
-            <span aria-hidden="true">
-              {selected.imageUrl ? (
-                // biome-ignore lint/performance/noImgElement: the API media host is configured at runtime.
+        <div className={`dialog-shell${selected.imageUrl ? "" : " dialog-shell--text-only"}`}>
+          {selected.imageUrl && (
+            <div className={`product-hero food-${selected.id}`}>
+              <span aria-hidden="true">
+                {/* biome-ignore lint/performance/noImgElement: the API media host is configured at runtime. */}
                 <img src={selected.imageUrl} alt="" decoding="async" />
-              ) : (
-                selected.visual
-              )}
-            </span>
-            <Button type="button" variant="ghost" aria-label="Fechar" onClick={onClose}>
-              ×
-            </Button>
-          </div>
+              </span>
+            </div>
+          )}
+          <Button
+            className="product-dialog-close"
+            type="button"
+            variant="ghost"
+            aria-label="Fechar"
+            onClick={onClose}
+          >
+            ×
+          </Button>
           <div className="dialog-content">
             <p className="overline">{selected.category}</p>
             <h2 id="product-dialog-title">{selected.name}</h2>
@@ -82,7 +86,7 @@ export function ProductDetail({
                 ))}
               </fieldset>
             ))}
-            <Label className="notes">
+            <Label className="notes min-w-0 w-full flex-col items-stretch">
               Alguma observação?
               <Textarea
                 rows={2}
@@ -92,7 +96,7 @@ export function ProductDetail({
                 placeholder="Ex.: sem cebola"
               />
             </Label>
-            <Label className="notes">
+            <Label className="notes min-w-0 w-full flex-col items-stretch">
               Alergia alimentar
               <Textarea
                 rows={2}

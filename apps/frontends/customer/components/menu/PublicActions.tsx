@@ -246,59 +246,52 @@ export function PublicServices({
     <>
       <section className="public-services" aria-labelledby="public-services-title">
         <div className="public-services-heading">
-          <p>Outros canais</p>
-          <h2 id="public-services-title">Retirada, delivery e serviços</h2>
+          <p>Peça do seu jeito</p>
+          <h2 id="public-services-title">Retirada, delivery e mais</h2>
         </div>
-        <div className="service-grid">
-          <Service
-            title="Reserva"
-            state="Solicitação pública"
-            action="Solicitar reserva →"
-            href={`/m/${menuSlug}/servicos#reserva`}
-          >
-            Envie uma solicitação para a unidade. A equipe ainda precisa confirmar o horário.
-          </Service>
-          <Service
-            title="Fila de espera"
-            state="Solicitação pública"
-            action="Entrar na fila →"
-            href={`/m/${menuSlug}/servicos#fila`}
-          >
-            Registre a intenção de entrar na fila, sem promessa automática de tempo ou mesa.
-          </Service>
-          <Service
-            title="Cupom"
-            state="Validação pública"
-            action="Validar cupom →"
-            href={`/m/${menuSlug}/servicos#cupom`}
-          >
-            Confira uma estimativa sem consumir o cupom. A aplicação final ocorre na comanda.
-          </Service>
-          <Service
-            title="Delivery e retirada"
-            state="Pedido persistido"
-            action="Revisar pedido →"
-            onAction={onOpenCart}
-          >
-            Este fluxo é separado do pedido da mesa. Escolha retirada ou entrega própria e pague no
-            recebimento.
-          </Service>
-          <article className="service-card service-card-locked">
-            <Badge tone="warning">Prova de posse pendente</Badge>
-            <h3 className="service-card-title">Saldo de fidelidade</h3>
-            <p className="service-card-copy">
-              A consulta exige OTP para não expor perfil e saldo de terceiros.
-            </p>
-          </article>
-          <Service
-            title="Preferências de comunicação"
-            state="Serviço público"
-            action="Gerenciar preferência →"
-            href="/preferencias"
-          >
-            Recebeu um link de descadastro? Valide o token no serviço público de opt-out.
+        <div className="service-featured">
+          <Service title="Retirada ou delivery" action="Abrir seleção →" onAction={onOpenCart}>
+            Escolha os itens do cardápio e confira as opções disponíveis para esta unidade.
           </Service>
         </div>
+        <details className="service-disclosure">
+          <summary>
+            <span>Ver outros serviços</span>
+            <small>Reserva, fila, cupom e preferências</small>
+          </summary>
+          <div className="service-grid">
+            <Service
+              title="Reservar mesa"
+              action="Solicitar reserva →"
+              href={`/m/${menuSlug}/servicos#reserva`}
+            >
+              Peça um horário. A reserva fica válida após a confirmação da equipe.
+            </Service>
+            <Service
+              title="Fila de espera"
+              action="Entrar na fila →"
+              href={`/m/${menuSlug}/servicos#fila`}
+            >
+              Solicite sua entrada na fila. A equipe confirma a disponibilidade.
+            </Service>
+            <Service
+              title="Consultar cupom"
+              action="Consultar →"
+              href={`/m/${menuSlug}/servicos#cupom`}
+            >
+              Confira as condições do cupom antes de fechar o pedido.
+            </Service>
+            <article className="service-card service-card-locked">
+              <h3 className="service-card-title">Saldo de fidelidade</h3>
+              <p className="service-card-copy">
+                A consulta segura ainda não está disponível neste cardápio.
+              </p>
+            </article>
+            <Service title="Preferências de comunicação" action="Gerenciar →" href="/preferencias">
+              Consulte ou altere as comunicações autorizadas para seu contato.
+            </Service>
+          </div>
+        </details>
       </section>
       <footer className="menu-footer">
         <b>
@@ -313,14 +306,12 @@ export function PublicServices({
 
 function Service({
   title,
-  state,
   action,
   href,
   onAction,
   children,
 }: {
   title: string;
-  state: string;
   action: string;
   href?: string;
   onAction?: () => void;
@@ -328,7 +319,6 @@ function Service({
 }) {
   return (
     <article className="service-card service-card-public">
-      <Badge tone="info">{state}</Badge>
       <h3 className="service-card-title">{title}</h3>
       <p className="service-card-copy">{children}</p>
       {href ? (

@@ -22,6 +22,7 @@ import {
 import { useState } from "react";
 import { api } from "../../api";
 import type { KdsData, PilotScope } from "../../operations.shared";
+import { kdsChannelLabel } from "./kds.model";
 
 const key = () => globalThis.crypto.randomUUID();
 
@@ -31,12 +32,14 @@ export function KdsAdvancedPanels({
   installationId,
   mode,
   refresh,
+  fullscreen,
 }: {
   data: KdsData;
   scope: PilotScope;
   installationId: string;
   mode: "station" | "pass";
   refresh: () => Promise<boolean>;
+  fullscreen: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,10 +108,10 @@ export function KdsAdvancedPanels({
         </Alert>
       )}
 
-      {data.demand && (
-        <Card>
-          <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle>Ritmo da operação</CardTitle>
+      {!fullscreen && data.demand && (
+        <details className="kds-support-panel">
+          <summary>
+            <strong>Ritmo da operação</strong>
             <Badge tone={data.demand.state === "overloaded" ? "danger" : "info"}>
               {data.demand.state === "normal"
                 ? "Normal"
@@ -116,8 +119,8 @@ export function KdsAdvancedPanels({
                   ? "Pressionado"
                   : "Sobrecarregado"}
             </Badge>
-          </CardHeader>
-          <CardContent className="grid gap-2">
+          </summary>
+          <div className="kds-support-panel__body">
             <p>
               Acréscimo recomendado: <strong>{data.demand.suggestedDelayMinutes} min</strong>. A
               decisão permanece manual.
@@ -125,119 +128,123 @@ export function KdsAdvancedPanels({
             <div className="flex flex-wrap gap-2">
               {data.demand.channels.map((channel) => (
                 <Badge key={channel.channel} tone="neutral">
-                  {channel.channel}: {channel.activeOrders} pedidos · +
+                  {kdsChannelLabel(channel.channel)}: {channel.activeOrders} pedidos · +
                   {channel.suggestedDelayMinutes} min
                 </Badge>
               ))}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </details>
       )}
 
-      {mode === "station" && data.capabilities.productionGrid && data.productionGrid.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Produção por item</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Accordion>
-              {data.productionGrid.map((group) => {
-                const recipe = data.items.find(
-                  ({ item }) => item.productId === group.productId && item.recipe.length > 0,
-                )?.item.recipe;
-                return (
-                  <AccordionItem key={`${group.stationId}:${group.productId}`}>
-                    <AccordionTrigger>
-                      {group.productName} · {group.totalQuantity} unidades
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Pedido</TableHead>
-                            <TableHead>Etapa</TableHead>
-                            <TableHead>Quantidade</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Atribuição</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {group.assignments.map((assignment) => {
-                            const ticket = data.tickets.find(
-                              (row) => row.id === assignment.ticketId,
-                            );
-                            const claimedHere = ticket?.claimedByInstallationId === installationId;
-                            const claimedElsewhere = Boolean(
-                              ticket?.claimedByInstallationId && !claimedHere,
-                            );
-                            return (
-                              <TableRow key={`${assignment.ticketId}:${assignment.orderItemId}`}>
-                                <TableCell>{assignment.reference}</TableCell>
-                                <TableCell>{assignment.stage}</TableCell>
-                                <TableCell>
-                                  {assignment.readyQuantity}/{assignment.quantity}
-                                </TableCell>
-                                <TableCell>{assignment.status}</TableCell>
-                                <TableCell>
-                                  {data.capabilities.ticketClaim && ticket && (
-                                    <Button
-                                      disabled={busy === ticket.id || claimedElsewhere}
-                                      onClick={() =>
-                                        run(ticket.id, () =>
-                                          claimedHere
-                                            ? api.pilot.releaseKdsTicketClaim(
-                                                scope.organizationId,
-                                                scope.unitId,
-                                                ticket.id,
-                                                installationId,
-                                                key(),
-                                              )
-                                            : api.pilot.claimKdsTicket(
-                                                scope.organizationId,
-                                                scope.unitId,
-                                                ticket.id,
-                                                installationId,
-                                                key(),
-                                              ),
-                                        )
-                                      }
-                                      size="sm"
-                                      variant="secondary"
-                                    >
-                                      {claimedHere
-                                        ? "Liberar"
-                                        : claimedElsewhere
-                                          ? "Em outro terminal"
-                                          : "Assumir"}
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                      {recipe && (
-                        <details className="mt-3">
-                          <summary className="cursor-pointer font-medium">Ver montagem</summary>
-                          <ul className="mt-2 list-disc pl-5">
-                            {recipe.map((component) => (
-                              <li key={component.id}>
-                                {component.ingredientName}: {component.quantityMilli / 1000}{" "}
-                                {component.unit}
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          </CardContent>
-        </Card>
-      )}
+      {!fullscreen &&
+        mode === "station" &&
+        data.capabilities.productionGrid &&
+        data.productionGrid.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Produção por item</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Accordion>
+                {data.productionGrid.map((group) => {
+                  const recipe = data.items.find(
+                    ({ item }) => item.productId === group.productId && item.recipe.length > 0,
+                  )?.item.recipe;
+                  return (
+                    <AccordionItem key={`${group.stationId}:${group.productId}`}>
+                      <AccordionTrigger>
+                        {group.productName} · {group.totalQuantity} unidades
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Pedido</TableHead>
+                              <TableHead>Etapa</TableHead>
+                              <TableHead>Quantidade</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Atribuição</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.assignments.map((assignment) => {
+                              const ticket = data.tickets.find(
+                                (row) => row.id === assignment.ticketId,
+                              );
+                              const claimedHere =
+                                ticket?.claimedByInstallationId === installationId;
+                              const claimedElsewhere = Boolean(
+                                ticket?.claimedByInstallationId && !claimedHere,
+                              );
+                              return (
+                                <TableRow key={`${assignment.ticketId}:${assignment.orderItemId}`}>
+                                  <TableCell>{assignment.reference}</TableCell>
+                                  <TableCell>{assignment.stage}</TableCell>
+                                  <TableCell>
+                                    {assignment.readyQuantity}/{assignment.quantity}
+                                  </TableCell>
+                                  <TableCell>{assignment.status}</TableCell>
+                                  <TableCell>
+                                    {data.capabilities.ticketClaim && ticket && (
+                                      <Button
+                                        disabled={busy === ticket.id || claimedElsewhere}
+                                        onClick={() =>
+                                          run(ticket.id, () =>
+                                            claimedHere
+                                              ? api.pilot.releaseKdsTicketClaim(
+                                                  scope.organizationId,
+                                                  scope.unitId,
+                                                  ticket.id,
+                                                  installationId,
+                                                  key(),
+                                                )
+                                              : api.pilot.claimKdsTicket(
+                                                  scope.organizationId,
+                                                  scope.unitId,
+                                                  ticket.id,
+                                                  installationId,
+                                                  key(),
+                                                ),
+                                          )
+                                        }
+                                        size="sm"
+                                        variant="secondary"
+                                      >
+                                        {claimedHere
+                                          ? "Liberar"
+                                          : claimedElsewhere
+                                            ? "Em outro terminal"
+                                            : "Assumir"}
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                        {recipe && (
+                          <details className="mt-3">
+                            <summary className="cursor-pointer font-medium">Ver montagem</summary>
+                            <ul className="mt-2 list-disc pl-5">
+                              {recipe.map((component) => (
+                                <li key={component.id}>
+                                  {component.ingredientName}: {component.quantityMilli / 1000}{" "}
+                                  {component.unit}
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </CardContent>
+          </Card>
+        )}
 
       {mode === "pass" && data.capabilities.runnerHandoff && runnerOrders.length > 0 && (
         <Card>

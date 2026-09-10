@@ -8,6 +8,7 @@ const shiftId = "d1111111-1111-4111-8111-111111111111";
 const registerId = "a2222222-2222-4222-8222-222222222222";
 const barRegisterId = "a3333333-3333-4333-8333-333333333333";
 const barShiftId = "d2222222-2222-4222-8222-222222222222";
+const reviewShiftId = "d3333333-3333-4333-8333-333333333333";
 
 test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ page }, testInfo) => {
   test.setTimeout(60_000);
@@ -99,7 +100,29 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
           },
         ],
       });
-    if (path.endsWith("/cash-shifts/history")) return json({ items: [], nextCursor: null });
+    if (path.endsWith("/cash-shifts/history"))
+      return json({
+        items: [
+          {
+            id: reviewShiftId,
+            cashRegisterId: registerId,
+            cashRegisterName: "Caixa principal",
+            unitName: "Unidade Centro",
+            status: "closed",
+            openingCents: 10_000,
+            expectedCents: 15_000,
+            countedCents: 14_900,
+            differenceCents: -100,
+            differenceSeverity: "warning",
+            openedAt: "2026-08-20T15:00:00.000Z",
+            closedAt: "2026-08-20T21:30:00.000Z",
+            operatorName: "Operador",
+            responsibleName: "Operador",
+            closedByName: "Operador",
+          },
+        ],
+        nextCursor: null,
+      });
     if (path.endsWith("/cash-shifts"))
       return json({
         settings: {
@@ -116,7 +139,7 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
           canOpen: true,
           canMove: true,
           canClose: true,
-          canReview: false,
+          canReview: true,
           canViewExpected: false,
           canManageRegisters: false,
           canTransfer: true,
@@ -173,6 +196,27 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
             tenderBreakdown: [],
             differenceSeverity: "none",
           },
+          {
+            id: reviewShiftId,
+            cashRegisterId: registerId,
+            cashRegisterName: "Caixa principal",
+            status: "closed",
+            openingCents: 10_000,
+            expectedCents: 15_000,
+            countedCents: 14_900,
+            differenceCents: -100,
+            openedAt: "2026-08-20T15:00:00.000Z",
+            closedAt: "2026-08-20T21:30:00.000Z",
+            operatorName: "Operador",
+            closedByName: "Operador",
+            reviewedByName: null,
+            reviewedAt: null,
+            reviewNote: null,
+            currentResponsibleIdentityId: identityId,
+            responsibleName: "Operador",
+            tenderBreakdown: [],
+            differenceSeverity: "warning",
+          },
         ],
         entries: [
           {
@@ -205,6 +249,7 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await page.setViewportSize({ width, height: 900 });
     await page.goto("http://127.0.0.1:3112/#/cash");
     await expect(page.getByRole("heading", { name: "Contas e caixa" })).toBeVisible();
+    await page.getByRole("button", { name: "Turno", exact: true }).click();
     await expect(page.getByText("Contagem cega", { exact: true })).toBeVisible();
     const mainRegister = page.getByRole("button", {
       name: "Selecionar Caixa principal, aberto",
@@ -217,19 +262,20 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await expect(page.getByText("2 gavetas em operação", { exact: true })).toBeVisible();
     await expect(page.getByText("1 comanda(s) com saldo pendente")).toBeVisible();
 
+    await expect(page.getByRole("heading", { name: "Fechar turno" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Fechar caixa" }).click();
     const countedInput = page.getByLabel("Dinheiro contado");
-    if (!(await countedInput.isVisible()))
-      await page.getByText("Fechar caixa", { exact: true }).click();
     await countedInput.fill("149,00");
     await barRegister.click();
     await expect(barRegister).toHaveAttribute("aria-pressed", "true");
-    await expect(page.getByLabel("Dinheiro contado")).toHaveValue("");
+    await expect(page.getByRole("heading", { name: "Fechar turno" })).toHaveCount(0);
     await mainRegister.click();
+    await page.getByRole("button", { name: "Fechar caixa" }).click();
     await expect(page.getByLabel("Dinheiro contado")).toHaveValue("");
     await page.getByLabel("Dinheiro contado").fill("149,00");
-    await page.getByRole("button", { name: "Revisar contagem" }).click();
+    await page.getByRole("button", { name: "Revisar Contagem e Fechar Caixa" }).click();
     await expect(
-      page.getByText("Após fechar, o esperado e a diferença serão revelados."),
+      page.getByText("Ao confirmar, o turno será encerrado e as diferenças ficarão registradas."),
     ).toBeVisible();
     await page.getByRole("button", { name: "Confirmar fechamento" }).click();
     await expect(page.getByRole("heading", { name: "Resultado da conferência" })).toBeVisible();
@@ -240,6 +286,10 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await page.keyboard.press("Escape");
     await expect(page.getByRole("dialog")).toBeHidden();
     await expect(page.getByText("Revisão necessária", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: /Histórico/ }).click();
+    await expect(page.getByRole("heading", { name: "Histórico de turnos" })).toBeVisible();
+    await expect(page.getByText(/Revisar divergência/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Resultado da conferência" })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

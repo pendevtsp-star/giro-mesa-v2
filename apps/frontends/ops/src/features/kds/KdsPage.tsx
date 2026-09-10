@@ -2400,6 +2400,16 @@ export function RealKdsPage({
                   </div>
                   <div className="kds-toolbar-actions">
                     <Button
+                      aria-keyshortcuts="F"
+                      aria-pressed={fullscreen}
+                      data-kds-fullscreen
+                      onClick={() => void toggleFullscreen()}
+                      size="sm"
+                      variant="secondary"
+                    >
+                      {fullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                    </Button>
+                    <Button
                       aria-keyshortcuts="R"
                       aria-busy={manualRefreshing}
                       data-kds-refresh
@@ -2421,15 +2431,6 @@ export function RealKdsPage({
                           variant="ghost"
                         >
                           {soundEnabled ? "Desativar som" : "Ativar som"}
-                        </Button>
-                        <Button
-                          aria-keyshortcuts="F"
-                          aria-pressed={fullscreen}
-                          onClick={() => void toggleFullscreen()}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          {fullscreen ? "Sair da tela cheia" : "Tela cheia"}
                         </Button>
                         <Button
                           aria-keyshortcuts="P"
@@ -2455,6 +2456,7 @@ export function RealKdsPage({
 
                 <div
                   className={`kds-freshness kds-freshness--${freshness.tone}`}
+                  data-kds-current={!freshnessNeedsDetail && !leaseAtRisk}
                   role={freshness.alert || leaseAtRisk ? "alert" : "status"}
                 >
                   <Badge tone={freshness.tone}>{freshness.label}</Badge>
@@ -2883,13 +2885,14 @@ export function RealKdsPage({
 
                 <KdsAdvancedPanels
                   data={data}
+                  fullscreen={fullscreen}
                   installationId={terminalInstallationId}
                   mode={operationalViewMode}
                   refresh={remote.refresh}
                   scope={scope}
                 />
 
-                {data.capabilities.batches && (
+                {!fullscreen && data.capabilities.batches && (
                   <KdsBatchesPanel
                     batches={data.batches}
                     busyKeys={busyKeys}

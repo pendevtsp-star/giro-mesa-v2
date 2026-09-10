@@ -7,6 +7,7 @@
   box-shadow: var(--shadow);
 }
 .dialog-shell {
+  position: relative;
   max-height: calc(100dvh - 28px);
   overflow-y: auto;
 }
@@ -25,8 +26,9 @@
   place-items: center;
   overflow: hidden;
 }
-.product-hero > button {
+.product-dialog-close {
   position: absolute;
+  z-index: 1;
   top: 15px;
   right: 15px;
   width: 40px;
@@ -37,6 +39,9 @@
   color: var(--ink);
   font-size: 25px;
   cursor: pointer;
+}
+.dialog-shell--text-only .dialog-content {
+  padding-top: 62px;
 }
 .dialog-content {
   padding: 25px;
@@ -104,16 +109,21 @@ fieldset label input {
 }
 .notes {
   margin-top: 18px;
-  display: grid;
   gap: 7px;
   font-size: 12px;
   font-weight: 750;
 }
 .notes textarea {
+  width: 100%;
+  min-width: 0;
   padding: 11px;
   border: 1px solid var(--gm-border);
   border-radius: 10px;
   resize: vertical;
+}
+.notes > small {
+  display: block;
+  width: 100%;
 }
 .add-row {
   position: sticky;

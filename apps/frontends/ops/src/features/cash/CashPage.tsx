@@ -32,6 +32,7 @@ import { cashEntryLabel, paymentMethodLabel, summarizeCashEntries } from "./cash
 import "./cash.css";
 
 type BusyAction = "open" | "movement" | "close" | "review" | "register" | "transfer" | null;
+type CashWorkspaceView = "shift" | "ledger" | "history" | "settings";
 
 const QUICK_OPENING_AMOUNTS = [
   { label: "R$ 50", value: "50,00" },
@@ -94,9 +95,10 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [lastClosure, setLastClosure] = useState<ReturnType<typeof parseCashClosure> | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [activeView, setActiveView] = useState<CashWorkspaceView>("shift");
   const [activeActionPanel, setActiveActionPanel] = useState<
     "close" | "movement" | "transfer" | null
-  >("close");
+  >(null);
   const [ledgerFilter, setLedgerFilter] = useState<"all" | "in" | "out">("all");
 
   // Novas funcionalidades reais
@@ -119,7 +121,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
     setReviewNote("");
     setFeedback("");
     setActionError("");
-    setActiveActionPanel("close");
+    setActiveActionPanel(null);
     setDenominationCounts({});
     setShowDenominationCalculator(false);
   }
@@ -172,7 +174,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
       setOpening("");
       setLastClosure(null);
       setFeedback("Caixa aberto com sucesso.");
-      setActiveActionPanel("close");
+      setActiveActionPanel(null);
       remote.retry();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Não foi possível abrir o caixa.");
@@ -454,7 +456,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             {/* ALERTAS OPERACIONAIS EM DESTAQUE NO TOPO */}
-            {data.alerts.length > 0 && (
+            {activeView === "shift" && data.alerts.length > 0 && (
               <div className="cash-top-alerts">
                 {data.alerts.map((alert) => (
                   <Callout
@@ -666,7 +668,43 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
               )}
             </Card>
 
-            {openShifts.length > 1 && (
+            <nav className="cash-workspace-tabs" aria-label="Áreas do caixa">
+              {(
+                [
+                  ["shift", "Turno"],
+                  ["ledger", "Extrato"],
+                  ["history", "Histórico"],
+                  ["settings", "Configurações"],
+                ] as const
+              )
+                .filter(
+                  ([view]) =>
+                    view !== "settings" ||
+                    data.capabilities.canManageCashSettings ||
+                    data.capabilities.canManageTerminals,
+                )
+                .map(([view, label]) => (
+                  <button
+                    aria-current={activeView === view ? "page" : undefined}
+                    className="cash-workspace-tabs__item"
+                    data-active={activeView === view}
+                    key={view}
+                    onClick={() => {
+                      setActiveView(view);
+                      setActiveActionPanel(null);
+                      setConfirmClose(false);
+                    }}
+                    type="button"
+                  >
+                    {label}
+                    {view === "history" && reviewCandidate && data.capabilities.canReview && (
+                      <Badge tone="warning">Revisar</Badge>
+                    )}
+                  </button>
+                ))}
+            </nav>
+
+            {activeView === "shift" && openShifts.length > 1 && (
               <Card className="metric-card cash-consolidated-card">
                 <p>Consolidado da unidade ({openShifts.length} gavetas abertas)</p>
                 <strong>
@@ -678,10 +716,73 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
               </Card>
             )}
 
+            {activeView === "shift" && lastClosure && (
+              <Card aria-live="polite" className="cash-result">
+                <div className="card-header">
+                  <div>
+                    <p className="eyebrow">Fechamento concluído</p>
+                    <h2>Resultado da conferência</h2>
+                  </div>
+                  <div className="cash-result__header-actions">
+                    <Button
+                      onClick={() => setShowReceiptModal(true)}
+                      size="sm"
+                      type="button"
+                      variant="secondary"
+                    >
+                      <Icon name="download" />
+                      Imprimir Comprovante
+                    </Button>
+                    <Badge tone={lastClosure.reviewRequired ? "warning" : "success"}>
+                      {lastClosure.reviewRequired ? "Revisão necessária" : "Sem diferença"}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="cash-result__values">
+                  <span>
+                    <small>Esperado</small>
+                    <strong>{formatMoney(lastClosure.expectedCents)}</strong>
+                  </span>
+                  <span>
+                    <small>Contado</small>
+                    <strong>{formatMoney(lastClosure.countedCents)}</strong>
+                  </span>
+                  <span>
+                    <small>Diferença</small>
+                    <strong>{formatMoney(lastClosure.differenceCents)}</strong>
+                  </span>
+                </div>
+                {lastClosure.breakdown.length > 0 && (
+                  <div className="cash-methods">
+                    {lastClosure.breakdown.map((item) => (
+                      <span key={item.method}>
+                        <small>{paymentMethodLabel(item.method)}</small>
+                        <strong>{formatMoney(item.amountCents)}</strong>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {lastClosure.tenderBreakdown.length > 0 && (
+                  <div className="cash-tender-result">
+                    {lastClosure.tenderBreakdown.map((item) => (
+                      <span key={item.method}>
+                        <strong>{paymentMethodLabel(item.method)}</strong>
+                        <small>
+                          Esperado {formatMoney(item.expectedCents)} · conferido{" "}
+                          {formatMoney(item.observedCents)} · diferença{" "}
+                          {formatMoney(item.differenceCents)}
+                        </small>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
             {open ? (
               <>
                 {/* BARRA DE OPERAÇÃO DO TURNO ABERTO COM DESTAQUE PARA FECHAMENTO */}
-                <div className="cash-operation-header">
+                <div className="cash-operation-header" hidden={activeView !== "shift"}>
                   <div className="cash-operation-header__info">
                     <div className="cash-operation-header__title-row">
                       <StatusDot pulse tone="success" />
@@ -779,14 +880,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 </div>
 
                 {/* MÉTRICAS PRINCIPAIS DO TURNO */}
-                <div className="metrics-grid metrics-grid--three">
-                  <Card className="metric-card">
-                    <p>{open.cashRegisterName}</p>
-                    <strong>
-                      {open.responsibleName ?? open.operatorName ?? "Operador identificado"}
-                    </strong>
-                    <small>Desde {dateLabel(open.openedAt)}</small>
-                  </Card>
+                <div className="metrics-grid" hidden={activeView !== "shift"}>
                   <Card className="metric-card">
                     <p>Dinheiro na gaveta</p>
                     <strong>
@@ -811,7 +905,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 </div>
 
                 {/* ALERTA PREVENTIVO DE COMANDAS PENDENTES COM DETALHAMENTO REAL */}
-                {data.pendingTabs.length > 0 && (
+                {activeView === "shift" && data.pendingTabs.length > 0 && (
                   <Callout tone="warning">
                     <div className="cash-pending-banner">
                       <div className="cash-pending-banner__text">
@@ -884,14 +978,12 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                             ? "Conferência assistida do turno"
                             : "Conferência cega do turno"}
                         </p>
-                        <h2>Encerramento e Fechamento de Caixa</h2>
+                        <h2>Fechar turno</h2>
                         <p className="cash-card-desc">
-                          Conte os valores físicos da gaveta e os totais das maquininhas de cartão e
-                          Pix. O sistema revelará eventuais diferenças e sobras/faltas após a
-                          confirmação.
+                          Informe a contagem física. Ao confirmar, o sistema registra o fechamento e
+                          apresenta eventuais diferenças.
                         </p>
                       </div>
-                      <Badge tone="danger">Fechamento Ativo</Badge>
                     </div>
 
                     <form
@@ -1060,7 +1152,10 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                             <Icon name="alert-circle" />
                             <div>
                               <strong>Confira os valores antes de encerrar o turno:</strong>
-                              <p>Após fechar, o esperado e a diferença serão revelados.</p>
+                              <p>
+                                Ao confirmar, o turno será encerrado e as diferenças ficarão
+                                registradas.
+                              </p>
                             </div>
                           </div>
                           <div className="cash-confirm-box__summary">
@@ -1293,7 +1388,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   )}
 
                 {/* EXTRATO DO CAIXA COM FILTROS */}
-                <Card className="cash-ledger">
+                <Card className="cash-ledger" hidden={activeView !== "ledger"}>
                   <div className="card-header">
                     <div>
                       <p className="eyebrow">Turno atual</p>
@@ -1387,7 +1482,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   )}
                 </Card>
               </>
-            ) : (
+            ) : activeView === "shift" ? (
               /* HERO CARD DE ABERTURA DE CAIXA COM CHIPS RÁPIDOS */
               <Card className="cash-hero-card cash-hero-card--opening">
                 <div className="cash-hero-card__header">
@@ -1464,13 +1559,14 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                         size="md"
                         type="submit"
                       >
-                        {busy === "open" ? "Abrindo turno…" : "🔓 Abrir Turno de Caixa"}
+                        {busy === "open" ? "Abrindo turno…" : "Abrir turno"}
                       </Button>
                     </form>
                     <div className="cash-opening-note">
                       <small>
                         Auditoria de ponto de venda ativa. O valor inicial será associado ao seu
-                        operador e a conferência cega permanecerá ativa durante todo o turno.
+                        operador e a política de conferência do seu perfil será aplicada no
+                        fechamento.
                       </small>
                     </div>
                   </div>
@@ -1481,71 +1577,15 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   </p>
                 )}
               </Card>
-            )}
-
-            {/* RESULTADO DO ÚLTIMO FECHAMENTO COM BOTÃO DE IMPRESSÃO */}
-            {lastClosure && (
-              <Card aria-live="polite" className="cash-result">
-                <div className="card-header">
-                  <div>
-                    <p className="eyebrow">Fechamento concluído</p>
-                    <h2>Resultado da conferência</h2>
-                  </div>
-                  <div className="cash-result__header-actions">
-                    <Button
-                      onClick={() => setShowReceiptModal(true)}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      <Icon name="download" />
-                      Imprimir Comprovante
-                    </Button>
-                    <Badge tone={lastClosure.reviewRequired ? "warning" : "success"}>
-                      {lastClosure.reviewRequired ? "Revisão necessária" : "Sem diferença"}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="cash-result__values">
-                  <span>
-                    <small>Esperado</small>
-                    <strong>{formatMoney(lastClosure.expectedCents)}</strong>
-                  </span>
-                  <span>
-                    <small>Contado</small>
-                    <strong>{formatMoney(lastClosure.countedCents)}</strong>
-                  </span>
-                  <span>
-                    <small>Diferença</small>
-                    <strong>{formatMoney(lastClosure.differenceCents)}</strong>
-                  </span>
-                </div>
-                {lastClosure.breakdown.length > 0 && (
-                  <div className="cash-methods">
-                    {lastClosure.breakdown.map((item) => (
-                      <span key={item.method}>
-                        <small>{paymentMethodLabel(item.method)}</small>
-                        <strong>{formatMoney(item.amountCents)}</strong>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {lastClosure.tenderBreakdown.length > 0 && (
-                  <div className="cash-tender-result">
-                    {lastClosure.tenderBreakdown.map((item) => (
-                      <span key={item.method}>
-                        <strong>{paymentMethodLabel(item.method)}</strong>
-                        <small>
-                          Esperado {formatMoney(item.expectedCents)} · conferido{" "}
-                          {formatMoney(item.observedCents)} · diferença{" "}
-                          {formatMoney(item.differenceCents)}
-                        </small>
-                      </span>
-                    ))}
-                  </div>
-                )}
+            ) : activeView === "ledger" ? (
+              <Card>
+                <EmptyState
+                  description="Abra um turno nesta gaveta para acompanhar seus lançamentos."
+                  icon="$"
+                  title="Nenhum turno aberto"
+                />
               </Card>
-            )}
+            ) : null}
 
             {/* MODAL DE COMPROVANTE OFICIAL DE FECHAMENTO (SLIP TÉRMICO) */}
             {lastClosure && (
@@ -1597,7 +1637,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             {/* REVISÃO DE DIVERGÊNCIA */}
-            {reviewCandidate && data.capabilities.canReview && (
+            {activeView === "history" && reviewCandidate && data.capabilities.canReview && (
               <details className="action-panel cash-review">
                 <summary>
                   <span>
@@ -1634,7 +1674,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             {/* AJUSTES PÓS-FECHAMENTO */}
-            {data.adjustments.length > 0 && (
+            {activeView === "history" && data.adjustments.length > 0 && (
               <Card className="cash-adjustments">
                 <div className="card-header">
                   <div>
@@ -1662,15 +1702,18 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             {/* PAINÉIS DE ADMINISTRAÇÃO E HISTÓRICO */}
-            <CashAdministrationPanels
-              data={data}
-              key={open?.id ?? selectedRegister?.id ?? "no-register"}
-              onChanged={remote.retry}
-              online={online}
-              openShift={open}
-              scope={scope}
-            />
-            <CashHistoryPanel data={data} scope={scope} />
+            {(activeView === "shift" || activeView === "settings") && (
+              <CashAdministrationPanels
+                data={data}
+                key={`${open?.id ?? selectedRegister?.id ?? "no-register"}:${activeView}`}
+                onChanged={remote.retry}
+                online={online}
+                openShift={open}
+                scope={scope}
+                section={activeView === "shift" ? "operations" : "settings"}
+              />
+            )}
+            {activeView === "history" && <CashHistoryPanel data={data} scope={scope} />}
           </div>
         );
       }}

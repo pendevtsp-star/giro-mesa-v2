@@ -22,12 +22,14 @@ export function CashAdministrationPanels({
   openShift,
   scope,
   onChanged,
+  section,
 }: {
   data: CashData;
   online: boolean;
   openShift: CashShift | undefined;
   scope: ManagementScope;
   onChanged: () => void;
+  section: "operations" | "settings";
 }) {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -143,10 +145,15 @@ export function CashAdministrationPanels({
   }
 
   const pendingApprovals = data.approvals.filter((approval) => approval.status === "pending");
+  const handoverCandidates = openShift
+    ? data.operators.filter(
+        (operator) => operator.identityId !== openShift.currentResponsibleIdentityId,
+      )
+    : [];
   return (
     <>
       {openShift && data.capabilities.canHandover && (
-        <details className="action-panel">
+        <details className="action-panel" hidden={section !== "operations"}>
           <summary>
             <span>
               <strong>Transferir responsabilidade</strong>
@@ -156,44 +163,46 @@ export function CashAdministrationPanels({
             </span>
             <span aria-hidden="true">+</span>
           </summary>
-          <form className="action-form" onSubmit={handover}>
-            <label>
-              Novo responsável
-              <NativeSelect
-                onChange={(event) => setHandoverIdentityId(event.target.value)}
-                required
-                value={handoverIdentityId}
-              >
-                <option value="">Selecione</option>
-                {data.operators
-                  .filter(
-                    (operator) => operator.identityId !== openShift.currentResponsibleIdentityId,
-                  )
-                  .map((operator) => (
+          {handoverCandidates.length > 0 ? (
+            <form className="action-form" onSubmit={handover}>
+              <label>
+                Novo responsável
+                <NativeSelect
+                  onChange={(event) => setHandoverIdentityId(event.target.value)}
+                  required
+                  value={handoverIdentityId}
+                >
+                  <option value="">Selecione</option>
+                  {handoverCandidates.map((operator) => (
                     <option key={operator.identityId} value={operator.identityId}>
                       {operator.name}
                     </option>
                   ))}
-              </NativeSelect>
-            </label>
-            <label className="action-form__wide">
-              Motivo
-              <Input
-                minLength={3}
-                onChange={(event) => setHandoverReason(event.target.value)}
-                required
-                value={handoverReason}
-              />
-            </label>
-            <Button disabled={Boolean(busy) || !online} type="submit">
-              {busy === "handover" ? "Transferindo…" : "Confirmar transferência"}
-            </Button>
-          </form>
+                </NativeSelect>
+              </label>
+              <label className="action-form__wide">
+                Motivo
+                <Input
+                  minLength={3}
+                  onChange={(event) => setHandoverReason(event.target.value)}
+                  required
+                  value={handoverReason}
+                />
+              </label>
+              <Button disabled={Boolean(busy) || !online} type="submit">
+                {busy === "handover" ? "Transferindo…" : "Confirmar transferência"}
+              </Button>
+            </form>
+          ) : (
+            <p className="cash-inline-empty">
+              Nenhum outro operador está disponível para receber a responsabilidade deste turno.
+            </p>
+          )}
         </details>
       )}
 
       {data.pendingTransfers.length > 0 && (
-        <Card className="cash-approvals">
+        <Card className="cash-approvals" hidden={section !== "operations"}>
           <div className="card-header">
             <div>
               <p className="eyebrow">Custódia entre gavetas</p>
@@ -251,7 +260,7 @@ export function CashAdministrationPanels({
       )}
 
       {data.capabilities.canApproveCashRequests && pendingApprovals.length > 0 && (
-        <Card className="cash-approvals">
+        <Card className="cash-approvals" hidden={section !== "operations"}>
           <div className="card-header">
             <div>
               <p className="eyebrow">Alçada gerencial</p>
@@ -329,16 +338,18 @@ export function CashAdministrationPanels({
       )}
 
       {(data.capabilities.canManageCashSettings || data.capabilities.canManageTerminals) && (
-        <details className="action-panel cash-controls">
-          <summary>
-            <span>
-              <strong>Controles e terminais</strong>
-              <small>Alçadas, alertas e vínculo autoritativo das gavetas.</small>
-            </span>
-            <span aria-hidden="true">+</span>
-          </summary>
+        <Card className="cash-settings" hidden={section !== "settings"}>
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">Administração</p>
+              <h2>Política e terminais</h2>
+              <p className="cash-card-desc">
+                Aprovações, alertas e gaveta usada por cada terminal.
+              </p>
+            </div>
+          </div>
           {data.capabilities.canManageCashSettings && (
-            <form className="action-form" onSubmit={saveSettings}>
+            <form className="cash-settings__form" onSubmit={saveSettings}>
               <label>
                 Aprovação acima de (R$)
                 <Input
@@ -400,6 +411,7 @@ export function CashAdministrationPanels({
                           : "Não pareado"}
                     </Badge>
                   </span>
+                  <span className="cash-terminal__select-label">Gaveta vinculada</span>
                   <NativeSelect
                     disabled={Boolean(busy) || !online}
                     onChange={(event) =>
@@ -431,7 +443,7 @@ export function CashAdministrationPanels({
               ))}
             </div>
           )}
-        </details>
+        </Card>
       )}
       {notice && (
         <p aria-live="polite" className="form-feedback">
