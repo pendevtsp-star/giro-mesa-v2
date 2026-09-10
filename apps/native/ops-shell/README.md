@@ -10,7 +10,7 @@ Aplicativo .NET MAUI que empacota o bundle React de `apps/frontends/ops` e forne
 
 O SDK .NET 10 e os workloads MAUI do alvo precisam estar instalados. Para validar o pacote Windows, execute `dotnet build apps/native/ops-shell/GiroMesa.OpsShell.csproj` a partir da raiz do repositório.
 
-O bundle `Resources/Raw/wwwroot` é versionado e precisa acompanhar alterações de interface. Nunca sincronize um build de E2E apontando para localhost. O script valida o diretório de destino e a presença do `index.html` antes de substituir seus arquivos; `-ValidateOnly` faz essa conferência sem copiar ou excluir arquivos. O self-check da bridge pode rodar sem workload MAUI ou terminal físico:
+O bundle `Resources/Raw/wwwroot` é versionado e precisa acompanhar alterações de interface. Nunca sincronize um build de E2E apontando para localhost. O script valida o diretório de destino, a presença do `index.html` e a API de distribuição antes de substituir seus arquivos; recusa o endereço local padrão e a ausência de `https://api.giromesa.com.br`. `-ValidateOnly` faz essa conferência sem copiar ou excluir arquivos. O self-check da bridge pode rodar sem workload MAUI ou terminal físico:
 
 ```powershell
 rtk proxy dotnet run --project apps/native/ops-shell/checks/SmartPos.SelfCheck/SmartPos.SelfCheck.csproj

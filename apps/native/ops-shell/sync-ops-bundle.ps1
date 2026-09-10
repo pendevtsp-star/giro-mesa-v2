@@ -16,6 +16,11 @@ if (-not [string]::Equals($target, $expectedTarget, [System.StringComparison]::O
 if (-not (Test-Path -LiteralPath (Join-Path $source "index.html") -PathType Leaf)) {
   throw "Build apps/frontends/ops before synchronizing the native bundle."
 }
+$scripts = (Get-ChildItem -LiteralPath (Join-Path $source "assets") -Filter "*.js" |
+  ForEach-Object { [System.IO.File]::ReadAllText($_.FullName) }) -join "`n"
+if ($scripts.Contains("http://localhost:3200") -or -not $scripts.Contains("https://api.giromesa.com.br")) {
+  throw "Build Ops with VITE_API_URL=https://api.giromesa.com.br before synchronizing the distribution bundle."
+}
 if ($ValidateOnly) {
   Write-Output "Validated native bundle paths: $source -> $target"
   return
