@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
-import { identities } from "@giromesa/db";
-import { inArray } from "drizzle-orm";
+import { identities, organizations } from "@giromesa/db";
+import { eq, inArray } from "drizzle-orm";
 import { createApplication, shouldExposeOpenApi } from "./app-factory.js";
 import { AuthService } from "./auth/auth.service.js";
+import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { DatabaseService } from "./database/database.module.js";
+import { OrganizationsService } from "./organizations/organizations.service.js";
 import {
   createTableSessionToken,
   TABLE_SESSION_COOKIE_NAME,
@@ -142,5 +144,139 @@ test("isolates operational limits by valid session while strict buckets remain I
       ),
     );
     await app.close();
+  }
+});
+
+async function expectImmediateRealtimeSubscription(options: {
+  app: Awaited<ReturnType<typeof createApplication>>["app"];
+  token: string;
+  organizationId: string;
+  unitId: string;
+}) {
+  const auth = options.app.get(AuthService);
+  const originalAuthenticate = auth.authenticate.bind(auth);
+  auth.authenticate = async (token) => {
+    await new Promise((resolve) => setTimeout(resolve, 75));
+    return originalAuthenticate(token);
+  };
+  const fastify = options.app.getHttpAdapter().getInstance();
+  await fastify.ready();
+
+  let resolveSubscription: () => void = () => {};
+  let rejectSubscription: (error: Error) => void = () => {};
+  const subscribed = new Promise<void>((resolve, reject) => {
+    resolveSubscription = resolve;
+    rejectSubscription = reject;
+  });
+  const timeout = setTimeout(
+    () => rejectSubscription(new Error("Timed out waiting for immediate realtime subscription")),
+    1_500,
+  );
+  timeout.unref();
+  const socket = await fastify.injectWS(
+    "/v1/realtime",
+    {
+      headers: {
+        cookie: `${SESSION_COOKIE_NAME}=${options.token}`,
+        origin: "http://localhost:3102",
+      },
+    },
+    {
+      onInit: (client) => {
+        client.on("message", (raw: { toString(): string }) => {
+          const message = JSON.parse(raw.toString()) as { type?: string };
+          if (message.type === "subscribed") resolveSubscription();
+        });
+      },
+      onOpen: (client) => {
+        client.send(
+          JSON.stringify({
+            type: "subscribe",
+            organizationId: options.organizationId,
+            unitId: options.unitId,
+          }),
+        );
+      },
+    },
+  );
+
+  try {
+    await subscribed;
+  } finally {
+    clearTimeout(timeout);
+    socket.terminate();
+  }
+}
+
+test("accepts an immediate realtime subscription after reconnecting to a restarted app", async (context) => {
+  if (!process.env.DATABASE_URL) {
+    context.skip("DATABASE_URL not configured");
+    return;
+  }
+
+  const suffix = randomUUID();
+  let activeApp: Awaited<ReturnType<typeof createApplication>>["app"] | undefined;
+  let identityId: string | undefined;
+  let organizationId: string | undefined;
+  try {
+    const first = await createApplication();
+    activeApp = first.app;
+    await activeApp.init();
+    const registration = await activeApp.get(AuthService).register({
+      email: `realtime-reconnect-${suffix}@example.invalid`,
+      displayName: "Realtime reconnect",
+      password: "Local-realtime-123!",
+    });
+    identityId = registration.identity.id;
+    const fastify = activeApp.getHttpAdapter().getInstance();
+    await fastify.ready();
+    await assert.rejects(
+      fastify.injectWS("/v1/realtime", {
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=${registration.token}`,
+          origin: "https://origin.invalid",
+        },
+      }),
+      /Unexpected server response: 403/,
+    );
+    await assert.rejects(
+      fastify.injectWS("/v1/realtime", {
+        headers: {
+          cookie: `${SESSION_COOKIE_NAME}=invalid-session-token`,
+          origin: "http://localhost:3102",
+        },
+      }),
+      /Unexpected server response: 401/,
+    );
+    const created = await activeApp.get(OrganizationsService).create(identityId, {
+      legalName: "Realtime reconnect integration",
+      tradeName: "Realtime reconnect",
+      document: `RT${suffix.replaceAll("-", "").slice(0, 10).toUpperCase()}12`,
+      unitName: "Unidade realtime",
+      timezone: "America/Sao_Paulo",
+    });
+    organizationId = created.organization.id;
+    const subscription = {
+      app: activeApp,
+      token: registration.token,
+      organizationId,
+      unitId: created.unit.id,
+    };
+    await expectImmediateRealtimeSubscription(subscription);
+
+    await activeApp.close();
+    activeApp = undefined;
+    const restarted = await createApplication();
+    activeApp = restarted.app;
+    await activeApp.init();
+    await expectImmediateRealtimeSubscription({ ...subscription, app: activeApp });
+  } finally {
+    if (activeApp) {
+      const database = activeApp.get(DatabaseService);
+      if (organizationId)
+        await database.db.delete(organizations).where(eq(organizations.id, organizationId));
+      if (identityId) await database.db.delete(identities).where(eq(identities.id, identityId));
+      await activeApp.close();
+    }
   }
 });

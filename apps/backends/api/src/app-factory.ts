@@ -8,8 +8,9 @@ import websocket from "@fastify/websocket";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import type { FastifyReply, FastifyRequest } from "fastify";
 import { AppModule } from "./app.module.js";
-import { AuthService } from "./auth/auth.service.js";
+import { type AuthContext, AuthService } from "./auth/auth.service.js";
 import { sessionToken } from "./auth/session.guard.js";
 import { SESSION_COOKIE_NAME } from "./auth/session-cookie.js";
 import { TerminalSessionService } from "./auth/terminal-session.service.js";
@@ -110,24 +111,42 @@ export async function createApplication(options: { checkDatabaseReadiness?: bool
   }
 
   const realtime = app.get(RealtimeService);
-  const realtimeHandler = async (
+  const realtimeContexts = new WeakMap<FastifyRequest, AuthContext>();
+  const validateRealtimeHandshake = async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!isAllowedRealtimeOrigin(request.headers.origin)) {
+      return reply.code(403).send({ code: "REALTIME_ORIGIN_DENIED" });
+    }
+    const token = request.cookies[SESSION_COOKIE_NAME];
+    const context = token ? await auth.authenticate(token) : null;
+    if (!context) return reply.code(401).send({ code: "INVALID_REALTIME_SESSION" });
+    realtimeContexts.set(request, context);
+  };
+  const realtimeHandler = (
     socket: Parameters<typeof realtime.attach>[0],
-    request: { headers: { origin?: string }; cookies: Record<string, string | undefined> },
+    request: FastifyRequest,
   ) => {
     if (!isAllowedRealtimeOrigin(request.headers.origin)) {
       socket.close(1008, "Origem não autorizada");
       return;
     }
-    const token = request.cookies[SESSION_COOKIE_NAME];
-    const context = token ? await auth.authenticate(token) : null;
+    const context = realtimeContexts.get(request);
+    realtimeContexts.delete(request);
     if (!context) {
       socket.close(1008, "Sessão inválida");
       return;
     }
     realtime.attach(socket, context);
   };
-  fastify.get("/api/v1/realtime", { websocket: true }, realtimeHandler);
-  fastify.get("/v1/realtime", { websocket: true }, realtimeHandler);
+  fastify.get(
+    "/api/v1/realtime",
+    { websocket: true, preValidation: validateRealtimeHandshake },
+    realtimeHandler,
+  );
+  fastify.get(
+    "/v1/realtime",
+    { websocket: true, preValidation: validateRealtimeHandshake },
+    realtimeHandler,
+  );
 
   if (options.checkDatabaseReadiness !== false) {
     await app.get(DatabaseReadinessService).assertReady();
