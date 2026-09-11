@@ -1,0 +1,107 @@
+{
+  "runtime": {
+    "release": "9e2530499a9ce5363ac9627ee0674bc10023b1e2",
+    "schemaVersion": 83,
+    "services": [
+      {
+        "service": "api",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      },
+      {
+        "service": "customer",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      },
+      {
+        "service": "ops",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      },
+      {
+        "service": "site",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      },
+      {
+        "service": "worker",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      },
+      {
+        "service": "postgres",
+        "status": "running",
+        "health": "healthy",
+        "restarts": 0,
+        "digestMatch": true
+      }
+    ]
+  },
+  "activeReleasePath": "/srv/apps/giromesa-v2/releases/9e2530499a9ce5363ac9627ee0674bc10023b1e2",
+  "backupId": "20260911T012325Z-ca0b7dfe24b68aac0d4dda1e51f82f14",
+  "removedTransferArchives": [
+    {
+      "file": "giromesa-release-9e2530499a9ce5363ac9627ee0674bc10023b1e2.tar.gz",
+      "bytes": 7910583
+    },
+    {
+      "file": "giromesa-release-e1575375d9779fab8b7e5724cad1e6c9b832d0b9.tar.gz",
+      "bytes": 7908672
+    },
+    {
+      "file": "giromesa-release-fd976a4c3ab7cac2c6e20cf73b834e714cc5cfa6.tar.gz",
+      "bytes": 7910484
+    }
+  ],
+  "preservedUnrelatedContainers": 41,
+  "healthyContainers": 47,
+  "preservedVolumes": 26,
+  "currentBackups": 39,
+  "configurationUnchanged": true,
+  "retainedImageArchivesPreserved": [
+    "/srv/apps/giromesa-v2/shared/retained-images/2baa3098091d10638e604083c28a3bac9c8f4397/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/2baa3098091d10638e604083c28a3bac9c8f4397/recovery-authorized-caf2.tar.gz",
+    "/srv/apps/giromesa-v2/shared/retained-images/2baa3098091d10638e604083c28a3bac9c8f4397/recovery-authorized-caf2.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/2baa3098091d10638e604083c28a3bac9c8f4397/verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/README-api-customer.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/api-customer-verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/api-customer.tar.gz",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/api-customer.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/worker-site.tar.gz",
+    "/srv/apps/giromesa-v2/shared/retained-images/586212588ad670701ed1474092aceba1d4043682/worker-site.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/afb323b8fcca26adeab51da17ccdf60101e35c5e/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/afb323b8fcca26adeab51da17ccdf60101e35c5e/REGISTRY-RECOVERY-20260910.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/afb323b8fcca26adeab51da17ccdf60101e35c5e/historical-images.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/afb323b8fcca26adeab51da17ccdf60101e35c5e/verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/caf2b0181b8cf8dd106ee5567d6f0ca7afa272b8/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/caf2b0181b8cf8dd106ee5567d6f0ca7afa272b8/historical-target-images.tar.gz",
+    "/srv/apps/giromesa-v2/shared/retained-images/caf2b0181b8cf8dd106ee5567d6f0ca7afa272b8/historical-target-images.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/caf2b0181b8cf8dd106ee5567d6f0ca7afa272b8/verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/e520b3c07cf99ad8924436d1a7635719e1e221e3/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/e520b3c07cf99ad8924436d1a7635719e1e221e3/REGISTRY-RECOVERY-20260910.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/e520b3c07cf99ad8924436d1a7635719e1e221e3/recovery-images.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/e520b3c07cf99ad8924436d1a7635719e1e221e3/verification.json",
+    "/srv/apps/giromesa-v2/shared/retained-images/recovery-317b1a49646f2dc89293db6e0da0c7408ff2bf8a/README.md",
+    "/srv/apps/giromesa-v2/shared/retained-images/recovery-317b1a49646f2dc89293db6e0da0c7408ff2bf8a/recovery-authorized-317.tar.gz",
+    "/srv/apps/giromesa-v2/shared/retained-images/recovery-317b1a49646f2dc89293db6e0da0c7408ff2bf8a/recovery-authorized-317.tar.gz.sha256",
+    "/srv/apps/giromesa-v2/shared/retained-images/recovery-317b1a49646f2dc89293db6e0da0c7408ff2bf8a/verification.json"
+  ],
+  "freeDiskBytes": 14023077888,
+  "ciRuns": {
+    "ci": 34542618588,
+    "security": 34542618562,
+    "signedPublication": 34543229757
+  }
+}

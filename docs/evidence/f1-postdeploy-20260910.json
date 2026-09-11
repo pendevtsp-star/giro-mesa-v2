@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-09-11T01:26:45.458056+00:00",
+  "expectedBuildSha": "9e2530499a9ce5363ac9627ee0674bc10023b1e2",
+  "readOnly": true,
+  "sourceScript": "/srv/apps/giromesa-v2/incoming/service-20260910/f1-readiness-audit.py",
+  "endpoints": [
+    {
+      "url": "https://api.giromesa.com.br/health",
+      "statusCode": 200,
+      "health": {
+        "status": "ok",
+        "version": "2.0.0",
+        "buildSha": "9e2530499a9ce5363ac9627ee0674bc10023b1e2",
+        "schemaVersion": 83,
+        "capabilities": [
+          "table_qr_lifecycle_v1",
+          "table_qr_metrics_v1",
+          "table_qr_presence_code_v1",
+          "ops_background_notifications_v1",
+          "table_qr_brand_upload_v1",
+          "ops_web_push_v1",
+          "public_menu_cover_image_v1",
+          "platform_backoffice_v1",
+          "platform_commercial_site_v1",
+          "crm_evolution_go_v1",
+          "crm_operational_inbox_v1",
+          "edge_hub_pairing_v1"
+        ],
+        "database": "up",
+        "integrations": {
+          "asaas": "disabled",
+          "google": "configured",
+          "email": "configured",
+          "webPush": "configured",
+          "evolutionGo": "configured_unit_status_required",
+          "focus": "edge_capability_required",
+          "edgeHubInstaller": "configured_not_homologated",
+          "paygo": "external_homologation_required"
+        }
+      }
+    },
+    {
+      "url": "https://app.giromesa.com.br",
+      "statusCode": 200
+    },
+    {
+      "url": "https://giromesa.com.br",
+      "statusCode": 200
+    },
+    {
+      "url": "https://menu.giromesa.com.br",
+      "statusCode": 200
+    }
+  ],
+  "readinessAudit": {
+    "checkedAt": "2026-09-11T01:26:44.290679+00:00",
+    "activeRelease": "9e2530499a9ce5363ac9627ee0674bc10023b1e2",
+    "backupManifestCount": 38,
+    "latestBackupId": "20260911T012325Z-ca0b7dfe24b68aac0d4dda1e51f82f14",
+    "latestBackupAgeSeconds": 196,
+    "rootCronGiroMesaBackupSchedules": [],
+    "giroMesaBackupTimerFound": false,
+    "externalBackupConfigurationKeyNames": [],
+    "postgresRecovery": [
+      {
+        "archiveMode": "off",
+        "walLevel": "replica",
+        "archiveTimeout": "0",
+        "synchronousCommit": "on",
+        "synchronousStandbyConfigured": false
+      }
+    ],
+    "f1Organizations": [
+      []
+    ]
+  },
+  "releaseVerified": true
+}
