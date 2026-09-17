@@ -1905,10 +1905,6 @@
     .ops-layout.counter-operation--selected {
       display: block;
     }
-
-    .counter-ops-panel--active .attendance-cockpit {
-      min-height: calc(100dvh - 62px);
-    }
   }
 
   @container counter-operation (max-width: 760px) {
@@ -2226,14 +2222,25 @@
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-md);
-  display: block;
-  max-height: calc(100dvh - 200px);
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - 200px);
+  min-height: 0;
+  overflow: hidden;
   overscroll-behavior: contain;
   padding: 12px;
   position: sticky;
   scrollbar-gutter: stable;
   top: 80px;
+}
+
+.counter-ops-panel--active .service-workspace {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  scrollbar-gutter: stable;
 }
 
 .counter-ops-panel--active .counter-workspace-close {
@@ -2243,14 +2250,7 @@
   justify-content: flex-start;
   margin-bottom: 8px;
   min-height: 44px;
-  position: sticky;
-  top: 0;
-  width: 100%;
-  z-index: 30;
-}
-
-.counter-ops-panel--active .attendance-cockpit .workspace-tabs--primary {
-  top: 52px;
+  width: fit-content;
 }
 
 .counter-operation--selected .counter-open-form > .gm-button {
@@ -2258,11 +2258,34 @@
   grid-row: auto;
 }
 
+/* Use the form's available width, including the narrow desktop queue column. */
+.counter-operation .counter-open-advanced > div {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.counter-open-advanced > div > *,
+.counter-open-advanced label {
+  min-width: 0;
+}
+
+.counter-operation .counter-open-advanced .counter-notification-consent {
+  align-items: start;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  line-height: 1.4;
+}
+
+.counter-operation .counter-open-advanced .promised-at-field {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+}
+
 @container counter-operation (max-width: 930px) {
   .counter-operation .counter-ops-panel--active {
     border: 0;
     border-radius: 0;
     inset: 0;
+    height: auto;
     max-height: 100dvh;
     padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
       max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));

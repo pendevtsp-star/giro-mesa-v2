@@ -30,7 +30,12 @@ const tab = {
 type CreateBehavior = "timeout-once" | "permanent";
 type CounterCalls = { createKeys: string[]; sendKeys: string[] };
 
-async function mockCounterApi(page: Page, behavior: CreateBehavior, calls: CounterCalls) {
+async function mockCounterApi(
+  page: Page,
+  behavior: CreateBehavior,
+  calls: CounterCalls,
+  role: "manager" | "cashier" = "cashier",
+) {
   const acceptedCreateKeys = new Set<string>();
   await page.route("**/health", (route) =>
     route.fulfill({
@@ -116,7 +121,7 @@ async function mockCounterApi(page: Page, behavior: CreateBehavior, calls: Count
                     active: true,
                   },
                 ],
-                scopes: [{ role: "cashier", unitId }],
+                scopes: [{ role, unitId }],
               },
             ]
           : url.pathname.endsWith("/pilot/counter-queue")
@@ -182,7 +187,32 @@ async function mockCounterApi(page: Page, behavior: CreateBehavior, calls: Count
                     combos: [],
                   }
                 : url.pathname.endsWith(`/pilot/tabs/${tab.id}`)
-                  ? { tab, orders: [], items: [], payments: [], events: [], presence: [] }
+                  ? {
+                      tab: { ...tab, subtotalCents: 900, totalCents: 900 },
+                      orders: [
+                        {
+                          id: "order-existing",
+                          status: "sent",
+                          createdAt: "2026-09-17T12:00:00.000Z",
+                        },
+                      ],
+                      items: [
+                        {
+                          id: "item-existing",
+                          orderId: "order-existing",
+                          productId: "product-espresso",
+                          productName: "Café Continuidade",
+                          quantity: 1,
+                          grossCents: 900,
+                          discountCents: 0,
+                          netCents: 900,
+                          status: "sent",
+                        },
+                      ],
+                      payments: [],
+                      events: [],
+                      presence: [],
+                    }
                   : url.pathname.endsWith("/pilot/tabs")
                     ? [tab]
                     : path.startsWith(`/v1/organizations/${organizationId}/growth/customers/page`)
@@ -239,6 +269,147 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.document, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.viewport);
 }
 
+async function expectControlsContained(page: Page, selector: string) {
+  const bounds = await page.locator(selector).evaluate((container) => {
+    const boundary = container.getBoundingClientRect();
+    return [
+      ...container.querySelectorAll<HTMLElement>(
+        "input, select, button, summary, .counter-notification-consent",
+      ),
+    ]
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        return style.display !== "none" && style.visibility !== "hidden";
+      })
+      .map((element) => {
+        const rect = element.getBoundingClientRect();
+        return {
+          name:
+            element.getAttribute("aria-label") ?? element.textContent?.trim() ?? element.tagName,
+          left: rect.left - boundary.left,
+          right: rect.right - boundary.left,
+          width: rect.width,
+          containerWidth: boundary.width,
+        };
+      });
+  });
+  for (const control of bounds) {
+    expect(control.width, control.name).toBeGreaterThan(0);
+    expect(control.left, control.name).toBeGreaterThanOrEqual(-1);
+    expect(control.right, control.name).toBeLessThanOrEqual(control.containerWidth + 1);
+  }
+}
+
+test("mantém os campos da abertura contidos na coluna operacional estreita", async ({ page }) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "timeout-once", calls);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openCounter(page);
+
+  const advanced = page.locator(".counter-open-advanced");
+  const openCardWidth = await page
+    .locator(".counter-quick-open-card")
+    .evaluate((element) => element.getBoundingClientRect().width);
+  expect(openCardWidth).toBeLessThan(600);
+  await advanced.locator("summary").click();
+  await expect(advanced).toHaveAttribute("open", "");
+  await expectControlsContained(page, ".counter-open-advanced > div");
+  await expectNoHorizontalOverflow(page);
+});
+
+test("troca de painel preserva cabeçalho e deixa o fim de cada fluxo alcançável", async ({
+  page,
+}, testInfo) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "timeout-once", calls, "manager");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openCounter(page);
+
+  const panel = page.locator("#counter-order-panel");
+  const tabs = page.getByRole("navigation", { name: "Ações do atendimento" });
+  const orderTab = tabs.getByRole("button", { name: "Lançar pedido" });
+  const accountTab = tabs.getByRole("button", { name: "Conta e pagamento" });
+  await page.getByRole("button", { name: "Adicionar Café Continuidade", exact: true }).click();
+  await expect(orderTab).toHaveAttribute("aria-current", "page");
+
+  await page.screenshot({
+    path: testInfo.outputPath("counter-order-desktop-light.png"),
+    fullPage: false,
+  });
+
+  await panel.locator(".service-workspace").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const orderEnd = await panel.locator(".service-action-dock").evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { bottom: rect?.bottom ?? 0, height: rect?.height ?? 0, viewport: window.innerHeight };
+  });
+  expect(orderEnd.height).toBeGreaterThan(0);
+  expect(orderEnd.bottom).toBeLessThanOrEqual(orderEnd.viewport + 1);
+
+  await accountTab.click();
+  await expect(accountTab).toHaveAttribute("aria-current", "page");
+  const account = page.getByRole("region", { name: /Conta de Retirada continuidade/ });
+  await expect(account).toBeVisible();
+  const accountGeometry = await page.evaluate(() => {
+    const tabs = document.querySelector<HTMLElement>(".service-workspace-actions");
+    const account = document.querySelector<HTMLElement>(".service-account-area");
+    const charges = [...document.querySelectorAll<HTMLElement>(".account-disclosure")].find(
+      (element) => element.textContent?.includes("Taxa de serviço e gorjeta"),
+    );
+    const tabRect = tabs?.getBoundingClientRect();
+    const accountRect = account?.getBoundingClientRect();
+    const chargeRect = charges?.getBoundingClientRect();
+    return {
+      accountTop: accountRect?.top ?? 0,
+      accountHeight: accountRect?.height ?? 0,
+      chargesTop: chargeRect?.top ?? 0,
+      chargesPreviousGap:
+        chargeRect && charges?.previousElementSibling instanceof HTMLElement
+          ? chargeRect.top - charges.previousElementSibling.getBoundingClientRect().bottom
+          : Number.NaN,
+      tabsBottom: tabRect?.bottom ?? 0,
+      viewport: window.innerHeight,
+    };
+  });
+  expect(accountGeometry.accountTop).toBeGreaterThanOrEqual(accountGeometry.tabsBottom - 1);
+  expect(accountGeometry.accountHeight).toBeGreaterThan(0);
+  expect(accountGeometry.chargesPreviousGap).toBeLessThanOrEqual(24);
+  await page.screenshot({
+    path: testInfo.outputPath("counter-account-desktop-light.png"),
+    fullPage: false,
+  });
+  await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("counter-account-desktop-dark.png"),
+    fullPage: false,
+  });
+  const chargeDisclosure = page
+    .locator(".account-disclosure")
+    .filter({ hasText: "Taxa de serviço e gorjeta" });
+  await chargeDisclosure.locator("summary").click();
+  await chargeDisclosure.scrollIntoViewIfNeeded();
+  await expectControlsContained(page, ".account-charge-grid");
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("counter-charges-desktop-dark.png"),
+    fullPage: false,
+  });
+  await accountTab.focus();
+  await page.keyboard.press("/");
+  await expect(orderTab).toHaveAttribute("aria-current", "page");
+  await expect(page.getByPlaceholder("Buscar produto ou descrição")).toBeFocused();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await orderTab.click();
+  await expect(orderTab).toHaveAttribute("aria-current", "page");
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("counter-order-mobile-dark.png"),
+    fullPage: false,
+  });
+});
+
 test("retorna a fila preservando rascunho, filtros, foco e tema", async ({ page }) => {
   test.setTimeout(60_000);
   const calls: CounterCalls = { createKeys: [], sendKeys: [] };
@@ -269,21 +440,15 @@ test("retorna a fila preservando rascunho, filtros, foco e tema", async ({ page 
       await page.setViewportSize(viewport);
       await expectNoHorizontalOverflow(page);
       const close = page.getByRole("button", { name: "Voltar para a fila", exact: true });
-      const closeBounds = await panel.evaluate((element) => {
+      await panel.locator(".service-workspace").evaluate((element) => {
         element.scrollTop = element.scrollHeight;
-        const closeButton = element.querySelector<HTMLElement>(".counter-workspace-close");
-        const rect = closeButton?.getBoundingClientRect();
-        return {
-          bottom: rect?.bottom ?? 0,
-          height: rect?.height ?? 0,
-          top: rect?.top ?? 0,
-          viewport: window.innerHeight,
-        };
       });
       await expect(close).toBeVisible();
-      expect(closeBounds.height).toBeGreaterThan(0);
-      expect(closeBounds.top).toBeGreaterThanOrEqual(-1);
-      expect(closeBounds.bottom).toBeLessThanOrEqual(closeBounds.viewport + 1);
+      const closeBounds = await close.boundingBox();
+      expect(closeBounds?.y ?? -1).toBeGreaterThanOrEqual(0);
+      expect((closeBounds?.y ?? 0) + (closeBounds?.height ?? 0)).toBeLessThanOrEqual(
+        viewport.height + 1,
+      );
       await close.click();
       await expect(panel).toHaveCount(0);
       await expect(page).toHaveURL(/#\/counter\?stage=new&channel=pickup&query=coffee$/);

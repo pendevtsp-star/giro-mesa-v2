@@ -185,7 +185,9 @@ async function mockProductionApi(
   await page.route("**/v1/**", async (route) => {
     const url = new URL(route.request().url());
     const path = `${url.pathname}${url.search}`;
-    const printJob = (status: "queued" | "printing" | "printed" = "queued") => ({
+    const printJob = (
+      status: "queued" | "printing" | "confirmation_required" | "printed" = "queued",
+    ) => ({
       id: "print-job-1",
       tabId: "pickup-1",
       documentType: "partial_statement",
@@ -193,10 +195,11 @@ async function mockProductionApi(
       copies: 1,
       attempts: status === "queued" ? 0 : 1,
       terminalId: null,
-      printerId: status === "printed" ? "caixa" : null,
+      printerId: status === "queued" ? null : "caixa",
+      deliveryRoute: "local",
       payload: {
         generatedAt: new Date().toISOString(),
-        tab: { label: "Retirada teste" },
+        context: { tabId: "pickup-1", label: "Retirada teste" },
         totals: {
           subtotalCents: 9_300,
           discountCents: 0,
@@ -206,7 +209,15 @@ async function mockProductionApi(
           paidCents: 0,
           remainingCents: 9_300,
         },
-        items: [],
+        items: [
+          {
+            id: "pickup-item-1",
+            productName: "Salada Giro",
+            quantity: 1,
+            netCents: 9_300,
+            status: "sent",
+          },
+        ],
         payments: [],
       },
       reason: null,
@@ -230,7 +241,9 @@ async function mockProductionApi(
       route.request().method() === "PUT" &&
       url.pathname.endsWith("/print-jobs/print-job-1/status")
     ) {
-      const body = route.request().postDataJSON() as { status: "printing" | "printed" };
+      const body = route.request().postDataJSON() as {
+        status: "printing" | "confirmation_required" | "printed";
+      };
       await route.fulfill({ json: { printJob: printJob(body.status) } });
       return;
     }
@@ -1040,7 +1053,27 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     { width: 1024, height: 768 },
     { width: 1440, height: 900 },
   ];
-  await mockProductionApi(page);
+  await mockProductionApi(page, undefined, undefined, floor, undefined, undefined, "manager", {
+    tab,
+    orders: [{ id: "order-3", status: "sent", createdAt: "2026-09-17T12:00:00.000Z" }],
+    items: [
+      {
+        id: "item-3",
+        orderId: "order-3",
+        orderStatus: "sent",
+        productId: "product-1",
+        productName: "Prato da casa",
+        quantity: 1,
+        grossCents: 26_127,
+        discountCents: 0,
+        netCents: 26_127,
+        status: "sent",
+      },
+    ],
+    payments: [],
+    events: [],
+    presence: [],
+  });
   await page.goto("/");
   await page.evaluate(() => {
     window.location.hash = "#/salon";
@@ -1209,10 +1242,17 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(dialog).toBeVisible();
   const desktopDrawerBounds = await dialog.locator(".gm-modal").evaluate((element) => {
     const rect = element.getBoundingClientRect();
-    return { right: rect.right, viewportWidth: window.innerWidth, width: rect.width };
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: window.innerWidth,
+      width: rect.width,
+    };
   });
-  expect(desktopDrawerBounds.width).toBeLessThanOrEqual(720);
-  expect(desktopDrawerBounds.viewportWidth - desktopDrawerBounds.right).toBeLessThanOrEqual(1);
+  expect(desktopDrawerBounds.width).toBeGreaterThanOrEqual(1_200);
+  expect(desktopDrawerBounds.width).toBeLessThanOrEqual(desktopDrawerBounds.viewportWidth);
+  expect(desktopDrawerBounds.left).toBeGreaterThanOrEqual(0);
+  expect(desktopDrawerBounds.right).toBeLessThanOrEqual(desktopDrawerBounds.viewportWidth + 1);
   const moreMenu = dialog.locator(".workspace-tabs__more");
   for (const viewport of [
     { width: 1440, height: 900 },
@@ -1230,14 +1270,13 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     await expectNoHorizontalOverflow(page);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await expect(dialog.getByText("Preparar conta", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Linha do tempo da mesa", { exact: true })).toBeVisible();
+  const accountTab = dialog.getByRole("button", { name: "Conta e pagamento", exact: true });
+  await accountTab.click();
+  await expect(dialog.getByText("Comanda em foco", { exact: true })).toBeVisible();
+  await expect(dialog.getByText("Impressão", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Online", { exact: true })).toHaveCount(0);
   await expect(dialog.getByText(/no rascunho/)).toHaveCount(0);
-  await expect(dialog.getByRole("button", { name: "Conta", exact: true })).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(accountTab).toHaveAttribute("aria-current", "page");
   const fullPayment = dialog
     .locator(".service-action-dock")
     .getByRole("button", { name: /Confirmar R\$ 287,40/ });
@@ -1260,8 +1299,12 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
       right: payment.right,
     };
   });
-  expect(paymentLayout.left - paymentLayout.gridLeft).toBeCloseTo(paymentLayout.paddingLeft, 1);
-  expect(paymentLayout.gridRight - paymentLayout.right).toBeCloseTo(paymentLayout.paddingRight, 1);
+  expect(
+    Math.abs(paymentLayout.left - paymentLayout.gridLeft - paymentLayout.paddingLeft),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(paymentLayout.gridRight - paymentLayout.right - paymentLayout.paddingRight),
+  ).toBeLessThanOrEqual(1);
   await expect(dialog.getByLabel("Valor a receber")).toHaveValue("287.4");
   await expect(dialog.getByLabel("Valor recebido")).toHaveValue("287.4");
   const manualMethods = dialog.getByLabel("Forma de pagamento");
@@ -1279,12 +1322,14 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expectNoHorizontalOverflow(page);
   const mobilePaymentLayout = await dialog.evaluate((root) => {
     const title = root.querySelector<HTMLElement>('[data-slot="dialog-title"]');
-    const description = root.querySelector<HTMLElement>(".gm-modal__description");
+    const tabs = root.querySelector<HTMLElement>(".service-workspace-actions");
+    const account = root.querySelector<HTMLElement>(".service-account-area");
     const fields = root.querySelector<HTMLElement>(".cashier-payment-form__fields");
     const labels = fields ? [...fields.querySelectorAll<HTMLElement>("label")] : [];
     const controls = fields ? [...fields.querySelectorAll<HTMLElement>("select, input")] : [];
     const titleBounds = title?.getBoundingClientRect();
-    const descriptionBounds = description?.getBoundingClientRect();
+    const tabsBounds = tabs?.getBoundingClientRect();
+    const accountBounds = account?.getBoundingClientRect();
     const fieldBounds = fields?.getBoundingClientRect();
     return {
       controlsFit: controls.every((control) => {
@@ -1294,8 +1339,8 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
           bounds.right <= (fieldBounds?.right ?? 0) + 1
         );
       }),
-      descriptionBelowTitle:
-        (descriptionBounds?.top ?? 0) >= (titleBounds?.bottom ?? Number.POSITIVE_INFINITY) - 1,
+      accountBelowTabs:
+        (accountBounds?.top ?? 0) >= (tabsBounds?.bottom ?? Number.POSITIVE_INFINITY) - 1,
       fieldColumns: fields
         ? getComputedStyle(fields).gridTemplateColumns.split(" ").filter(Boolean).length
         : 0,
@@ -1310,18 +1355,18 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     };
   });
   expect(mobilePaymentLayout.titleHeight).toBeLessThan(48);
-  expect(mobilePaymentLayout.descriptionBelowTitle).toBe(true);
+  expect(mobilePaymentLayout.accountBelowTabs).toBe(true);
   expect(mobilePaymentLayout.fieldColumns).toBeGreaterThanOrEqual(1);
   expect(mobilePaymentLayout.fieldColumns).toBeLessThanOrEqual(2);
   expect(mobilePaymentLayout.labelsFit).toBe(true);
   expect(mobilePaymentLayout.controlsFit).toBe(true);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await dialog.locator("details.account-items-disclosure > summary").click();
+  await expect(dialog.locator("details.account-items-disclosure")).toHaveAttribute("open", "");
   const firstAccountLine = dialog.locator(".account-line-group").first();
   await firstAccountLine.getByRole("button", { name: /Ações para/ }).click();
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");
   await firstAccountLine.getByRole("button", { name: "Fechar" }).click();
-  await dialog.getByRole("button", { name: /^Pedido/ }).click();
+  await dialog.getByRole("button", { name: "Lançar pedido", exact: true }).click();
   await dialog.locator(".real-product-picker").evaluate((picker) => {
     const cards = [...picker.children];
     for (let index = 0; index < 4; index += 1) {
@@ -1355,7 +1400,8 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   ).toBeVisible();
   await expect(dialog.locator(".cart-preview__submit")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Receber no caixa" })).toHaveCount(0);
-  await dialog.getByRole("button", { name: "Dados e ações" }).click();
+  await moreMenu.locator("summary").click();
+  await moreMenu.getByRole("button", { name: /^Detalhes Cliente/ }).click();
   await expect(dialog.locator(".counter-metadata-form")).toBeVisible();
   await expectWcagAa(page);
 
@@ -1758,7 +1804,28 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
     await route.fulfill({
       json: pathname.endsWith("/pilot/tabs")
         ? [pickupTab]
-        : { tab: pickupTab, orders: [], items: [], payments: [], events: [], presence: [] },
+        : {
+            tab: pickupTab,
+            orders: [
+              { id: "pickup-order-1", status: "sent", createdAt: "2026-09-17T12:00:00.000Z" },
+            ],
+            items: [
+              {
+                id: "pickup-item-1",
+                orderId: "pickup-order-1",
+                productId: "product-1",
+                productName: "Salada Giro",
+                quantity: 1,
+                grossCents: 9_300,
+                discountCents: 0,
+                netCents: 9_300,
+                status: "sent",
+              },
+            ],
+            payments: [],
+            events: [],
+            presence: [],
+          },
     });
   });
   await page.route("**/pilot/counter-queue**", async (route) => {
@@ -1803,7 +1870,7 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
   const cartHeight = await page
     .locator(".cart-preview")
     .evaluate((element) => element.getBoundingClientRect().height);
-  expect(cartHeight).toBeLessThanOrEqual(812 * 0.55);
+  expect(cartHeight).toBeLessThanOrEqual(Math.min(812 * 0.52, 440));
   const draftSubmitLayout = await page.locator(".cart-preview__submit").evaluate((element) => {
     const container = element.getBoundingClientRect();
     const buttons = [...element.querySelectorAll("button")].map((button) =>
@@ -1863,13 +1930,17 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
   await paymentDialog.getByRole("button", { name: "Voltar à conta" }).click();
   await expect(page.locator("form.cashier-payment-form")).toBeHidden();
 
-  await page.locator("details.account-print-disclosure > summary").click();
   const printAccount = page.getByRole("button", { name: "Imprimir pré-conta", exact: true });
   await expect(printAccount).toBeEnabled();
   await printAccount.click();
+  await expect.poll(() => printStatusUpdates).toContain("confirmation_required");
+  const confirmPrint = page.getByRole("button", { name: "Confirmar que saiu", exact: true });
+  await expect(confirmPrint).toBeVisible();
+  await confirmPrint.click();
   await expect.poll(() => printStatusUpdates).toContain("printed");
   await expect(page.getByRole("button", { name: "Confirmar saída física" })).toHaveCount(0);
-  await expect(page.locator(".print-queue")).toHaveCount(0);
+  await expect(page.locator(".print-queue")).toContainText("Pré-conta · Retirada teste");
+  await page.getByText("Dividir valor da pré-conta", { exact: true }).click();
   await expect(
     page.getByText("Valores divididos sobre o saldo. Imprimir não registra pagamento."),
   ).toBeVisible();

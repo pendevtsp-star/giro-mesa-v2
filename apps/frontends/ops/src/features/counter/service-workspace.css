@@ -1,4 +1,5 @@
 .service-workspace {
+  align-content: start;
   container: service-workspace / inline-size;
   min-width: 0;
 }
@@ -22,8 +23,10 @@
 }
 
 .service-order-area {
+  align-content: start;
   display: grid;
   gap: 12px;
+  scroll-margin-top: 72px;
 }
 
 .service-workspace .service-order-area .order-composer {
@@ -45,12 +48,38 @@
   position: static;
 }
 
+.service-workspace .order-composer .real-product-picker {
+  max-height: none;
+  overflow: visible;
+}
+
+.service-workspace .service-action-dock {
+  position: static;
+  box-shadow: none;
+}
+
 .service-workspace .service-account-area {
+  align-content: start;
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: 14px;
   padding: 14px;
   scroll-margin-top: 72px;
+}
+
+.service-workspace .account-charge-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.service-workspace .account-charge-grid > form {
+  min-width: 0;
+}
+
+.service-workspace .account-charge-grid label {
+  align-items: start;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .service-workspace-actions {
@@ -268,15 +297,19 @@
 }
 
 @container service-workspace (max-width: 979px) {
-  .service-workspace[data-focus="account"] .service-account-area {
-    grid-row: 1;
-  }
+  .service-workspace[data-focus="order"] .service-account-area,
   .service-workspace[data-focus="account"] .service-order-area {
-    grid-row: 2;
+    display: none;
   }
 }
 
 @container service-workspace (max-width: 500px) {
+  .service-workspace .order-composer > .cart-preview {
+    max-height: min(52dvh, 440px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   .service-workspace-actions {
     gap: 4px;
   }
@@ -353,4 +386,8 @@
   .salon-service-modal--attendance .gm-modal__description {
     display: none;
   }
+}
+
+.smart-pos-payment .smart-pos-payment__submit > button {
+  min-height: 48px;
 }

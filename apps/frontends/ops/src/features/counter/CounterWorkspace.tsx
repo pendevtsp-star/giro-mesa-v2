@@ -933,7 +933,7 @@ function TabWorkspaceSession({
     if (detail.state.status !== "ready" || (view !== "order" && view !== "account")) return;
     const frame = requestAnimationFrame(() => {
       if (view === "account")
-        accountPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "instant" });
+        accountPanelRef.current?.scrollIntoView({ block: "start", behavior: "instant" });
       else if (window.matchMedia("(min-width: 760px)").matches)
         productSearchRef.current?.focus({ preventScroll: true });
     });
@@ -2570,6 +2570,7 @@ function TabWorkspaceSession({
                   const editing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
                   if (event.key === "/" && !editing) {
                     event.preventDefault();
+                    flushSync(() => setView("order"));
                     productSearchRef.current?.focus();
                   }
                   if (
@@ -2657,12 +2658,12 @@ function TabWorkspaceSession({
                   <Button
                     aria-current={view === "order" ? "page" : undefined}
                     onClick={() => {
-                      setView("order");
+                      flushSync(() => setView("order"));
                       orderPanelRef.current?.scrollIntoView({
                         block: "start",
                         behavior: "instant",
                       });
-                      productSearchRef.current?.focus();
+                      productSearchRef.current?.focus({ preventScroll: true });
                     }}
                     type="button"
                   >
@@ -2671,7 +2672,7 @@ function TabWorkspaceSession({
                   <Button
                     aria-current={view === "account" ? "page" : undefined}
                     onClick={() => {
-                      setView("account");
+                      flushSync(() => setView("account"));
                       accountPanelRef.current?.scrollIntoView({
                         block: "start",
                         behavior: "instant",
@@ -3310,6 +3311,7 @@ function TabWorkspaceSession({
                           <Icon aria-hidden="true" name="search" size={16} />
                           <Input
                             ref={productSearchRef}
+                            className="border-0 bg-transparent shadow-none focus-visible:ring-0"
                             onChange={(event) => setProductSearch(event.target.value)}
                             onKeyDown={(event) => {
                               if (event.key === "Enter" && visibleProducts[0]) {
@@ -4847,10 +4849,97 @@ function TabWorkspaceSession({
                           ))}
                         </div>
                       </details>
+                      <details
+                        className="account-disclosure"
+                        hidden={!tabOpen || !canAdjustCharges}
+                      >
+                        <summary>Taxa de serviço e gorjeta</summary>
+                        <div className="account-charge-grid">
+                          <form
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void mutate(
+                                () =>
+                                  scope.dispatch(
+                                    "pos.tab.service_charge_requested",
+                                    pilotMutation("service-charge", {
+                                      tabId,
+                                      basisPoints: Math.round(servicePercent * 100),
+                                    }),
+                                    (key) =>
+                                      api.pilot.serviceCharge(
+                                        scope.organizationId,
+                                        scope.unitId,
+                                        tabId,
+                                        Math.round(servicePercent * 100),
+                                        key,
+                                      ),
+                                  ),
+                                "Taxa de serviço atualizada.",
+                              );
+                            }}
+                          >
+                            <h3>Serviço</h3>
+                            <Label>
+                              Percentual
+                              <Input
+                                max={100}
+                                min={0}
+                                onChange={(event) => setServicePercent(Number(event.target.value))}
+                                step="0.01"
+                                type="number"
+                                value={servicePercent}
+                              />
+                            </Label>
+                            <Button disabled={busy} size="sm" type="submit">
+                              Aplicar
+                            </Button>
+                          </form>
+                          <form
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void mutate(
+                                () =>
+                                  scope.dispatch(
+                                    "pos.tab.tip_requested",
+                                    pilotMutation("tip", {
+                                      tabId,
+                                      tipCents: Math.round(tipReais * 100),
+                                    }),
+                                    (key) =>
+                                      api.pilot.tip(
+                                        scope.organizationId,
+                                        scope.unitId,
+                                        tabId,
+                                        Math.round(tipReais * 100),
+                                        key,
+                                      ),
+                                  ),
+                                "Gorjeta atualizada.",
+                              );
+                            }}
+                          >
+                            <h3>Gorjeta</h3>
+                            <Label>
+                              Valor em reais
+                              <Input
+                                min={0}
+                                onChange={(event) => setTipReais(Number(event.target.value))}
+                                step="0.01"
+                                type="number"
+                                value={tipReais}
+                              />
+                            </Label>
+                            <Button disabled={busy} size="sm" type="submit">
+                              Aplicar
+                            </Button>
+                          </form>
+                        </div>
+                      </details>
                     </section>
                   )}
                 </div>
-                {tabOpen && view !== "order" && view !== "activity" && (
+                {tabOpen && view === "table" && (
                   <section className={`workspace-tools workspace-tools--${view}`}>
                     {view === "table" && (
                       <div className="workspace-tools__heading">
@@ -5066,95 +5155,6 @@ function TabWorkspaceSession({
                             Unificar aqui
                           </Button>
                         </form>
-                        <details
-                          className="account-disclosure"
-                          hidden={view !== "account" || !canAdjustCharges}
-                        >
-                          <summary>Taxa de serviço e gorjeta</summary>
-                          <div className="account-charge-grid">
-                            <form
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                void mutate(
-                                  () =>
-                                    scope.dispatch(
-                                      "pos.tab.service_charge_requested",
-                                      pilotMutation("service-charge", {
-                                        tabId,
-                                        basisPoints: Math.round(servicePercent * 100),
-                                      }),
-                                      (key) =>
-                                        api.pilot.serviceCharge(
-                                          scope.organizationId,
-                                          scope.unitId,
-                                          tabId,
-                                          Math.round(servicePercent * 100),
-                                          key,
-                                        ),
-                                    ),
-                                  "Taxa de serviço atualizada.",
-                                );
-                              }}
-                            >
-                              <h3>Serviço</h3>
-                              <Label>
-                                Percentual
-                                <Input
-                                  max={100}
-                                  min={0}
-                                  onChange={(event) =>
-                                    setServicePercent(Number(event.target.value))
-                                  }
-                                  step="0.01"
-                                  type="number"
-                                  value={servicePercent}
-                                />
-                              </Label>
-                              <Button disabled={busy} size="sm" type="submit">
-                                Aplicar
-                              </Button>
-                            </form>
-                            <form
-                              onSubmit={(event) => {
-                                event.preventDefault();
-                                void mutate(
-                                  () =>
-                                    scope.dispatch(
-                                      "pos.tab.tip_requested",
-                                      pilotMutation("tip", {
-                                        tabId,
-                                        tipCents: Math.round(tipReais * 100),
-                                      }),
-                                      (key) =>
-                                        api.pilot.tip(
-                                          scope.organizationId,
-                                          scope.unitId,
-                                          tabId,
-                                          Math.round(tipReais * 100),
-                                          key,
-                                        ),
-                                    ),
-                                  "Gorjeta atualizada.",
-                                );
-                              }}
-                            >
-                              <h3>Gorjeta</h3>
-                              <Label>
-                                Valor em reais
-                                <Input
-                                  min={0}
-                                  onChange={(event) => setTipReais(Number(event.target.value))}
-                                  step="0.01"
-                                  type="number"
-                                  value={tipReais}
-                                />
-                              </Label>
-                              <Button disabled={busy} size="sm" type="submit">
-                                Aplicar
-                              </Button>
-                            </form>
-                          </div>
-                        </details>
                       </div>
                     </div>
                   </section>
