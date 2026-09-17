@@ -24,6 +24,8 @@ test("claims each scheduled execution once and gates email by current permission
     return;
   }
 
+  const now = new Date("2026-08-17T12:31:00.000Z");
+  context.mock.timers.enable({ apis: ["Date"], now });
   const previousEnvironment = { ...process.env };
   const previousFetch = globalThis.fetch;
   process.env.DATABASE_URL = databaseUrl;
@@ -131,7 +133,6 @@ test("claims each scheduled execution once and gates email by current permission
       closedAt: new Date("2026-08-12T15:00:00.000Z"),
     });
 
-    const now = new Date("2026-08-17T12:31:00.000Z");
     const claims = await Promise.all([
       processDueReportSchedules(database.db, { now, limit: 10 }),
       processDueReportSchedules(database.db, { now, limit: 10 }),
