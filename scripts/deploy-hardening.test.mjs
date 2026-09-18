@@ -175,17 +175,21 @@ test("Linux restore rejects a signed privileged database role before Docker", ()
   const key = Buffer.alloc(32, 19);
   try {
     const dump = Buffer.from("not-a-real-dump\n");
-    const roles = Buffer.from(JSON.stringify([{
-      name: "giromesa_dr_policy",
-      canLogin: false,
-      superuser: true,
-      createDb: false,
-      createRole: false,
-      hasMembership: false,
-      inherit: false,
-      replication: false,
-      bypassRls: false,
-    }]));
+    const roles = Buffer.from(
+      JSON.stringify([
+        {
+          name: "giromesa_dr_policy",
+          canLogin: false,
+          superuser: true,
+          createDb: false,
+          createRole: false,
+          hasMembership: false,
+          inherit: false,
+          replication: false,
+          bypassRls: false,
+        },
+      ]),
+    );
     writeFileSync(join(directory, "database.dump"), dump);
     writeFileSync(join(directory, "database-roles.json"), roles);
     signedManifest(
@@ -201,8 +205,18 @@ test("Linux restore rejects a signed privileged database role before Docker", ()
         databaseName: "giromesa",
         declaredRpoMinutes: 5,
         files: [
-          { path: "database.dump", kind: "postgresql", bytes: dump.length, sha256: createHash("sha256").update(dump).digest("hex") },
-          { path: "database-roles.json", kind: "postgresql_roles", bytes: roles.length, sha256: createHash("sha256").update(roles).digest("hex") },
+          {
+            path: "database.dump",
+            kind: "postgresql",
+            bytes: dump.length,
+            sha256: createHash("sha256").update(dump).digest("hex"),
+          },
+          {
+            path: "database-roles.json",
+            kind: "postgresql_roles",
+            bytes: roles.length,
+            sha256: createHash("sha256").update(roles).digest("hex"),
+          },
         ],
       },
       key,
@@ -210,12 +224,18 @@ test("Linux restore rejects a signed privileged database role before Docker", ()
     const result = run(
       restoreScript,
       [
-        "--backup-directory", directory,
-        "--target-database-container", "container-that-must-not-run",
-        "--database-name", "giromesa",
-        "--database-user", "giromesa",
-        "--expected-artifact", `git:${"1".repeat(40)}`,
-        "--expected-source-migration-id", "0029_platform_incident_projection_actions",
+        "--backup-directory",
+        directory,
+        "--target-database-container",
+        "container-that-must-not-run",
+        "--database-name",
+        "giromesa",
+        "--database-user",
+        "giromesa",
+        "--expected-artifact",
+        `git:${"1".repeat(40)}`,
+        "--expected-source-migration-id",
+        "0029_platform_incident_projection_actions",
       ],
       { GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64: key.toString("base64") },
     );
@@ -521,10 +541,14 @@ test("deploy rejects insufficient Docker bytes or inodes before any recovery pul
   assert.match(deploy, /DISK_INODES_INSUFFICIENT/);
   assert.match(deploy, /DISK_IMAGE_ESTIMATE_UNAVAILABLE/);
   assert.match(deploy, /config --format json/);
-  const targetSnapshot = deploy.indexOf('target_image_candidate_text=$(');
-  const recoveryEnvironment = deploy.indexOf('export GIROMESA_API_IMAGE=${recovery_image_values[0]}');
-  assert.ok(targetSnapshot >= 0 && targetSnapshot < recoveryEnvironment,
-    "capture target images before Compose inherits recovery image variables");
+  const targetSnapshot = deploy.indexOf("target_image_candidate_text=$(");
+  const recoveryEnvironment = deploy.indexOf(
+    "export GIROMESA_API_IMAGE=${recovery_image_values[0]}",
+  );
+  assert.ok(
+    targetSnapshot >= 0 && targetSnapshot < recoveryEnvironment,
+    "capture target images before Compose inherits recovery image variables",
+  );
 });
 
 test("disk estimate supports OCI and Docker manifests and rejects ambiguous platforms", () => {
@@ -623,11 +647,15 @@ test("deploy fiscal gate accepts blocked homologation and rejects unhomologated 
   );
   try {
     writeFileSync(envFile, "FISCAL_RELEASE_ENV=homologation\n");
-    const homologation = spawnSync("python3", ["-", manifest, join(root, "package.json"), envFile], {
-      cwd: root,
-      encoding: "utf8",
-      input: source,
-    });
+    const homologation = spawnSync(
+      "python3",
+      ["-", manifest, join(root, "package.json"), envFile],
+      {
+        cwd: root,
+        encoding: "utf8",
+        input: source,
+      },
+    );
     assert.equal(homologation.status, 0, output(homologation));
 
     writeFileSync(
@@ -724,7 +752,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0083_linked_service_accounts");
+  assert.equal(matrix.requiredAppliedMigration, "0084_inventory_resale_before_catalog");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -841,7 +869,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0083_linked_service_accounts");
+  assert.equal(recovery.targetMigration, "0084_inventory_resale_before_catalog");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -868,14 +896,15 @@ test("pre-migration backup binds the migration actually applied in the source da
       },
       { appliedBefore: "0082_delivery_failure_states", appliedBeforeWhen: "1788972000001" },
       { appliedBefore: "0083_linked_service_accounts", appliedBeforeWhen: "1789065000000" },
+      { appliedBefore: "0084_inventory_resale_before_catalog", appliedBeforeWhen: "1789660800000" },
     ],
   );
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
-    assert.equal(transition.recoveryMigration, "0083_linked_service_accounts");
-    assert.equal(transition.recoveryArtifact, "git:2baa3098091d10638e604083c28a3bac9c8f4397");
+    assert.equal(transition.recoveryMigration, "0084_inventory_resale_before_catalog");
+    assert.equal(transition.recoveryArtifact, "git:785cc0e59bcecf652a11f478871b6582dc0789bd");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/34519597202$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/35361685839$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });
@@ -971,11 +1000,12 @@ test("private repository publishes keyless Sigstore signatures for every image d
     "scripts/fiscal-production-smoke.sql",
   ]) {
     assert.equal(workflow.split(fiscalReleaseFile).length - 1, 1);
-    assert.ok(
-      workflow.indexOf(fiscalReleaseFile) < workflow.indexOf("\n  recovery-manifest:"),
-    );
+    assert.ok(workflow.indexOf(fiscalReleaseFile) < workflow.indexOf("\n  recovery-manifest:"));
     assert.match(provenance, new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
-    assert.match(readFileSync(trustedEntrypoint, "utf8"), new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")));
+    assert.match(
+      readFileSync(trustedEntrypoint, "utf8"),
+      new RegExp(fiscalReleaseFile.replaceAll(".", "\\.")),
+    );
   }
   assert.match(workflow, /critical=\[[^\n]*"package\.json"/);
   assert.match(provenance, /"package\.json"/);
@@ -1053,7 +1083,8 @@ test("BuildKit attestation validation accepts single and multi-platform structur
   };
   const slsaV1 = {
     buildDefinition: {
-      buildType: "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md",
+      buildType:
+        "https://github.com/moby/buildkit/blob/master/docs/attestations/slsa-definitions.md",
       resolvedDependencies: [],
     },
     runDetails: {
