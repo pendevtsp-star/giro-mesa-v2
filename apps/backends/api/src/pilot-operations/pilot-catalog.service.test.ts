@@ -15,6 +15,7 @@ import {
   posProductPrices,
   posProductStations,
   posProducts,
+  posRecipeComponents,
   units,
 } from "@giromesa/db";
 import type { DatabaseService } from "../database/database.module.js";
@@ -27,6 +28,48 @@ const actorIdentityId = "33333333-3333-4333-8333-333333333333";
 const categoryId = "44444444-4444-4444-8444-444444444444";
 const stationId = "55555555-5555-4555-8555-555555555555";
 const productId = "66666666-6666-4666-8666-666666666666";
+
+it("redacts management stock, recipe and cost for operators even with manager access to another unit", async () => {
+  const rowsFor = (table: unknown) => {
+    if (table === units) return [{ timezone: "America/Sao_Paulo" }];
+    if (table === posProductPrices) return [{ productId, priceCents: 1500, costCents: 600 }];
+    if (table === posProducts) return [{ id: productId, name: "Cerveja" }];
+    assert.notEqual(table, posRecipeComponents, "operator must not query internal recipes");
+    return [];
+  };
+  const database = {
+    db: {
+      select: () => ({
+        from: (table: unknown) => ({
+          where: () => {
+            const rows = rowsFor(table);
+            return Object.assign(Promise.resolve(rows), { limit: async () => rows });
+          },
+        }),
+      }),
+      execute: async () => {
+        assert.fail("operator must not query stock projections");
+      },
+    },
+  } as unknown as DatabaseService;
+  const scope = {
+    requireUnitAccess: async () => ({ role: "waiter" }),
+    requireOrganizationRole: async () => [
+      { role: "waiter", unitId },
+      { role: "manager", unitId: "77777777-7777-4777-8777-777777777777" },
+    ],
+  } as unknown as ScopeService;
+  const catalog = await new PilotCatalogService(database, scope).list(
+    actorIdentityId,
+    organizationId,
+    unitId,
+  );
+  assert.deepEqual(catalog.capabilities, { canManage: false });
+  assert.equal("inventoryProducts" in catalog, false);
+  assert.deepEqual(catalog.recipes, []);
+  assert.deepEqual(catalog.prices, [{ productId, priceCents: 1500 }]);
+  assert.equal(catalog.products[0]?.id, productId);
+});
 
 type Receipt = {
   actorIdentityId: string;
@@ -114,7 +157,7 @@ function createHarness(primaryTable: unknown, primaryId: string) {
   } as unknown as DatabaseService;
   const scope = {
     requireUnitAccess: async () => ({ organizationId, unitId }),
-    requireOrganizationRole: async () => [{ unitId: null }],
+    requireOrganizationRole: async () => [{ unitId: null, role: "owner" }],
   } as unknown as ScopeService;
 
   return {

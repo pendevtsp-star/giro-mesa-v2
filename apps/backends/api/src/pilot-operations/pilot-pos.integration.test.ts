@@ -409,6 +409,42 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       .where(eq(posTabs.id, tabId))
       .limit(1);
     assert.ok(tabBeforeQrDraft);
+    const ordersBeforePriceReview = await database.db
+      .select({ id: posOrders.id })
+      .from(posOrders)
+      .where(eq(posOrders.tabId, tabId));
+    for (const expectedTotalCents of [undefined, 500]) {
+      await assert.rejects(
+        pos.createPublicTableOrder(
+          organizationA.id,
+          unitA.id,
+          table.id,
+          tabId,
+          `qr-price-review-${expectedTotalCents}`,
+          {
+            items: [{ productId: product.id, quantity: 1, modifierOptionIds: [] }],
+            expectedTotalCents,
+          },
+        ),
+        (error: unknown) => {
+          const response = (
+            error as { getResponse(): { code: string; totalCents: number } }
+          ).getResponse();
+          assert.equal(response.code, "PUBLIC_ORDER_PRICE_CHANGED");
+          assert.equal(response.totalCents, 1_000);
+          return true;
+        },
+      );
+    }
+    assert.equal(
+      (
+        await database.db
+          .select({ id: posOrders.id })
+          .from(posOrders)
+          .where(eq(posOrders.tabId, tabId))
+      ).length,
+      ordersBeforePriceReview.length,
+    );
     const qrDraft = await pos.createPublicTableOrder(
       organizationA.id,
       unitA.id,
@@ -416,6 +452,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       tabId,
       "qr-table-order-0001",
       {
+        expectedTotalCents: 1_000,
         items: [
           { productId: product.id, quantity: 1, modifierOptionIds: [], allergyNote: "Amendoim" },
         ],
@@ -424,6 +461,29 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     assert.equal(qrDraft.order.source, "qr_table");
     assert.equal(qrDraft.order.status, "draft");
     assert.equal(qrDraft.items[0]?.allergyNote, "Amendoim");
+    await database.db
+      .update(posProductPrices)
+      .set({ priceCents: 1_200 })
+      .where(eq(posProductPrices.productId, product.id));
+    const qrReplay = await pos.createPublicTableOrder(
+      organizationA.id,
+      unitA.id,
+      table.id,
+      tabId,
+      "qr-table-order-0001",
+      {
+        expectedTotalCents: 1_000,
+        items: [
+          { productId: product.id, quantity: 1, modifierOptionIds: [], allergyNote: "Amendoim" },
+        ],
+      },
+    );
+    assert.equal(qrReplay.idempotentReplay, true);
+    assert.equal(qrReplay.items[0]?.netCents, 1_000);
+    await database.db
+      .update(posProductPrices)
+      .set({ priceCents: 1_000 })
+      .where(eq(posProductPrices.productId, product.id));
     const [[stockWithQrDraft], [tabWithQrDraft]] = await Promise.all([
       database.db
         .select({ soldToday: posProductAvailability.soldToday })
@@ -2999,6 +3059,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       tabId,
       "qr-table-order-approval-0001",
       {
+        expectedTotalCents: 1_000,
         items: [
           { productId: product.id, quantity: 1, modifierOptionIds: [], allergyNote: "Amendoim" },
         ],

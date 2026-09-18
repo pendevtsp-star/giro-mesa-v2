@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   InterunitTransfer,
   InventoryAsset,
+  InventoryIssueRoute,
   InventoryItem,
   InventoryItemKind,
   InventoryLot,
@@ -13,6 +14,7 @@ import type {
   ReturnableCustody,
   ReturnableMovement,
   ReturnablePosition,
+  StockBalance,
   StockLocation,
 } from "../../management.shared";
 import { inventoryQuantity as numberInput, validInventoryQuantity } from "./inventory-input";
@@ -125,9 +127,13 @@ export function LocationModal({
                 );
             }}
             required
+            placeholder="Ex.: Depósito, Freezer 1, Freezer 2"
             value={name}
           />
         </Label>
+        <p className="inventory-context-note">
+          Cadastre cada freezer como um local para conferir seu saldo e repor a partir do depósito.
+        </p>
         <div className="gm-form-grid inventory-form-grid">
           <Label className="gm-form-field">
             <span>Tipo de setor</span>
@@ -275,8 +281,7 @@ export function ItemModal({
     Number(numberInput(reorder)) >= 0 &&
     Number(leadTime) >= 0 &&
     Number(numberInput(returnableQuantity)) > 0 &&
-    Number(numberInput(deposit)) >= 0 &&
-    (kind !== "resale" || Boolean(productId));
+    Number(numberInput(deposit)) >= 0;
   return (
     <Modal
       isOpen={open}
@@ -304,7 +309,7 @@ export function ItemModal({
             minimumQuantity: numberInput(minimum),
             reorderQuantity: numberInput(reorder),
             leadTimeDays: Number(leadTime),
-            productId: kind === "resale" ? productId : item ? null : undefined,
+            productId: kind === "resale" && productId ? productId : item ? null : undefined,
             preferredSupplierId: supplierId || (item ? null : undefined),
             allowNegative: item?.allowNegative ?? false,
             kind,
@@ -315,7 +320,7 @@ export function ItemModal({
           });
         }}
       >
-        <div className="gm-form-grid inventory-form-grid">
+        <div className="gm-form-grid inventory-form-grid [&>label]:flex-col [&>label]:items-stretch">
           <Label className="gm-form-field">
             <span>Nome do item</span>
             <Input minLength={2} onChange={(e) => setName(e.target.value)} required value={name} />
@@ -417,11 +422,13 @@ export function ItemModal({
             <Label className="gm-form-field inventory-form-grid__wide">
               <span>Produto do Cardápio para baixa direta</span>
               <NativeSelect
-                onChange={(e) => setProductId(e.target.value)}
-                required
+                onChange={(e) => {
+                  setProductId(e.target.value);
+                  if (!e.target.value) setContainerItemId("");
+                }}
                 value={productId}
               >
-                <option value="">Selecione</option>
+                <option value="">Vincular depois no Cardápio</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.name}
@@ -429,18 +436,25 @@ export function ItemModal({
                 ))}
               </NativeSelect>
               <small>
-                Obrigatório para revenda. Itens preparados devem consumir por ficha técnica.
+                Você pode receber a mercadoria antes de criar o produto. No Cardápio, escolha
+                Produto de revenda e busque este item para ativar a baixa por venda.
               </small>
             </Label>
           )}
-          {kind === "resale" && (
+          {kind === "resale" && !productId && (
+            <p className="inventory-context-note inventory-form-grid__wide">
+              Vincule um produto do Cardápio para configurar vasilhames retornáveis. Até lá, o saldo
+              da bebida é controlado normalmente; os vasilhames cheios ainda não são calculados.
+            </p>
+          )}
+          {kind === "resale" && productId && (
             <Label className="gm-form-field inventory-form-grid__wide">
               <span>Vasilhame vinculado</span>
               <NativeSelect
                 onChange={(event) => setContainerItemId(event.target.value)}
                 value={containerItemId}
               >
-                <option value="">Produto não retornável</option>
+                <option value="">Sem vasilhame principal</option>
                 {containers.map((container) => (
                   <option key={container.id} value={container.id}>
                     {container.name}
@@ -453,7 +467,10 @@ export function ItemModal({
                   cadastre o vasilhame primeiro. Depois, volte a esta bebida para vinculá-lo.
                 </small>
               )}
-              <small>A venda gera retorno previsto; o saldo físico só muda após conferência.</small>
+              <small>
+                O saldo da bebida calcula os vasilhames cheios. O envio do pedido gera retorno
+                pendente; os vazios entram no estoque após conferência.
+              </small>
             </Label>
           )}
           {kind === "resale" && containerItemId && (
@@ -761,6 +778,7 @@ export function TransferModal({
   items,
   locations,
   lots,
+  balances,
   onClose,
   onSubmit,
 }: {
@@ -769,6 +787,7 @@ export function TransferModal({
   items: InventoryItem[];
   locations: StockLocation[];
   lots: InventoryLot[];
+  balances: StockBalance[];
   onClose: () => void;
   onSubmit: (body: {
     sourceLocationId: string;
@@ -800,6 +819,13 @@ export function TransferModal({
   }, [open]);
   const availableLots = lots.filter(
     (lot) => lot.inventoryItemId === itemId && lot.locationId === sourceId && lot.quantity > 0,
+  );
+  const selectedItem = items.find((item) => item.id === itemId);
+  const sourceBalance = balances.find(
+    (balance) => balance.inventoryItemId === itemId && balance.locationId === sourceId,
+  );
+  const destinationBalance = balances.find(
+    (balance) => balance.inventoryItemId === itemId && balance.locationId === destinationId,
   );
   return (
     <Modal isOpen={open} onClose={onClose} size="md" title="Transferir entre locais">
@@ -933,6 +959,18 @@ export function TransferModal({
             />
           </Label>
         </div>
+        {selectedItem && sourceId && (
+          <p className="inventory-context-note" aria-live="polite">
+            Origem: {(sourceBalance?.quantity ?? 0).toLocaleString("pt-BR")} {selectedItem.unit}
+            {" físicos · "}
+            {(sourceBalance?.availableQuantity ?? 0).toLocaleString("pt-BR")} disponíveis.
+            {destinationId &&
+              ` Destino: ${(destinationBalance?.quantity ?? 0).toLocaleString("pt-BR")} ${selectedItem.unit} físicos.`}
+          </p>
+        )}
+        <p className="inventory-context-note">
+          A quantidade sai da origem ao enviar e entra no destino após a conferência do recebimento.
+        </p>
         <Button
           type="button"
           variant="secondary"
@@ -3470,6 +3508,7 @@ export function InventoryIssueRouteModal({
   busy,
   items,
   locations,
+  routes,
   onClose,
   onSubmit,
 }: {
@@ -3477,12 +3516,21 @@ export function InventoryIssueRouteModal({
   busy: boolean;
   items: InventoryItem[];
   locations: StockLocation[];
+  routes: InventoryIssueRoute[];
   onClose: () => void;
   onSubmit: (body: { productId: string; locationId: string; active: boolean }) => Promise<unknown>;
 }) {
   const [productId, setProductId] = useState("");
   const [locationId, setLocationId] = useState("");
   const products = items.filter((item) => item.active && item.kind === "resale" && item.productId);
+  useEffect(() => {
+    if (!open) return;
+    setProductId("");
+    setLocationId("");
+  }, [open]);
+  const existingRoute = routes.find(
+    (route) => route.productId === productId && route.stationId === null,
+  );
   return (
     <Modal isOpen={open} onClose={onClose} size="sm" title="Origem da baixa por venda">
       <form
@@ -3493,15 +3541,23 @@ export function InventoryIssueRouteModal({
         }}
       >
         <p className="inventory-context-note">
-          Define de qual setor o produto de revenda será baixado. Sem rota, a venda é bloqueada
-          quando houver saldo em mais de um setor.
+          Defina o local padrão de saída, como Freezer 1. A venda usa esse local automaticamente,
+          sem pedir uma escolha a cada lançamento. Rotas específicas de estação têm preferência.
         </p>
         <Label className="gm-form-field">
           <span>Produto</span>
           <NativeSelect
             required
             value={productId}
-            onChange={(event) => setProductId(event.target.value)}
+            onChange={(event) => {
+              const nextProductId = event.target.value;
+              setProductId(nextProductId);
+              setLocationId(
+                routes.find(
+                  (route) => route.productId === nextProductId && route.stationId === null,
+                )?.locationId ?? "",
+              );
+            }}
           >
             <option value="">Selecione</option>
             {products.map((item) => (
@@ -3512,7 +3568,7 @@ export function InventoryIssueRouteModal({
           </NativeSelect>
         </Label>
         <Label className="gm-form-field">
-          <span>Setor da baixa</span>
+          <span>Local padrão de saída</span>
           <NativeSelect
             required
             value={locationId}
@@ -3528,6 +3584,12 @@ export function InventoryIssueRouteModal({
               ))}
           </NativeSelect>
         </Label>
+        {existingRoute && (
+          <p className="inventory-context-note">
+            {existingRoute.active ? "Rota atual carregada." : "Esta rota está inativa."} Ao salvar,
+            o local escolhido será usado nas próximas vendas.
+          </p>
+        )}
         <div className="inventory-modal-actions">
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancelar

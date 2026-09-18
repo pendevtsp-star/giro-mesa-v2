@@ -327,7 +327,7 @@ function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapsh
         missing("pending-approvals", "Aprovações pendentes", "counter"),
         missing("occupancy", "Ocupação", "salon"),
         missing("open-tabs", "Comandas abertas", "counter"),
-        missing("late-kds", "Tickets atrasados", "kds"),
+        missing("late-kds", "Pedidos atrasados", "kds"),
       ];
     if (profile === "waiter")
       return [
@@ -448,7 +448,7 @@ function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapsh
       ),
       metric(
         "late-kds",
-        "Tickets atrasados",
+        "Pedidos atrasados",
         count(operation.kdsDelayed),
         "Acima de 15 minutos",
         operation.kdsDelayed ? "danger" : "success",
@@ -477,7 +477,7 @@ function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapsh
         "open-calls",
         "Chamados",
         count(operation.openCalls),
-        `${operation.overdueCalls} fora do SLA`,
+        `${operation.overdueCalls} fora do prazo`,
         operation.overdueCalls ? "danger" : "neutral",
         "salon",
       ),
@@ -485,7 +485,7 @@ function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapsh
         "ready-items",
         "Prontos para retirar",
         count(operation.readyForMe),
-        "Tickets das suas comandas",
+        "Pedidos das suas comandas",
         operation.readyForMe ? "warning" : "success",
         "salon",
       ),
@@ -561,7 +561,7 @@ function operationalMetrics(profile: OverviewProfileId, snapshot: OverviewSnapsh
         "open-calls",
         "Chamados",
         count(operation.openCalls),
-        `${operation.overdueCalls} fora do SLA`,
+        `${operation.overdueCalls} fora do prazo`,
         operation.overdueCalls ? "danger" : "neutral",
         "salon",
       ),
@@ -824,7 +824,7 @@ function priorities(profile: OverviewProfileId, snapshot: OverviewSnapshot): Pri
     items.push(
       priority(
         "late-kds",
-        `${operation.kdsDelayed} ticket(s) atrasado(s)`,
+        `${operation.kdsDelayed} pedido(s) atrasado(s)`,
         "Priorize o mais antigo.",
         "danger",
         "kds",
@@ -835,7 +835,7 @@ function priorities(profile: OverviewProfileId, snapshot: OverviewSnapshot): Pri
     items.push(
       priority(
         "late-calls",
-        `${operation.overdueCalls} chamado(s) fora do SLA`,
+        `${operation.overdueCalls} chamado(s) fora do prazo`,
         "Atenda o chamado mais antigo.",
         "danger",
         "salon",
@@ -1023,18 +1023,23 @@ const quickActions: Record<
 > = {
   accountant: [],
   owner: [
-    { id: "reports", label: "Ver relatórios", route: "reports" },
-    { id: "finance", label: "Abrir financeiro", route: "finance" },
-    { id: "multiunit", label: "Comparar unidades", route: "multiunit" },
+    { id: "new-tab", label: "Abrir comanda", route: "counter" },
+    { id: "salon", label: "Mesas", route: "salon" },
+    { id: "kds", label: "Produção", route: "kds" },
+    { id: "cash", label: "Caixa", route: "cash" },
+    { id: "reports", label: "Relatórios", route: "reports" },
+    { id: "finance", label: "Financeiro", route: "finance" },
   ],
   manager: [
-    { id: "salon", label: "Abrir salão", route: "salon" },
-    { id: "kds", label: "Abrir produção", route: "kds" },
-    { id: "people", label: "Ver equipe", route: "people" },
+    { id: "new-tab", label: "Abrir comanda", route: "counter" },
+    { id: "salon", label: "Mesas", route: "salon" },
+    { id: "kds", label: "Produção", route: "kds" },
+    { id: "cash", label: "Caixa", route: "cash" },
+    { id: "people", label: "Equipe", route: "people" },
   ],
   waiter: [
     { id: "salon", label: "Abrir salão", route: "salon" },
-    { id: "counter", label: "Nova comanda", route: "counter" },
+    { id: "new-tab", label: "Abrir comanda", route: "counter" },
     { id: "reservations", label: "Ver reservas", route: "reservations" },
   ],
   receptionist: [
@@ -1166,6 +1171,31 @@ export function shapeManagementOverview(
       route: allowed.has("counter") ? "counter" : undefined,
       source: "operations",
     });
+    if (profileId === "owner" || profileId === "manager") {
+      pulse.push(
+        {
+          id: "kds-preparing",
+          label: "Em preparo",
+          value: count(operation.kdsPreparing),
+          route: "kds",
+          source: "operations",
+        },
+        {
+          id: "kds-ready",
+          label: "Prontos para servir",
+          value: count(operation.kdsReady),
+          route: "kds",
+          source: "operations",
+        },
+        {
+          id: "received",
+          label: "Recebido no turno",
+          value: money(operation.receivedCents),
+          route: "cash",
+          source: "operations",
+        },
+      );
+    }
     pulse.push({
       id: "active-team",
       label: "Equipe ativa",

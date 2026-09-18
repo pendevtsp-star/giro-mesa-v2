@@ -589,6 +589,13 @@
       "when": 1789065000000,
       "tag": "0083_linked_service_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1789660800000,
+      "tag": "0084_inventory_resale_before_catalog",
+      "breakpoints": true
     }
   ]
 }

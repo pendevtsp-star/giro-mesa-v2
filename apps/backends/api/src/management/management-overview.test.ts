@@ -124,6 +124,67 @@ describe("management overview role matrix", () => {
     }
   });
 
+  it("projects operational pulse and shortcuts only for owner and manager", () => {
+    const expectedPulse = [
+      ["kds-preparing", "Em preparo", "3", "kds"],
+      ["kds-ready", "Prontos para servir", "1", "kds"],
+      [
+        "received",
+        "Recebido no turno",
+        new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(100),
+        "cash",
+      ],
+    ];
+    for (const profile of ["owner", "manager"] as const) {
+      const result = shapeManagementOverview(profile, generatedAt, snapshot);
+      assert.deepEqual(
+        result.pulse
+          .filter(({ id }) => expectedPulse.some(([expectedId]) => id === expectedId))
+          .map(({ id, label, value, route, source }) => [id, label, value, route, source]),
+        expectedPulse.map((item) => [...item, "operations"]),
+      );
+    }
+    for (const profile of ["waiter", "cashier", "kitchen"] as const) {
+      const result = shapeManagementOverview(profile, generatedAt, snapshot);
+      assert.equal(
+        result.pulse.some(({ id }) => ["kds-preparing", "kds-ready", "received"].includes(id)),
+        false,
+      );
+    }
+    assert.deepEqual(
+      shapeManagementOverview("manager", generatedAt, snapshot).quickActions.map(
+        ({ id, label }) => [id, label],
+      ),
+      [
+        ["new-tab", "Abrir comanda"],
+        ["salon", "Mesas"],
+        ["kds", "Produção"],
+        ["cash", "Caixa"],
+        ["people", "Equipe"],
+      ],
+    );
+    assert.deepEqual(
+      shapeManagementOverview("owner", generatedAt, snapshot).quickActions.map(({ id, label }) => [
+        id,
+        label,
+      ]),
+      [
+        ["new-tab", "Abrir comanda"],
+        ["salon", "Mesas"],
+        ["kds", "Produção"],
+        ["cash", "Caixa"],
+        ["reports", "Relatórios"],
+        ["finance", "Financeiro"],
+      ],
+    );
+    assert.ok(
+      shapeManagementOverview("waiter", generatedAt, snapshot).quickActions.some(
+        ({ id, label, route }) =>
+          id === "new-tab" && label === "Abrir comanda" && route === "counter",
+      ),
+    );
+  });
+
   it("uses frontend precedence, ignores foreign-unit elevation and sorts actionable priorities", () => {
     assert.equal(resolveOverviewProfile([{ role: "owner", unitId: "other-unit" }], "unit"), null);
     assert.equal(

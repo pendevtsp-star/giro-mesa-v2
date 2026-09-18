@@ -1,4 +1,5 @@
 .finance-page {
+  container: finance / inline-size;
   display: grid;
   min-width: 0;
   max-width: 1320px;
@@ -67,33 +68,24 @@
 }
 
 .finance-tabs {
-  display: flex;
-  max-width: 100%;
-  padding: var(--gm-space-1);
-  gap: var(--gm-space-1);
-  overflow-x: auto;
-  background: var(--gm-surface-soft);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-lg);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: 100%;
+  max-width: 640px;
+  overflow: visible;
 }
 
-.finance-tabs button {
-  min-height: 38px;
-  padding: 0 var(--gm-space-3);
-  color: var(--gm-muted);
-  font: inherit;
-  font-weight: 700;
-  white-space: nowrap;
-  background: transparent;
-  border: 0;
-  border-radius: var(--gm-radius-md);
-  cursor: pointer;
+.finance-tabs .gm-segmented-control__item {
+  justify-content: center;
+  min-width: 0;
+  min-height: 40px;
+  white-space: normal;
 }
 
-.finance-tabs button[aria-selected="true"] {
-  color: var(--gm-ink);
-  background: var(--gm-surface);
-  box-shadow: var(--gm-shadow-sm);
+@container finance (max-width: 580px) {
+  .finance-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .finance-tabs button:focus-visible,
@@ -134,11 +126,26 @@
 }
 
 .finance-filters {
-  grid-template-columns: minmax(190px, 2fr) repeat(4, minmax(115px, 1fr)) auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
   padding: var(--gm-space-3);
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-lg);
+}
+
+.finance-filter-search {
+  grid-column: 1 / -1;
+}
+
+.finance-filters input,
+.finance-filters select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.finance-filters > button {
+  min-height: 40px;
 }
 
 .finance-form label,
@@ -479,14 +486,6 @@
 
   .finance-agenda {
     grid-template-columns: 1fr;
-  }
-
-  .finance-filters {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .finance-filter-search {
-    grid-column: span 2;
   }
 }
 

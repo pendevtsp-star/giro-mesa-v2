@@ -30,7 +30,42 @@ import {
   parseCrmWhatsappMedia,
   parseCrmWhatsappMessages,
 } from "./crm.model";
-import { crmError } from "./crm.ui";
+import { type CrmFeedback, crmError, crmFailureMessage } from "./crm.ui";
+
+export function whatsappStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    ready: "Conectado",
+    connected: "Conectado",
+    connecting: "Conectando",
+    disconnected: "Desconectado",
+    disabled: "Desativado",
+    not_configured: "Não configurado",
+    pending: "Pendente",
+    error: "Conexão indisponível",
+    qr_ready: "Aguardando leitura do código",
+    queued: "Na fila",
+    sending: "Enviando",
+    sent: "Enviada",
+    delivered: "Entregue",
+    read: "Lida",
+    received: "Recebida",
+    failed: "Falha no envio",
+    skipped: "Não enviada",
+    suppressed: "Não enviada pelas regras de envio",
+    canceled: "Cancelada",
+    blocked: "Envio bloqueado",
+    scheduled: "Agendada",
+  };
+  return labels[status] ?? "Aguardando atualização";
+}
+
+const contentLabels: Record<string, string> = {
+  text: "Mensagem",
+  image: "Imagem",
+  audio: "Áudio",
+  video: "Vídeo",
+  document: "Documento",
+};
 
 const automationDefaults: Record<
   CrmAutomationRule["trigger"],
@@ -53,7 +88,7 @@ const automationDefaults: Record<
     delay: 120,
   },
   no_show: {
-    label: "No-show",
+    label: "Ausência na reserva",
     message: "Olá, {nome}. Podemos ajudar a remarcar sua reserva?",
     delay: 30,
   },
@@ -247,10 +282,21 @@ export function CrmWhatsappWorkspace({
   const [testRuleId, setTestRuleId] = useState("");
   const [qr, setQr] = useState<string | null>(null);
   const [busy, setBusy] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const [feedback, setFeedback] = useState<CrmFeedback | null>(null);
   const [quietStart, setQuietStart] = useState("21:00");
   const [quietEnd, setQuietEnd] = useState("08:00");
   const [cap, setCap] = useState("4");
+  const connectionError =
+    integration.state.status === "ready" && integration.state.data.config.lastErrorCode
+      ? crmFailureMessage(
+          integration.state.data.config.lastErrorCode,
+          "Não foi possível conectar o WhatsApp. Tente atualizar a conexão. Se continuar, avise o responsável pelo sistema.",
+        )
+      : null;
+
+  function showError(error: unknown, fallback: string) {
+    setFeedback({ tone: "danger", message: crmError(error, fallback) });
+  }
 
   useEffect(() => {
     if (integration.state.status !== "ready") return;
@@ -292,7 +338,7 @@ export function CrmWhatsappWorkspace({
   async function openConversation(conversation: CrmWhatsappConversation) {
     setSelected(conversation);
     setBusy("messages");
-    setFeedback("");
+    setFeedback(null);
     try {
       const page = parseCrmWhatsappMessages(
         await api.growth.whatsappMessages(scope.organizationId, conversation.id),
@@ -304,7 +350,7 @@ export function CrmWhatsappWorkspace({
         inbox.retry();
       }
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível abrir a conversa."));
+      showError(error, "Não foi possível abrir a conversa.");
     } finally {
       setBusy("");
     }
@@ -313,12 +359,15 @@ export function CrmWhatsappWorkspace({
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selected || (!messageBody.trim() && !attachment)) return;
+    if (attachment && attachment.size > 3 * 1024 * 1024) {
+      setFeedback({ tone: "danger", message: "O anexo deve ter no máximo 3 MB." });
+      return;
+    }
     setBusy("send");
-    setFeedback("");
+    setFeedback(null);
     try {
       let media: { fileName: string; mimeType: string; base64: string } | undefined;
       if (attachment) {
-        if (attachment.size > 3 * 1024 * 1024) throw new Error("O anexo deve ter no máximo 3 MB.");
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
@@ -343,7 +392,7 @@ export function CrmWhatsappWorkspace({
       await openConversation(selected);
       inbox.retry();
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível enfileirar a mensagem."));
+      showError(error, "Não foi possível enviar a mensagem.");
     } finally {
       setBusy("");
     }
@@ -359,7 +408,7 @@ export function CrmWhatsappWorkspace({
       setMessages((current) => [...page.items, ...current]);
       setMessageCursor(page.nextCursor);
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível carregar mensagens anteriores."));
+      showError(error, "Não foi possível carregar mensagens anteriores.");
     } finally {
       setBusy("");
     }
@@ -385,7 +434,7 @@ export function CrmWhatsappWorkspace({
       setSelected({ ...updated, customerName: selected.customerName, assignedIdentityName });
       inbox.retry();
     } catch (error) {
-      setFeedback(crmError(error, "A conversa mudou; atualize e tente novamente."));
+      showError(error, "A conversa mudou; atualize e tente novamente.");
       inbox.retry();
     } finally {
       setBusy("");
@@ -404,7 +453,7 @@ export function CrmWhatsappWorkspace({
       link.rel = "noopener";
       link.click();
     } catch (error) {
-      setFeedback(crmError(error, "A mídia não está disponível."));
+      showError(error, "O anexo não está disponível.");
     }
   }
 
@@ -422,19 +471,20 @@ export function CrmWhatsappWorkspace({
       setQuickReplyBody("");
       quickReplies.retry();
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível salvar a resposta rápida."));
+      showError(error, "Não foi possível salvar a resposta rápida.");
     } finally {
       setBusy("");
     }
   }
 
   async function retryExecution(execution: CrmAutomationExecution) {
+    if (busy || !execution.canRetry) return;
     setBusy(`retry:${execution.id}`);
     try {
       await api.growth.retryCrmAutomationExecution(scope.organizationId, execution.id);
       executions.retry();
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível reenfileirar a automação."));
+      showError(error, "Não foi possível tentar o envio novamente.");
     } finally {
       setBusy("");
     }
@@ -459,7 +509,7 @@ export function CrmWhatsappWorkspace({
         nextCursor: page.nextCursor,
       }));
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível carregar mais conversas."));
+      showError(error, "Não foi possível carregar mais conversas.");
     } finally {
       setBusy("");
     }
@@ -473,9 +523,9 @@ export function CrmWhatsappWorkspace({
         unitId: scope.unitId,
         phone: testPhone.trim(),
       });
-      setFeedback("Mensagem de teste enfileirada.");
+      setFeedback({ tone: "success", message: "Mensagem de teste adicionada à fila de envio." });
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível enviar o teste."));
+      showError(error, "Não foi possível enviar o teste.");
     } finally {
       setBusy("");
     }
@@ -483,7 +533,7 @@ export function CrmWhatsappWorkspace({
 
   async function configure() {
     setBusy("configure");
-    setFeedback("");
+    setFeedback(null);
     try {
       await api.growth.configureEvolution(scope.organizationId, {
         unitId: scope.unitId,
@@ -493,9 +543,12 @@ export function CrmWhatsappWorkspace({
         maxMessagesPer30Days: Number(cap),
       });
       integration.retry();
-      setFeedback("Configuração salva. Leia o QR Code para concluir o login.");
+      setFeedback({
+        tone: "success",
+        message: "Configuração salva. Exiba e leia o código QR para conectar o WhatsApp.",
+      });
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível configurar a Evolution Go."));
+      showError(error, "Não foi possível salvar a conexão com o WhatsApp.");
     } finally {
       setBusy("");
     }
@@ -503,7 +556,8 @@ export function CrmWhatsappWorkspace({
 
   async function loadQr(configured: boolean) {
     setBusy("qr");
-    setFeedback("");
+    setFeedback(null);
+    setQr(null);
     try {
       const result = await requestEvolutionQr(
         configured,
@@ -519,9 +573,19 @@ export function CrmWhatsappWorkspace({
       );
       setQr(result.qrDataUrl);
       integration.retry();
-      if (result.ready) setFeedback("WhatsApp conectado; nenhum QR Code é necessário.");
+      if (result.ready)
+        setFeedback({
+          tone: "success",
+          message: "WhatsApp conectado; nenhum código QR é necessário.",
+        });
+      else if (!result.qrDataUrl)
+        setFeedback({
+          tone: "danger",
+          message:
+            "O código QR ainda não está disponível. Aguarde alguns instantes e tente novamente.",
+        });
     } catch (error) {
-      setFeedback(crmError(error, "Não foi possível obter o QR Code."));
+      showError(error, "Não foi possível obter o código QR. Tente novamente em instantes.");
     } finally {
       setBusy("");
     }
@@ -529,14 +593,30 @@ export function CrmWhatsappWorkspace({
 
   async function connectionAction(action: "reconnect" | "logout") {
     setBusy(action);
-    setFeedback("");
+    setFeedback(null);
     try {
       await api.growth.evolutionAction(scope.organizationId, scope.unitId, action);
       setQr(null);
       integration.retry();
-      setFeedback(action === "logout" ? "Sessão desconectada." : "Reconexão solicitada.");
+      setFeedback({
+        tone: "success",
+        message: action === "logout" ? "WhatsApp desconectado." : "Reconexão solicitada.",
+      });
     } catch (error) {
-      setFeedback(crmError(error, "A Evolution Go não concluiu a ação."));
+      showError(error, "Não foi possível concluir a ação no WhatsApp.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function refreshConnection() {
+    setBusy("status");
+    setFeedback(null);
+    try {
+      await api.growth.evolutionStatus(scope.organizationId, scope.unitId);
+      integration.retry();
+    } catch (error) {
+      showError(error, "Não foi possível atualizar a conexão.");
     } finally {
       setBusy("");
     }
@@ -546,11 +626,7 @@ export function CrmWhatsappWorkspace({
     <section className="crm-whatsapp-section" aria-labelledby="crm-whatsapp-title">
       <div className="crm-section-heading">
         <div>
-          <p className="eyebrow">WhatsApp operacional</p>
-          <h2 id="crm-whatsapp-title">Inbox e automações</h2>
-          <p>
-            Mensagens persistidas por unidade, com consentimento, limites e rastreio de campanha.
-          </p>
+          <h2 id="crm-whatsapp-title">Conversas e mensagens automáticas</h2>
         </div>
         <Badge tone={realtimeStatus === "live" ? "success" : "warning"}>
           {realtimeStatus === "live"
@@ -561,9 +637,9 @@ export function CrmWhatsappWorkspace({
         </Badge>
       </div>
       {feedback ? (
-        <Callout tone={feedback.includes("não") || feedback.includes("Não") ? "danger" : "info"}>
-          {feedback}
-        </Callout>
+        <div role={feedback.tone === "danger" ? "alert" : "status"}>
+          <Callout tone={feedback.tone}>{feedback.message}</Callout>
+        </div>
       ) : null}
       <div className="crm-whatsapp-grid">
         <Card className="crm-evolution-card">
@@ -572,7 +648,7 @@ export function CrmWhatsappWorkspace({
               <>
                 <div className="crm-card-heading">
                   <div>
-                    <strong>Evolution Go</strong>
+                    <strong>Conexão com o WhatsApp</strong>
                     <small>
                       {value.connectedNumber
                         ? `+${value.connectedNumber}`
@@ -582,17 +658,17 @@ export function CrmWhatsappWorkspace({
                   <Badge
                     tone={value.ready ? "success" : value.status === "error" ? "danger" : "warning"}
                   >
-                    {value.ready ? "Conectado" : value.status}
+                    {value.ready ? "Conectado" : whatsappStatusLabel(value.status)}
                   </Badge>
                 </div>
-                {value.config.lastErrorCode ? (
-                  <Callout tone="danger">Falha registrada: {value.config.lastErrorCode}</Callout>
+                {connectionError && feedback?.message !== connectionError ? (
+                  <Callout tone="danger">{connectionError}</Callout>
                 ) : null}
                 {scope.profileId === "owner" ? (
                   <>
                     <div className="crm-inline-fields">
                       <label>
-                        Silêncio inicia{" "}
+                        Pausar envios às{" "}
                         <Input
                           type="time"
                           value={quietStart}
@@ -600,7 +676,7 @@ export function CrmWhatsappWorkspace({
                         />
                       </label>
                       <label>
-                        Silêncio termina{" "}
+                        Retomar envios às{" "}
                         <Input
                           type="time"
                           value={quietEnd}
@@ -608,7 +684,7 @@ export function CrmWhatsappWorkspace({
                         />
                       </label>
                       <label>
-                        Limite/30 dias{" "}
+                        Mensagens por cliente em 30 dias{" "}
                         <Input
                           type="number"
                           min="1"
@@ -619,17 +695,13 @@ export function CrmWhatsappWorkspace({
                       </label>
                     </div>
                     <div className="crm-button-row">
-                      <Button
-                        size="sm"
-                        disabled={busy === "configure"}
-                        onClick={() => void configure()}
-                      >
+                      <Button size="sm" disabled={Boolean(busy)} onClick={() => void configure()}>
                         {busy === "configure" ? "Salvando…" : "Salvar conexão"}
                       </Button>
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={busy === "qr"}
+                        disabled={Boolean(busy)}
                         onClick={() => void loadQr(value.configured)}
                       >
                         {busy === "qr" ? "Carregando…" : "Exibir QR Code"}
@@ -637,22 +709,16 @@ export function CrmWhatsappWorkspace({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() =>
-                          void api.growth
-                            .evolutionStatus(scope.organizationId, scope.unitId)
-                            .then(() => integration.retry())
-                            .catch((error) =>
-                              setFeedback(crmError(error, "Não foi possível atualizar o status.")),
-                            )
-                        }
+                        disabled={Boolean(busy)}
+                        onClick={() => void refreshConnection()}
                       >
-                        Atualizar status
+                        {busy === "status" ? "Atualizando…" : "Atualizar conexão"}
                       </Button>
                       {value.configured ? (
                         <Button
                           size="sm"
                           variant="secondary"
-                          disabled={busy === "reconnect"}
+                          disabled={Boolean(busy)}
                           onClick={() => void connectionAction("reconnect")}
                         >
                           {busy === "reconnect" ? "Reconectando…" : "Reconectar"}
@@ -662,7 +728,7 @@ export function CrmWhatsappWorkspace({
                         <Button
                           size="sm"
                           variant="danger"
-                          disabled={busy === "logout"}
+                          disabled={Boolean(busy)}
                           onClick={() => void connectionAction("logout")}
                         >
                           {busy === "logout" ? "Desconectando…" : "Desconectar"}
@@ -742,6 +808,7 @@ export function CrmWhatsappWorkspace({
                   {page.items.map((conversation) => (
                     <button
                       type="button"
+                      aria-pressed={selected?.id === conversation.id}
                       className={selected?.id === conversation.id ? "is-selected" : ""}
                       key={conversation.id}
                       onClick={() => void openConversation(conversation)}
@@ -760,7 +827,9 @@ export function CrmWhatsappWorkspace({
                       <span>
                         {conversation.priority !== "normal" ? (
                           <Badge tone={conversation.priority === "urgent" ? "danger" : "warning"}>
-                            {conversation.priority}
+                            {{ low: "Baixa", high: "Alta", urgent: "Urgente" }[
+                              conversation.priority
+                            ] ?? "Normal"}
                           </Badge>
                         ) : null}
                         {conversation.unreadCount > 0 ? (
@@ -800,7 +869,7 @@ export function CrmWhatsappWorkspace({
                 size="sm"
                 variant="secondary"
               >
-                Abrir Cliente 360
+                Abrir cadastro
               </Button>
             ) : null}
           </div>
@@ -865,11 +934,11 @@ export function CrmWhatsappWorkspace({
                   disabled={busy === "conversation"}
                   onClick={() => void updateConversation({ slaMinutes: 15 })}
                 >
-                  SLA 15 min
+                  Prazo de resposta: 15 min
                 </Button>
                 {selected.slaDueAt ? (
                   <small className={new Date(selected.slaDueAt) < new Date() ? "is-overdue" : ""}>
-                    SLA {dateTime(selected.slaDueAt)}
+                    Responder até {dateTime(selected.slaDueAt)}
                   </small>
                 ) : null}
               </div>
@@ -889,16 +958,17 @@ export function CrmWhatsappWorkspace({
                     className={message.direction === "outbound" ? "is-outbound" : "is-inbound"}
                     key={message.id}
                   >
-                    <p>{message.body || `[${message.contentKind}]`}</p>
+                    <p>{message.body || contentLabels[message.contentKind] || "Anexo"}</p>
                     {message.mediaMimeType ? (
                       <Button size="sm" variant="ghost" onClick={() => void openMedia(message)}>
-                        Baixar {message.mediaFileName ?? message.contentKind}
+                        Baixar{" "}
+                        {message.mediaFileName ?? contentLabels[message.contentKind] ?? "anexo"}
                       </Button>
                     ) : message.mediaErrorCode ? (
-                      <small>Mídia indisponível: {message.mediaErrorCode}</small>
+                      <small>Não foi possível carregar este anexo.</small>
                     ) : null}
                     <small>
-                      {dateTime(message.occurredAt)} · {message.status}
+                      {dateTime(message.occurredAt)} · {whatsappStatusLabel(message.status)}
                     </small>
                   </article>
                 ))}
@@ -945,14 +1015,14 @@ export function CrmWhatsappWorkspace({
                   type="submit"
                   disabled={busy === "send" || (!messageBody.trim() && !attachment)}
                 >
-                  {busy === "send" ? "Enfileirando…" : "Enfileirar envio"}
+                  {busy === "send" ? "Adicionando à fila…" : "Enviar mensagem"}
                 </Button>
               </form>
             </>
           ) : (
             <EmptyState
-              title="Inbox persistida"
-              description="Escolha uma conversa para consultar a linha do tempo e responder."
+              title="Suas conversas"
+              description="Escolha uma conversa para consultar o histórico e responder."
               icon={<Icon name="crm" size={28} />}
             />
           )}
@@ -1031,7 +1101,7 @@ export function CrmWhatsappWorkspace({
                       }
                       key={status}
                     >
-                      {status}: {total}
+                      {whatsappStatusLabel(status)}: {total}
                     </Badge>
                   ))}
                 </div>
@@ -1045,7 +1115,14 @@ export function CrmWhatsappWorkspace({
                             {automationDefaults[execution.trigger].label} ·{" "}
                             {dateTime(execution.createdAt)}
                           </small>
-                          {execution.reason ? <small>{execution.reason}</small> : null}
+                          {execution.reason ? (
+                            <small>
+                              {crmFailureMessage(
+                                execution.reason,
+                                "Envio não concluído. Verifique a conexão e as regras da automação.",
+                              )}
+                            </small>
+                          ) : null}
                         </span>
                         <Badge
                           tone={
@@ -1056,13 +1133,13 @@ export function CrmWhatsappWorkspace({
                                 : "neutral"
                           }
                         >
-                          {execution.status}
+                          {whatsappStatusLabel(execution.status)}
                         </Badge>
                         {execution.status === "failed" ? (
                           <Button
                             size="sm"
                             variant="secondary"
-                            disabled={busy === `retry:${execution.id}`}
+                            disabled={Boolean(busy) || !execution.canRetry}
                             onClick={() => void retryExecution(execution)}
                           >
                             Tentar novamente
@@ -1128,7 +1205,7 @@ export function CrmWhatsappWorkspace({
                           .deleteCrmQuickReply(scope.organizationId, reply.id)
                           .then(() => quickReplies.retry())
                           .catch((error) =>
-                            setFeedback(crmError(error, "Não foi possível excluir a resposta.")),
+                            showError(error, "Não foi possível excluir a resposta."),
                           )
                       }
                     >

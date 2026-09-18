@@ -21,6 +21,7 @@ import {
   terminalApi,
   terminalDeviceId,
 } from "./features/auth/terminal-api";
+import { InventoryShortageDialog } from "./features/shell/InventoryShortageDialog";
 import { OperationalApp } from "./features/shell/OperationalApp";
 
 const scopeStorageKey = "giromesa_operational_scope_v1";
@@ -262,17 +263,24 @@ export function App() {
   }
 
   return (
-    <OperationalApp
-      session={session}
-      onLogout={logout}
-      onSwitchUser={session.terminalMode ? () => lockTerminal("switch") : undefined}
-      onConfigurePin={
-        !session.terminalMode && !session.platformAdmin
-          ? async (input) => {
-              await terminalApi.configurePin(input);
-            }
-          : undefined
-      }
-    />
+    <>
+      <InventoryShortageDialog
+        key={`${session.identityId}:${session.organizationId}:${session.unitId}:${session.actorEpoch ?? "web"}`}
+        organizationId={session.organizationId}
+        unitId={session.unitId}
+      />
+      <OperationalApp
+        session={session}
+        onLogout={logout}
+        onSwitchUser={session.terminalMode ? () => lockTerminal("switch") : undefined}
+        onConfigurePin={
+          !session.terminalMode && !session.platformAdmin
+            ? async (input) => {
+                await terminalApi.configurePin(input);
+              }
+            : undefined
+        }
+      />
+    </>
   );
 }

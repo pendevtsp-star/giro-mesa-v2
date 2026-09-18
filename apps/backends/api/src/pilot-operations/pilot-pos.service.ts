@@ -24,20 +24,14 @@ import {
   managementCashRegisters,
   managementCashRegisterTerminals,
   managementCashShifts,
-  managementInventoryIssueRoutes,
   managementInventoryItems,
-  managementInventoryReservations,
   managementOperationalLosses,
   managementPeople,
   managementProductReturnables,
-  managementRecipeComponents,
-  managementRecipeVersions,
   managementReturnableCustodyHandoffs,
   managementReturnableCustodyMovements,
   managementReturnablePolicies,
   managementSettlementSettings,
-  managementStockBalances,
-  managementStockLocations,
   memberships,
   organizations,
   outboxEvents,
@@ -145,7 +139,9 @@ import { loyaltyEarn } from "../growth/growth.rules.js";
 import { normalizeStoredBranding } from "../organizations/establishment-settings.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { bestPromotion, localCalendar } from "../public-menu/public-order-rules.js";
+import { requireConfirmedPublicTotal } from "../public-menu/public-order-total.js";
 import { tableAccessSecret } from "../public-menu/table-access-token.js";
+import { reserveOrderInventory } from "./order-inventory.js";
 import {
   allocatePrintSplitAmounts,
   approvalExpiresAt,
@@ -224,6 +220,7 @@ import type {
   ReprintJobInput,
   RetryPrintJobInput,
   RoomInput,
+  SendOrderInput,
   ServiceCallInput,
   ServiceChargeInput,
   ServiceSectionInput,
@@ -9878,7 +9875,7 @@ export class PilotPosService {
     tableId: string,
     tabId: string,
     idempotencyKey: string,
-    input: OrderInput,
+    input: OrderInput & { expectedTotalCents?: number },
   ) {
     await this.requireOperationalBilling(organizationId);
     if (input.items.some((item) => Boolean(item.doseClub))) {
@@ -9904,7 +9901,7 @@ export class PilotPosService {
     unitId: string,
     tabId: string,
     idempotencyKey: string,
-    input: OrderInput,
+    input: OrderInput & { expectedTotalCents?: number },
     source: "ops" | "qr_table",
     offlineIds?: {
       orderId: string;
@@ -10297,6 +10294,12 @@ export class PilotPosService {
           }
           createdItems.push(created);
         }
+        if (source === "qr_table") {
+          requireConfirmedPublicTotal(
+            input.expectedTotalCents,
+            createdItems.reduce((sum, item) => sum + item.netCents, 0),
+          );
+        }
         const totals = await this.recalculateTab(tx, organizationId, unitId, tabId);
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "order.created", {
           orderId: order.id,
@@ -10443,251 +10446,6 @@ export class PilotPosService {
         return { orderId, status: "canceled" as const, source: "qr_table" as const, totals };
       },
     );
-  }
-
-  private async reserveOrderInventory(
-    tx: Transaction,
-    input: {
-      identityId: string;
-      organizationId: string;
-      unitId: string;
-      orderId: string;
-      sentAt: Date;
-      items: Array<{ id: string; productId: string; quantity: number; stationId: string | null }>;
-    },
-  ) {
-    const productIds = [...new Set(input.items.map((item) => item.productId))];
-    const [components, inventoryItems, issueRoutes] = await Promise.all([
-      tx
-        .select({
-          id: managementRecipeComponents.id,
-          inventoryItemId: managementRecipeComponents.inventoryItemId,
-          locationId: managementRecipeComponents.locationId,
-          lossBasisPoints: managementRecipeComponents.lossBasisPoints,
-          productId: managementRecipeVersions.productId,
-          quantityMilli: managementRecipeComponents.quantityMilli,
-        })
-        .from(managementRecipeVersions)
-        .innerJoin(
-          managementRecipeComponents,
-          and(
-            eq(managementRecipeComponents.organizationId, managementRecipeVersions.organizationId),
-            eq(managementRecipeComponents.unitId, managementRecipeVersions.unitId),
-            eq(managementRecipeComponents.recipeVersionId, managementRecipeVersions.id),
-          ),
-        )
-        .where(
-          and(
-            eq(managementRecipeVersions.organizationId, input.organizationId),
-            eq(managementRecipeVersions.unitId, input.unitId),
-            inArray(managementRecipeVersions.productId, productIds),
-            lte(managementRecipeVersions.validFrom, input.sentAt),
-            or(
-              isNull(managementRecipeVersions.validUntil),
-              gt(managementRecipeVersions.validUntil, input.sentAt),
-            ),
-          ),
-        ),
-      tx
-        .select({
-          allowNegative: managementInventoryItems.allowNegative,
-          id: managementInventoryItems.id,
-          kind: managementInventoryItems.kind,
-          productId: managementInventoryItems.productId,
-        })
-        .from(managementInventoryItems)
-        .where(
-          and(
-            eq(managementInventoryItems.organizationId, input.organizationId),
-            eq(managementInventoryItems.unitId, input.unitId),
-            eq(managementInventoryItems.active, true),
-          ),
-        ),
-      tx
-        .select({
-          locationId: managementInventoryIssueRoutes.locationId,
-          productId: managementInventoryIssueRoutes.productId,
-          stationId: managementInventoryIssueRoutes.stationId,
-        })
-        .from(managementInventoryIssueRoutes)
-        .where(
-          and(
-            eq(managementInventoryIssueRoutes.organizationId, input.organizationId),
-            eq(managementInventoryIssueRoutes.unitId, input.unitId),
-            eq(managementInventoryIssueRoutes.active, true),
-            inArray(managementInventoryIssueRoutes.productId, productIds),
-          ),
-        ),
-    ]);
-    const recipesByProduct = new Map<string, typeof components>();
-    for (const component of components)
-      recipesByProduct.set(component.productId, [
-        ...(recipesByProduct.get(component.productId) ?? []),
-        component,
-      ]);
-    const resaleByProduct = new Map<string, typeof inventoryItems>();
-    const inventoryById = new Map(inventoryItems.map((item) => [item.id, item]));
-    for (const item of inventoryItems) {
-      if (!item.productId || item.kind !== "resale") continue;
-      resaleByProduct.set(item.productId, [...(resaleByProduct.get(item.productId) ?? []), item]);
-    }
-    const reservations = new Map<
-      string,
-      { inventoryItemId: string; locationId: string; quantityMilli: bigint; allowNegative: boolean }
-    >();
-    const addReservation = (
-      inventoryItemId: string,
-      locationId: string,
-      quantityMilli: bigint,
-      allowNegative: boolean,
-    ) => {
-      const key = `${inventoryItemId}:${locationId}`;
-      const current = reservations.get(key);
-      reservations.set(key, {
-        inventoryItemId,
-        locationId,
-        quantityMilli: (current?.quantityMilli ?? 0n) + quantityMilli,
-        allowNegative,
-      });
-    };
-    for (const orderItem of input.items) {
-      const recipe = recipesByProduct.get(orderItem.productId) ?? [];
-      if (recipe.length) {
-        for (const component of recipe) {
-          const yieldBasisPoints = BigInt(10_000 - component.lossBasisPoints);
-          const netMilli = BigInt(component.quantityMilli) * BigInt(orderItem.quantity);
-          addReservation(
-            component.inventoryItemId,
-            component.locationId,
-            (netMilli * 10_000n + yieldBasisPoints - 1n) / yieldBasisPoints,
-            inventoryById.get(component.inventoryItemId)?.allowNegative ?? false,
-          );
-        }
-        continue;
-      }
-      const directItems = resaleByProduct.get(orderItem.productId) ?? [];
-      if (directItems.length === 0) continue;
-      if (directItems.length > 1)
-        throw new ConflictException({
-          code: "INVENTORY_MAPPING_AMBIGUOUS",
-          productId: orderItem.productId,
-        });
-      const inventoryItem = directItems[0];
-      if (!inventoryItem) continue;
-      const route =
-        issueRoutes.find(
-          (candidate) =>
-            candidate.productId === orderItem.productId &&
-            candidate.stationId === orderItem.stationId,
-        ) ??
-        issueRoutes.find(
-          (candidate) =>
-            candidate.productId === orderItem.productId && candidate.stationId === null,
-        );
-      let locationId = route?.locationId;
-      if (!locationId) {
-        const balances = await tx
-          .select({ locationId: managementStockBalances.locationId })
-          .from(managementStockBalances)
-          .innerJoin(
-            managementStockLocations,
-            and(
-              eq(managementStockLocations.organizationId, managementStockBalances.organizationId),
-              eq(managementStockLocations.unitId, managementStockBalances.unitId),
-              eq(managementStockLocations.id, managementStockBalances.locationId),
-              eq(managementStockLocations.active, true),
-            ),
-          )
-          .where(
-            and(
-              eq(managementStockBalances.organizationId, input.organizationId),
-              eq(managementStockBalances.unitId, input.unitId),
-              eq(managementStockBalances.inventoryItemId, inventoryItem.id),
-            ),
-          );
-        if (balances.length !== 1)
-          throw new ConflictException({
-            code: "INVENTORY_ISSUE_ROUTE_MISSING",
-            productId: orderItem.productId,
-          });
-        locationId = balances[0]?.locationId;
-      }
-      if (locationId)
-        addReservation(
-          inventoryItem.id,
-          locationId,
-          BigInt(orderItem.quantity) * 1_000n,
-          inventoryItem.allowNegative,
-        );
-    }
-    const quantity = (milli: bigint) =>
-      `${milli / 1_000n}.${String(milli % 1_000n).padStart(3, "0")}`;
-    const quantityMilli = (value: string) => {
-      const [whole = "0", fraction = ""] = value.split(".");
-      return BigInt(whole) * 1_000n + BigInt(fraction.padEnd(3, "0").slice(0, 3));
-    };
-    for (const reservation of [...reservations.values()].sort((left, right) =>
-      `${left.inventoryItemId}:${left.locationId}`.localeCompare(
-        `${right.inventoryItemId}:${right.locationId}`,
-      ),
-    )) {
-      const rows = await tx.execute<{
-        quantity: string;
-        reservedQuantity: string;
-        blockedQuantity: string;
-      }>(sql`
-        select balance.quantity,
-               coalesce((select sum(r.quantity) from management_inventory_reservations r
-                 where r.organization_id = balance.organization_id and r.unit_id = balance.unit_id
-                   and r.location_id = balance.location_id and r.inventory_item_id = balance.inventory_item_id
-                   and r.status = 'active' and (r.expires_at is null or r.expires_at > now())), 0) as "reservedQuantity",
-               coalesce((select sum(lot.quantity) from management_inventory_lots lot
-                 inner join management_inventory_lot_holds hold on hold.organization_id = lot.organization_id
-                   and hold.unit_id = lot.unit_id and hold.lot_id = lot.id and hold.status = 'active'
-                 where lot.organization_id = balance.organization_id and lot.unit_id = balance.unit_id
-                   and lot.location_id = balance.location_id and lot.inventory_item_id = balance.inventory_item_id
-                   and lot.active = true), 0) as "blockedQuantity"
-        from management_stock_balances balance
-        where balance.organization_id = ${input.organizationId}::uuid
-          and balance.unit_id = ${input.unitId}::uuid
-          and balance.location_id = ${reservation.locationId}::uuid
-          and balance.inventory_item_id = ${reservation.inventoryItemId}::uuid
-        for update
-      `);
-      const balance = rows[0];
-      if (!balance)
-        throw new ConflictException({
-          code: "INVENTORY_STOCK_BALANCE_MISSING",
-          inventoryItemId: reservation.inventoryItemId,
-        });
-      const availableMilli =
-        quantityMilli(balance.quantity) -
-        quantityMilli(balance.reservedQuantity) -
-        quantityMilli(balance.blockedQuantity);
-      if (!reservation.allowNegative && availableMilli < reservation.quantityMilli)
-        throw new ConflictException({
-          code: "INVENTORY_STOCK_INSUFFICIENT",
-          inventoryItemId: reservation.inventoryItemId,
-          availableQuantity: quantity(availableMilli > 0n ? availableMilli : 0n),
-          requiredQuantity: quantity(reservation.quantityMilli),
-        });
-      await tx
-        .insert(managementInventoryReservations)
-        .values({
-          organizationId: input.organizationId,
-          unitId: input.unitId,
-          inventoryItemId: reservation.inventoryItemId,
-          locationId: reservation.locationId,
-          quantity: quantity(reservation.quantityMilli),
-          sourceType: "order",
-          sourceId: input.orderId,
-          reason: `Pedido ${input.orderId}`,
-          expiresAt: new Date(input.sentAt.getTime() + 24 * 60 * 60_000),
-          idempotencyKey: `order:${input.orderId}:${reservation.inventoryItemId}:${reservation.locationId}`,
-          actorIdentityId: input.identityId,
-        })
-        .onConflictDoNothing();
-    }
   }
 
   private async syncDeliveryProjection(
@@ -10874,6 +10632,7 @@ export class PilotPosService {
     orderId: string,
     idempotencyKey: string,
     offlineIds?: { ticketIdForStation: (stationId: string) => string },
+    input: SendOrderInput = {},
   ) {
     const [orderScope] = await this.database.db
       .select({ tabId: posOrders.tabId })
@@ -11126,15 +10885,18 @@ export class PilotPosService {
             unitId,
             orderId,
           );
-          await this.reserveOrderInventory(tx, {
+          await reserveOrderInventory(tx, {
             identityId,
             organizationId,
             unitId,
             orderId,
             sentAt: now,
+            acknowledgeInventoryShortage: input.acknowledgeInventoryShortage,
+            source: offlineIds ? "offline" : "operator",
             items: items.map((item) => ({
               id: item.id,
               productId: item.productId,
+              productName: item.productName,
               quantity: item.quantity,
               stationId: stationIdsByProduct.get(item.productId)?.[0] ?? item.stationId,
             })),

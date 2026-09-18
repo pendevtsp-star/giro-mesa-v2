@@ -28,6 +28,7 @@ const DIRECT_SOURCE_TYPE = "pos_order_direct_item";
 const CANCELLATION_SOURCE_TYPE = "pos_order_item_cancellation";
 const RETURNABLE_ISSUE_SOURCE_TYPE = "pos_order_item_returnable_issue";
 const RETURNABLE_CANCEL_SOURCE_TYPE = "pos_order_item_returnable_cancellation";
+const MAX_QUANTITY_MILLI = 9_999_999_999_999_999n;
 const ITEM_CANCELED_KEYS = new Set([
   "approvalId",
   "itemId",
@@ -70,6 +71,29 @@ interface InventoryItem {
   name: string;
   productId: string | null;
   unit: string;
+}
+
+interface ReviewedInventorySource {
+  orderItemId: string;
+  inventoryItemId: string;
+  locationId: string;
+}
+
+interface ConsumedLotAllocation {
+  movementId: string;
+  lotId: string;
+  quantity: string;
+}
+
+interface ReviewedReturnables {
+  mappings: {
+    id: string;
+    productId: string;
+    containerInventoryItemId: string;
+    quantityPerUnit: string;
+    depositCents: number;
+  }[];
+  defaultDueDays: number;
 }
 
 interface ConsumptionTask {
@@ -122,6 +146,12 @@ interface InventoryIssue {
     | "INVENTORY_STOCK_INSUFFICIENT"
     | "INVENTORY_STOCK_LOW"
     | "INVENTORY_STOCK_NEGATIVE_ALLOWED"
+    | "INVENTORY_STOCK_SHORTAGE_CONFIRMED"
+    | "INVENTORY_STOCK_SHORTAGE_PUBLIC_ORDER"
+    | "INVENTORY_STOCK_SHORTAGE_OFFLINE_ORDER"
+    | "INVENTORY_STOCK_SHORTAGE_AFTER_REVIEW"
+    | "INVENTORY_STOCK_HELD"
+    | "INVENTORY_ITEM_INACTIVE"
     | "INVENTORY_ISSUE_ROUTE_MISSING";
   componentId?: string;
   currentQuantity?: string;
@@ -151,6 +181,104 @@ export class InventoryConsumptionError extends Error {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function reviewedInventorySources(value: unknown): ReviewedInventorySource[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new InventoryConsumptionError("INVENTORY_REVIEW_INVALID");
+  return value.map((source) => {
+    if (
+      !isRecord(source) ||
+      typeof source.orderItemId !== "string" ||
+      !UUID.test(source.orderItemId) ||
+      typeof source.inventoryItemId !== "string" ||
+      !UUID.test(source.inventoryItemId) ||
+      typeof source.locationId !== "string" ||
+      !UUID.test(source.locationId)
+    )
+      throw new InventoryConsumptionError("INVENTORY_REVIEW_INVALID");
+    return {
+      orderItemId: source.orderItemId,
+      inventoryItemId: source.inventoryItemId,
+      locationId: source.locationId,
+    };
+  });
+}
+
+function consumedLotAllocations(value: unknown): ConsumedLotAllocation[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value))
+    throw new InventoryConsumptionError("INVENTORY_LOT_ALLOCATION_INVALID");
+  const keys = new Set<string>();
+  return value.map((allocation) => {
+    if (
+      !isRecord(allocation) ||
+      typeof allocation.movementId !== "string" ||
+      !UUID.test(allocation.movementId) ||
+      typeof allocation.lotId !== "string" ||
+      !UUID.test(allocation.lotId) ||
+      typeof allocation.quantity !== "string" ||
+      !/^\d+\.\d{3}$/.test(allocation.quantity) ||
+      quantityToMilli(allocation.quantity) <= 0n
+    )
+      throw new InventoryConsumptionError("INVENTORY_LOT_ALLOCATION_INVALID");
+    const key = `${allocation.movementId}:${allocation.lotId}`;
+    if (keys.has(key)) throw new InventoryConsumptionError("INVENTORY_LOT_ALLOCATION_INVALID");
+    keys.add(key);
+    return {
+      movementId: allocation.movementId,
+      lotId: allocation.lotId,
+      quantity: allocation.quantity,
+    };
+  });
+}
+
+function reviewedReturnables(value: unknown): ReviewedReturnables | undefined {
+  if (value === undefined) return undefined;
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.mappings) ||
+    typeof value.defaultDueDays !== "number" ||
+    !Number.isInteger(value.defaultDueDays) ||
+    value.defaultDueDays < 1 ||
+    value.defaultDueDays > 365
+  )
+    throw new InventoryConsumptionError("INVENTORY_RETURNABLE_REVIEW_INVALID");
+  const ids = new Set<string>();
+  const pairs = new Set<string>();
+  const mappings = value.mappings.map((mapping) => {
+    if (
+      !isRecord(mapping) ||
+      typeof mapping.id !== "string" ||
+      !UUID.test(mapping.id) ||
+      typeof mapping.productId !== "string" ||
+      !UUID.test(mapping.productId) ||
+      typeof mapping.containerInventoryItemId !== "string" ||
+      !UUID.test(mapping.containerInventoryItemId) ||
+      typeof mapping.quantityPerUnit !== "string" ||
+      !/^\d{1,13}(?:\.\d{1,3})?$/.test(mapping.quantityPerUnit) ||
+      quantityToMilli(mapping.quantityPerUnit) <= 0n ||
+      quantityToMilli(mapping.quantityPerUnit) > MAX_QUANTITY_MILLI ||
+      typeof mapping.depositCents !== "number" ||
+      !Number.isInteger(mapping.depositCents) ||
+      mapping.depositCents < 0 ||
+      mapping.depositCents > 2_147_483_647
+    )
+      throw new InventoryConsumptionError("INVENTORY_RETURNABLE_REVIEW_INVALID");
+    const pair = `${mapping.productId}:${mapping.containerInventoryItemId}`;
+    if (ids.has(mapping.id) || pairs.has(pair))
+      throw new InventoryConsumptionError("INVENTORY_RETURNABLE_REVIEW_INVALID");
+    ids.add(mapping.id);
+    pairs.add(pair);
+    return {
+      id: mapping.id,
+      productId: mapping.productId,
+      containerInventoryItemId: mapping.containerInventoryItemId,
+      quantityPerUnit: mapping.quantityPerUnit,
+      depositCents: mapping.depositCents,
+    };
+  });
+  return { mappings, defaultDueDays: value.defaultDueDays };
 }
 
 export function parseOrderSentPayload(payload: unknown): OrderSentPayload {
@@ -311,6 +439,9 @@ async function recordIssue(
       inventoryItemId: issue.inventoryItemId ?? null,
       orderItemId: issue.orderItemId,
       policy: issue.policy,
+      currentQuantity: issue.currentQuantity ?? null,
+      requiredQuantity: issue.requiredQuantity ?? null,
+      unit: issue.unit ?? null,
     },
     organizationId: request.organizationId,
     unitId: request.unitId,
@@ -372,6 +503,29 @@ export async function consumeOrderSentInventory(
       .where(eq(auditEvents.id, completionAuditId))
       .limit(1);
     if (completed) return { issueCodes: [], movementCount: 0, retryRequired: false };
+
+    const [inventoryReview] = await tx
+      .select({ metadata: auditEvents.metadata, actorIdentityId: auditEvents.actorIdentityId })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, request.organizationId),
+          eq(auditEvents.unitId, request.unitId),
+          eq(auditEvents.entityType, "order"),
+          eq(auditEvents.entityId, request.orderId),
+          eq(auditEvents.action, "management.inventory.order-reviewed"),
+        ),
+      )
+      .limit(1);
+    const review = inventoryReview?.metadata;
+    const publicStockPolicy = review?.source === "public_menu";
+    const offlineStockPolicy = review?.source === "offline";
+    const operatorStockReviewed = review?.source === "operator";
+    const shortageAcknowledged =
+      review?.source === "operator" && review.shortageAcknowledged === true;
+    const hasReviewedSources = Array.isArray(review?.sources);
+    const reviewedSources = reviewedInventorySources(review?.sources);
+    const reviewedReturnablePolicy = reviewedReturnables(review?.returnables);
 
     const orderItems = await tx
       .select({
@@ -476,14 +630,50 @@ export async function consumeOrderSentInventory(
         ]);
       }
     }
+    if (reviewedReturnablePolicy?.mappings.length) {
+      const originalOrderProducts = await tx
+        .select({ productId: posOrderItems.productId })
+        .from(posOrderItems)
+        .where(
+          and(
+            eq(posOrderItems.organizationId, request.organizationId),
+            eq(posOrderItems.unitId, request.unitId),
+            eq(posOrderItems.orderId, request.orderId),
+          ),
+        );
+      const originalProductIds = new Set(originalOrderProducts.map((item) => item.productId));
+      for (const mapping of reviewedReturnablePolicy.mappings) {
+        // The container role was fixed at send; later kind/active edits do not change custody.
+        const container = inventoryById.get(mapping.containerInventoryItemId);
+        if (!originalProductIds.has(mapping.productId) || !container)
+          throw new InventoryConsumptionError("INVENTORY_RETURNABLE_REVIEW_SCOPE_INVALID");
+      }
+    }
 
     const blockingIssues: InventoryIssue[] = [];
     const tasks: ConsumptionTask[] = [];
     for (const orderItem of orderItems) {
       const recipe = recipesByProduct.get(orderItem.productId) ?? [];
       if (recipe.length === 0) {
-        const directItems = inventoryByProduct.get(orderItem.productId) ?? [];
-        if (directItems.length === 0) continue;
+        const itemSources = reviewedSources.filter((source) => source.orderItemId === orderItem.id);
+        if (hasReviewedSources && itemSources.length === 0) continue;
+        const directItems = itemSources.length
+          ? itemSources.map((source) => inventoryById.get(source.inventoryItemId))
+          : (inventoryByProduct.get(orderItem.productId) ?? []);
+        if (directItems.length === 0) {
+          if (
+            inventoryItems.some(
+              (item) =>
+                item.kind === "resale" && item.productId === orderItem.productId && !item.active,
+            )
+          )
+            blockingIssues.push({
+              code: "INVENTORY_ITEM_INACTIVE",
+              orderItemId: orderItem.id,
+              policy: "block_and_retry",
+            });
+          continue;
+        }
         if (directItems.length > 1) {
           blockingIssues.push({
             code: "INVENTORY_MAPPING_AMBIGUOUS",
@@ -493,7 +683,15 @@ export async function consumeOrderSentInventory(
           continue;
         }
         const inventoryItem = directItems[0];
-        if (!inventoryItem) continue;
+        if (!inventoryItem?.active) {
+          blockingIssues.push({
+            code: inventoryItem ? "INVENTORY_ITEM_INACTIVE" : "INVENTORY_MAPPING_MISSING",
+            inventoryItemId: itemSources[0]?.inventoryItemId,
+            orderItemId: orderItem.id,
+            policy: "block_and_retry",
+          });
+          continue;
+        }
         const issueRoute =
           issueRoutes.find(
             (route) =>
@@ -511,7 +709,7 @@ export async function consumeOrderSentInventory(
           componentId: inventoryItem.id,
           componentKind: "direct",
           inventoryItem,
-          locationId: issueRoute?.locationId ?? null,
+          locationId: itemSources[0]?.locationId ?? issueRoute?.locationId ?? null,
           orderItemId: orderItem.id,
           productId: orderItem.productId,
           requiredMilli: BigInt(orderItem.quantity) * 1_000n,
@@ -523,9 +721,9 @@ export async function consumeOrderSentInventory(
       }
       for (const component of recipe) {
         const inventoryItem = inventoryById.get(component.inventoryItemId);
-        if (!inventoryItem) {
+        if (!inventoryItem?.active) {
           blockingIssues.push({
-            code: "INVENTORY_MAPPING_MISSING",
+            code: inventoryItem ? "INVENTORY_ITEM_INACTIVE" : "INVENTORY_MAPPING_MISSING",
             componentId: component.id,
             orderItemId: orderItem.id,
             policy: "block_and_retry",
@@ -594,6 +792,17 @@ export async function consumeOrderSentInventory(
       const taskBalanceKey = `${task.inventoryItem.id}:${task.locationId ?? "*"}`;
       let balances = balanceStates.get(taskBalanceKey);
       if (!balances) {
+        if (task.locationId && (operatorStockReviewed || publicStockPolicy || offlineStockPolicy))
+          await tx
+            .insert(managementStockBalances)
+            .values({
+              organizationId: request.organizationId,
+              unitId: request.unitId,
+              inventoryItemId: task.inventoryItem.id,
+              locationId: task.locationId,
+              quantity: "0.000",
+            })
+            .onConflictDoNothing();
         const rows = await tx.execute<LockedBalance>(sql`
           select balance.id,
                  balance.location_id as "locationId",
@@ -638,7 +847,7 @@ export async function consumeOrderSentInventory(
             and balance.unit_id = ${request.unitId}::uuid
             and balance.inventory_item_id = ${task.inventoryItem.id}::uuid
             and (${task.locationId}::uuid is null or balance.location_id = ${task.locationId}::uuid)
-            and (${task.locationId}::uuid is not null or location.active = true)
+            and location.active = true
           order by location.code, balance.location_id
           for update of balance
         `);
@@ -685,9 +894,15 @@ export async function consumeOrderSentInventory(
         const available = balance.virtualMilli - balance.reservedOtherMilli - balance.blockedMilli;
         return total + (available > 0n ? available : 0n);
       }, 0n);
-      if (!task.inventoryItem.allowNegative && availableMilli < task.requiredMilli) {
+      const hasHeldStock = balances.some((balance) => balance.blockedMilli > 0n);
+      const mayRecordShortage =
+        task.inventoryItem.allowNegative ||
+        operatorStockReviewed ||
+        publicStockPolicy ||
+        offlineStockPolicy;
+      if (availableMilli < task.requiredMilli && (!mayRecordShortage || hasHeldStock)) {
         blockingIssues.push({
-          code: "INVENTORY_STOCK_INSUFFICIENT",
+          code: hasHeldStock ? "INVENTORY_STOCK_HELD" : "INVENTORY_STOCK_INSUFFICIENT",
           componentId: task.componentId,
           currentQuantity: milliToQuantity(availableMilli),
           inventoryItemId: task.inventoryItem.id,
@@ -718,7 +933,15 @@ export async function consumeOrderSentInventory(
         addAllocation(allocations, negativeBalance, remainingMilli);
         negativeBalance.virtualMilli -= remainingMilli;
         warnings.push({
-          code: "INVENTORY_STOCK_NEGATIVE_ALLOWED",
+          code: shortageAcknowledged
+            ? "INVENTORY_STOCK_SHORTAGE_CONFIRMED"
+            : publicStockPolicy
+              ? "INVENTORY_STOCK_SHORTAGE_PUBLIC_ORDER"
+              : offlineStockPolicy
+                ? "INVENTORY_STOCK_SHORTAGE_OFFLINE_ORDER"
+                : operatorStockReviewed
+                  ? "INVENTORY_STOCK_SHORTAGE_AFTER_REVIEW"
+                  : "INVENTORY_STOCK_NEGATIVE_ALLOWED",
           componentId: task.componentId,
           currentQuantity: milliToQuantity(availableMilli),
           inventoryItemId: task.inventoryItem.id,
@@ -742,6 +965,7 @@ export async function consumeOrderSentInventory(
       };
     }
 
+    const lotAllocations: ConsumedLotAllocation[] = [];
     for (const plan of plans) {
       for (const allocation of plan.allocations) {
         const lotRows = await tx.execute<{
@@ -768,7 +992,7 @@ export async function consumeOrderSentInventory(
           for update
         `);
         let remainingLotMilli = allocation.quantityMilli;
-        const consumedLotIds: string[] = [];
+        const consumedLots: { lotId: string; quantity: string }[] = [];
         for (const lot of lotRows) {
           if (remainingLotMilli === 0n) break;
           const availableLotMilli = quantityToMilli(lot.quantity);
@@ -782,7 +1006,7 @@ export async function consumeOrderSentInventory(
               updatedAt: new Date(),
             })
             .where(eq(managementInventoryLots.id, lot.id));
-          consumedLotIds.push(lot.id);
+          consumedLots.push({ lotId: lot.id, quantity: milliToQuantity(consumedMilli) });
           remainingLotMilli -= consumedMilli;
         }
         if (remainingLotMilli > 0n) {
@@ -807,7 +1031,7 @@ export async function consumeOrderSentInventory(
             actorIdentityId: order.createdByIdentityId,
             inventoryItemId: plan.task.inventoryItem.id,
             lotId:
-              remainingLotMilli === 0n && consumedLotIds.length === 1 ? consumedLotIds[0] : null,
+              remainingLotMilli === 0n && consumedLots.length === 1 ? consumedLots[0]?.lotId : null,
             locationId: allocation.balance.locationId,
             organizationId: request.organizationId,
             quantityDelta: milliToQuantity(-allocation.quantityMilli),
@@ -822,6 +1046,9 @@ export async function consumeOrderSentInventory(
         if (!movement) {
           throw new InventoryConsumptionError("INVENTORY_IDEMPOTENCY_CONFLICT");
         }
+        lotAllocations.push(
+          ...consumedLots.map((allocation) => ({ ...allocation, movementId: movement.id })),
+        );
       }
       const taskBalanceKey = `${plan.task.inventoryItem.id}:${plan.task.locationId ?? "*"}`;
       const states = balanceStates.get(taskBalanceKey) ?? [];
@@ -925,10 +1152,17 @@ export async function consumeOrderSentInventory(
         ) === index,
     );
     for (const issue of uniqueWarnings) {
-      await recordIssue(tx, event, request, order.createdByIdentityId, issue);
+      await recordIssue(
+        tx,
+        event,
+        request,
+        inventoryReview?.actorIdentityId ?? order.createdByIdentityId,
+        issue,
+      );
     }
     const returnableMappings =
-      productIds.length === 0
+      reviewedReturnablePolicy?.mappings ??
+      (productIds.length === 0
         ? []
         : await tx
             .select({
@@ -946,7 +1180,7 @@ export async function consumeOrderSentInventory(
                 eq(managementProductReturnables.active, true),
                 inArray(managementProductReturnables.productId, productIds),
               ),
-            );
+            ));
     const returnablesByProduct = new Map<string, typeof returnableMappings>();
     for (const mapping of returnableMappings) {
       returnablesByProduct.set(mapping.productId, [
@@ -955,7 +1189,7 @@ export async function consumeOrderSentInventory(
       ]);
     }
     const [returnablePolicy] =
-      returnableMappings.length === 0
+      reviewedReturnablePolicy || returnableMappings.length === 0
         ? []
         : await tx
             .select({ defaultDueDays: managementReturnablePolicies.defaultDueDays })
@@ -967,7 +1201,8 @@ export async function consumeOrderSentInventory(
               ),
             )
             .limit(1);
-    const defaultReturnableDueDays = returnablePolicy?.defaultDueDays ?? 7;
+    const defaultReturnableDueDays =
+      reviewedReturnablePolicy?.defaultDueDays ?? returnablePolicy?.defaultDueDays ?? 7;
     for (const orderItem of orderItems) {
       const directPlan = plans.find(
         (plan) => plan.task.orderItemId === orderItem.id && plan.task.componentKind === "direct",
@@ -980,6 +1215,15 @@ export async function consumeOrderSentInventory(
         : [{ locationId: null, soldQuantityMilli: BigInt(orderItem.quantity) * 1_000n }];
       for (const mapping of returnablesByProduct.get(orderItem.productId) ?? []) {
         for (const source of custodySources) {
+          const quantityNumerator =
+            quantityToMilli(mapping.quantityPerUnit) * source.soldQuantityMilli;
+          const quantityMilli = quantityNumerator / 1_000n;
+          if (
+            quantityNumerator % 1_000n !== 0n ||
+            quantityMilli <= 0n ||
+            quantityMilli > MAX_QUANTITY_MILLI
+          )
+            throw new InventoryConsumptionError("INVENTORY_RETURNABLE_QUANTITY_INVALID");
           const sourceId = deterministicUuid(
             `returnable-issue:${request.organizationId}:${request.unitId}:${request.orderId}:${orderItem.id}:${mapping.id}:${source.locationId ?? "unrouted"}`,
           );
@@ -1003,9 +1247,7 @@ export async function consumeOrderSentInventory(
                 order.promisedAt ??
                 new Date(order.sentAt.getTime() + defaultReturnableDueDays * 24 * 60 * 60_000),
               organizationId: request.organizationId,
-              quantityDelta: milliToQuantity(
-                (quantityToMilli(mapping.quantityPerUnit) * source.soldQuantityMilli) / 1_000n,
-              ),
+              quantityDelta: milliToQuantity(quantityMilli),
               sourceId,
               sourceType: RETURNABLE_ISSUE_SOURCE_TYPE,
               type: "issue",
@@ -1055,6 +1297,7 @@ export async function consumeOrderSentInventory(
           ],
           unitConversionPolicy: "stock_unit_with_explicit_purchase_conversion",
           lotPolicy: "fefo_when_lots_are_available_then_legacy_balance",
+          lotAllocations,
         },
         organizationId: request.organizationId,
         unitId: request.unitId,
@@ -1128,17 +1371,50 @@ export async function reverseCanceledOrderItemInventory(
       .limit(1);
     if (completed) return { movementCount: 0 };
 
-    const [directItems, recipeComponents] = await Promise.all([
-      tx
-        .select({ id: managementInventoryItems.id })
-        .from(managementInventoryItems)
-        .where(
-          and(
-            eq(managementInventoryItems.organizationId, request.organizationId),
-            eq(managementInventoryItems.unitId, request.unitId),
-            eq(managementInventoryItems.productId, item.productId),
-          ),
+    const [consumptionAudit] = await tx
+      .select({ metadata: auditEvents.metadata })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, request.organizationId),
+          eq(auditEvents.unitId, request.unitId),
+          eq(auditEvents.entityType, "order"),
+          eq(auditEvents.entityId, item.orderId),
+          eq(auditEvents.action, "management.inventory.order-consumed"),
         ),
+      )
+      .limit(1);
+    const savedLotAllocations = consumedLotAllocations(consumptionAudit?.metadata.lotAllocations);
+
+    const [inventoryReview] = await tx
+      .select({ metadata: auditEvents.metadata })
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, request.organizationId),
+          eq(auditEvents.unitId, request.unitId),
+          eq(auditEvents.entityType, "order"),
+          eq(auditEvents.entityId, item.orderId),
+          eq(auditEvents.action, "management.inventory.order-reviewed"),
+        ),
+      )
+      .limit(1);
+    const itemSources = reviewedInventorySources(inventoryReview?.metadata.sources).filter(
+      (source) => source.orderItemId === request.itemId,
+    );
+    const [directItems, recipeComponents] = await Promise.all([
+      Array.isArray(inventoryReview?.metadata.sources)
+        ? itemSources.map((source) => ({ id: source.inventoryItemId }))
+        : // Legacy orders lack item snapshots; their movement hashes still identify the original item.
+          tx
+            .select({ id: managementInventoryItems.id })
+            .from(managementInventoryItems)
+            .where(
+              and(
+                eq(managementInventoryItems.organizationId, request.organizationId),
+                eq(managementInventoryItems.unitId, request.unitId),
+              ),
+            ),
       tx
         .select({ id: managementRecipeComponents.id })
         .from(managementRecipeVersions)
@@ -1196,6 +1472,20 @@ export async function reverseCanceledOrderItemInventory(
     let movementCount = 0;
     for (const movement of consumed) {
       const restoredQuantity = milliToQuantity(-quantityToMilli(movement.quantityDelta));
+      // Older single-lot movements carry their complete allocation in lotId.
+      const lotRestorations =
+        savedLotAllocations === undefined
+          ? movement.lotId
+            ? [{ lotId: movement.lotId, quantity: restoredQuantity }]
+            : []
+          : savedLotAllocations.filter((allocation) => allocation.movementId === movement.id);
+      if (
+        lotRestorations.reduce(
+          (sum, allocation) => sum + quantityToMilli(allocation.quantity),
+          0n,
+        ) > quantityToMilli(restoredQuantity)
+      )
+        throw new InventoryConsumptionError("INVENTORY_LOT_ALLOCATION_INVALID");
       const reversalSourceId = deterministicUuid(`inventory-cancel:${movement.id}`);
       const [reversal] = await tx
         .insert(managementInventoryMovements)
@@ -1234,20 +1524,25 @@ export async function reverseCanceledOrderItemInventory(
       if (restored.length !== 1) {
         throw new InventoryConsumptionError("INVENTORY_BALANCE_UPDATE_CONFLICT");
       }
-      if (movement.lotId) {
-        await tx
+      for (const allocation of lotRestorations) {
+        const restoredLots = await tx
           .update(managementInventoryLots)
           .set({
-            quantity: sql`${managementInventoryLots.quantity} + ${restoredQuantity}::numeric`,
+            quantity: sql`${managementInventoryLots.quantity} + ${allocation.quantity}::numeric`,
             updatedAt: new Date(),
           })
           .where(
             and(
               eq(managementInventoryLots.organizationId, request.organizationId),
               eq(managementInventoryLots.unitId, request.unitId),
-              eq(managementInventoryLots.id, movement.lotId),
+              eq(managementInventoryLots.id, allocation.lotId),
+              eq(managementInventoryLots.inventoryItemId, movement.inventoryItemId),
+              eq(managementInventoryLots.locationId, movement.locationId),
             ),
-          );
+          )
+          .returning({ id: managementInventoryLots.id });
+        if (restoredLots.length !== 1)
+          throw new InventoryConsumptionError("INVENTORY_LOT_ALLOCATION_INVALID");
       }
       movementCount += 1;
     }

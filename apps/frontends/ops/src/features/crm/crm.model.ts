@@ -47,6 +47,17 @@ export interface CrmTimelineEntry {
   amount: number | null;
 }
 
+export interface CrmCustomerHistoryCursor {
+  at: string;
+  kind: string;
+  id: string;
+}
+
+export interface CrmCustomerHistoryPage {
+  items: CrmTimelineEntry[];
+  nextCursor: CrmCustomerHistoryCursor | null;
+}
+
 export interface CrmCustomerDetail {
   customer: CrmCustomer;
   consent: {
@@ -82,6 +93,7 @@ export interface CrmCampaign {
   channel: string;
   status: string;
   subject: string | null;
+  content: string;
   variantBContent: string | null;
   attributionWindowDays: number;
   holdoutPercentage: number;
@@ -101,6 +113,11 @@ export interface CrmCampaignPreview {
 }
 
 export interface CrmCampaignDeliveries {
+  campaign: CrmCampaign;
+  limit: number;
+  offset: number;
+  total: number;
+  nextOffset: number | null;
   counts: Record<string, number>;
   attribution: {
     delivered: number;
@@ -133,6 +150,15 @@ export interface CrmCampaignDeliveries {
     sentAt: string | null;
     createdAt: string;
   }>;
+}
+
+export interface CrmLoyaltyProgram {
+  id: string;
+  mode: "points" | "cashback";
+  rate: number;
+  minimumOrderCents: number;
+  expiresAfterDays: number | null;
+  active: boolean;
 }
 
 export interface CrmEvolutionIntegration {
@@ -200,6 +226,7 @@ export interface CrmAutomationExecution {
   status: string;
   reason: string | null;
   retryCount: number;
+  canRetry: boolean;
   scheduledFor: string;
   executedAt: string | null;
   createdAt: string;
@@ -295,6 +322,29 @@ export function parseCrmCustomerPage(value: unknown): CrmCustomerPage {
   };
 }
 
+function timelineEntry(row: Row): CrmTimelineEntry {
+  return {
+    kind: text(row.kind),
+    id: text(row.id),
+    at: text(row.at),
+    status: text(row.status),
+    label: text(row.label),
+    amountCents: nullableNumber(row.amountCents),
+    amount: nullableNumber(row.amount),
+  };
+}
+
+export function parseCrmCustomerHistory(value: unknown): CrmCustomerHistoryPage {
+  const payload = record(value);
+  const cursor = payload.nextCursor === null ? null : record(payload.nextCursor);
+  return {
+    items: records(payload.items).map(timelineEntry),
+    nextCursor: cursor
+      ? { at: text(cursor.at), kind: text(cursor.kind), id: text(cursor.id) }
+      : null,
+  };
+}
+
 export function parseCrmCustomerDetail(value: unknown): CrmCustomerDetail | null {
   if (value === null) return null;
   const payload = record(value);
@@ -306,15 +356,7 @@ export function parseCrmCustomerDetail(value: unknown): CrmCustomerDetail | null
     consent: { email: bool(consent.email), whatsapp: bool(consent.whatsapp) },
     metrics: customerMetrics(metricValues),
     loyalty: { balance: number(loyalty.balance) },
-    timeline: records(payload.timeline).map((row) => ({
-      kind: text(row.kind),
-      id: text(row.id),
-      at: text(row.at),
-      status: text(row.status),
-      label: text(row.label),
-      amountCents: nullableNumber(row.amountCents),
-      amount: nullableNumber(row.amount),
-    })),
+    timeline: records(payload.timeline).map(timelineEntry),
   };
 }
 
@@ -346,21 +388,54 @@ export function parseCrmSegments(value: unknown): CrmSegment[] {
   });
 }
 
-export function parseCrmCampaigns(value: unknown): CrmCampaign[] {
-  return collectionRows(value).map((row) => ({
+export function parseCrmCampaign(value: unknown): CrmCampaign {
+  const row = record(value);
+  if (row.channel !== "email" && row.channel !== "whatsapp") throw new InvalidGrowthPayloadError();
+  return {
     id: text(row.id),
     segmentId: optionalText(row.segmentId),
     name: text(row.name),
     channel: text(row.channel),
     status: text(row.status),
     subject: optionalText(row.subject),
+    content: text(row.content),
     variantBContent: optionalText(row.variantBContent),
-    attributionWindowDays:
-      row.attributionWindowDays === undefined ? 7 : number(row.attributionWindowDays),
-    holdoutPercentage: row.holdoutPercentage === undefined ? 0 : number(row.holdoutPercentage),
+    attributionWindowDays: number(row.attributionWindowDays),
+    holdoutPercentage: number(row.holdoutPercentage),
     queuedAt: optionalText(row.queuedAt),
     sentAt: optionalText(row.sentAt),
-  }));
+  };
+}
+
+export function parseCrmCampaigns(value: unknown): CrmCampaign[] {
+  return collectionRows(value).map(parseCrmCampaign);
+}
+
+export function parseCrmLoyaltyProgram(value: unknown): CrmLoyaltyProgram | null {
+  if (value === null) return null;
+  const row = record(value);
+  const mode = text(row.mode);
+  const rate = number(row.rate);
+  const minimumOrderCents = number(row.minimumOrderCents);
+  const expiresAfterDays = row.expiresAfterDays === null ? null : number(row.expiresAfterDays);
+  if (
+    (mode !== "points" && mode !== "cashback") ||
+    rate <= 0 ||
+    rate > 10_000 ||
+    !Number.isSafeInteger(minimumOrderCents) ||
+    minimumOrderCents < 0 ||
+    (expiresAfterDays !== null &&
+      (!Number.isInteger(expiresAfterDays) || expiresAfterDays < 1 || expiresAfterDays > 3650))
+  )
+    throw new InvalidGrowthPayloadError();
+  return {
+    id: text(row.id),
+    mode,
+    rate,
+    minimumOrderCents,
+    expiresAfterDays,
+    active: bool(row.active),
+  };
 }
 
 export function parseCrmCampaignPreview(value: unknown): CrmCampaignPreview {
@@ -392,7 +467,28 @@ export function parseCrmCampaignDeliveries(value: unknown): CrmCampaignDeliverie
     attribution.incompleteCostOrders === undefined
       ? orders
       : number(attribution.incompleteCostOrders);
+  const limit = number(payload.limit);
+  const offset = number(payload.offset);
+  const total = number(payload.total);
+  const nextOffset = payload.nextOffset === null ? null : number(payload.nextOffset);
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit < 1 ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    !Number.isSafeInteger(total) ||
+    total < 0 ||
+    (nextOffset !== null &&
+      (!Number.isSafeInteger(nextOffset) || nextOffset <= offset || nextOffset >= total))
+  ) {
+    throw new InvalidGrowthPayloadError();
+  }
   return {
+    campaign: parseCrmCampaign(payload.campaign),
+    limit,
+    offset,
+    total,
+    nextOffset,
     counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, number(value)])),
     attribution: {
       delivered: number(attribution.delivered),
@@ -428,6 +524,23 @@ export function parseCrmCampaignDeliveries(value: unknown): CrmCampaignDeliverie
       createdAt: text(row.createdAt),
     })),
   };
+}
+
+export function parseCrmCampaignReview(
+  campaignId: string,
+  previewValue: unknown,
+  deliveriesValue: unknown,
+) {
+  const preview = parseCrmCampaignPreview(previewValue);
+  const deliveries = parseCrmCampaignDeliveries(deliveriesValue);
+  if (
+    preview.campaignId !== campaignId ||
+    deliveries.campaign.id !== campaignId ||
+    preview.channel !== deliveries.campaign.channel
+  ) {
+    throw new InvalidGrowthPayloadError();
+  }
+  return { preview, deliveries };
 }
 
 export function parseCrmEvolutionIntegration(value: unknown): CrmEvolutionIntegration {
@@ -562,6 +675,7 @@ export function parseCrmAutomationExecutions(value: unknown): {
       status: text(row.status),
       reason: optionalText(row.reason),
       retryCount: number(row.retryCount),
+      canRetry: row.canRetry === undefined ? false : bool(row.canRetry),
       scheduledFor: text(row.scheduledFor),
       executedAt: optionalText(row.executedAt),
       createdAt: text(row.createdAt),

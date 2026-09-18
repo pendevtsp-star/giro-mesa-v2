@@ -11,7 +11,7 @@ import {
   NativeSelect,
   Textarea,
 } from "@giromesa/ui";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../api";
 import {
   dateTime,
@@ -24,13 +24,15 @@ import {
   type CrmCampaign,
   type CrmCampaignDeliveries,
   type CrmCampaignPreview,
+  type CrmLoyaltyProgram,
   parseCrmCampaignDeliveries,
-  parseCrmCampaignPreview,
+  parseCrmCampaignReview,
   parseCrmCampaigns,
   parseCrmCoupons,
+  parseCrmLoyaltyProgram,
   parseCrmSegments,
 } from "./crm.model";
-import { type CrmFeedback, CrmFormPanel, crmCurrency, crmError } from "./crm.ui";
+import { type CrmFeedback, CrmFormPanel, crmCurrency, crmError, crmFailureMessage } from "./crm.ui";
 
 type SegmentKind =
   | "all"
@@ -44,6 +46,14 @@ const months = Array.from({ length: 12 }, (_, index) => ({
   value: index + 1,
   label: new Intl.DateTimeFormat("pt-BR", { month: "long" }).format(new Date(2026, index, 1)),
 }));
+const deliveryStatuses: Record<string, string> = {
+  pending: "Pendente",
+  blocked: "Envio bloqueado",
+  sent: "Enviada",
+  failed: "Falha no envio",
+  skipped: "Não enviada",
+  holdout: "Grupo de controle",
+};
 
 function campaignStatus(campaign: CrmCampaign): {
   label: string;
@@ -59,20 +69,159 @@ function campaignStatus(campaign: CrmCampaign): {
     draft: { label: "Rascunho", tone: "neutral" },
   } as const;
   return (
-    known[campaign.status as keyof typeof known] ?? { label: campaign.status, tone: "warning" }
+    known[campaign.status as keyof typeof known] ?? {
+      label: "Situação indisponível",
+      tone: "warning",
+    }
   );
 }
 function segmentLabel(kind: string): string {
   const labels: Record<string, string> = {
-    marketing_opt_in: "Marketing autorizado",
+    marketing_opt_in: "Com autorização para campanhas",
     birthday_month: "Aniversariantes do mês",
     inactive_days: "Clientes inativos",
     minimum_visits: "Frequência mínima",
     minimum_spend_cents: "Gasto mínimo",
-    no_show_count: "Histórico de no-show",
+    no_show_count: "Histórico de faltas",
     all: "Todos os clientes",
   };
-  return labels[kind] ?? kind;
+  return labels[kind] ?? "Grupo de clientes";
+}
+
+type LoyaltyProgramInput = Parameters<typeof api.growth.createLoyaltyProgram>[1];
+
+export function CrmLoyaltyProgramForm({
+  program,
+  disabled,
+  saving,
+  onSave,
+}: {
+  program: CrmLoyaltyProgram | null;
+  disabled: boolean;
+  saving: boolean;
+  onSave: (input: LoyaltyProgramInput) => Promise<void>;
+}) {
+  const [mode, setMode] = useState<"points" | "cashback">(program?.mode ?? "points");
+  const [rate, setRate] = useState(program ? String(program.rate).replace(".", ",") : "");
+  const [minimum, setMinimum] = useState(
+    ((program?.minimumOrderCents ?? 0) / 100).toFixed(2).replace(".", ","),
+  );
+  const [expiry, setExpiry] = useState(String(program?.expiresAfterDays ?? ""));
+  const [active, setActive] = useState(program?.active ?? true);
+  const parsedRate = Number(rate.replace(",", "."));
+  const minimumOrderCents = moneyToCents(minimum);
+  const expiresAfterDays = expiry.trim() ? Number(expiry) : undefined;
+  const invalid =
+    !Number.isFinite(parsedRate) ||
+    parsedRate <= 0 ||
+    parsedRate > 10_000 ||
+    !minimum.trim() ||
+    !Number.isSafeInteger(minimumOrderCents) ||
+    minimumOrderCents < 0 ||
+    (expiresAfterDays !== undefined &&
+      (!Number.isInteger(expiresAfterDays) || expiresAfterDays < 1 || expiresAfterDays > 3650));
+  return (
+    <form
+      className="action-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (disabled || invalid) return;
+        void onSave({ mode, rate: parsedRate, minimumOrderCents, expiresAfterDays, active });
+      }}
+    >
+      <div className="action-form__wide">
+        <Badge tone={program?.active ? "success" : "neutral"}>
+          {program
+            ? program.active
+              ? "Programa ativo"
+              : "Programa desativado"
+            : "Nenhum programa configurado"}
+        </Badge>
+      </div>
+      <label>
+        Modalidade
+        <NativeSelect
+          disabled={disabled}
+          onChange={(event) => setMode(event.target.value as "points" | "cashback")}
+          value={mode}
+        >
+          <option value="points">Pontos</option>
+          <option value="cashback">Crédito de volta</option>
+        </NativeSelect>
+      </label>
+      <label>
+        {mode === "points" ? "Pontos por R$ 1,00" : "Crédito de volta (%)"}
+        <Input
+          disabled={disabled}
+          inputMode="decimal"
+          onChange={(event) => setRate(event.target.value)}
+          required
+          value={rate}
+        />
+      </label>
+      <label>
+        Pedido mínimo
+        <Input
+          disabled={disabled}
+          inputMode="decimal"
+          onChange={(event) => setMinimum(event.target.value)}
+          required
+          value={minimum}
+          data-currency="brl"
+        />
+      </label>
+      <label>
+        Validade do saldo (dias)
+        <Input
+          disabled={disabled}
+          type="number"
+          min="1"
+          max="3650"
+          onChange={(event) => setExpiry(event.target.value)}
+          value={expiry}
+          placeholder="Sem prazo de validade"
+        />
+      </label>
+      <label className="crm-confirmation action-form__wide">
+        <Checkbox
+          checked={active}
+          disabled={disabled}
+          onChange={(event) => setActive(event.target.checked)}
+        />
+        Programa ativo
+      </label>
+      <Button disabled={disabled || invalid} type="submit">
+        {saving ? "Salvando…" : "Salvar programa"}
+      </Button>
+    </form>
+  );
+}
+
+export function CrmCampaignMessagePreview({ campaign }: { campaign: CrmCampaign }) {
+  return (
+    <section className="crm-profile__section" aria-label="Mensagem salva da campanha">
+      <div className="crm-section-heading">
+        <strong>Mensagem salva</strong>
+      </div>
+      {campaign.channel === "email" && (
+        <p>
+          <strong>Assunto:</strong> {campaign.subject ?? "Não informado"}
+        </p>
+      )}
+      {campaign.variantBContent && <strong>Variação A</strong>}
+      <p className="crm-notes">{campaign.content}</p>
+      {campaign.variantBContent && (
+        <>
+          <strong>Variação B</strong>
+          <p className="crm-notes">{campaign.variantBContent}</p>
+        </>
+      )}
+      <p className="muted">
+        Resultados acompanhados por {campaign.attributionWindowDays} dia(s). Grupo de controle:{" "}
+        {campaign.holdoutPercentage}%.
+      </p>
+    </section>
+  );
 }
 
 export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
@@ -87,6 +236,11 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
     () => api.growth.campaigns(scope.organizationId),
     parseCrmCampaigns,
   );
+  const loyalty = useRemote(
+    scope,
+    () => api.growth.loyaltyProgram(scope.organizationId),
+    parseCrmLoyaltyProgram,
+  );
   const [busy, setBusy] = useState("");
   const [feedback, setFeedback] = useState<CrmFeedback | null>(null);
   const [campaignName, setCampaignName] = useState("");
@@ -97,9 +251,6 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
   const [attributionWindowDays, setAttributionWindowDays] = useState("7");
   const [holdoutPercentage, setHoldoutPercentage] = useState("0");
   const [campaignSegmentId, setCampaignSegmentId] = useState("");
-  const [loyaltyMode, setLoyaltyMode] = useState<"points" | "cashback">("points");
-  const [loyaltyRate, setLoyaltyRate] = useState("");
-  const [loyaltyMinimum, setLoyaltyMinimum] = useState("0");
   const [couponCode, setCouponCode] = useState("");
   const [couponType, setCouponType] = useState<"fixed" | "percentage">("fixed");
   const [couponValue, setCouponValue] = useState("");
@@ -112,6 +263,20 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
   const [reviewedId, setReviewedId] = useState("");
   const [queueConfirmed, setQueueConfirmed] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewAction, setReviewAction] = useState<"queue" | "cancel" | null>(null);
+  const [loadingMoreDeliveries, setLoadingMoreDeliveries] = useState(false);
+  const [reviewScope, setReviewScope] = useState("");
+  const reviewRequest = useRef(0);
+  const scopeKey = `${scope.organizationId}:${scope.unitId}`;
+  const currentScope = useRef(scopeKey);
+  currentScope.current = scopeKey;
+  useEffect(() => {
+    void scopeKey;
+    return () => {
+      reviewRequest.current += 1;
+    };
+  }, [scopeKey]);
 
   const segmentNames = useMemo(
     () =>
@@ -123,9 +288,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
     [segments.state],
   );
   const reviewed =
-    campaigns.state.status === "ready"
-      ? (campaigns.state.data.find((campaign) => campaign.id === reviewedId) ?? null)
-      : null;
+    reviewScope === scopeKey && deliveries?.campaign.id === reviewedId ? deliveries.campaign : null;
   const parsedCoupon = Number(couponValue.replace(",", "."));
   const couponInvalid =
     !Number.isFinite(parsedCoupon) ||
@@ -145,13 +308,21 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
     needsThreshold && (!Number.isInteger(parsedThreshold) || parsedThreshold <= 0);
   const canQueue =
     Boolean(reviewed && preview) &&
+    !reviewLoading &&
+    !loadingMoreDeliveries &&
+    !reviewAction &&
+    preview?.campaignId === reviewed?.id &&
+    preview?.channel === reviewed?.channel &&
+    (reviewed?.channel !== "email" || Boolean(reviewed.subject)) &&
     ["draft", "blocked"].includes(reviewed?.status ?? "") &&
     preview?.provider.ready === true &&
     preview.eligibleRecipients > 0 &&
     !preview.exceedsRecipientLimit;
   const canCancel = Boolean(reviewed && !["sending", "sent", "canceled"].includes(reviewed.status));
-  const refreshing = coupons.refreshing || segments.refreshing || campaigns.refreshing;
-  const refreshError = coupons.refreshError ?? segments.refreshError ?? campaigns.refreshError;
+  const refreshing =
+    coupons.refreshing || segments.refreshing || campaigns.refreshing || loyalty.refreshing;
+  const refreshError =
+    coupons.refreshError ?? segments.refreshError ?? campaigns.refreshError ?? loyalty.refreshError;
 
   async function createCampaign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -189,86 +360,169 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
     }
   }
   async function loadReview(id: string) {
+    const request = ++reviewRequest.current;
     setReviewedId(id);
+    setReviewScope(scopeKey);
     setPreview(null);
     setDeliveries(null);
+    setLoadingMoreDeliveries(false);
     setQueueConfirmed(false);
     setCancelReason("");
-    setBusy("review");
+    setReviewLoading(true);
     setFeedback(null);
     try {
       const [previewPayload, deliveryPayload] = await Promise.all([
         api.growth.campaignPreview(scope.organizationId, id),
-        api.growth.campaignDeliveries(scope.organizationId, id),
+        api.growth.campaignDeliveries(scope.organizationId, id, { limit: 20 }),
       ]);
-      setPreview(parseCrmCampaignPreview(previewPayload));
-      setDeliveries(parseCrmCampaignDeliveries(deliveryPayload));
+      const next = parseCrmCampaignReview(id, previewPayload, deliveryPayload);
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return false;
+      setPreview(next.preview);
+      setDeliveries(next.deliveries);
+      return true;
     } catch (error) {
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return false;
       setFeedback({
         tone: "danger",
         message: crmError(error, "Não foi possível revisar a campanha."),
       });
+      return false;
     } finally {
-      setBusy("");
+      if (request === reviewRequest.current) setReviewLoading(false);
+    }
+  }
+  async function loadMoreDeliveries() {
+    if (
+      !deliveries ||
+      deliveries.nextOffset === null ||
+      loadingMoreDeliveries ||
+      reviewLoading ||
+      reviewAction
+    )
+      return;
+    const request = reviewRequest.current;
+    const offset = deliveries.nextOffset;
+    setLoadingMoreDeliveries(true);
+    setFeedback(null);
+    try {
+      const page = parseCrmCampaignDeliveries(
+        await api.growth.campaignDeliveries(scope.organizationId, reviewedId, {
+          limit: 20,
+          offset,
+        }),
+      );
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
+      if (
+        page.campaign.id !== reviewedId ||
+        page.campaign.channel !== deliveries.campaign.channel ||
+        page.offset !== offset
+      )
+        throw new Error(
+          "Não foi possível confirmar a próxima página de entregas. Atualize a revisão.",
+        );
+      setDeliveries((current) => {
+        if (!current) return current;
+        const loadedIds = new Set(current.deliveries.map((delivery) => delivery.id));
+        return {
+          ...page,
+          deliveries: [
+            ...current.deliveries,
+            ...page.deliveries.filter((delivery) => !loadedIds.has(delivery.id)),
+          ],
+        };
+      });
+      setQueueConfirmed(false);
+    } catch (error) {
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
+      setFeedback({
+        tone: "danger",
+        message: crmError(error, "Não foi possível carregar mais entregas."),
+      });
+    } finally {
+      if (request === reviewRequest.current) setLoadingMoreDeliveries(false);
     }
   }
   async function queueCampaign() {
-    if (!reviewed || !preview || !queueConfirmed) return;
-    setBusy("queue");
+    if (!reviewed || !preview || !queueConfirmed || !canQueue) return;
+    const request = reviewRequest.current;
+    setReviewAction("queue");
     setFeedback(null);
     try {
       await api.growth.queueCampaign(scope.organizationId, reviewed.id);
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
       setQueueConfirmed(false);
       campaigns.retry();
-      await loadReview(reviewed.id);
+      if (!(await loadReview(reviewed.id))) return;
       setFeedback({
         tone: "success",
-        message: "Campanha enfileirada. Entregas continuam confirmadas pelo status persistido.",
+        message: "Campanha na fila de envio. Acompanhe abaixo a confirmação das entregas.",
       });
     } catch (error) {
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
       setFeedback({
         tone: "danger",
-        message: crmError(error, "Não foi possível enfileirar a campanha."),
+        message: crmError(error, "Não foi possível iniciar o envio da campanha."),
       });
     } finally {
-      setBusy("");
+      setReviewAction(null);
     }
   }
   async function cancelCampaign() {
-    if (!reviewed || cancelReason.trim().length < 3) return;
-    setBusy("cancel");
+    if (
+      !reviewed ||
+      reviewLoading ||
+      loadingMoreDeliveries ||
+      reviewAction ||
+      cancelReason.trim().length < 3
+    )
+      return;
+    const request = reviewRequest.current;
+    setReviewAction("cancel");
     setFeedback(null);
     try {
       await api.growth.cancelCampaign(scope.organizationId, reviewed.id, {
         reason: cancelReason.trim(),
       });
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
       setCancelReason("");
       setQueueConfirmed(false);
       campaigns.retry();
-      await loadReview(reviewed.id);
-      setFeedback({ tone: "success", message: "Campanha cancelada com auditoria." });
+      if (!(await loadReview(reviewed.id))) return;
+      setFeedback({
+        tone: "success",
+        message: "Campanha cancelada. A justificativa foi registrada.",
+      });
     } catch (error) {
+      if (request !== reviewRequest.current || currentScope.current !== scopeKey) return;
       setFeedback({
         tone: "danger",
         message: crmError(error, "Não foi possível cancelar a campanha."),
       });
     } finally {
-      setBusy("");
+      setReviewAction(null);
     }
   }
-  async function createLoyalty(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function createLoyalty(input: LoyaltyProgramInput) {
+    if (
+      loyalty.state.status !== "ready" ||
+      loyalty.refreshing ||
+      loyalty.refreshError ||
+      busy === "loyalty"
+    )
+      return;
     setBusy("loyalty");
     setFeedback(null);
     try {
-      await api.growth.createLoyaltyProgram(scope.organizationId, {
-        mode: loyaltyMode,
-        rate: Number(loyaltyRate.replace(",", ".")),
-        minimumOrderCents: moneyToCents(loyaltyMinimum),
-        active: true,
-      });
+      const saved = parseCrmLoyaltyProgram(
+        await api.growth.createLoyaltyProgram(scope.organizationId, input),
+      );
+      if (!saved)
+        throw new Error("Não foi possível confirmar os dados salvos. Atualize o programa.");
+      if (currentScope.current !== scopeKey) return;
+      loyalty.update(() => saved);
       setFeedback({ tone: "success", message: "Programa de fidelidade configurado." });
     } catch (error) {
+      if (currentScope.current !== scopeKey) return;
       setFeedback({
         tone: "danger",
         message: crmError(error, "Não foi possível configurar fidelidade."),
@@ -344,12 +598,12 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
       });
       setSegmentName("");
       setSegmentThreshold("");
-      setFeedback({ tone: "success", message: "Segmento salvo para uso em campanhas." });
+      setFeedback({ tone: "success", message: "Grupo de clientes salvo para uso em campanhas." });
       segments.retry();
     } catch (error) {
       setFeedback({
         tone: "danger",
-        message: crmError(error, "Não foi possível criar o segmento."),
+        message: crmError(error, "Não foi possível criar o grupo de clientes."),
       });
     } finally {
       setBusy("");
@@ -365,9 +619,9 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               ? "Relacionamento pode estar desatualizado"
               : refreshing
                 ? "Sincronizando relacionamento"
-                : "Relacionamento persistido"}
+                : "Benefícios e campanhas atualizados"}
           </Badge>
-          <small>Fidelidade, benefícios, audiências e campanhas.</small>
+          <small>Fidelidade, benefícios, grupos de clientes e campanhas.</small>
         </div>
         <Button
           disabled={refreshing}
@@ -375,6 +629,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
             coupons.retry();
             segments.retry();
             campaigns.retry();
+            loyalty.retry();
           }}
           size="sm"
           variant="secondary"
@@ -388,7 +643,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
         </div>
       )}
       <CrmFormPanel
-        description="Selecione a audiência e salve o rascunho. Nenhum envio é presumido."
+        description="Selecione o público e salve o rascunho para revisar antes do envio."
         title="Nova campanha"
       >
         <form className="action-form" onSubmit={(event) => void createCampaign(event)}>
@@ -402,12 +657,12 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
             />
           </label>
           <label>
-            Segmento
+            Grupo de clientes
             <NativeSelect
               onChange={(event) => setCampaignSegmentId(event.target.value)}
               value={campaignSegmentId}
             >
-              <option value="">Marketing autorizado (padrão)</option>
+              <option value="">Clientes com autorização</option>
               {segments.state.status === "ready" &&
                 segments.state.data
                   .filter((segment) => segment.active)
@@ -450,36 +705,48 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               value={campaignContent}
             />
           </label>
-          <label className="action-form__wide">
-            Variação B (opcional)
-            <Textarea
-              maxLength={5000}
-              onChange={(event) => setCampaignVariantB(event.target.value)}
-              placeholder="Quando preenchida, divide a audiência entre A e B de forma estável."
-              rows={4}
-              value={campaignVariantB}
-            />
-          </label>
-          <label>
-            Janela de atribuição (dias)
-            <Input
-              type="number"
-              min="1"
-              max="90"
-              value={attributionWindowDays}
-              onChange={(event) => setAttributionWindowDays(event.target.value)}
-            />
-          </label>
-          <label>
-            Grupo de controle (%)
-            <Input
-              type="number"
-              min="0"
-              max="50"
-              value={holdoutPercentage}
-              onChange={(event) => setHoldoutPercentage(event.target.value)}
-            />
-          </label>
+          <details
+            className="gm-disclosure action-form__wide"
+            onInvalidCapture={(event) => {
+              event.currentTarget.open = true;
+            }}
+          >
+            <summary>Comparar mensagens e acompanhar resultados</summary>
+            <div className="gm-disclosure__content gm-form-grid gm-form-grid--split">
+              <label className="action-form__wide">
+                Variação B (opcional)
+                <Textarea
+                  maxLength={5000}
+                  onChange={(event) => setCampaignVariantB(event.target.value)}
+                  placeholder="Mensagem alternativa para comparar resultados entre dois grupos de clientes."
+                  rows={4}
+                  value={campaignVariantB}
+                />
+              </label>
+              <label>
+                Prazo para acompanhar resultados (dias)
+                <Input
+                  type="number"
+                  min="1"
+                  max="90"
+                  required
+                  value={attributionWindowDays}
+                  onChange={(event) => setAttributionWindowDays(event.target.value)}
+                />
+              </label>
+              <label>
+                Grupo de controle (%)
+                <Input
+                  type="number"
+                  min="0"
+                  max="50"
+                  required
+                  value={holdoutPercentage}
+                  onChange={(event) => setHoldoutPercentage(event.target.value)}
+                />
+              </label>
+            </div>
+          </details>
           <Button
             disabled={
               busy === "campaign" ||
@@ -495,50 +762,30 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
       </CrmFormPanel>
       <div className="quick-actions-grid">
         <CrmFormPanel
-          description="Configure pontos ou cashback da organização."
+          description="Configure pontos ou crédito de volta para seus clientes."
           title="Programa de fidelidade"
         >
-          <form className="action-form" onSubmit={(event) => void createLoyalty(event)}>
-            <label>
-              Modalidade
-              <NativeSelect
-                onChange={(event) => setLoyaltyMode(event.target.value as "points" | "cashback")}
-                value={loyaltyMode}
-              >
-                <option value="points">Pontos</option>
-                <option value="cashback">Cashback</option>
-              </NativeSelect>
-            </label>
-            <label>
-              Taxa
-              <Input
-                inputMode="decimal"
-                onChange={(event) => setLoyaltyRate(event.target.value)}
-                required
-                value={loyaltyRate}
-              />
-            </label>
-            <label>
-              Pedido mínimo
-              <Input
-                inputMode="decimal"
-                onChange={(event) => setLoyaltyMinimum(event.target.value)}
-                required
-                value={loyaltyMinimum}
-                data-currency="brl"
-              />
-            </label>
-            <Button
-              disabled={
-                busy === "loyalty" ||
-                Number(loyaltyRate.replace(",", ".")) <= 0 ||
-                moneyToCents(loyaltyMinimum) < 0
-              }
-              type="submit"
-            >
-              {busy === "loyalty" ? "Salvando…" : "Salvar programa"}
-            </Button>
-          </form>
+          <RemoteGate remote={loyalty}>
+            {(program) => (
+              <>
+                {loyalty.refreshError && (
+                  <Callout tone="warning">
+                    Não foi possível atualizar o programa. Atualize os dados antes de salvar
+                    alterações.
+                  </Callout>
+                )}
+                <CrmLoyaltyProgramForm
+                  key={`${scope.organizationId}:${program?.id ?? "new"}`}
+                  program={program}
+                  disabled={
+                    busy === "loyalty" || loyalty.refreshing || Boolean(loyalty.refreshError)
+                  }
+                  saving={busy === "loyalty"}
+                  onSave={createLoyalty}
+                />
+              </>
+            )}
+          </RemoteGate>
         </CrmFormPanel>
         <CrmFormPanel description="Crie benefício limitado à unidade atual." title="Novo cupom">
           <form className="action-form" onSubmit={(event) => void createCoupon(event)}>
@@ -588,8 +835,8 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
           </form>
         </CrmFormPanel>
         <CrmFormPanel
-          description="Defina uma audiência persistida para campanhas."
-          title="Novo segmento"
+          description="Defina um grupo de clientes para suas campanhas."
+          title="Novo grupo de clientes"
         >
           <form className="action-form" onSubmit={(event) => void createSegment(event)}>
             <label>
@@ -607,12 +854,12 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 onChange={(event) => setSegmentKind(event.target.value as SegmentKind)}
                 value={segmentKind}
               >
-                <option value="marketing_opt_in">Marketing autorizado</option>
+                <option value="marketing_opt_in">Com autorização para campanhas</option>
                 <option value="birthday_month">Aniversariantes do mês</option>
                 <option value="inactive_days">Inativos há X dias</option>
                 <option value="minimum_visits">Mínimo de visitas</option>
                 <option value="minimum_spend_cents">Gasto mínimo</option>
-                <option value="no_show_count">Mínimo de no-shows</option>
+                <option value="no_show_count">Mínimo de faltas</option>
                 <option value="all">Todos os clientes</option>
               </NativeSelect>
             </label>
@@ -639,7 +886,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                     ? "Quantidade de visitas"
                     : segmentKind === "minimum_spend_cents"
                       ? "Gasto mínimo"
-                      : "Quantidade de no-shows"}
+                      : "Quantidade de faltas"}
                 <Input
                   aria-invalid={segmentThreshold.length > 0 && thresholdInvalid}
                   inputMode="decimal"
@@ -659,7 +906,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               disabled={busy === "segment" || segmentName.trim().length < 2 || thresholdInvalid}
               type="submit"
             >
-              {busy === "segment" ? "Salvando…" : "Salvar segmento"}
+              {busy === "segment" ? "Salvando…" : "Salvar grupo"}
             </Button>
           </form>
         </CrmFormPanel>
@@ -719,8 +966,8 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
         <Card>
           <div className="section-title">
             <div>
-              <p className="eyebrow">Audiências</p>
-              <h2>Segmentos</h2>
+              <p className="eyebrow">Público</p>
+              <h2>Grupos de clientes</h2>
             </div>
             {segments.state.status === "ready" && (
               <Badge tone="neutral">{segments.state.data.length}</Badge>
@@ -730,9 +977,9 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
             {(rows) =>
               rows.length === 0 ? (
                 <EmptyState
-                  description="Crie uma audiência antes de direcionar campanhas."
+                  description="Crie um grupo para direcionar suas campanhas."
                   icon={<Icon name="people" size={26} />}
-                  title="Sem segmentos"
+                  title="Sem grupos de clientes"
                 />
               ) : (
                 <div className="data-list">
@@ -763,7 +1010,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
             )}
           </div>
           <p className="muted">
-            Revise audiência e provedor antes de enfileirar; entrega só conta quando persistida.
+            Revise os destinatários e a disponibilidade do canal antes de iniciar o envio.
           </p>
           <RemoteGate remote={campaigns}>
             {(rows) =>
@@ -778,8 +1025,8 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                   {rows.map((campaign) => {
                     const status = campaignStatus(campaign);
                     const audience = campaign.segmentId
-                      ? (segmentNames.get(campaign.segmentId) ?? "Segmento associado")
-                      : "Marketing autorizado";
+                      ? (segmentNames.get(campaign.segmentId) ?? "Grupo associado")
+                      : "Com autorização para campanhas";
                     return (
                       <article className="data-row" key={campaign.id}>
                         <div>
@@ -789,12 +1036,16 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                         <div className="data-row__end">
                           <Badge tone={status.tone}>{status.label}</Badge>
                           <Button
-                            disabled={busy === "review"}
+                            disabled={Boolean(reviewAction)}
                             onClick={() => void loadReview(campaign.id)}
                             size="sm"
                             variant="secondary"
                           >
-                            {reviewedId === campaign.id ? "Atualizar revisão" : "Revisar"}
+                            {reviewedId === campaign.id && reviewLoading
+                              ? "Consultando…"
+                              : reviewedId === campaign.id
+                                ? "Atualizar revisão"
+                                : "Revisar"}
                           </Button>
                         </div>
                       </article>
@@ -806,7 +1057,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
           </RemoteGate>
         </Card>
       </div>
-      {reviewedId && (
+      {reviewedId && reviewScope === scopeKey && (
         <Card aria-labelledby="crm-campaign-review-title" className="crm-campaign-review">
           <div className="section-title">
             <div>
@@ -815,9 +1066,12 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
             </div>
             <Button
               onClick={() => {
+                reviewRequest.current += 1;
                 setReviewedId("");
                 setPreview(null);
                 setDeliveries(null);
+                setQueueConfirmed(false);
+                setReviewLoading(false);
               }}
               size="sm"
               variant="ghost"
@@ -825,24 +1079,25 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               Fechar
             </Button>
           </div>
-          {busy === "review" && !preview ? (
+          {reviewLoading ? (
             <div className="remote-state" role="status">
               <span className="spinner" aria-hidden="true" />
-              <strong>Calculando audiência e entregas persistidas…</strong>
+              <strong>Consultando destinatários e entregas…</strong>
             </div>
           ) : preview && reviewed ? (
             <>
+              <CrmCampaignMessagePreview campaign={reviewed} />
               <dl className="crm-campaign-metrics">
                 <div>
                   <dt>Clientes ativos</dt>
                   <dd>{preview.activeCustomers}</dd>
                 </div>
                 <div>
-                  <dt>Elegíveis</dt>
+                  <dt>Podem receber</dt>
                   <dd>{preview.eligibleRecipients}</dd>
                 </div>
                 <div>
-                  <dt>Excluídos</dt>
+                  <dt>Fora do envio</dt>
                   <dd>{preview.excludedRecipients}</dd>
                 </div>
                 <div>
@@ -853,21 +1108,22 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
               {!preview.provider.ready ? (
                 <Callout tone="warning">
                   {preview.provider.unavailableCode === "CAMPAIGN_CHANNEL_NOT_HOMOLOGATED"
-                    ? "WhatsApp ainda não está homologado; o envio permanece bloqueado."
-                    : "O provedor deste canal não está configurado; o envio permanece bloqueado."}
+                    ? "O envio de campanhas pelo WhatsApp ainda não foi liberado. Solicite a ativação ao responsável pelo sistema."
+                    : "Este canal ainda não está disponível para envio. Solicite a configuração ao responsável pelo sistema."}
                 </Callout>
               ) : preview.exceedsRecipientLimit ? (
                 <Callout tone="danger">
-                  A audiência excede o limite de {preview.recipientLimit} destinatários. Refine o
-                  segmento.
+                  O público excede o limite de {preview.recipientLimit} destinatários. Escolha um
+                  grupo menor.
                 </Callout>
               ) : preview.eligibleRecipients === 0 ? (
                 <Callout tone="warning">
-                  Nenhum destinatário elegível após consentimentos e contatos válidos.
+                  Nenhum cliente deste grupo tem autorização e contato válido para receber a
+                  campanha.
                 </Callout>
               ) : (
                 <Callout tone="success">
-                  Provedor disponível e audiência dentro do limite operacional.
+                  Canal disponível e quantidade de destinatários dentro do limite de envio.
                 </Callout>
               )}
               {["draft", "blocked"].includes(reviewed.status) && (
@@ -878,13 +1134,13 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                       disabled={!canQueue}
                       onChange={(event) => setQueueConfirmed(event.target.checked)}
                     />
-                    Confirmo o envio para {preview.eligibleRecipients} destinatário(s) elegível(is).
+                    Confirmo o envio para {preview.eligibleRecipients} destinatário(s).
                   </label>
                   <Button
-                    disabled={!canQueue || !queueConfirmed || busy === "queue"}
+                    disabled={!canQueue || !queueConfirmed}
                     onClick={() => void queueCampaign()}
                   >
-                    {busy === "queue" ? "Enfileirando…" : "Enfileirar campanha"}
+                    {reviewAction === "queue" ? "Adicionando à fila…" : "Iniciar envio"}
                   </Button>
                 </div>
               )}
@@ -895,16 +1151,20 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                     <Input
                       minLength={3}
                       onChange={(event) => setCancelReason(event.target.value)}
-                      placeholder="Registre o motivo para auditoria"
+                      placeholder="Informe por que a campanha será cancelada"
                       value={cancelReason}
                     />
                   </label>
                   <Button
-                    disabled={cancelReason.trim().length < 3 || busy === "cancel"}
+                    disabled={
+                      cancelReason.trim().length < 3 ||
+                      loadingMoreDeliveries ||
+                      Boolean(reviewAction)
+                    }
                     onClick={() => void cancelCampaign()}
                     variant="danger"
                   >
-                    {busy === "cancel" ? "Cancelando…" : "Cancelar campanha"}
+                    {reviewAction === "cancel" ? "Cancelando…" : "Cancelar campanha"}
                   </Button>
                 </div>
               )}
@@ -986,7 +1246,10 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 <div className="crm-section-heading">
                   <div>
                     <strong>Entregas</strong>
-                    <small>{deliveries?.deliveries.length ?? 0} registro(s) recente(s)</small>
+                    <small>
+                      {deliveries?.deliveries.length ?? 0} de {deliveries?.total ?? 0} registro(s)
+                      carregado(s)
+                    </small>
                   </div>
                   <div className="crm-delivery-counts">
                     {deliveries &&
@@ -1001,7 +1264,7 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                                 : "neutral"
                           }
                         >
-                          {status}: {total}
+                          {deliveryStatuses[status] ?? "Situação indisponível"}: {total}
                         </Badge>
                       ))}
                   </div>
@@ -1009,11 +1272,11 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 {!deliveries || deliveries.deliveries.length === 0 ? (
                   <div className="crm-inline-empty">
                     <Icon name="alerts" size={18} />
-                    <p>Nenhuma entrega foi materializada para esta campanha.</p>
+                    <p>Nenhuma entrega registrada para esta campanha.</p>
                   </div>
                 ) : (
                   <div className="data-list">
-                    {deliveries.deliveries.slice(0, 20).map((delivery) => (
+                    {deliveries.deliveries.map((delivery) => (
                       <article className="data-row" key={delivery.id}>
                         <div>
                           <strong>{delivery.customerName}</strong>
@@ -1022,7 +1285,9 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                               ? dateTime(delivery.sentAt)
                               : dateTime(delivery.createdAt)}
                             {` · ${delivery.experimentVariant === "control" ? "controle" : `variação ${delivery.experimentVariant.toUpperCase()}`}`}
-                            {delivery.errorCode ? ` · ${delivery.errorCode}` : ""}
+                            {delivery.errorCode
+                              ? ` · ${crmFailureMessage(delivery.errorCode, "Não foi possível entregar a mensagem. Verifique o contato e tente novamente.")}`
+                              : ""}
                           </small>
                         </div>
                         <Badge
@@ -1034,10 +1299,20 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                                 : "neutral"
                           }
                         >
-                          {delivery.status}
+                          {deliveryStatuses[delivery.status] ?? "Situação indisponível"}
                         </Badge>
                       </article>
                     ))}
+                    {deliveries.nextOffset !== null && (
+                      <Button
+                        disabled={loadingMoreDeliveries || Boolean(reviewAction)}
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void loadMoreDeliveries()}
+                      >
+                        {loadingMoreDeliveries ? "Carregando…" : "Ver mais entregas"}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

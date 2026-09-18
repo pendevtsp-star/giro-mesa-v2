@@ -2850,7 +2850,7 @@ export class ManagementService {
           ),
         });
     }
-    if (resultingMilli < 0 && !item.allowNegative)
+    if (resultingMilli < 0 && !item.allowNegative && input.quantityDeltaMilli <= 0)
       throw new ConflictException({
         code: "NEGATIVE_STOCK_BLOCKED",
         message: "A operação deixaria o estoque negativo.",
@@ -3502,10 +3502,15 @@ export class ManagementService {
           lastProcessedAt: sql<Date | null>`max(${outboxEvents.processedAt})`,
         })
         .from(outboxEvents)
-        .innerJoin(posOrders, eq(sql`${outboxEvents.aggregateId}::uuid`, posOrders.id))
+        .innerJoin(
+          posOrders,
+          eq(sql`${outboxEvents.payload}->>'orderId'`, sql`${posOrders.id}::text`),
+        )
         .where(
           and(
             eq(outboxEvents.topic, "pos.order.sent"),
+            eq(sql`${outboxEvents.payload}->>'organizationId'`, organizationId),
+            eq(sql`${outboxEvents.payload}->>'unitId'`, unitId),
             eq(posOrders.organizationId, organizationId),
             eq(posOrders.unitId, unitId),
           ),
@@ -7495,15 +7500,10 @@ export class ManagementService {
   ) {
     await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
     const kind = input.kind ?? "ingredient";
-    if (kind === "resale" && !input.productId)
-      throw new BadRequestException({
-        code: "RESALE_PRODUCT_REQUIRED",
-        message: "Item de revenda deve estar vinculado ao produto vendido.",
-      });
-    if ((kind === "reusable" || kind === "returnable_container") && input.productId)
+    if (kind !== "resale" && input.productId)
       throw new BadRequestException({
         code: "INVENTORY_KIND_PRODUCT_FORBIDDEN",
-        message: "Reutilizáveis e vasilhames não podem ser o produto vendido.",
+        message: "Somente itens de revenda podem vincular um produto vendido diretamente.",
       });
     return this.idempotent(
       identityId,
@@ -7577,18 +7577,10 @@ export class ManagementService {
       const resultingKind = input.kind ?? existing.kind;
       const resultingProductId =
         input.productId === undefined ? existing.productId : input.productId;
-      if (resultingKind === "resale" && !resultingProductId)
-        throw new BadRequestException({
-          code: "RESALE_PRODUCT_REQUIRED",
-          message: "Item de revenda deve estar vinculado ao produto vendido.",
-        });
-      if (
-        (resultingKind === "reusable" || resultingKind === "returnable_container") &&
-        resultingProductId
-      )
+      if (resultingKind !== "resale" && resultingProductId)
         throw new BadRequestException({
           code: "INVENTORY_KIND_PRODUCT_FORBIDDEN",
-          message: "Reutilizáveis e vasilhames não podem ser o produto vendido.",
+          message: "Somente itens de revenda podem vincular um produto vendido diretamente.",
         });
       if (input.productId) await this.requireProduct(tx, organizationId, input.productId);
       if (input.preferredSupplierId)
@@ -9322,6 +9314,7 @@ export class ManagementService {
           .select({
             version: managementRecipeVersions.version,
             validFrom: managementRecipeVersions.validFrom,
+            validUntil: managementRecipeVersions.validUntil,
           })
           .from(managementRecipeVersions)
           .where(
@@ -9333,7 +9326,13 @@ export class ManagementService {
           )
           .orderBy(desc(managementRecipeVersions.version))
           .limit(1);
-        const validFrom = new Date(Math.max(Date.now(), (latest?.validFrom.getTime() ?? 0) + 1));
+        const validFrom = new Date(
+          Math.max(
+            Date.now(),
+            (latest?.validFrom.getTime() ?? 0) + 1,
+            latest?.validUntil?.getTime() ?? 0,
+          ),
+        );
         await tx
           .update(managementRecipeVersions)
           .set({ validUntil: validFrom })
@@ -9381,6 +9380,68 @@ export class ManagementService {
           version,
           validFrom: validFrom.toISOString(),
           components: input.components,
+        };
+      },
+    );
+  }
+
+  async deactivateRecipe(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    productId: string,
+    idempotencyKey: string,
+  ) {
+    await this.requireRole(identityId, organizationId, unitId, INVENTORY_ROLES);
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "recipe.deactivate",
+      { productId },
+      async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtext(${`management-recipe:${organizationId}:${unitId}:${productId}`}))`,
+        );
+        await this.requireProduct(tx, organizationId, productId);
+        const [active] = await tx
+          .select({
+            id: managementRecipeVersions.id,
+            validFrom: managementRecipeVersions.validFrom,
+          })
+          .from(managementRecipeVersions)
+          .where(
+            and(
+              eq(managementRecipeVersions.organizationId, organizationId),
+              eq(managementRecipeVersions.unitId, unitId),
+              eq(managementRecipeVersions.productId, productId),
+              isNull(managementRecipeVersions.validUntil),
+            ),
+          )
+          .limit(1);
+        if (!active)
+          return { productId, recipeVersionId: null, validUntil: null, active: false as const };
+        const validUntil = new Date(Math.max(Date.now(), active.validFrom.getTime() + 1));
+        await tx
+          .update(managementRecipeVersions)
+          .set({ validUntil })
+          .where(eq(managementRecipeVersions.id, active.id));
+        await this.record(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          "management.recipe.deactivated",
+          "recipe_version",
+          active.id,
+          { productId, validUntil: validUntil.toISOString() },
+        );
+        return {
+          productId,
+          recipeVersionId: active.id,
+          validUntil: validUntil.toISOString(),
+          active: false as const,
         };
       },
     );
@@ -10723,11 +10784,13 @@ export class ManagementService {
         const averageCostCents =
           input.unitCostCents === undefined
             ? balance.averageCostCents
-            : Math.round(
-                ((balance.averageCostCents ?? input.unitCostCents) * previousMilli +
-                  input.unitCostCents * quantityMilli) /
-                  (previousMilli + quantityMilli),
-              );
+            : previousMilli > 0
+              ? Math.round(
+                  ((balance.averageCostCents ?? input.unitCostCents) * previousMilli +
+                    input.unitCostCents * quantityMilli) /
+                    (previousMilli + quantityMilli),
+                )
+              : input.unitCostCents;
         await tx
           .update(managementStockBalances)
           .set({

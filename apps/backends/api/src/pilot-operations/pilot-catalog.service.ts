@@ -11,6 +11,7 @@ import {
   auditEvents,
   type Database,
   identities,
+  managementInventoryItems,
   organizations,
   outboxEvents,
   posAllergens,
@@ -121,7 +122,13 @@ export class PilotCatalogService {
       "owner",
       "manager",
     ]);
-    if (!roles.some((role) => role.unitId === null || role.unitId === unitId)) {
+    if (
+      !roles.some(
+        (role) =>
+          (role.role === "owner" || role.role === "manager") &&
+          (role.unitId === null || role.unitId === unitId),
+      )
+    ) {
       throw new ForbiddenException({
         code: "CATALOG_SCOPE_DENIED",
         message: "Gestão de catálogo não autorizada nesta unidade.",
@@ -201,6 +208,13 @@ export class PilotCatalogService {
 
   async list(identityId: string, organizationId: string, unitId: string) {
     await this.requireAccess(identityId, organizationId, unitId);
+    let canManage = false;
+    try {
+      await this.requireManager(identityId, organizationId, unitId);
+      canManage = true;
+    } catch (error) {
+      if (!(error instanceof ForbiddenException)) throw error;
+    }
     const businessDate = await this.unitBusinessDate(organizationId, unitId);
     const [
       categories,
@@ -242,10 +256,12 @@ export class PilotCatalogService {
         .select()
         .from(posProducts)
         .where(eq(posProducts.organizationId, organizationId)),
-      this.database.db
-        .select()
-        .from(posRecipeComponents)
-        .where(eq(posRecipeComponents.organizationId, organizationId)),
+      canManage
+        ? this.database.db
+            .select()
+            .from(posRecipeComponents)
+            .where(eq(posRecipeComponents.organizationId, organizationId))
+        : Promise.resolve([]),
       this.database.db
         .select()
         .from(posProductAllergens)
@@ -328,6 +344,10 @@ export class PilotCatalogService {
         .where(and(eq(publicMenus.organizationId, organizationId), eq(publicMenus.unitId, unitId))),
     ]);
     return {
+      capabilities: { canManage },
+      ...(canManage
+        ? { inventoryProducts: await this.inventoryProducts(organizationId, unitId) }
+        : {}),
       categories,
       allergens,
       modifierGroups,
@@ -336,7 +356,7 @@ export class PilotCatalogService {
       recipes,
       productAllergens,
       productModifierGroups,
-      prices,
+      prices: canManage ? prices : prices.map(({ costCents: _cost, ...price }) => price),
       availability: availability.map((row) => ({
         ...row,
         dailyStockRemaining:
@@ -353,6 +373,76 @@ export class PilotCatalogService {
       branding: branding[0]?.config ?? null,
       publication: publication[0] ?? null,
     };
+  }
+
+  private async inventoryProducts(organizationId: string, unitId: string) {
+    const rows = await this.database.db.execute<{
+      productId: string;
+      inventoryItemId: string | null;
+      itemName: string | null;
+      stockUnit: string | null;
+      physicalQuantity: string | null;
+      availableQuantity: string | null;
+      estimatedCostCents: string | null;
+      costSource: "inventory" | "recipe" | null;
+      recipeVersion: number | null;
+      componentCount: number;
+    }>(sql`
+      with balances as (
+        select b.*,
+          greatest(0, b.quantity
+            - coalesce((select sum(r.quantity) from management_inventory_reservations r
+                where r.organization_id = b.organization_id and r.unit_id = b.unit_id
+                  and r.inventory_item_id = b.inventory_item_id and r.location_id = b.location_id
+                  and r.status = 'active' and (r.expires_at is null or r.expires_at > now())), 0)
+            - coalesce((select sum(l.quantity) from management_inventory_lots l
+                inner join management_inventory_lot_holds h on h.organization_id = l.organization_id
+                  and h.unit_id = l.unit_id and h.lot_id = l.id and h.status = 'active'
+                where l.organization_id = b.organization_id and l.unit_id = b.unit_id
+                  and l.inventory_item_id = b.inventory_item_id and l.location_id = b.location_id
+                  and l.active = true), 0)) as available
+        from management_stock_balances b
+        inner join management_stock_locations loc on loc.organization_id = b.organization_id
+          and loc.unit_id = b.unit_id and loc.id = b.location_id and loc.active = true
+        where b.organization_id = ${organizationId}::uuid and b.unit_id = ${unitId}::uuid
+      )
+      select p.id as "productId", i.id as "inventoryItemId", i.name as "itemName", i.unit as "stockUnit",
+        case when i.id is not null then coalesce(stock.physical, 0) end as "physicalQuantity",
+        case when i.id is not null then coalesce(stock.available, 0) end as "availableQuantity",
+        case when recipe.id is not null then recipe_cost.cost else stock.cost end as "estimatedCostCents",
+        case when recipe.id is not null then 'recipe' when i.id is not null then 'inventory' end as "costSource",
+        recipe.version as "recipeVersion", coalesce(recipe_cost.count, 0)::integer as "componentCount"
+      from pos_products p
+      left join management_inventory_items i on i.organization_id = p.organization_id
+        and i.unit_id = ${unitId}::uuid and i.product_id = p.id and i.kind = 'resale' and i.active = true
+      left join lateral (
+        select sum(b.quantity) as physical, sum(b.available) as available,
+          case when count(*) filter (where b.quantity > 0 and b.average_cost_cents is null) = 0
+            then round(sum(greatest(b.quantity, 0) * b.average_cost_cents)
+              / nullif(sum(greatest(b.quantity, 0)), 0)) end as cost
+        from balances b where b.inventory_item_id = i.id
+      ) stock on true
+      left join management_recipe_versions recipe on recipe.organization_id = p.organization_id
+        and recipe.unit_id = ${unitId}::uuid and recipe.product_id = p.id
+        and recipe.valid_until is null and recipe.valid_from <= now()
+      left join lateral (
+        select count(*) as count,
+          case when count(*) > 0 and count(*) = count(b.average_cost_cents)
+            then round(sum(ceil(c.quantity_milli::numeric * 10000 / (10000 - c.loss_basis_points))
+              / 1000 * b.average_cost_cents)) end as cost
+        from management_recipe_components c
+        left join balances b on b.inventory_item_id = c.inventory_item_id and b.location_id = c.location_id
+        where c.organization_id = p.organization_id and c.unit_id = ${unitId}::uuid
+          and c.recipe_version_id = recipe.id
+      ) recipe_cost on true
+      where p.organization_id = ${organizationId}::uuid
+    `);
+    return rows.map((row) => ({
+      ...row,
+      physicalQuantity: row.physicalQuantity === null ? null : Number(row.physicalQuantity),
+      availableQuantity: row.availableQuantity === null ? null : Number(row.availableQuantity),
+      estimatedCostCents: row.estimatedCostCents === null ? null : Number(row.estimatedCostCents),
+    }));
   }
 
   async createCategory(
@@ -683,6 +773,43 @@ export class PilotCatalogService {
       input,
       async (tx) => {
         await this.assertProductReferences(organizationId, unitId, input);
+        if (input.inventoryItemId) {
+          if (input.productType !== "resale") {
+            throw new BadRequestException({ code: "INVENTORY_LINK_REQUIRES_RESALE" });
+          }
+          const [item] = await tx
+            .select()
+            .from(managementInventoryItems)
+            .where(
+              and(
+                eq(managementInventoryItems.organizationId, organizationId),
+                eq(managementInventoryItems.unitId, unitId),
+                eq(managementInventoryItems.id, input.inventoryItemId),
+                eq(managementInventoryItems.kind, "resale"),
+                eq(managementInventoryItems.active, true),
+              ),
+            )
+            .limit(1)
+            .for("update");
+          if (!item) {
+            throw new NotFoundException({
+              code: "RESALE_INVENTORY_ITEM_NOT_FOUND",
+              message: "Item de revenda ativo não encontrado nesta unidade.",
+            });
+          }
+          if (item.productId) {
+            throw new ConflictException({
+              code: "INVENTORY_ITEM_ALREADY_LINKED",
+              message: "Este item de estoque já está vinculado a um produto do cardápio.",
+            });
+          }
+          if (item.unit.toLowerCase() !== "un") {
+            throw new BadRequestException({
+              code: "RESALE_INVENTORY_UNIT_INVALID",
+              message: "A revenda direta exige estoque em un: cada venda baixa uma unidade.",
+            });
+          }
+        }
         const [product] = await tx
           .insert(posProducts)
           .values({
@@ -709,6 +836,18 @@ export class PilotCatalogService {
           })
           .returning();
         if (!product) throw new Error("Product insert did not return a row");
+        if (input.inventoryItemId) {
+          await tx
+            .update(managementInventoryItems)
+            .set({ productId: product.id, updatedAt: new Date() })
+            .where(
+              and(
+                eq(managementInventoryItems.organizationId, organizationId),
+                eq(managementInventoryItems.unitId, unitId),
+                eq(managementInventoryItems.id, input.inventoryItemId),
+              ),
+            );
+        }
         if (input.allergenIds.length > 0) {
           await tx.insert(posProductAllergens).values(
             [...new Set(input.allergenIds)].map((allergenId) => ({
@@ -772,13 +911,22 @@ export class PilotCatalogService {
           action: "pos.product.created",
           entityType: "product",
           entityId: product.id,
-          metadata: { priceCents: input.priceCents },
+          metadata: {
+            priceCents: input.priceCents,
+            ...(input.inventoryItemId ? { inventoryItemId: input.inventoryItemId } : {}),
+          },
         });
         await tx.insert(outboxEvents).values({
           topic: "pos.catalog_changed",
           aggregateType: "product",
           aggregateId: product.id,
-          payload: { organizationId, unitId, productId: product.id, action: "created" },
+          payload: {
+            organizationId,
+            unitId,
+            productId: product.id,
+            action: "created",
+            ...(input.inventoryItemId ? { inventoryItemId: input.inventoryItemId } : {}),
+          },
         });
         return product;
       },

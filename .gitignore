@@ -27,3 +27,6 @@ data/
 apps/backends/edge-hub/data/
 apps/native/ops-shell/Platforms/**/bin/
 .vscode/
+
+# Local review captures, release evidence, and generated scratch output.
+/scratch/

@@ -2,6 +2,10 @@
   min-width: 0;
 }
 
+.crm-page .action-panel {
+  align-self: start;
+}
+
 .crm-page-navigation,
 .crm-page-navigation nav,
 .crm-thread-heading {
@@ -16,6 +20,11 @@
   gap: 0.15rem;
 }
 
+.crm-page-navigation {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
 .crm-page-navigation :is(h2, p),
 .crm-thread-heading h3 {
   margin: 0;
@@ -23,7 +32,7 @@
 
 .crm-page-navigation nav {
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .crm-observability,
@@ -277,6 +286,22 @@
   padding-top: var(--gm-space-4);
 }
 
+.crm-merge-management {
+  display: grid;
+  gap: var(--gm-space-3);
+  min-width: 0;
+}
+
+.crm-merge-search {
+  align-items: end;
+}
+
+.crm-merge-search label {
+  display: grid;
+  gap: var(--gm-space-1);
+  min-width: 0;
+}
+
 .crm-action-grid,
 .crm-assets-grid {
   display: grid;
@@ -297,6 +322,10 @@
 
 .crm-assets-grid .data-row {
   align-items: flex-start;
+}
+
+.crm-assets-grid .data-row__end {
+  flex-shrink: 0;
 }
 
 .crm-campaign-review {
@@ -360,16 +389,23 @@
 .crm-whatsapp-grid {
   display: grid;
   gap: var(--gm-space-3);
-  grid-template-columns: minmax(16rem, 0.8fr) minmax(15rem, 0.7fr) minmax(20rem, 1.5fr);
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.7fr) minmax(0, 1.5fr);
 }
 
 .crm-evolution-card,
 .crm-inbox-card,
 .crm-thread-card,
 .crm-automations-card {
+  align-content: start;
   display: grid;
   gap: var(--gm-space-3);
+  grid-template-columns: minmax(0, 1fr);
   min-width: 0;
+}
+
+.crm-whatsapp-grid .gm-empty {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .crm-card-heading,
@@ -382,6 +418,7 @@
 
 .crm-card-heading {
   align-items: flex-start;
+  flex-wrap: wrap;
   justify-content: space-between;
 }
 
@@ -452,13 +489,18 @@
   gap: var(--gm-space-2);
 }
 
-.crm-inbox-filters {
-  grid-template-columns: minmax(0, 1fr) repeat(3, minmax(7rem, auto));
+.crm-inbox-filters,
+.crm-conversation-controls {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+
+.crm-inbox-filters > *,
+.crm-conversation-controls > * {
+  min-width: 0;
 }
 
 .crm-conversation-controls {
   align-items: center;
-  grid-template-columns: repeat(3, minmax(8rem, 1fr)) auto;
 }
 
 .crm-conversation-controls small {
@@ -528,9 +570,24 @@
   color: inherit;
   cursor: pointer;
   display: flex;
+  gap: var(--gm-space-2);
   justify-content: space-between;
   padding: var(--gm-space-3);
   text-align: left;
+}
+
+.crm-inbox-list button > span,
+.crm-thread-heading h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.crm-inbox-list button > span:first-child {
+  flex: 1;
+}
+
+.crm-inbox-list button > span:last-child {
+  flex-shrink: 0;
 }
 
 .crm-inbox-list button:hover,

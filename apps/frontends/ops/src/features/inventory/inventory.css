@@ -64,6 +64,15 @@
   color: var(--gm-muted);
 }
 
+.inventory-system-status--action {
+  flex-wrap: wrap;
+}
+
+.inventory-system-status--action > span {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
 @media (max-width: 900px) {
   .inventory-shift-grid {
     grid-template-columns: 1fr;

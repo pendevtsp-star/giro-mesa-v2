@@ -20,18 +20,22 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
       <Card className="crm-page-navigation">
         <div>
           <p className="eyebrow">Relacionamento</p>
-          <h2>Central de CRM</h2>
-          <p>Atenda primeiro; abra cadastro ou campanhas quando a tarefa exigir.</p>
+          <h2>Clientes e campanhas</h2>
         </div>
-        <nav aria-label="Áreas do CRM">
-          <Button aria-pressed={view === "service"} onClick={() => setView("service")} size="sm">
+        <nav aria-label="Áreas de relacionamento">
+          <Button
+            aria-pressed={view === "service"}
+            onClick={() => setView("service")}
+            size="sm"
+            variant={view === "service" ? "primary" : "secondary"}
+          >
             Atendimento
           </Button>
           <Button
             aria-pressed={view === "customers"}
             onClick={() => setView("customers")}
             size="sm"
-            variant="secondary"
+            variant={view === "customers" ? "primary" : "secondary"}
           >
             Clientes
           </Button>
@@ -39,7 +43,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             aria-pressed={view === "campaigns"}
             onClick={() => setView("campaigns")}
             size="sm"
-            variant="secondary"
+            variant={view === "campaigns" ? "primary" : "secondary"}
           >
             Benefícios e campanhas
           </Button>

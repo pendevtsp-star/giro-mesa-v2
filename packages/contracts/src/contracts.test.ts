@@ -507,6 +507,21 @@ describe("public contracts", () => {
     };
     assert.equal(publicOrderSchema.safeParse({ ...base, fulfillment: "pickup" }).success, true);
     assert.equal(
+      publicOrderSchema.safeParse({ ...base, fulfillment: "pickup", expectedTotalCents: 0 })
+        .success,
+      true,
+    );
+    for (const expectedTotalCents of [-1, 1.5, "1000", Number.MAX_SAFE_INTEGER + 1]) {
+      assert.equal(
+        publicOrderSchema.safeParse({ ...base, fulfillment: "pickup", expectedTotalCents }).success,
+        false,
+      );
+      assert.equal(
+        publicTableOrderSchema.safeParse({ items: base.items, expectedTotalCents }).success,
+        false,
+      );
+    }
+    assert.equal(
       publicOrderSchema.safeParse({
         ...base,
         fulfillment: "pickup",

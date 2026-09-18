@@ -1,12 +1,14 @@
 import { Button } from "@giromesa/ui";
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import type { CartItem } from "../../lib/menu";
+import type { OrderPriceChange } from "../../lib/order-price-change";
 import type { PublicOrderReceipt } from "../../lib/public-order";
 import { CartSummary } from "./CartSummary";
 import { type AddressState, OrderFlow, type OrderOptionsState } from "./OrderFlow";
 import { TableOrderFlow, type TableOrderState } from "./TableOrderFlow";
 
 export function CartDialog({
+  priceChange,
   dialogRef,
   open,
   cart,
@@ -37,6 +39,7 @@ export function CartDialog({
   onPlace,
   onPlaceTableOrder,
 }: {
+  priceChange: OrderPriceChange | null;
   dialogRef: RefObject<HTMLDialogElement | null>;
   open: boolean;
   cart: CartItem[];
@@ -135,9 +138,15 @@ export function CartDialog({
               O pedido na mesa será liberado quando a equipe abrir a comanda.
             </p>
           ) : mode === "table" ? (
-            <TableOrderFlow cart={cart} state={tableOrder} onPlace={onPlaceTableOrder} />
+            <TableOrderFlow
+              cart={cart}
+              state={tableOrder}
+              priceChange={priceChange}
+              onPlace={onPlaceTableOrder}
+            />
           ) : !receipt ? (
             <OrderFlow
+              priceChange={priceChange}
               cart={cart}
               options={options}
               fulfillment={fulfillment}

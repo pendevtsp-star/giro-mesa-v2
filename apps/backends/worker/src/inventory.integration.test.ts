@@ -2,9 +2,13 @@ import assert from "node:assert/strict";
 import { randomInt, randomUUID } from "node:crypto";
 import { test } from "node:test";
 import {
+  auditEvents,
   createDatabase,
   identities,
+  managementInventoryIssueRoutes,
   managementInventoryItems,
+  managementInventoryLotHolds,
+  managementInventoryLots,
   managementInventoryMovements,
   managementInventoryReservations,
   managementProductReturnables,
@@ -24,6 +28,11 @@ import {
   units,
 } from "@giromesa/db";
 import { and, eq, inArray } from "drizzle-orm";
+import {
+  consumeOrderSentInventory,
+  type OrderSentOutboxEvent,
+  reverseCanceledOrderItemInventory,
+} from "./inventory.js";
 import { OutboxWorker } from "./outbox.js";
 
 function document() {
@@ -570,6 +579,275 @@ test("consumes a sent order once and preserves tenant isolation in PostgreSQL", 
         .where(eq(outboxEvents.topic, "management.inventory_attention_required"))
     ).filter((event) => event.payload.orderId === insufficientOrder.id);
     assert.equal(replayedAlerts.length, 1);
+    const consumptionEvent = {
+      id: insufficientOutbox.id,
+      aggregate_id: insufficientOutbox.aggregateId,
+      aggregate_type: insufficientOutbox.aggregateType,
+      payload: insufficientOutbox.payload,
+    };
+    await database.db.insert(auditEvents).values({
+      organizationId: organizationB.id,
+      unitId: unitB.id,
+      actorIdentityId: identityB.id,
+      action: "management.inventory.order-reviewed",
+      entityType: "order",
+      entityId: insufficientOrder.id,
+      metadata: { source: "operator", shortageAcknowledged: true },
+    });
+    assert.equal(
+      (await consumeOrderSentInventory(database.db, consumptionEvent)).retryRequired,
+      true,
+    );
+    await database.db.insert(auditEvents).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      actorIdentityId: identityA.id,
+      action: "management.inventory.order-reviewed",
+      entityType: "order",
+      entityId: insufficientOrder.id,
+      metadata: { source: "operator", shortageAcknowledged: true },
+    });
+    const confirmedConsumption = await consumeOrderSentInventory(database.db, consumptionEvent);
+    assert.equal(confirmedConsumption.retryRequired, false);
+    assert.equal(confirmedConsumption.movementCount, 1);
+    assert.ok(confirmedConsumption.issueCodes.includes("INVENTORY_STOCK_SHORTAGE_CONFIRMED"));
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(managementStockBalances)
+          .where(eq(managementStockBalances.id, balanceA.id))
+      )[0]?.quantity,
+      "-0.700",
+    );
+    assert.equal((await consumeOrderSentInventory(database.db, consumptionEvent)).movementCount, 0);
+    const [canceledShortageItem] = await database.db
+      .update(posOrderItems)
+      .set({ status: "canceled" })
+      .where(eq(posOrderItems.orderId, insufficientOrder.id))
+      .returning();
+    assert.ok(canceledShortageItem);
+    const negativeCancellation = {
+      id: randomUUID(),
+      aggregate_id: tab.id,
+      aggregate_type: "tab",
+      payload: {
+        approvalId: randomUUID(),
+        itemId: canceledShortageItem.id,
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        tabId: tab.id,
+        reason: "Cliente desistiu",
+      },
+    };
+    assert.equal(
+      (await reverseCanceledOrderItemInventory(database.db, negativeCancellation)).movementCount,
+      1,
+    );
+    assert.equal(
+      (await reverseCanceledOrderItemInventory(database.db, negativeCancellation)).movementCount,
+      0,
+    );
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(managementStockBalances)
+          .where(eq(managementStockBalances.id, balanceA.id))
+      )[0]?.quantity,
+      "0.100",
+    );
+    for (const [source, expectedCode] of [
+      ["public_menu", "INVENTORY_STOCK_SHORTAGE_PUBLIC_ORDER"],
+      ["offline", "INVENTORY_STOCK_SHORTAGE_OFFLINE_ORDER"],
+      ["operator", "INVENTORY_STOCK_SHORTAGE_AFTER_REVIEW"],
+    ] as const) {
+      const [acceptedOrder]: Array<typeof posOrders.$inferSelect> = await database.db
+        .insert(posOrders)
+        .values({
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          tabId: tab.id,
+          createdByIdentityId: identityA.id,
+          status: "sent",
+          sentAt: new Date(),
+        })
+        .returning();
+      assert.ok(acceptedOrder);
+      await database.db.insert(posOrderItems).values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        orderId: acceptedOrder.id,
+        productId: product.id,
+        productName: product.name,
+        quantity: 1,
+        unitPriceCents: 1000,
+        grossCents: 1000,
+        netCents: 1000,
+        status: "queued",
+      });
+      await database.db.insert(auditEvents).values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        actorIdentityId: identityA.id,
+        action: "management.inventory.order-reviewed",
+        entityType: "order",
+        entityId: acceptedOrder.id,
+        metadata: { source, shortageAcknowledged: false },
+      });
+      const acceptedEvent: OrderSentOutboxEvent = {
+        ...consumptionEvent,
+        id: randomUUID(),
+        payload: { ...consumptionEvent.payload, orderId: acceptedOrder.id },
+      };
+      const consumed = await consumeOrderSentInventory(database.db, acceptedEvent);
+      assert.equal(consumed.retryRequired, false);
+      assert.ok(consumed.issueCodes.includes(expectedCode));
+      assert.equal((await consumeOrderSentInventory(database.db, acceptedEvent)).movementCount, 0);
+    }
+    assert.equal(
+      (
+        await database.db
+          .select()
+          .from(managementStockBalances)
+          .where(eq(managementStockBalances.id, balanceA.id))
+      )[0]?.quantity,
+      "-1.100",
+    );
+    const [beer] = await database.db
+      .insert(posProducts)
+      .values({ organizationId: organizationA.id, categoryId: category.id, name: "Cerveja" })
+      .returning();
+    const [secondFreezer] = await database.db
+      .insert(managementStockLocations)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        name: "Freezer 2",
+        code: "freezer2",
+      })
+      .returning();
+    assert.ok(beer && secondFreezer);
+    const [beerStock] = await database.db
+      .insert(managementInventoryItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        productId: beer.id,
+        kind: "resale",
+        unit: "un",
+        name: beer.name,
+      })
+      .returning();
+    assert.ok(beerStock);
+    await database.db.insert(managementStockBalances).values(
+      [locationA.id, secondFreezer.id].map((locationId) => ({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        inventoryItemId: beerStock.id,
+        locationId,
+        quantity: "10.000",
+      })),
+    );
+    // The current route changed after dispatch. Consumption must retain the reviewed freezer.
+    await database.db.insert(managementInventoryIssueRoutes).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      productId: beer.id,
+      locationId: secondFreezer.id,
+    });
+    for (const held of [false, true]) {
+      const [beerOrder]: Array<typeof posOrders.$inferSelect> = await database.db
+        .insert(posOrders)
+        .values({
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          tabId: tab.id,
+          createdByIdentityId: identityA.id,
+          status: "sent",
+          sentAt: new Date(),
+        })
+        .returning();
+      assert.ok(beerOrder);
+      const [beerOrderItem]: Array<typeof posOrderItems.$inferSelect> = await database.db
+        .insert(posOrderItems)
+        .values({
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          orderId: beerOrder.id,
+          productId: beer.id,
+          productName: beer.name,
+          quantity: 2,
+          unitPriceCents: 1000,
+          grossCents: 2000,
+          netCents: 2000,
+          status: "queued",
+        })
+        .returning();
+      assert.ok(beerOrderItem);
+      await database.db.insert(auditEvents).values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        actorIdentityId: identityA.id,
+        action: "management.inventory.order-reviewed",
+        entityType: "order",
+        entityId: beerOrder.id,
+        metadata: {
+          source: "operator",
+          shortageAcknowledged: held,
+          sources: [
+            {
+              orderItemId: beerOrderItem.id,
+              inventoryItemId: beerStock.id,
+              locationId: locationA.id,
+            },
+          ],
+        },
+      });
+      if (held) {
+        const [heldLot] = await database.db
+          .insert(managementInventoryLots)
+          .values({
+            organizationId: organizationA.id,
+            unitId: unitA.id,
+            inventoryItemId: beerStock.id,
+            locationId: locationA.id,
+            batchCode: "hold",
+            quantity: "8.000",
+          })
+          .returning();
+        assert.ok(heldLot);
+        await database.db.insert(managementInventoryLotHolds).values({
+          organizationId: organizationA.id,
+          unitId: unitA.id,
+          lotId: heldLot.id,
+          reason: "Temperatura",
+          idempotencyKey: randomUUID(),
+          createdByIdentityId: identityA.id,
+        });
+      }
+      const beerEvent: OrderSentOutboxEvent = {
+        ...consumptionEvent,
+        id: randomUUID(),
+        payload: { ...consumptionEvent.payload, orderId: beerOrder.id },
+      };
+      const consumedBeer = await consumeOrderSentInventory(database.db, beerEvent);
+      assert.equal(consumedBeer.retryRequired, held);
+      assert.equal(consumedBeer.movementCount, held ? 0 : 1);
+      if (held) assert.ok(consumedBeer.issueCodes.includes("INVENTORY_STOCK_HELD"));
+    }
+    const freezerBalances = await database.db
+      .select()
+      .from(managementStockBalances)
+      .where(eq(managementStockBalances.inventoryItemId, beerStock.id));
+    assert.equal(
+      freezerBalances.find((balance) => balance.locationId === locationA.id)?.quantity,
+      "8.000",
+    );
+    assert.equal(
+      freezerBalances.find((balance) => balance.locationId === secondFreezer.id)?.quantity,
+      "10.000",
+    );
     await database.db
       .update(outboxEvents)
       .set({ lockedAt: null, processedAt: new Date() })

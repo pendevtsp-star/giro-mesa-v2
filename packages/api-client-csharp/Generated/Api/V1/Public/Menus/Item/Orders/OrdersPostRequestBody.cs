@@ -36,6 +36,8 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders
 #else
         public string DeliveryZone { get; set; }
 #endif
+        /// <summary>The expectedTotalCents property</summary>
+        public int? ExpectedTotalCents { get; set; }
         /// <summary>The fulfillment property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_fulfillment? Fulfillment { get; set; }
         /// <summary>The items property</summary>
@@ -79,6 +81,7 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders
                 { "address", n => { Address = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_address>(global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_address.CreateFromDiscriminatorValue); } },
                 { "customer", n => { Customer = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_customer>(global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_customer.CreateFromDiscriminatorValue); } },
                 { "deliveryZone", n => { DeliveryZone = n.GetStringValue(); } },
+                { "expectedTotalCents", n => { ExpectedTotalCents = n.GetIntValue(); } },
                 { "fulfillment", n => { Fulfillment = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_fulfillment>(); } },
                 { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_items>(global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_items.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "paymentMethod", n => { PaymentMethod = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_paymentMethod>(); } },
@@ -96,6 +99,7 @@ namespace GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_address>("address", Address);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_customer>("customer", Customer);
             writer.WriteStringValue("deliveryZone", DeliveryZone);
+            writer.WriteIntValue("expectedTotalCents", ExpectedTotalCents);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_fulfillment>("fulfillment", Fulfillment);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_items>("items", Items);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Public.Menus.Item.Orders.OrdersPostRequestBody_paymentMethod>("paymentMethod", PaymentMethod);

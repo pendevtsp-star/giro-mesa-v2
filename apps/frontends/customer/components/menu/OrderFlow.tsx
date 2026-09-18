@@ -1,6 +1,7 @@
 import { Button, Input, Label, NativeSelect } from "@giromesa/ui";
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 import { type CartItem, cartTotal, formatMoney } from "../../lib/menu";
+import type { OrderPriceChange } from "../../lib/order-price-change";
 import type { PublicOrderOptions } from "../../lib/public-order";
 
 export type AddressState = {
@@ -19,6 +20,7 @@ export type OrderOptionsState =
   | { status: "ready"; data: PublicOrderOptions };
 
 export function OrderFlow({
+  priceChange,
   cart,
   options,
   fulfillment,
@@ -37,6 +39,7 @@ export function OrderFlow({
   onPrivacy,
   onPlace,
 }: {
+  priceChange: OrderPriceChange | null;
   cart: CartItem[];
   options: OrderOptionsState;
   fulfillment: "pickup" | "delivery";
@@ -269,17 +272,31 @@ export function OrderFlow({
         )}
       </section>
       <div className="cart-summary checkout-total">
-        <span>Total estimado</span>
+        <span>{priceChange ? "Total atualizado" : "Total estimado"}</span>
         <strong>
+          {formatMoney(
+            priceChange?.totalCents ??
+              cartTotal(cart, fulfillment) +
+                (fulfillment === "delivery" ? (selectedZone?.feeCents ?? 0) : 0),
+          )}
+        </strong>
+        {fulfillment === "delivery" && selectedZone && (
+          <small>
+            Inclui {formatMoney(priceChange?.deliveryFeeCents ?? selectedZone.feeCents)} de entrega.
+          </small>
+        )}
+      </div>
+      {priceChange && (
+        <p className="checkout-state checkout-state-warning" role="alert">
+          Preços, descontos ou taxa de entrega mudaram. O pedido ainda não foi enviado. Confira o
+          novo total antes de confirmar. Estimativa anterior:{" "}
           {formatMoney(
             cartTotal(cart, fulfillment) +
               (fulfillment === "delivery" ? (selectedZone?.feeCents ?? 0) : 0),
           )}
-        </strong>
-        {fulfillment === "delivery" && selectedZone && (
-          <small>Inclui {formatMoney(selectedZone.feeCents)} de entrega.</small>
-        )}
-      </div>
+          . Novo total: {formatMoney(priceChange.totalCents)}.
+        </p>
+      )}
       <p className="service-note">
         Preços, disponibilidade e taxas serão conferidos ao confirmar o pedido.
       </p>
@@ -288,7 +305,11 @@ export function OrderFlow({
         type="submit"
         disabled={options.status !== "ready" || !cart.length || pending || belowMinimum}
       >
-        {pending ? "Registrando pedido…" : "Confirmar pedido"}
+        {pending
+          ? "Registrando pedido…"
+          : priceChange
+            ? `Confirmar novo total de ${formatMoney(priceChange.totalCents)}`
+            : "Confirmar pedido"}
       </Button>
     </form>
   );

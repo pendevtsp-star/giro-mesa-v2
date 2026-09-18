@@ -18,6 +18,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Headers,
   Param,
   ParseUUIDPipe,
@@ -43,6 +44,7 @@ export class PublicMenuController {
   ) {}
 
   @Get(":slug")
+  @Header("Cache-Control", "no-store")
   menu(@Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string) {
     return this.publicMenuService.menu(slug);
   }
@@ -53,6 +55,7 @@ export class PublicMenuController {
   }
 
   @Get(":slug/order-options")
+  @Header("Cache-Control", "no-store")
   orderOptions(@Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string) {
     return this.publicOrderService.options(slug);
   }

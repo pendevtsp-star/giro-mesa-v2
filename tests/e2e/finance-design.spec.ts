@@ -186,15 +186,58 @@ async function mockFinance(page: Page) {
 test("financeiro mantém agenda e ações legíveis no desktop e em 375 px", async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop", "A jornada cobre 1440 px e 375 px.");
+  test.setTimeout(60_000);
+  test.skip(testInfo.project.name !== "desktop", "A jornada cobre desktop e telas menores.");
   await mockFinance(page);
-  for (const width of [1440, 375]) {
+  for (const width of [1440, 1280, 1100, 1024, 768, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("http://127.0.0.1:3112/#/finance");
     await page.reload();
     await expect(page.getByRole("heading", { name: "Financeiro" })).toBeVisible();
     await expect(page.getByText("Saldo projetado", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Agenda", exact: true }).click();
+    const filters = page.locator(".finance-filters");
+    const tabs = page.getByRole("tablist", { name: "Áreas do financeiro" });
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => {
+        document.documentElement.dataset.theme = value;
+      }, theme);
+      expect(await tabs.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      const tabBounds = await tabs.boundingBox();
+      if (!tabBounds) throw new Error("Abas do financeiro não estão visíveis.");
+      for (const tab of await tabs.getByRole("tab").all()) {
+        const box = await tab.boundingBox();
+        if (!box) throw new Error("Aba do financeiro não está visível.");
+        expect(box.x).toBeGreaterThanOrEqual(tabBounds.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(tabBounds.x + tabBounds.width);
+        expect(box.height).toBeGreaterThanOrEqual(40);
+        expect(await tab.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+          true,
+        );
+      }
+      await tabs.screenshot({ path: testInfo.outputPath(`tabs-${width}-${theme}.png`) });
+      const bounds = await filters.boundingBox();
+      if (!bounds) throw new Error("Painel de filtros não está visível.");
+      for (const control of await filters.locator("input, select, button").all()) {
+        const box = await control.boundingBox();
+        if (!box) throw new Error("Controle dos filtros não está visível.");
+        expect(box.x).toBeGreaterThanOrEqual(bounds.x);
+        expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        expect(box.y + box.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+      }
+      expect(await filters.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+        true,
+      );
+      await filters.screenshot({ path: testInfo.outputPath(`filters-${width}-${theme}.png`) });
+    }
+    await filters.getByRole("button", { name: "Filtrar", exact: true }).click();
+    for (const tab of await tabs.getByRole("tab").all()) {
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+    }
+    await tabs.getByRole("tab", { name: "Agenda", exact: true }).click();
     await expect(page.getByRole("button", { name: "Registrar lançamento" })).toBeVisible();
     await expect(page.getByLabel("Categoria", { exact: true })).toBeHidden();
     await page.getByText("Mais informações", { exact: true }).click();

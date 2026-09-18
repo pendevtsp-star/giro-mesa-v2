@@ -100,6 +100,7 @@ import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { EvolutionGoClient, EvolutionGoError } from "./evolution-go.js";
 import {
+  canRetryCrmAutomationFailure,
   canTransition,
   couponDiscount,
   deliveryCoverageStatus,
@@ -115,6 +116,7 @@ import {
 import type {
   ApiKeyInput,
   CampaignCancelInput,
+  CampaignDeliveriesQueryInput,
   CampaignInput,
   ConsentInput,
   CouponInput,
@@ -125,6 +127,7 @@ import type {
   CrmAutomationTestInput,
   CrmQuickReplyInput,
   CustomerArchiveInput,
+  CustomerHistoryQueryInput,
   CustomerInput,
   CustomerListQueryInput,
   CustomerMergeInput,
@@ -460,6 +463,83 @@ export class GrowthService {
       this.database.db.select({ value: count() }).from(growthCustomers).where(where),
     ]);
     return { items, total: Number(total?.value ?? 0), limit: query.limit, offset: query.offset };
+  }
+
+  async customerHistory(
+    identityId: string,
+    organizationId: string,
+    customerId: string,
+    query: CustomerHistoryQueryInput = { limit: 30 },
+  ) {
+    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireEntitlement(organizationId, "basic_crm");
+    await this.customer(organizationId, customerId);
+    const cursor = query.cursorAt
+      ? sql`(event_at, kind, id) < (${query.cursorAt}::timestamptz, ${query.cursorKind}::text, ${query.cursorId}::uuid)`
+      : sql`true`;
+    const rows = await this.database.db.execute<{
+      id: string;
+      kind: NonNullable<CustomerHistoryQueryInput["cursorKind"]>;
+      at: string;
+      status: string;
+      label: string;
+      amountCents: number | null;
+      amount: number | null;
+    }>(sql`
+      with history as (
+        select tab.id, 'service'::text as kind, coalesce(tab.closed_at, tab.created_at) as event_at,
+          tab.status::text as status, tab.fulfillment_type::text as label,
+          tab.total_cents as amount_cents, null::int as amount
+        from growth_pos_tab_customer_links link
+        inner join pos_tabs tab on tab.organization_id = link.organization_id
+          and tab.unit_id = link.unit_id and tab.id = link.tab_id
+        where link.organization_id = ${organizationId} and link.customer_id = ${customerId}
+        union all
+        select id, 'reservation', scheduled_at, status::text, party_size::text || ' pessoa(s)', null, null
+        from growth_reservations where organization_id = ${organizationId} and customer_id = ${customerId}
+        union all
+        select id, 'waitlist', joined_at, status::text, party_size::text || ' pessoa(s)', null, null
+        from growth_waitlist_entries where organization_id = ${organizationId} and customer_id = ${customerId}
+        union all
+        select id, 'delivery', created_at, status::text, fulfillment, total_cents, null
+        from growth_delivery_orders where organization_id = ${organizationId} and customer_id = ${customerId}
+        union all
+        select delivery.id, 'campaign', coalesce(delivery.sent_at, delivery.created_at),
+          delivery.status, campaign.channel::text || ' · ' || campaign.name, null, null
+        from growth_campaign_deliveries delivery
+        inner join growth_marketing_campaigns campaign on campaign.organization_id = delivery.organization_id
+          and campaign.id = delivery.campaign_id
+        where delivery.organization_id = ${organizationId} and delivery.customer_id = ${customerId}
+        union all
+        select redemption.id, 'coupon', redemption.redeemed_at, 'redeemed', coupon.code,
+          redemption.discount_cents, null
+        from growth_coupon_redemptions redemption
+        inner join growth_coupons coupon on coupon.organization_id = redemption.organization_id
+          and coupon.id = redemption.coupon_id
+        where redemption.organization_id = ${organizationId} and redemption.customer_id = ${customerId}
+        union all
+        select id, 'whatsapp', occurred_at, status,
+          (case when direction = 'inbound' then 'Recebida' else 'Enviada' end) || ' · ' || coalesce(nullif(left(body, 80), ''), 'mídia'),
+          null, null
+        from growth_whatsapp_messages where organization_id = ${organizationId} and customer_id = ${customerId}
+        union all
+        select id, 'loyalty', created_at, type::text, coalesce(description, type::text), null, amount
+        from growth_loyalty_ledger where organization_id = ${organizationId} and customer_id = ${customerId}
+      )
+      select id, kind, to_char(event_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at,
+        status, label, amount_cents as "amountCents", amount
+      from history
+      where ${cursor}
+      order by event_at desc, kind desc, id desc
+      limit ${query.limit + 1}
+    `);
+    const items = rows.slice(0, query.limit);
+    const last = items.at(-1);
+    return {
+      items,
+      nextCursor:
+        rows.length > query.limit && last ? { at: last.at, kind: last.kind, id: last.id } : null,
+    };
   }
 
   async customerDetail(identityId: string, organizationId: string, customerId: string) {
@@ -1324,16 +1404,12 @@ export class GrowthService {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtext(${`growth-loyalty:${organizationId}`}))`,
       );
-      if (input.active)
-        await tx
-          .update(loyaltyPrograms)
-          .set({ active: false, updatedAt: new Date() })
-          .where(
-            and(
-              eq(loyaltyPrograms.organizationId, organizationId),
-              eq(loyaltyPrograms.active, true),
-            ),
-          );
+      await tx
+        .update(loyaltyPrograms)
+        .set({ active: false, updatedAt: new Date() })
+        .where(
+          and(eq(loyaltyPrograms.organizationId, organizationId), eq(loyaltyPrograms.active, true)),
+        );
       const [created] = await tx
         .insert(loyaltyPrograms)
         .values({
@@ -1985,10 +2061,29 @@ export class GrowthService {
       .where(eq(customerSegments.organizationId, organizationId));
   }
 
+  private async campaignUnitScope(
+    identityId: string,
+    organizationId: string,
+    unitId?: string | null,
+  ) {
+    const bindings = await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const managers = bindings.filter(
+      (binding) => binding.role === "owner" || binding.role === "manager",
+    );
+    const unrestricted = managers.some((binding) => binding.unitId === null);
+    const unitIds = managers.flatMap((binding) => (binding.unitId ? [binding.unitId] : []));
+    if (unitId !== undefined && !unrestricted && (!unitId || !unitIds.includes(unitId)))
+      throw new ForbiddenException({
+        code: "UNIT_ACCESS_DENIED",
+        message: "Acesso à unidade da campanha não autorizado.",
+      });
+    if (unitId) await this.scope.requireUnitAccess(identityId, organizationId, unitId);
+    return unrestricted ? undefined : inArray(marketingCampaigns.unitId, unitIds);
+  }
+
   async createCampaign(identityId: string, organizationId: string, input: CampaignInput) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.campaignUnitScope(identityId, organizationId, input.unitId ?? null);
     await this.requireEntitlement(organizationId, "campaigns");
-    if (input.unitId) await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
     if (input.segmentId) {
       const [segment] = await this.database.db
         .select({ id: customerSegments.id })
@@ -2046,12 +2141,12 @@ export class GrowthService {
   }
 
   async listCampaigns(identityId: string, organizationId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const unitScope = await this.campaignUnitScope(identityId, organizationId);
     await this.requireEntitlement(organizationId, "campaigns");
     return this.database.db
       .select()
       .from(marketingCampaigns)
-      .where(eq(marketingCampaigns.organizationId, organizationId))
+      .where(and(eq(marketingCampaigns.organizationId, organizationId), unitScope))
       .orderBy(desc(marketingCampaigns.createdAt));
   }
 
@@ -2191,22 +2286,29 @@ export class GrowthService {
     channel: "email" | "whatsapp",
     organizationId: string,
     unitId: string | null,
+    recipients: Array<{ defaultUnitId: string | null }>,
   ) {
     if (channel === "whatsapp") {
       if (process.env.WHATSAPP_PROVIDER_ENABLED !== "true") return false;
-      const [integration] = await this.database.db
-        .select({ id: growthIntegrations.id })
+      const requiredUnits = [
+        ...new Set(unitId ? [unitId] : recipients.map((customer) => customer.defaultUnitId)),
+      ];
+      if (requiredUnits.includes(null)) return false;
+      const unitIds = requiredUnits.filter((id): id is string => id !== null);
+      if (!unitIds.length) return true;
+      const integrations = await this.database.db
+        .select({ unitId: growthIntegrations.unitId })
         .from(growthIntegrations)
         .where(
           and(
             eq(growthIntegrations.organizationId, organizationId),
-            unitId ? eq(growthIntegrations.unitId, unitId) : undefined,
+            inArray(growthIntegrations.unitId, unitIds),
             eq(growthIntegrations.provider, "evolution_go"),
             eq(growthIntegrations.status, "ready"),
           ),
-        )
-        .limit(1);
-      return Boolean(integration);
+        );
+      const readyUnits = new Set(integrations.map((integration) => integration.unitId));
+      return unitIds.every((id) => readyUnits.has(id));
     }
     const prefix = "EMAIL";
     return (
@@ -2216,7 +2318,7 @@ export class GrowthService {
   }
 
   async queueCampaign(identityId: string, organizationId: string, campaignId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const unitScope = await this.campaignUnitScope(identityId, organizationId);
     await this.requireEntitlement(organizationId, "campaigns");
     const [campaign] = await this.database.db
       .select()
@@ -2225,6 +2327,7 @@ export class GrowthService {
         and(
           eq(marketingCampaigns.organizationId, organizationId),
           eq(marketingCampaigns.id, campaignId),
+          unitScope,
         ),
       )
       .limit(1);
@@ -2233,6 +2336,8 @@ export class GrowthService {
         code: "CAMPAIGN_NOT_FOUND",
         message: "Campanha não encontrada.",
       });
+    if (campaign.unitId)
+      await this.scope.requireUnitAccess(identityId, organizationId, campaign.unitId);
     if (["queued", "sending", "sent"].includes(campaign.status))
       return { status: campaign.status, duplicate: true, queuedRecipients: 0 };
     if (campaign.status === "canceled")
@@ -2240,7 +2345,13 @@ export class GrowthService {
         code: "CAMPAIGN_CANCELED",
         message: "Campanha cancelada não pode ser enfileirada.",
       });
-    if (!(await this.providerReady(campaign.channel, organizationId, campaign.unitId))) {
+    const audience = await this.campaignAudience(campaign);
+    const sendRecipients = audience.recipients.filter(
+      (customer) => campaignExperimentVariant(campaign, customer.id) !== "control",
+    );
+    if (
+      !(await this.providerReady(campaign.channel, organizationId, campaign.unitId, sendRecipients))
+    ) {
       const providerCode =
         campaign.channel === "whatsapp" ? "EVOLUTION_NOT_LOGGED_IN" : "PROVIDER_NOT_CONFIGURED";
       const blocked = await this.database.db.transaction(async (tx) => {
@@ -2298,7 +2409,6 @@ export class GrowthService {
         queuedRecipients: 0,
       };
     }
-    const audience = await this.campaignAudience(campaign);
     if (audience.eligible > 500)
       throw new BadRequestException({
         code: "CAMPAIGN_RECIPIENT_LIMIT",
@@ -2434,7 +2544,7 @@ export class GrowthService {
   }
 
   async previewCampaign(identityId: string, organizationId: string, campaignId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const unitScope = await this.campaignUnitScope(identityId, organizationId);
     await this.requireEntitlement(organizationId, "campaigns");
     const [campaign] = await this.database.db
       .select()
@@ -2443,15 +2553,21 @@ export class GrowthService {
         and(
           eq(marketingCampaigns.organizationId, organizationId),
           eq(marketingCampaigns.id, campaignId),
+          unitScope,
         ),
       )
       .limit(1);
     if (!campaign) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+    if (campaign.unitId)
+      await this.scope.requireUnitAccess(identityId, organizationId, campaign.unitId);
     const audience = await this.campaignAudience(campaign);
     const providerReady = await this.providerReady(
       campaign.channel,
       organizationId,
       campaign.unitId,
+      audience.recipients.filter(
+        (customer) => campaignExperimentVariant(campaign, customer.id) !== "control",
+      ),
     );
     return {
       campaignId,
@@ -2473,8 +2589,13 @@ export class GrowthService {
     };
   }
 
-  async campaignDeliverySummary(identityId: string, organizationId: string, campaignId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+  async campaignDeliverySummary(
+    identityId: string,
+    organizationId: string,
+    campaignId: string,
+    query: CampaignDeliveriesQueryInput = { limit: 100, offset: 0 },
+  ) {
+    const unitScope = await this.campaignUnitScope(identityId, organizationId);
     await this.requireEntitlement(organizationId, "campaigns");
     const [campaign] = await this.database.db
       .select()
@@ -2483,10 +2604,13 @@ export class GrowthService {
         and(
           eq(marketingCampaigns.organizationId, organizationId),
           eq(marketingCampaigns.id, campaignId),
+          unitScope,
         ),
       )
       .limit(1);
     if (!campaign) throw new NotFoundException({ code: "CAMPAIGN_NOT_FOUND" });
+    if (campaign.unitId)
+      await this.scope.requireUnitAccess(identityId, organizationId, campaign.unitId);
     const [counts, deliveries, [attribution], experiments] = await Promise.all([
       this.database.db
         .select({ status: campaignDeliveries.status, total: count() })
@@ -2530,8 +2654,9 @@ export class GrowthService {
             eq(campaignDeliveries.campaignId, campaignId),
           ),
         )
-        .orderBy(desc(campaignDeliveries.createdAt))
-        .limit(100),
+        .orderBy(desc(campaignDeliveries.createdAt), desc(campaignDeliveries.id))
+        .limit(query.limit)
+        .offset(query.offset),
       this.database.db.execute<{
         delivered: number;
         read: number;
@@ -2591,8 +2716,14 @@ export class GrowthService {
         order by experiment_variant
       `),
     ]);
+    const total = counts.reduce((sum, row) => sum + Number(row.total), 0);
     return {
       campaign,
+      total,
+      limit: query.limit,
+      offset: query.offset,
+      nextOffset:
+        query.offset + deliveries.length < total ? query.offset + deliveries.length : null,
       counts: Object.fromEntries(counts.map((row) => [row.status, Number(row.total)])),
       attribution: attribution ?? {
         delivered: 0,
@@ -2617,7 +2748,7 @@ export class GrowthService {
     campaignId: string,
     input: CampaignCancelInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    const unitScope = await this.campaignUnitScope(identityId, organizationId);
     await this.requireEntitlement(organizationId, "campaigns");
     return this.database.db.transaction(async (tx) => {
       const [campaign] = await tx
@@ -2627,6 +2758,7 @@ export class GrowthService {
           and(
             eq(marketingCampaigns.organizationId, organizationId),
             eq(marketingCampaigns.id, campaignId),
+            unitScope,
           ),
         )
         .for("update")
@@ -6077,7 +6209,10 @@ export class GrowthService {
         .groupBy(crmAutomationExecutions.status),
     ]);
     const hasMore = rows.length > input.limit;
-    const items = rows.slice(0, input.limit);
+    const items = rows.slice(0, input.limit).map((row) => ({
+      ...row,
+      canRetry: row.status === "failed" && canRetryCrmAutomationFailure(row.reason),
+    }));
     const tail = items.at(-1);
     return {
       items,
@@ -6092,15 +6227,9 @@ export class GrowthService {
     executionId: string,
   ) {
     await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
-    const [execution] = await this.database.db
-      .select({
-        execution: crmAutomationExecutions,
-        rule: crmAutomationRules,
-        customer: growthCustomers,
-      })
+    const [executionScope] = await this.database.db
+      .select({ unitId: crmAutomationExecutions.unitId })
       .from(crmAutomationExecutions)
-      .innerJoin(crmAutomationRules, eq(crmAutomationRules.id, crmAutomationExecutions.ruleId))
-      .innerJoin(growthCustomers, eq(growthCustomers.id, crmAutomationExecutions.customerId))
       .where(
         and(
           eq(crmAutomationExecutions.organizationId, organizationId),
@@ -6108,17 +6237,47 @@ export class GrowthService {
         ),
       )
       .limit(1);
-    if (!execution) throw new NotFoundException({ code: "CRM_AUTOMATION_EXECUTION_NOT_FOUND" });
-    await this.scope.requireUnitAccess(identityId, organizationId, execution.execution.unitId);
-    if (execution.execution.status !== "failed")
-      throw new ConflictException({ code: "CRM_AUTOMATION_EXECUTION_NOT_RETRYABLE" });
-    if (!execution.customer.whatsappMarketingOptIn || !execution.customer.phone)
-      throw new ConflictException({ code: "WHATSAPP_OPT_OUT_ACTIVE" });
-    const integration = await this.evolutionIntegration(organizationId, execution.execution.unitId);
-    if (integration.status !== "ready")
-      throw new ServiceUnavailableException({ code: "EVOLUTION_NOT_LOGGED_IN" });
-    const phone = normalizeWhatsAppPhone(execution.customer.phone);
+    if (!executionScope)
+      throw new NotFoundException({ code: "CRM_AUTOMATION_EXECUTION_NOT_FOUND" });
+    await this.scope.requireUnitAccess(identityId, organizationId, executionScope.unitId);
+    const integration = await this.evolutionIntegration(organizationId, executionScope.unitId);
     return this.database.db.transaction(async (tx) => {
+      const [execution] = await tx
+        .select({
+          execution: crmAutomationExecutions,
+          rule: crmAutomationRules,
+          customer: growthCustomers,
+        })
+        .from(crmAutomationExecutions)
+        .innerJoin(crmAutomationRules, eq(crmAutomationRules.id, crmAutomationExecutions.ruleId))
+        .innerJoin(growthCustomers, eq(growthCustomers.id, crmAutomationExecutions.customerId))
+        .where(
+          and(
+            eq(crmAutomationExecutions.organizationId, organizationId),
+            eq(crmAutomationExecutions.id, executionId),
+            eq(crmAutomationExecutions.unitId, executionScope.unitId),
+          ),
+        )
+        .for("update", { of: crmAutomationExecutions })
+        .limit(1);
+      if (!execution) throw new NotFoundException({ code: "CRM_AUTOMATION_EXECUTION_NOT_FOUND" });
+      if (execution.execution.status !== "failed")
+        throw new ConflictException({ code: "CRM_AUTOMATION_EXECUTION_NOT_RETRYABLE" });
+      if (!canRetryCrmAutomationFailure(execution.execution.reason))
+        throw new ConflictException({
+          code: "CRM_AUTOMATION_DELIVERY_UNCERTAIN",
+          message:
+            "O envio anterior pode ter chegado ao cliente. Confirme o recebimento antes de enviar uma nova mensagem.",
+        });
+      if (
+        execution.customer.archivedAt ||
+        !execution.customer.whatsappMarketingOptIn ||
+        !execution.customer.phone
+      )
+        throw new ConflictException({ code: "WHATSAPP_OPT_OUT_ACTIVE" });
+      if (integration.status !== "ready")
+        throw new ServiceUnavailableException({ code: "EVOLUTION_NOT_LOGGED_IN" });
+      const phone = normalizeWhatsAppPhone(execution.customer.phone);
       const [conversation] = await tx
         .insert(whatsappConversations)
         .values({

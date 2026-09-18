@@ -595,6 +595,15 @@ describe("pilot POS rules", () => {
     const stationId = "00000000-0000-4000-8000-000000000001";
     const base = { priceCents: 1_000, available: true };
     assert.equal(
+      productUnitConfigSchema.parse({ ...base, stationIds: [stationId] }).autoDeductStock,
+      undefined,
+    );
+    assert.equal(
+      productUnitConfigSchema.parse({ ...base, stationIds: [stationId], autoDeductStock: false })
+        .autoDeductStock,
+      false,
+    );
+    assert.equal(
       productUnitConfigSchema.safeParse({ ...base, stationIds: [stationId] }).success,
       true,
     );

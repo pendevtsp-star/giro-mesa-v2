@@ -151,7 +151,7 @@ export function buildOperationalAttentions(
         kind: "service_call",
         priority: elapsed >= call.slaMinutes ? "critical" : "warning",
         title: `${tableLabel(call.tableId)} · ${callLabel}`,
-        detail: `${elapsed} min · SLA ${call.slaMinutes} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
+        detail: `${elapsed} min · Prazo: ${call.slaMinutes} min · ${responsibilityDetail(responsible, currentIdentityId)}`,
         since: call.createdAt,
         route: call.kind === "bill" && access.counter ? "counter" : "salon",
         tableId: call.tableId,
@@ -560,8 +560,12 @@ export function OperationalAttentionInbox({
           ) : (
             <>
               <div className="operational-attention-summary">
-                <span>{items.length} exigem ação</span>
-                {criticalCount > 0 && <Badge tone="danger">{criticalCount} urgentes</Badge>}
+                <span>{items.length === 1 ? "1 pendência" : `${items.length} pendências`}</span>
+                {criticalCount > 0 && (
+                  <Badge tone="danger">
+                    {criticalCount === 1 ? "1 urgente" : `${criticalCount} urgentes`}
+                  </Badge>
+                )}
                 {presence?.mode === "daily_code" && presence.code && (
                   <Badge tone="info">Código QR de hoje: {presence.code}</Badge>
                 )}
@@ -588,12 +592,12 @@ export function OperationalAttentionInbox({
                   <Badge tone="warning">Estado das notificações indisponível</Badge>
                 )}
               </div>
-              <p>
+              <p className="operational-attention-description">
                 {canSalon
-                  ? "Chamados e pedidos das mesas acessíveis ao seu perfil"
-                  : "Impressões acessíveis ao seu perfil"}
-                {canSalon && canCounter ? ", além das falhas de impressão" : ""}. Estes alertas têm
-                escopo diferente dos indicadores do Salão.
+                  ? canCounter
+                    ? "Chamados, pedidos e falhas de impressão."
+                    : "Chamados e pedidos das mesas."
+                  : "Falhas de impressão."}
               </p>
               {pushError && (
                 <span className="operational-attention-error" role="alert">

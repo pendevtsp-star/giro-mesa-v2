@@ -1,5 +1,5 @@
 import { Button, Label, Modal, Textarea, Toast } from "@giromesa/ui";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import {
   type InterunitTransfer,
@@ -50,6 +50,7 @@ import {
   TransferResolutionModal,
 } from "./InventoryModals";
 import { type InventoryDialog, type InventoryView, InventoryWorkspace } from "./InventoryWorkspace";
+import { type InventoryItemSaveState, saveInventoryItem } from "./inventory-item-save";
 import {
   enqueueInventoryAction,
   type InventoryOfflineInput,
@@ -132,6 +133,7 @@ export function RealInventoryPage({
   );
   const [dialog, setDialog] = useState<InventoryDialog | null>(null);
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+  const itemSaveState = useRef<InventoryItemSaveState | null>(null);
   const [newItemProductId, setNewItemProductId] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<StockLocation | null>(null);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null);
@@ -194,6 +196,7 @@ export function RealInventoryPage({
     if (busy) return;
     setDialog(null);
     setSelectedItem(null);
+    itemSaveState.current = null;
     setNewItemProductId(null);
     setSelectedLocation(null);
     setSelectedIncidentId(null);
@@ -216,6 +219,7 @@ export function RealInventoryPage({
       setFeedback({ message: success, tone: "success" });
       setDialog(null);
       setSelectedItem(null);
+      itemSaveState.current = null;
       setNewItemProductId(null);
       setSelectedLocation(null);
       setSelectedReview(null);
@@ -476,72 +480,13 @@ export function RealInventoryPage({
               onSubmit={(body) =>
                 run(
                   async () => {
-                    const {
-                      returnableContainerItemId,
-                      returnableQuantityPerUnit,
-                      returnableDepositCents,
-                      ...itemBody
-                    } = body;
-                    if (selectedItem) {
-                      await api.management.updateInventoryItem(
-                        scope.organizationId,
-                        scope.unitId,
-                        selectedItem.id,
-                        itemBody,
-                      );
-                    } else {
-                      await api.management.createInventoryItem(
-                        scope.organizationId,
-                        scope.unitId,
-                        itemBody as Parameters<typeof api.management.createInventoryItem>[2],
-                        operationalKey("inventory-item"),
-                      );
-                    }
-                    const nextProductId =
-                      itemBody.kind === "resale" && typeof itemBody.productId === "string"
-                        ? itemBody.productId
-                        : null;
-                    const previousProductId = selectedItem?.productId ?? null;
-                    const nextContainerId =
-                      typeof returnableContainerItemId === "string"
-                        ? returnableContainerItemId
-                        : "";
-                    const previousContainerId = selectedItem?.returnableContainerItemId ?? "";
-                    if (
-                      previousProductId &&
-                      previousContainerId &&
-                      previousProductId !== nextProductId
-                    ) {
-                      await api.management.configureReturnable(
-                        scope.organizationId,
-                        scope.unitId,
-                        {
-                          productId: previousProductId,
-                          containerInventoryItemId: previousContainerId,
-                          quantityPerUnit: "1",
-                          depositCents: 0,
-                          active: false,
-                        },
-                        operationalKey("returnable-configuration-disable"),
-                      );
-                    }
-                    if (nextProductId && (nextContainerId || previousContainerId))
-                      await api.management.configureReturnable(
-                        scope.organizationId,
-                        scope.unitId,
-                        {
-                          productId: nextProductId,
-                          containerInventoryItemId: nextContainerId || previousContainerId,
-                          quantityPerUnit:
-                            typeof returnableQuantityPerUnit === "string"
-                              ? returnableQuantityPerUnit
-                              : "1",
-                          depositCents:
-                            typeof returnableDepositCents === "number" ? returnableDepositCents : 0,
-                          active: Boolean(nextContainerId),
-                        },
-                        operationalKey("returnable-configuration"),
-                      );
+                    itemSaveState.current ??= {
+                      itemId: selectedItem?.id ?? null,
+                      productId: selectedItem?.productId ?? null,
+                      containerId: selectedItem?.returnableContainerItemId ?? null,
+                      createKey: operationalKey("inventory-item"),
+                    };
+                    await saveInventoryItem(scope, body, itemSaveState.current);
                   },
                   selectedItem ? "Item atualizado." : "Item cadastrado.",
                 )
@@ -605,6 +550,7 @@ export function RealInventoryPage({
               open={dialog === "event"}
             />
             <TransferModal
+              balances={data.balances}
               busy={busy}
               items={data.items}
               locations={data.locations}
@@ -917,6 +863,7 @@ export function RealInventoryPage({
               busy={busy}
               items={data.items}
               locations={data.locations}
+              routes={data.issueRoutes}
               onClose={closeDialog}
               onSubmit={(body) =>
                 run(

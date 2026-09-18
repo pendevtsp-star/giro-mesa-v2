@@ -168,6 +168,7 @@ import {
   reprintJobSchema,
   retryPrintJobSchema,
   roomSchema,
+  type SendOrderInput,
   type ServiceCallInput,
   type ServiceChargeInput,
   type ServiceSectionInput,
@@ -176,6 +177,7 @@ import {
   type ShiftSectionCoverageInput,
   type ShiftSectionsBatchAssignmentInput,
   type SplitTabInput,
+  sendOrderSchema,
   serviceCallSchema,
   serviceChargeSchema,
   serviceSectionSchema,
@@ -1230,12 +1232,14 @@ export class PilotPosController {
   }
 
   @Post("orders/:orderId/send")
+  @ApiBody({ required: false, schema: toOpenApiSchema(sendOrderSchema) })
   sendOrder(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Param("unitId", ParseUUIDPipe) unitId: string,
     @Param("orderId", ParseUUIDPipe) orderId: string,
     @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(sendOrderSchema)) body: SendOrderInput,
   ) {
     return this.pos.sendOrder(
       request.auth.identityId,
@@ -1243,6 +1247,8 @@ export class PilotPosController {
       unitId,
       orderId,
       idempotencyKey,
+      undefined,
+      body,
     );
   }
 

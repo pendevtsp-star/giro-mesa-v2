@@ -146,6 +146,7 @@ describe("contratos operacionais reais", () => {
           active: true,
         },
       ],
+      capabilities: { canManage: true },
       recipes: [
         {
           id: "recipe-1",

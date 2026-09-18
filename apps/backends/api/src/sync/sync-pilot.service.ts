@@ -75,7 +75,9 @@ const moveItemsDataSchema = z.object({ tabId: z.uuid(), body: moveItemsSchema })
 const recordPaymentDataSchema = z.object({ tabId: z.uuid(), body: paymentSchema }).strict();
 const notifyReadyDataSchema = z.object({ tabId: z.uuid() }).strict();
 const transitionCallDataSchema = z.object({ callId: z.uuid() }).strict();
-const sendOrderDataSchema = z.object({ orderId: z.uuid() }).strict();
+const sendOrderDataSchema = z
+  .object({ orderId: z.uuid(), acknowledgeInventoryShortage: z.boolean().optional() })
+  .strict();
 const transferTabDataSchema = z.object({ tabId: z.uuid(), body: transferTabSchema }).strict();
 function normalizeLegacyReorganizationData(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -307,7 +309,7 @@ export class SyncPilotService {
         );
       }
       case "send-order": {
-        const { orderId } = sendOrderDataSchema.parse(envelope.data);
+        const { orderId, acknowledgeInventoryShortage } = sendOrderDataSchema.parse(envelope.data);
         return this.pilot.sendOrder(
           event.actorId,
           scope.organizationId,
@@ -318,6 +320,7 @@ export class SyncPilotService {
             ticketIdForStation: (stationId) =>
               stableOperationalId(event.id, "kds-ticket", stationId),
           },
+          { acknowledgeInventoryShortage },
         );
       }
       case "transfer-tab": {

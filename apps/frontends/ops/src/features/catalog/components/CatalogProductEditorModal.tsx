@@ -8,6 +8,7 @@ import type {
 } from "../../../operations.shared";
 import { formatMoney } from "../../../rules";
 import { hasCatalogProductionStation, toggleCatalogStationId } from "../catalog.stations";
+import { CatalogInventorySection } from "./CatalogInventorySection";
 import { CatalogReturnablesSection } from "./CatalogReturnablesSection";
 
 type CatalogProductEditorModalProps = {
@@ -23,6 +24,7 @@ type CatalogProductEditorModalProps = {
   editingProductReason: string;
   production: boolean;
   scope: PilotScope;
+  onInventorySaved?: () => void;
   setEditingProduct: Dispatch<SetStateAction<CatalogProduct | null>>;
   setEditingProductDeliveryPrice: Dispatch<SetStateAction<string>>;
   setEditingProductPrice: Dispatch<SetStateAction<string>>;
@@ -44,6 +46,7 @@ export function CatalogProductEditorModal({
   setEditingProductPrice,
   setEditingProductReason,
   scope,
+  onInventorySaved,
   uploadProductImage,
   updateProduct,
 }: CatalogProductEditorModalProps) {
@@ -290,8 +293,9 @@ export function CatalogProductEditorModal({
             </fieldset>
 
             {/* Preços e Motivo de Auditoria */}
-            <div className="gm-form-grid gm-form-grid--3">
-              <Label className="gm-field">
+            <fieldset className="gm-form-grid gm-form-grid--split min-w-0">
+              <legend>Preços por canal</legend>
+              <Label className="gm-field items-stretch">
                 Preço Salão & Balcão (R$) *
                 <Input
                   data-currency="brl"
@@ -300,29 +304,30 @@ export function CatalogProductEditorModal({
                   placeholder="Ex: 38,90"
                   className="gm-control gm-control--strong"
                 />
+                <small>Preço usado no atendimento presencial.</small>
               </Label>
 
-              <Label className="gm-field">
-                Preço para entrega (R$)
+              <Label className="gm-field items-stretch">
+                Preço Delivery (R$)
                 <Input
                   data-currency="brl"
                   value={editingProductDeliveryPrice}
                   onChange={(e) => setEditingProductDeliveryPrice(e.target.value)}
-                  placeholder="Ex: 44,90"
+                  placeholder="Usar preço do salão"
                   className="gm-control"
                 />
+                <small>Deixe vazio para acompanhar o preço do salão.</small>
               </Label>
-
-              <Label className="gm-field">
-                Motivo do Ajuste (Auditoria)
-                <Input
-                  value={editingProductReason}
-                  onChange={(e) => setEditingProductReason(e.target.value)}
-                  placeholder="Ex: Reajuste insumos, nova safra..."
-                  className="gm-control catalog-editor-control--audit"
-                />
-              </Label>
-            </div>
+            </fieldset>
+            <Label className="gm-field">
+              Motivo do Ajuste (Auditoria)
+              <Input
+                value={editingProductReason}
+                onChange={(e) => setEditingProductReason(e.target.value)}
+                placeholder="Ex: Reajuste insumos, nova safra..."
+                className="gm-control catalog-editor-control--audit"
+              />
+            </Label>
 
             <Label className="gm-field">
               Descrição & Ingredientes do Prato
@@ -679,6 +684,15 @@ export function CatalogProductEditorModal({
               </Button>
             </div>
           </form>
+          <CatalogInventorySection
+            product={{
+              ...editingProduct,
+              inventory: catalog.products.find((product) => product.id === editingProduct.id)
+                ?.inventory,
+            }}
+            scope={scope}
+            onSaved={onInventorySaved}
+          />
           <CatalogReturnablesSection productId={editingProduct.id} scope={scope} />
         </Modal>
       )}

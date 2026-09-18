@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  counterActionFromHash,
   counterCustomerFromOption,
   counterCustomerOptionValue,
   counterPaymentAttemptIdFromHash,
@@ -20,6 +21,11 @@ describe("atalho para a venda no balcão", () => {
       ),
     ).toBe("attempt-456");
     expect(counterPaymentAttemptIdFromHash("#/counter?tab=tab-123&attempt=attempt-456")).toBeNull();
+  });
+
+  it("lê somente o atalho de nova comanda", () => {
+    expect(counterActionFromHash("#/counter?action=new&tab=tab-123")).toBe("new");
+    expect(counterActionFromHash("#/counter?action=open")).toBeNull();
   });
 });
 

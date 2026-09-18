@@ -6,6 +6,8 @@ import {
 } from "./management.inventory-controls.schemas.js";
 import {
   commissionSchema,
+  inventoryItemSchema,
+  nfeImportReviewSchema,
   overviewPreferencesSchema,
   overviewPriorityActionSchema,
   productReturnableClassificationSchema,
@@ -27,6 +29,21 @@ import {
   timeTrackingClosureSchema,
   timeTrackingSettingsSchema,
 } from "./management.schemas.js";
+
+it("accepts resale inventory before catalog linking and forbids NF-e links for other kinds", () => {
+  const newItem = { name: "Cerveja", kind: "resale", unit: "un" };
+  const line = { lineId: "00000000-0000-4000-8000-000000000002", status: "new", newItem };
+  assert.equal(inventoryItemSchema.safeParse(newItem).success, true);
+  assert.equal(nfeImportReviewSchema.safeParse({ lines: [line] }).success, true);
+  for (const kind of ["ingredient", "prepared", "reusable", "returnable_container"]) {
+    assert.equal(
+      nfeImportReviewSchema.safeParse({
+        lines: [{ ...line, newItem: { ...newItem, kind, productId: line.lineId } }],
+      }).success,
+      false,
+    );
+  }
+});
 
 describe("overview action inputs", () => {
   const occurrenceKey = "a".repeat(64);

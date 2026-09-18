@@ -283,9 +283,18 @@ function ReturnablesReady({
         <StatCard
           title="Cheios equivalentes"
           value={selectedReconciliation.fullEquivalentQuantity}
+          footer="Vasilhames nas bebidas em estoque"
         />
-        <StatCard title="Vazios físicos" value={selectedReconciliation.emptyPhysicalQuantity} />
-        <StatCard title="Pendentes de retorno" value={selectedReconciliation.openCustodyQuantity} />
+        <StatCard
+          title="Vazios físicos"
+          value={selectedReconciliation.emptyPhysicalQuantity}
+          footer="Vasilhames vazios registrados no local"
+        />
+        <StatCard
+          title="Pendentes de retorno"
+          value={selectedReconciliation.openCustodyQuantity}
+          footer="Saídas aguardando devolução"
+        />
         <StatCard title="Com fornecedor" value={selectedReconciliation.supplierInTransitQuantity} />
         <StatCard title="Perdas aprovadas" value={selectedReconciliation.approvedLossQuantity} />
         <StatCard

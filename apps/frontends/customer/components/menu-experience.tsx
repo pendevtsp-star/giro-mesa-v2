@@ -14,6 +14,7 @@ import {
   type Modifier,
   type ModifierGroup,
 } from "../lib/menu";
+import { type OrderPriceChange, readOrderPriceChange } from "../lib/order-price-change";
 import {
   isCommandAccepted,
   type MutationAttempt,
@@ -162,6 +163,9 @@ export function MenuExperience({
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [publicOrderPending, setPublicOrderPending] = useState(false);
   const [publicOrderError, setPublicOrderError] = useState<string>();
+  const [priceChange, setPriceChange] = useState<(OrderPriceChange & { context: string }) | null>(
+    null,
+  );
   const [orderAttempt, setOrderAttempt] = useState<MutationAttempt | null>(null);
   const [orderReceipt, setOrderReceipt] = useState<PublicOrderReceipt | null>(null);
   const [tableOrderAttempt, setTableOrderAttempt] = useState<MutationAttempt | null>(null);
@@ -188,6 +192,22 @@ export function MenuExperience({
   );
   const count = cart.reduce((total, line) => total + line.quantity, 0);
   const pricingFulfillment = orderMode === "table" ? "pickup" : fulfillment;
+  const priceContext = JSON.stringify({
+    cart,
+    orderMode,
+    fulfillment,
+    customerName,
+    customerPhone,
+    deliveryZone,
+    address,
+    privacyAccepted,
+  });
+  const currentPriceChange = priceChange?.context === priceContext ? priceChange : null;
+  // A cart edit invalidates confirmation even if the user later restores the previous contents.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: this resets approval when the request context changes.
+  useEffect(() => {
+    setPriceChange(null);
+  }, [priceContext]);
   const openState = useMemo(
     () =>
       branding?.businessHours && branding.timezone
@@ -663,7 +683,10 @@ export function MenuExperience({
     if (!cart.length || session.status !== "ready" || !session.activeTab) return;
     const apiUrl = apiBase();
     if (!apiUrl || !apiEnabled()) return;
-    const serialized = JSON.stringify({ items: tableOrderLines(cart) });
+    const serialized = JSON.stringify({
+      items: tableOrderLines(cart),
+      expectedTotalCents: currentPriceChange?.totalCents ?? cartTotal(cart),
+    });
     const attempt = resolveMutationAttempt(tableOrderAttempt, serialized, () =>
       crypto.randomUUID(),
     );
@@ -684,6 +707,12 @@ export function MenuExperience({
       );
       const payload = await responsePayload(response);
       const order = readTableOrder(payload);
+      const updatedPrice = response.status === 409 ? readOrderPriceChange(payload) : null;
+      if (updatedPrice) {
+        setPriceChange({ ...updatedPrice, context: priceContext });
+        setTableOrder({ status: "idle" });
+        return;
+      }
       if (!response.ok || !order) {
         if (classifyPublicFailure(response.status) === "session") {
           setSession({ status: "expired" });
@@ -710,7 +739,7 @@ export function MenuExperience({
   }
 
   async function placePublicOrder() {
-    if (!cart.length || orderOptions.status !== "ready") return;
+    if (publicOrderPending || !cart.length || orderOptions.status !== "ready") return;
     if (customerName.trim().length < 2 || customerPhone.trim().length < 10 || !privacyAccepted) {
       setPublicOrderError("Revise os campos obrigatórios antes de confirmar.");
       return;
@@ -718,6 +747,13 @@ export function MenuExperience({
     const apiUrl = apiBase();
     if (!apiUrl || !apiEnabled()) return;
     const body = {
+      expectedTotalCents:
+        currentPriceChange?.totalCents ??
+        cartTotal(cart, fulfillment) +
+          (fulfillment === "delivery"
+            ? (orderOptions.data.deliveryZones.find((zone) => zone.name === deliveryZone)
+                ?.feeCents ?? 0)
+            : 0),
       fulfillment,
       customer: { name: customerName.trim(), phone: customerPhone.trim() },
       items: publicOrderLines(cart),
@@ -755,6 +791,11 @@ export function MenuExperience({
       );
       const payload = await responsePayload(response);
       const receipt = readPublicOrderReceipt(payload);
+      const updatedPrice = response.status === 409 ? readOrderPriceChange(payload) : null;
+      if (updatedPrice) {
+        setPriceChange({ ...updatedPrice, context: priceContext });
+        return;
+      }
       if (!response.ok || !receipt) throw new Error("Pedido sem confirmação persistida");
       setOrderReceipt(receipt);
       setOrderAttempt(null);
@@ -884,6 +925,7 @@ export function MenuExperience({
         onAdd={addToCart}
       />
       <CartDialog
+        priceChange={currentPriceChange}
         dialogRef={cartDialog}
         open={cartOpen}
         cart={cart}

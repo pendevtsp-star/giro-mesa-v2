@@ -48,6 +48,24 @@ export function canTransition<T extends Record<string, readonly string[]>>(
 
 export const marketingOptInAfter = (decision: "granted" | "withdrawn") => decision === "granted";
 
+export function canRetryCrmAutomationFailure(reason: string | null) {
+  return (
+    reason !== null &&
+    [
+      "CUSTOMER_PROVIDER_UNAVAILABLE",
+      "WHATSAPP_CONFIGURATION_INCOMPLETE",
+      "WHATSAPP_CONFIGURATION_INVALID",
+      "WHATSAPP_CREDENTIAL_REFERENCE_INVALID",
+      "WHATSAPP_MEDIA_UNAVAILABLE",
+      "WHATSAPP_PHONE_INVALID",
+      "EVOLUTION_HTTP_400",
+      "EVOLUTION_HTTP_401",
+      "EVOLUTION_HTTP_404",
+      "EVOLUTION_HTTP_503",
+    ].includes(reason)
+  );
+}
+
 export function assertSameOrganization(expected: string, actual: string) {
   if (expected !== actual) throw new Error("CROSS_TENANT_RESOURCE");
 }

@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   campaignCancelSchema,
+  campaignDeliveriesQuerySchema,
   couponUpdateSchema,
   crmAutomationRuleSchema,
+  customerHistoryQuerySchema,
   customerListQuerySchema,
   customerMergeSchema,
   customerUpdateSchema,
@@ -27,6 +29,28 @@ import {
 } from "./growth.schemas.js";
 
 describe("growth API boundaries", () => {
+  it("bounds history and delivery pages without losing cursor microseconds", () => {
+    const cursorAt = "2026-09-17T18:15:30.123456Z";
+    const input = {
+      cursorAt,
+      cursorKind: "whatsapp",
+      cursorId: "f898be18-4f20-4e20-93b3-75468c80646e",
+    };
+    assert.equal(customerHistoryQuerySchema.parse(input).cursorAt, cursorAt);
+    assert.equal(customerHistoryQuerySchema.safeParse({ cursorAt }).success, false);
+    assert.equal(customerHistoryQuerySchema.safeParse({ limit: 101 }).success, false);
+    assert.equal(
+      customerHistoryQuerySchema.safeParse({ ...input, cursorKind: "unknown" }).success,
+      false,
+    );
+    assert.deepEqual(campaignDeliveriesQuerySchema.parse({ limit: "10", offset: "20" }), {
+      limit: 10,
+      offset: 20,
+    });
+    assert.equal(campaignDeliveriesQuerySchema.safeParse({ limit: 201 }).success, false);
+    assert.equal(campaignDeliveriesQuerySchema.safeParse({ offset: -1 }).success, false);
+  });
+
   it("bounds CRM search and requires explicit customer mutations", () => {
     assert.deepEqual(customerListQuerySchema.parse({ q: "  Maria  ", limit: "20" }), {
       q: "Maria",

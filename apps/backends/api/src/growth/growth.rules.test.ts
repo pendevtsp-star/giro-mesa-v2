@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assertSameOrganization,
+  canRetryCrmAutomationFailure,
   canTransition,
   couponDiscount,
   deliveryCoverageStatus,
@@ -15,6 +16,24 @@ import {
 } from "./growth.rules.js";
 
 describe("growth rules", () => {
+  it("only retries automation failures known to precede dispatch", () => {
+    for (const reason of [
+      "EVOLUTION_HTTP_503",
+      "WHATSAPP_MEDIA_UNAVAILABLE",
+      "CUSTOMER_PROVIDER_UNAVAILABLE",
+    ])
+      assert.equal(canRetryCrmAutomationFailure(reason), true);
+    for (const reason of [
+      null,
+      "WHATSAPP_DELIVERY_UNCERTAIN",
+      "EVOLUTION_RESPONSE_INVALID",
+      "EVOLUTION_HTTP_500",
+      "WHATSAPP_DELIVERY_FAILED",
+      "NEW_UNKNOWN_FAILURE",
+    ])
+      assert.equal(canRetryCrmAutomationFailure(reason), false);
+  });
+
   it("enforces reservation, delivery and transfer state machines", () => {
     assert.equal(canTransition(reservationTransitions, "confirmed", "seated"), true);
     assert.equal(canTransition(reservationTransitions, "completed", "booked"), false);

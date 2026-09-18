@@ -35,13 +35,16 @@ import {
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { deliveryCoverageStatus } from "../growth/growth.rules.js";
+import { reserveOrderInventory } from "../pilot-operations/order-inventory.js";
 import {
   isWithinAvailability,
   itemAmounts,
+  projectKdsAvailability,
   replayResult,
   requestHash,
 } from "../pilot-operations/pilot-rules.js";
 import { bestPromotion, localCalendar, localDate } from "./public-order-rules.js";
+import { requireConfirmedPublicTotal } from "./public-order-total.js";
 
 const PUBLIC_ORDER_OPERATION = "public-order.create";
 
@@ -173,7 +176,13 @@ export class PublicOrderService {
           typeof item === "object" && item !== null && typeof item.id === "string" ? [item.id] : [],
         ),
       );
-      const createdItems: Array<{ id: string; stationId: string }> = [];
+      const createdItems: Array<{
+        id: string;
+        stationId: string;
+        productId: string;
+        productName: string;
+        quantity: number;
+      }> = [];
       const ticketIds: string[] = [];
       const preparedItems = [];
       let subtotalCents = 0;
@@ -198,6 +207,11 @@ export class PublicOrderService {
             available: posProductAvailability.available,
             schedule: posProductAvailability.schedule,
             autoDeductStock: posProductAvailability.autoDeductStock,
+            dailyStock: posProductAvailability.dailyStock,
+            soldToday: posProductAvailability.soldToday,
+            stockDate: posProductAvailability.stockDate,
+            resetAt: posProductAvailability.operationalResetAt,
+            reason: posProductAvailability.operationalReason,
             stationId: posProductStations.stationId,
           })
           .from(posProducts)
@@ -233,7 +247,11 @@ export class PublicOrderService {
             ),
           )
           .limit(1);
-        if (!product?.available || !isWithinAvailability(product.schedule, now, menu.timezone)) {
+        if (
+          !product ||
+          !projectKdsAvailability(product, stockDate, now).available ||
+          !isWithinAvailability(product.schedule, now, menu.timezone)
+        ) {
           throw new ConflictException({
             code: "PUBLIC_PRODUCT_UNAVAILABLE",
             message: "Um item não está disponível neste horário.",
@@ -422,6 +440,7 @@ export class PublicOrderService {
       if (!Number.isSafeInteger(totalCents)) {
         throw new BadRequestException({ code: "PUBLIC_ORDER_TOTAL_INVALID" });
       }
+      requireConfirmedPublicTotal(input.expectedTotalCents, subtotalCents, deliveryFeeCents);
       const protocol = this.protocol();
       const [tab] = await tx
         .insert(posTabs)
@@ -445,7 +464,7 @@ export class PublicOrderService {
           tabId: tab.id,
           createdByIdentityId: actorIdentityId,
           status: "sent",
-          sentAt: new Date(),
+          sentAt: now,
         })
         .returning({ id: posOrders.id });
       if (!order) throw new Error("PUBLIC_ORDER_INSERT_FAILED");
@@ -470,7 +489,13 @@ export class PublicOrderService {
           })
           .returning({ id: posOrderItems.id });
         if (!created) throw new Error("PUBLIC_ORDER_ITEM_INSERT_FAILED");
-        createdItems.push({ id: created.id, stationId: prepared.product.stationId });
+        createdItems.push({
+          id: created.id,
+          stationId: prepared.product.stationId,
+          productId: prepared.product.id,
+          productName: prepared.product.name,
+          quantity: prepared.input.quantity,
+        });
         if (prepared.options.length > 0) {
           await tx.insert(posOrderItemModifiers).values(
             prepared.options.map((option) => ({
@@ -592,6 +617,16 @@ export class PublicOrderService {
           policyVersion: input.policyVersion,
           promotionIds: [...promotionIds],
         },
+      });
+      // The same reservation protects availability; internal shortages never require a customer decision.
+      await reserveOrderInventory(tx, {
+        organizationId: menu.organizationId,
+        unitId: menu.unitId,
+        identityId: actorIdentityId,
+        orderId: order.id,
+        sentAt: now,
+        source: "public_menu",
+        items: createdItems,
       });
       await tx.insert(outboxEvents).values({
         topic: "pos.order.sent",

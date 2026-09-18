@@ -377,8 +377,8 @@ export const managementInventoryItems = pgTable(
     }).onDelete("restrict"),
     check("management_inventory_items_minimum_check", sql`${table.minimumQuantity} >= 0`),
     check(
-      "management_inventory_items_kind_product_check",
-      sql`(${table.kind} = 'resale' and ${table.productId} is not null) or (${table.kind} <> 'resale' and ${table.productId} is null)`,
+      "management_inventory_items_optional_resale_product_check",
+      sql`${table.kind} = 'resale' or ${table.productId} is null`,
     ),
     check(
       "management_inventory_items_purchase_factor_check",

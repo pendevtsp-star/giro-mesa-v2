@@ -3,17 +3,26 @@ import { randomInt, randomUUID } from "node:crypto";
 import { it } from "node:test";
 import type { PublicOrderInput } from "@giromesa/contracts";
 import {
+  auditEvents,
   deliveryOrders,
   deliveryZones,
   identities,
+  managementInventoryItems,
+  managementInventoryReservations,
+  managementProductReturnables,
+  managementStockBalances,
+  managementStockLocations,
   organizations,
   outboxEvents,
   posCatalogCategories,
   posCatalogPromotions,
   posKdsTickets,
+  posModifierGroups,
+  posModifierOptions,
   posOrders,
   posProductAvailability,
   posProductionStations,
+  posProductModifierGroups,
   posProductPrices,
   posProductStations,
   posProducts,
@@ -23,6 +32,7 @@ import {
 } from "@giromesa/db";
 import { and, count, eq } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { PublicMenuService } from "./public-menu.service.js";
 import { PublicOrderService } from "./public-order.service.js";
 import { localDate } from "./public-order-rules.js";
 
@@ -131,6 +141,59 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       ])
       .returning();
     assert.ok(productA && productB);
+    const [container] = await database.db
+      .insert(managementInventoryItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        name: "Embalagem retornável",
+        kind: "returnable_container",
+        unit: "un",
+      })
+      .returning();
+    assert.ok(container);
+    const [returnable] = await database.db
+      .insert(managementProductReturnables)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        productId: productA.id,
+        containerInventoryItemId: container.id,
+        quantityPerUnit: "1.000",
+        depositCents: 500,
+      })
+      .returning();
+    assert.ok(returnable);
+    await database.db.insert(posProducts).values({
+      organizationId: organizationA.id,
+      categoryId: categoryA.id,
+      name: "Produto ainda não publicado",
+    });
+    const [modifierGroup] = await database.db
+      .insert(posModifierGroups)
+      .values({
+        organizationId: organizationA.id,
+        name: "Adicionais",
+        minimumSelections: 0,
+        maximumSelections: 1,
+      })
+      .returning();
+    assert.ok(modifierGroup);
+    const [modifier] = await database.db
+      .insert(posModifierOptions)
+      .values({
+        organizationId: organizationA.id,
+        groupId: modifierGroup.id,
+        name: "Queijo",
+        priceDeltaCents: 300,
+      })
+      .returning();
+    assert.ok(modifier);
+    await database.db.insert(posProductModifierGroups).values({
+      organizationId: organizationA.id,
+      productId: productA.id,
+      groupId: modifierGroup.id,
+    });
     await database.db.insert(posProductPrices).values([
       {
         organizationId: organizationA.id,
@@ -183,7 +246,18 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       organizationId: organizationA.id,
       unitId: unitA.id,
       slug,
-      items: [{ id: productA.id, name: productA.name, priceCents: 1 }],
+      items: [
+        {
+          id: productA.id,
+          name: productA.name,
+          category: "Pratos",
+          description: "",
+          visual: "🍽️",
+          available: true,
+          priceCents: 1,
+          costCents: 999,
+        },
+      ],
       active: true,
       publishedAt: new Date(),
     });
@@ -208,6 +282,29 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       active: true,
     });
 
+    const [stockLocation] = await database.db
+      .insert(managementStockLocations)
+      .values({ organizationId: organizationA.id, unitId: unitA.id, name: "Bar", code: "bar" })
+      .returning();
+    const [stockItem] = await database.db
+      .insert(managementInventoryItems)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        productId: productA.id,
+        kind: "resale",
+        name: productA.name,
+        unit: "un",
+      })
+      .returning();
+    assert.ok(stockLocation && stockItem);
+    await database.db.insert(managementStockBalances).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      inventoryItemId: stockItem.id,
+      locationId: stockLocation.id,
+      quantity: "0.000",
+    });
     const options = await service.options(slug);
     assert.deepEqual(options.fulfillment, { pickup: true, delivery: true });
     assert.deepEqual(options.deliveryZones, [
@@ -223,6 +320,7 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
     assert.equal("id" in publicZone, false);
 
     const pickupInput: PublicOrderInput = {
+      expectedTotalCents: 4_000,
       fulfillment: "pickup",
       customer: { name: "Ana Cliente", phone: "+5511999999999" },
       items: [{ productId: productA.id, quantity: 2, modifierOptionIds: [] }],
@@ -231,6 +329,69 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       policyVersion: "2026-08-public-orders",
     };
     const pickupKey = `pickup-${suffix}`;
+    const menuService = new PublicMenuService(database);
+    const liveMenu = await menuService.menu(slug);
+    assert.equal(liveMenu.items.length, 1);
+    assert.equal(liveMenu.items[0]?.priceCents, 2_500);
+    assert.equal(liveMenu.items[0]?.deliveryPriceCents, 3_000);
+    assert.equal(liveMenu.items[0]?.available, true, "yesterday's daily sales do not pause today");
+    assert.equal("costCents" in (liveMenu.items[0] ?? {}), false);
+    assert.equal("dailyStock" in (liveMenu.items[0] ?? {}), false);
+    assert.deepEqual(liveMenu.items[0]?.modifierGroups, [
+      {
+        id: modifierGroup.id,
+        name: "Adicionais",
+        required: false,
+        maxSelections: 1,
+        options: [{ id: modifier.id, name: "Queijo", priceCents: 300 }],
+      },
+    ]);
+    await database.db
+      .update(posProductAvailability)
+      .set({ available: false })
+      .where(eq(posProductAvailability.productId, productA.id));
+    assert.equal((await menuService.menu(slug)).items[0]?.available, false);
+    await database.db
+      .update(posProductAvailability)
+      .set({ operationalResetAt: new Date(Date.now() - 60_000) })
+      .where(eq(posProductAvailability.productId, productA.id));
+    assert.equal(
+      (await menuService.menu(slug)).items[0]?.available,
+      true,
+      "an expired operational pause is lifted consistently in menu and checkout",
+    );
+    for (const expectedTotalCents of [undefined, 5_000]) {
+      await assert.rejects(
+        service.place(slug, `stale-${suffix}-${expectedTotalCents}`, {
+          ...pickupInput,
+          expectedTotalCents,
+        }),
+        (error: unknown) => {
+          assert.equal(hasCode("PUBLIC_ORDER_PRICE_CHANGED")(error), true);
+          assert.equal(
+            (error as { getResponse(): { totalCents: number } }).getResponse().totalCents,
+            4_000,
+          );
+          return true;
+        },
+      );
+    }
+    assert.equal(await scopedCount(database, posTabs, organizationA.id), 0);
+    assert.equal(await scopedCount(database, posOrders, organizationA.id), 0);
+    await assert.rejects(
+      service.place(slug, `modifier-stale-${suffix}`, {
+        ...pickupInput,
+        items: [{ productId: productA.id, quantity: 2, modifierOptionIds: [modifier.id] }],
+      }),
+      (error: unknown) => {
+        assert.equal(hasCode("PUBLIC_ORDER_PRICE_CHANGED")(error), true);
+        assert.equal(
+          (error as { getResponse(): { totalCents: number } }).getResponse().totalCents,
+          4_600,
+        );
+        return true;
+      },
+    );
     const pickup = await service.place(slug, pickupKey, pickupInput);
     assert.match(pickup.protocol, /^GM-\d{8}-[A-F0-9]{10}$/);
     assert.deepEqual(
@@ -254,9 +415,18 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
     assert.equal("orderId" in pickup, false);
     assert.equal("tabId" in pickup, false);
 
+    await database.db
+      .update(posProductPrices)
+      .set({ priceCents: 4_000 })
+      .where(eq(posProductPrices.productId, productA.id));
     const replay = await service.place(slug, pickupKey, pickupInput);
     assert.equal(replay.protocol, pickup.protocol);
     assert.equal(replay.idempotentReplay, true);
+    assert.equal(replay.totalCents, 4_000, "an accepted attempt replays its original total");
+    await database.db
+      .update(posProductPrices)
+      .set({ priceCents: 2_500 })
+      .where(eq(posProductPrices.productId, productA.id));
     const stock = async () =>
       database.db
         .select({
@@ -286,8 +456,13 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
     );
 
     const deliveryPlacedAt = Date.now();
-    const delivery = await service.place(slug, `delivery-${suffix}`, {
+    await database.db
+      .update(deliveryZones)
+      .set({ feeCents: 900 })
+      .where(eq(deliveryZones.unitId, unitA.id));
+    const deliveryInput: PublicOrderInput = {
       ...pickupInput,
+      expectedTotalCents: 6_900,
       fulfillment: "delivery",
       deliveryZone: "Centro",
       address: {
@@ -299,10 +474,23 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
         state: "SP",
         postalCode: "01001-000",
       },
-    });
-    assert.equal(delivery.deliveryFeeCents, 700);
+    };
+    await assert.rejects(
+      service.place(slug, `delivery-stale-${suffix}`, {
+        ...deliveryInput,
+        expectedTotalCents: 6_700,
+      }),
+      hasCode("PUBLIC_ORDER_PRICE_CHANGED"),
+    );
+    assert.equal(
+      (await stock())?.soldToday,
+      2,
+      "a changed fee or total rolls daily reservation back",
+    );
+    const delivery = await service.place(slug, `delivery-${suffix}`, deliveryInput);
+    assert.equal(delivery.deliveryFeeCents, 900);
     assert.equal(delivery.subtotalCents, 6_000);
-    assert.equal(delivery.totalCents, 6_700);
+    assert.equal(delivery.totalCents, 6_900);
     assert.equal((await stock())?.soldToday, 4);
     await assert.rejects(
       () =>
@@ -346,6 +534,49 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       .limit(1);
     assert.ok(deliveryPosOrder);
     assert.equal(deliveryPosOrder.status, "sent");
+    const [inventoryReview] = await database.db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.organizationId, organizationA.id),
+          eq(auditEvents.unitId, unitA.id),
+          eq(auditEvents.entityId, deliveryPosOrder.id),
+          eq(auditEvents.action, "management.inventory.order-reviewed"),
+        ),
+      );
+    assert.equal(inventoryReview?.metadata.source, "public_menu");
+    assert.equal(inventoryReview?.metadata.shortageAcknowledged, false);
+    assert.deepEqual(inventoryReview?.metadata.returnables, {
+      mappings: [
+        {
+          id: returnable.id,
+          productId: productA.id,
+          containerInventoryItemId: container.id,
+          quantityPerUnit: "1.000",
+          depositCents: 500,
+        },
+      ],
+      defaultDueDays: 7,
+    });
+    assert.deepEqual(inventoryReview?.metadata.shortages, [
+      {
+        inventoryItemId: stockItem.id,
+        locationId: stockLocation.id,
+        productIds: [productA.id],
+        availableQuantity: "0.000",
+        requiredQuantity: "2.000",
+      },
+    ]);
+    const publicReservations = await database.db
+      .select()
+      .from(managementInventoryReservations)
+      .where(eq(managementInventoryReservations.sourceId, deliveryPosOrder.id));
+    assert.equal(publicReservations.length, 1);
+    assert.equal(publicReservations[0]?.quantity, "2.000");
+    assert.equal("inventoryReview" in delivery, false);
+    assert.equal("returnables" in delivery, false);
+    assert.equal("stock" in delivery, false);
     const ticketRows = await database.db
       .select({ id: posKdsTickets.id })
       .from(posKdsTickets)

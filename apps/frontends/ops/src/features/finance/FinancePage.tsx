@@ -406,7 +406,11 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               </Card>
             </section>
 
-            <div className="finance-tabs" role="tablist" aria-label="Áreas do financeiro">
+            <div
+              className="finance-tabs gm-segmented-control"
+              role="tablist"
+              aria-label="Áreas do financeiro"
+            >
               {(
                 [
                   ["agenda", "Agenda"],
@@ -417,6 +421,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
               ).map(([value, label]) => (
                 <button
                   aria-selected={tab === value}
+                  className={`gm-segmented-control__item ${tab === value ? "gm-segmented-control__item--active" : ""}`}
                   key={value}
                   onClick={() => setTab(value)}
                   role="tab"

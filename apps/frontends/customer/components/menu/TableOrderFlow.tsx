@@ -1,6 +1,7 @@
 import { Button } from "@giromesa/ui";
 import type { FormEvent } from "react";
 import { type CartItem, cartTotal, formatMoney } from "../../lib/menu";
+import type { OrderPriceChange } from "../../lib/order-price-change";
 import type { TableOrder } from "../../lib/table-session";
 
 export type TableOrderState =
@@ -42,10 +43,12 @@ const orderStatus: Record<TableOrder["status"], { title: string; copy: string; t
 };
 
 export function TableOrderFlow({
+  priceChange,
   cart,
   state,
   onPlace,
 }: {
+  priceChange: OrderPriceChange | null;
   cart: CartItem[];
   state: TableOrderState;
   onPlace: () => void;
@@ -118,15 +121,26 @@ export function TableOrderFlow({
         </p>
       )}
       <div className="cart-summary checkout-total">
-        <span>Total estimado</span>
-        <strong>{formatMoney(cartTotal(cart))}</strong>
+        <span>{priceChange ? "Total atualizado" : "Total estimado"}</span>
+        <strong>{formatMoney(priceChange?.totalCents ?? cartTotal(cart))}</strong>
       </div>
+      {priceChange && (
+        <p className="checkout-state checkout-state-warning" role="alert">
+          Preços ou descontos mudaram. O pedido ainda não foi enviado. Confira o novo total antes de
+          confirmar. Estimativa anterior: {formatMoney(cartTotal(cart))}. Novo total:{" "}
+          {formatMoney(priceChange.totalCents)}.
+        </p>
+      )}
       <Button
         className="place-order"
         type="submit"
         disabled={!cart.length || state.status === "submitting"}
       >
-        {state.status === "submitting" ? "Enviando para a equipe…" : "Solicitar confirmação"}
+        {state.status === "submitting"
+          ? "Enviando para a equipe…"
+          : priceChange
+            ? `Confirmar novo total de ${formatMoney(priceChange.totalCents)}`
+            : "Solicitar confirmação"}
       </Button>
     </form>
   );

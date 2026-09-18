@@ -74,7 +74,6 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
         public UnitConfigPutRequestBody()
         {
             AdditionalData = new Dictionary<string, object>();
-            AutoDeductStock = false;
         }
         /// <summary>
         /// Creates a new instance of the appropriate class based on discriminator value

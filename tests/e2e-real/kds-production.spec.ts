@@ -26,7 +26,7 @@ async function mockKdsApi(page: Page) {
         status: "ok",
         version: "2.0.0",
         buildSha: "kds-e2e",
-        schemaVersion: 82,
+        schemaVersion: 84,
         database: "up",
         integrations: {},
         capabilities: [

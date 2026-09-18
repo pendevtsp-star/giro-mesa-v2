@@ -101,6 +101,35 @@ export const customerListQuerySchema = z
   .strict();
 export type CustomerListQueryInput = z.infer<typeof customerListQuerySchema>;
 
+export const customerHistoryKindSchema = z.enum([
+  "service",
+  "reservation",
+  "waitlist",
+  "delivery",
+  "campaign",
+  "coupon",
+  "whatsapp",
+  "loyalty",
+]);
+export const customerHistoryQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(30),
+    cursorAt: z.string().datetime({ offset: true }).optional(),
+    cursorKind: customerHistoryKindSchema.optional(),
+    cursorId: id.optional(),
+  })
+  .strict()
+  .refine(
+    (value) => {
+      const provided = [value.cursorAt, value.cursorKind, value.cursorId].filter(
+        (entry) => entry !== undefined,
+      ).length;
+      return provided === 0 || provided === 3;
+    },
+    { message: "Informe o cursor completo do histórico." },
+  );
+export type CustomerHistoryQueryInput = z.infer<typeof customerHistoryQuerySchema>;
+
 export const customerUpdateSchema = customerSchema
   .partial()
   .extend({ tags: customerTags.optional() })
@@ -254,6 +283,14 @@ export const campaignCancelSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 export type CampaignCancelInput = z.infer<typeof campaignCancelSchema>;
+
+export const campaignDeliveriesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).max(1_000_000).default(0),
+  })
+  .strict();
+export type CampaignDeliveriesQueryInput = z.infer<typeof campaignDeliveriesQuerySchema>;
 
 export const reservationSchema = z
   .object({

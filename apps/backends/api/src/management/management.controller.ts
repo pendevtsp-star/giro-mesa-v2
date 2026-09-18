@@ -1095,6 +1095,23 @@ export class ManagementController {
     );
   }
 
+  @Post("inventory/recipes/:productId/deactivate")
+  deactivateRecipe(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("productId", ParseUUIDPipe) productId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+  ) {
+    return this.management.deactivateRecipe(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      productId,
+      idempotencyKey,
+    );
+  }
+
   @Get("suppliers")
   suppliers(
     @Req() request: AuthenticatedRequest,

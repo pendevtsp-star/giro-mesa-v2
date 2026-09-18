@@ -256,7 +256,7 @@ export function InvoiceImportModal({
                 : {
                     name: line.description,
                     kind: line.kind,
-                    productId: line.kind === "resale" ? line.productId : undefined,
+                    productId: line.kind === "resale" ? line.productId || undefined : undefined,
                     unit: line.stockUnit,
                     sku: line.supplierProductCode || undefined,
                     barcode: line.gtin || undefined,
@@ -308,10 +308,7 @@ export function InvoiceImportModal({
     (line) =>
       line.status !== "ignored" &&
       !line.inventoryItemId &&
-      (!line.description ||
-        !line.stockUnit ||
-        Number(line.factor) <= 0 ||
-        (line.kind === "resale" && !line.productId)),
+      (!line.description || !line.stockUnit || Number(line.factor) <= 0),
   );
   const linesTotal = draft?.lines.reduce((sum, line) => sum + line.totalCents, 0) ?? 0;
   const divergence = draft ? draft.totalCents - linesTotal : 0;
@@ -468,10 +465,9 @@ export function InvoiceImportModal({
                               onChange={(event) =>
                                 patchLine(line.id, { productId: event.target.value })
                               }
-                              required
                               value={line.productId}
                             >
-                              <option value="">Selecione</option>
+                              <option value="">Vincular depois no Cardápio</option>
                               {products
                                 .filter((product) => product.active)
                                 .map((product) => (

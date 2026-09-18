@@ -12,12 +12,6 @@ Directory-based community: apps/backends
 
 | Name | Kind | File | Lines |
 |------|------|------|-------|
-| test:exposes OpenAPI only outside production@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.test.ts | 5-9 |
-| test:boots the complete Nest application graph@L11 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.test.ts | 11-21 |
-| shouldExposeOpenApi | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 21-22 |
-| createApplication | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 24-118 |
-| document | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 89-89 |
-| realtimeHandler | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app-factory.ts | 94-109 |
 | AppModule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/app.module.ts | 39-39 |
 | it:keeps opaque browser session tokens confined to the HttpOnly cookie@L7 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.test.ts | 7-56 |
 | AuthController | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.controller.ts | 59-334 |
@@ -62,8 +56,14 @@ Directory-based community: apps/backends
 | authenticate | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 506-527 |
 | verifyStepUp | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 529-591 |
 | revoke | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 593-605 |
+| assertCanEndOperation | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 607-636 |
+| me | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 638-676 |
+| requestPasswordReset | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 678-710 |
+| confirmPasswordReset | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 712-775 |
+| consumeComparablePasswordWork | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 777-780 |
+| beginIdentitySession | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 782-834 |
 
-*... and 2358 more members.*
+*... and 1977 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (1608 edge(s))
-- `equal` (984 edge(s))
-- `where` (882 edge(s))
-- `from` (687 edge(s))
-- `values` (604 edge(s))
-- `select` (580 edge(s))
-- `insert` (562 edge(s))
-- `and` (506 edge(s))
-- `Param` (408 edge(s))
-- `ParseUUIDPipe` (389 edge(s))
-- `returning` (344 edge(s))
-- `limit` (317 edge(s))
-- `ok` (304 edge(s))
-- `map` (282 edge(s))
-- `update` (221 edge(s))
+- `eq` (1174 edge(s))
+- `equal` (694 edge(s))
+- `where` (670 edge(s))
+- `from` (524 edge(s))
+- `values` (467 edge(s))
+- `insert` (431 edge(s))
+- `select` (422 edge(s))
+- `and` (345 edge(s))
+- `Param` (277 edge(s))
+- `returning` (271 edge(s))
+- `ParseUUIDPipe` (271 edge(s))
+- `limit` (251 edge(s))
+- `ok` (226 edge(s))
+- `map` (218 edge(s))
+- `Equal` (198 edge(s))
 
 ### Incoming
 
-- `equal` (979 edge(s))
-- `ok` (299 edge(s))
-- `values` (291 edge(s))
-- `insert` (291 edge(s))
-- `eq` (287 edge(s))
-- `where` (234 edge(s))
-- `returning` (206 edge(s))
-- `deepEqual` (204 edge(s))
-- `randomUUID` (203 edge(s))
-- `safeParse` (169 edge(s))
-- `from` (162 edge(s))
-- `select` (141 edge(s))
-- `rejects` (95 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-pos.controller.ts` (93 edge(s))
-- `delete` (75 edge(s))
+- `equal` (690 edge(s))
+- `values` (229 edge(s))
+- `insert` (229 edge(s))
+- `ok` (221 edge(s))
+- `eq` (197 edge(s))
+- `where` (177 edge(s))
+- `returning` (166 edge(s))
+- `deepEqual` (163 edge(s))
+- `randomUUID` (123 edge(s))
+- `from` (121 edge(s))
+- `select` (100 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-pos.controller.ts` (94 edge(s))
+- `rejects` (74 edge(s))
+- `safeParse` (73 edge(s))
+- `delete` (67 edge(s))

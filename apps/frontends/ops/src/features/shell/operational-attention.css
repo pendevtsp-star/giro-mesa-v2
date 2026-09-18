@@ -17,19 +17,34 @@
 .operational-attention-inbox,
 .operational-attention-list {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--gm-space-3);
+  min-width: 0;
+}
+
+.operational-attention-inbox {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.operational-attention-description {
+  margin: 0;
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
 }
 
 .operational-attention-summary,
 .operational-attention-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--gm-space-2);
 }
 
 .operational-attention-actions {
-  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 100%;
   justify-content: flex-end;
 }
 

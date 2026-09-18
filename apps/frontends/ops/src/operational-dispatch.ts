@@ -363,7 +363,13 @@ async function performPilotMutation(
         id,
       );
     case "send-order":
-      return api.pilot.sendOrder(scope.organizationId, scope.unitId, String(data.orderId), id);
+      return api.pilot.sendOrder(
+        scope.organizationId,
+        scope.unitId,
+        String(data.orderId),
+        id,
+        data.acknowledgeInventoryShortage === true,
+      );
     case "transfer-tab":
       return api.pilot.transferTab(
         scope.organizationId,

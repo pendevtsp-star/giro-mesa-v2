@@ -17577,6 +17577,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "expectedTotalCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "fulfillment": {
                     "type": "string",
                     "enum": [
@@ -17770,6 +17775,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "expectedTotalCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "fulfillment": {
                     "type": "string",
                     "enum": [
@@ -18794,6 +18804,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "expectedTotalCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "items": {
                     "minItems": 1,
                     "maxItems": 50,
@@ -18965,6 +18980,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "expectedTotalCents": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "items": {
                     "minItems": 1,
                     "maxItems": 50,
@@ -20936,6 +20956,11 @@
                         "maximum": 8
                       }
                     }
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   }
                 },
                 "required": [
@@ -21347,6 +21372,11 @@
                         "maximum": 8
                       }
                     }
+                  },
+                  "inventoryItemId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   }
                 },
                 "required": [
@@ -21527,7 +21557,6 @@
                     ]
                   },
                   "autoDeductStock": {
-                    "default": false,
                     "type": "boolean"
                   }
                 },
@@ -21708,7 +21737,6 @@
                     ]
                   },
                   "autoDeductStock": {
-                    "default": false,
                     "type": "boolean"
                   }
                 },
@@ -43174,6 +43202,23 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "acknowledgeInventoryShortage": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -43221,6 +43266,23 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "acknowledgeInventoryShortage": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -90439,6 +90501,100 @@
         }
       }
     },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/recipes/{productId}/deactivate": {
+      "post": {
+        "operationId": "ManagementController_deactivateRecipe[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Management"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/recipes/{productId}/deactivate": {
+      "post": {
+        "operationId": "ManagementController_deactivateRecipe[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Management"
+        ]
+      }
+    },
     "/api/v1/organizations/{organizationId}/units/{unitId}/management/suppliers": {
       "get": {
         "operationId": "ManagementController_suppliers[0]",
@@ -113997,6 +114153,162 @@
         }
       }
     },
+    "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/history": {
+      "get": {
+        "operationId": "GrowthController_customerHistory[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursorKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "service",
+                "reservation",
+                "waitlist",
+                "delivery",
+                "campaign",
+                "coupon",
+                "whatsapp",
+                "loyalty"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursorAt",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ]
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/customers/{customerId}/history": {
+      "get": {
+        "operationId": "GrowthController_customerHistory[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursorId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursorKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "service",
+                "reservation",
+                "waitlist",
+                "delivery",
+                "campaign",
+                "coupon",
+                "whatsapp",
+                "loyalty"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursorAt",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ]
+      }
+    },
     "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/archive": {
       "post": {
         "operationId": "GrowthController_archiveCustomer[0]",
@@ -116602,6 +116914,28 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
+            }
           }
         ],
         "responses": {
@@ -116632,6 +116966,28 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 100
             }
           }
         ],

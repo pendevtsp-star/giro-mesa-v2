@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0083_linked_service_accounts",
+  "requiredAppliedMigration": "0084_inventory_resale_before_catalog",
   "transitions": [],
   "fullRestore": {
     "required": true,

@@ -78,6 +78,7 @@
 
 .catalog-product-card__header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
@@ -101,11 +102,43 @@
   margin: 0;
 }
 
-.catalog-product-card__price {
-  font-weight: 800;
-  font-size: 1.15rem;
-  color: var(--gm-brand);
+.catalog-product-prices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gm-space-3);
+  min-width: 0;
+  margin: 0;
+}
+
+.catalog-product-card__header > .catalog-product-prices {
+  flex: 0 1 17rem;
+}
+
+.catalog-product-prices > :where(div + div) {
+  padding-left: var(--gm-space-3);
+  border-left: 1px solid var(--gm-border);
+}
+
+.catalog-product-prices dt,
+.catalog-price-note {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-xs);
+  font-weight: 400;
+}
+
+.catalog-product-prices dd {
+  margin: var(--gm-space-1) 0 0;
+  color: var(--gm-ink);
+  font-size: var(--gm-font-base);
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.catalog-price-note {
+  display: block;
+  margin-top: var(--gm-space-1);
+  white-space: normal;
 }
 
 .catalog-products-category,
@@ -116,6 +149,7 @@
 
 .catalog-product-card__main {
   display: flex;
+  flex: 1 1 240px;
   align-items: flex-start;
   gap: 12px;
 }
@@ -222,11 +256,6 @@
 .catalog-product-grid__heading h3 {
   color: var(--gm-ink);
   font-size: 0.95rem;
-}
-
-.catalog-product-grid__heading strong {
-  color: var(--gm-brand);
-  white-space: nowrap;
 }
 
 .catalog-product-grid__content p {
@@ -564,6 +593,7 @@
   justify-content: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
   padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -572,6 +602,7 @@
   font: inherit;
   font-size: 0.82rem;
   font-weight: 650;
+  white-space: normal;
   cursor: pointer;
 }
 
@@ -1230,6 +1261,10 @@
 }
 
 @media (max-width: 760px) {
+  .catalog-product-card__header > .catalog-product-prices {
+    flex-basis: 100%;
+  }
+
   .catalog-management-header__actions {
     flex-wrap: wrap;
     justify-content: flex-start;

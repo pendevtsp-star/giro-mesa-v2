@@ -10468,6 +10468,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/management/inventory/recipes/{productId}/deactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_deactivateRecipe[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/management/inventory/recipes/{productId}/deactivate": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["ManagementController_deactivateRecipe[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/management/suppliers": {
     parameters: {
       query?: never;
@@ -14850,6 +14882,38 @@ export interface paths {
     options?: never;
     head?: never;
     patch: operations["GrowthController_updateCustomer[1]"];
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_customerHistory[0]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/customers/{customerId}/history": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_customerHistory[1]"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   "/api/v1/organizations/{organizationId}/growth/customers/{customerId}/archive": {
@@ -24838,6 +24902,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedTotalCents?: number;
           /** @enum {string} */
           fulfillment: "pickup" | "delivery";
           customer: {
@@ -24894,6 +24959,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedTotalCents?: number;
           /** @enum {string} */
           fulfillment: "pickup" | "delivery";
           customer: {
@@ -25244,6 +25310,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedTotalCents?: number;
           items: {
             /** Format: uuid */
             productId: string;
@@ -25296,6 +25363,7 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": {
+          expectedTotalCents?: number;
           items: {
             /** Format: uuid */
             productId: string;
@@ -26020,6 +26088,8 @@ export interface operations {
             cest?: string;
             origin?: number;
           };
+          /** Format: uuid */
+          inventoryItemId?: string;
         };
       };
     };
@@ -26112,6 +26182,8 @@ export interface operations {
             cest?: string;
             origin?: number;
           };
+          /** Format: uuid */
+          inventoryItemId?: string;
         };
       };
     };
@@ -26156,7 +26228,6 @@ export interface operations {
             stage: number;
           }[];
           dailyStock?: number | null;
-          /** @default false */
           autoDeductStock?: boolean;
         };
       };
@@ -26202,7 +26273,6 @@ export interface operations {
             stage: number;
           }[];
           dailyStock?: number | null;
-          /** @default false */
           autoDeductStock?: boolean;
         };
       };
@@ -33747,7 +33817,13 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgeInventoryShortage?: boolean;
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -33770,7 +33846,13 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": {
+          acknowledgeInventoryShortage?: boolean;
+        };
+      };
+    };
     responses: {
       201: {
         headers: {
@@ -48610,6 +48692,52 @@ export interface operations {
       };
     };
   };
+  "ManagementController_deactivateRecipe[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "ManagementController_deactivateRecipe[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        productId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "ManagementController_suppliers[0]": {
     parameters: {
       query?: never;
@@ -58748,6 +58876,72 @@ export interface operations {
       };
     };
   };
+  "GrowthController_customerHistory[0]": {
+    parameters: {
+      query?: {
+        cursorId?: string;
+        cursorKind?:
+          | "service"
+          | "reservation"
+          | "waitlist"
+          | "delivery"
+          | "campaign"
+          | "coupon"
+          | "whatsapp"
+          | "loyalty";
+        cursorAt?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_customerHistory[1]": {
+    parameters: {
+      query?: {
+        cursorId?: string;
+        cursorKind?:
+          | "service"
+          | "reservation"
+          | "waitlist"
+          | "delivery"
+          | "campaign"
+          | "coupon"
+          | "whatsapp"
+          | "loyalty";
+        cursorAt?: string;
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "GrowthController_archiveCustomer[0]": {
     parameters: {
       query?: never;
@@ -59902,7 +60096,10 @@ export interface operations {
   };
   "GrowthController_campaignDeliveries[0]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+      };
       header?: never;
       path: {
         organizationId: string;
@@ -59922,7 +60119,10 @@ export interface operations {
   };
   "GrowthController_campaignDeliveries[1]": {
     parameters: {
-      query?: never;
+      query?: {
+        offset?: number;
+        limit?: number;
+      };
       header?: never;
       path: {
         organizationId: string;

@@ -27,6 +27,19 @@ export function remoteStateAfterFailure<T>(state: RemoteState<T>, message: strin
   return state.status === "ready" ? state : { status: "error", message };
 }
 
+export interface CatalogInventoryProduct {
+  productId: string;
+  inventoryItemId: string | null;
+  itemName: string | null;
+  stockUnit: string | null;
+  physicalQuantity: number | null;
+  availableQuantity: number | null;
+  estimatedCostCents: number | null;
+  costSource: "inventory" | "recipe" | null;
+  recipeVersion: number | null;
+  componentCount: number;
+}
+
 export interface CatalogProduct {
   id: string;
   categoryId: string;
@@ -57,6 +70,7 @@ export interface CatalogProduct {
   productType?: "prepared" | "resale";
   eanBarcode?: string | null;
   currentStockUnits?: number | null;
+  inventory?: CatalogInventoryProduct;
   minStockAlert?: number | null;
   autoDeductStock?: boolean;
   available: boolean;
@@ -189,6 +203,7 @@ export interface PilotCatalogCategory {
 }
 
 export interface PilotCatalog {
+  canManage?: boolean;
   categories: Array<PilotCatalogCategory>;
   stations: Array<{ id: string; name: string }>;
   allergens: Allergen[];
@@ -1052,8 +1067,31 @@ export function parsePilotCatalog(value: unknown): PilotCatalog {
     records(payload.categoryUnitConfigs ?? []).map((row) => [text(row.categoryId), row]),
   );
   const branding = payload.branding == null ? null : record(payload.branding);
+  const canManage = bool(record(payload.capabilities ?? {}).canManage ?? false);
+  const inventoryProducts = new Map<string, CatalogInventoryProduct>(
+    (canManage ? records(payload.inventoryProducts ?? []) : []).map((row) => {
+      const productId = text(row.productId);
+      return [
+        productId,
+        {
+          productId,
+          inventoryItemId: optionalText(row.inventoryItemId),
+          itemName: optionalText(row.itemName),
+          stockUnit: optionalText(row.stockUnit),
+          physicalQuantity: optionalNumber(row.physicalQuantity),
+          availableQuantity: optionalNumber(row.availableQuantity),
+          estimatedCostCents: optionalNumber(row.estimatedCostCents),
+          costSource:
+            row.costSource === "inventory" || row.costSource === "recipe" ? row.costSource : null,
+          recipeVersion: optionalNumber(row.recipeVersion),
+          componentCount: number(row.componentCount),
+        },
+      ];
+    }),
+  );
 
   return {
+    canManage,
     categories: records(payload.categories)
       .filter((row) => bool(row.active))
       .sort(
@@ -1116,7 +1154,7 @@ export function parsePilotCatalog(value: unknown): PilotCatalog {
           stationRouting: productStationRouting.get(id) ?? [],
           priceCents: price ? number(price.priceCents) : 0,
           deliveryPriceCents: price ? optionalNumber(price.deliveryPriceCents) : null,
-          costCents: price ? optionalNumber(price.costCents) : null,
+          costCents: canManage && price ? optionalNumber(price.costCents) : null,
           tags: values(metadata.tags).map((tag) => text(tag)) as CatalogProduct["tags"],
           suggestedProductIds: values(metadata.suggestedProductIds).map((item) => text(item)),
           dietaryTags: values(metadata.dietaryFlags).map((tag) => text(tag)) as DietaryTag[],
@@ -1152,15 +1190,13 @@ export function parsePilotCatalog(value: unknown): PilotCatalog {
             unitAvailability?.dailyStock == null
               ? null
               : Math.max(0, unitAvailability.dailyStock - unitAvailability.soldToday),
-          currentStockUnits:
-            unitAvailability?.dailyStock == null
-              ? null
-              : Math.max(0, unitAvailability.dailyStock - unitAvailability.soldToday),
+          currentStockUnits: inventoryProducts.get(id)?.physicalQuantity ?? null,
+          inventory: inventoryProducts.get(id),
           autoDeductStock: unitAvailability?.autoDeductStock ?? false,
           active: bool(row.active),
           allergenIds: productAllergens.get(id) ?? [],
           modifierGroupIds: productModifierGroups.get(id) ?? [],
-          recipe: productRecipes.get(id) ?? [],
+          recipe: canManage ? (productRecipes.get(id) ?? []) : [],
         };
       }),
     combos: payload.combos

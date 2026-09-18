@@ -70,6 +70,23 @@ function event(
 }
 
 describe("offline pilot replay", () => {
+  it("preserves explicit inventory acknowledgement and the trusted offline context", async () => {
+    const calls: Call[] = [];
+    const service = new SyncPilotService(mockPilot(calls));
+    await service.apply(
+      event("pos.order.send_requested", "send-order", {
+        orderId: entityId,
+        acknowledgeInventoryShortage: true,
+      }),
+      { organizationId, unitId },
+    );
+    assert.equal(calls[0]?.method, "sendOrder");
+    assert.deepEqual(calls[0]?.args[6], { acknowledgeInventoryShortage: true });
+    assert.equal(
+      typeof (calls[0]?.args[5] as { ticketIdForStation: unknown }).ticketIdForStation,
+      "function",
+    );
+  });
   it("routes every shift operation through the real POS service with stable generated ids", async () => {
     const calls: Call[] = [];
     const service = new SyncPilotService(mockPilot(calls));

@@ -22,6 +22,7 @@ import type {
   UpdateUnitSettingsInput,
 } from "@giromesa/contracts";
 import { apiHealthResponseSchema } from "@giromesa/contracts";
+import { confirmInventoryShortage } from "./inventory-shortage-confirmation";
 
 type AccountantPackageResponse =
   ApiOperations["FiscalController_accountantPackage[1]"]["responses"][200]["content"]["application/json"];
@@ -34,7 +35,7 @@ type AccountantRequestResolutionResponse =
 type AccountantAttachmentMutationResponse =
   ApiOperations["FiscalController_createAccountantAttachment[1]"]["responses"][201]["content"]["application/json"];
 
-export const OPS_REQUIRED_SCHEMA_VERSION = 82;
+export const OPS_REQUIRED_SCHEMA_VERSION = 84;
 export const OPS_REQUIRED_API_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -351,7 +352,7 @@ export interface CatalogProductAggregateInput {
   suggestedProductIds?: string[];
   allergenIds: string[];
   modifierGroupIds: string[];
-  recipe: Array<{
+  recipe?: Array<{
     ingredientName: string;
     quantityMilli: number;
     unit: string;
@@ -2148,6 +2149,19 @@ export const api = {
       idempotencyKey?: string,
     ) =>
       managementCommand<unknown>(organizationId, unitId, "inventory/recipes", body, idempotencyKey),
+    deactivateRecipe: (
+      organizationId: string,
+      unitId: string,
+      productId: string,
+      idempotencyKey: string,
+    ) =>
+      managementCommand<unknown>(
+        organizationId,
+        unitId,
+        `inventory/recipes/${encodeURIComponent(productId)}/deactivate`,
+        undefined,
+        idempotencyKey,
+      ),
     purchases: (organizationId: string, unitId: string, filters: PurchaseListFilters = {}) =>
       request<unknown>(managementListPath(organizationId, unitId, "purchases", filters)),
     importNfe: (
@@ -4586,7 +4600,7 @@ export const api = {
     createProduct: (
       organizationId: string,
       unitId: string,
-      body: CatalogProductAggregateInput,
+      body: CatalogProductAggregateInput & { inventoryItemId?: string },
       idempotencyKey?: string,
     ) =>
       idempotentRequest<unknown>(
@@ -5660,13 +5674,63 @@ export const api = {
         undefined,
         idempotencyKey,
       ),
-    sendOrder: (organizationId: string, unitId: string, orderId: string, idempotencyKey?: string) =>
-      idempotentRequest<unknown>(
-        pilotPath(organizationId, unitId, `orders/${encodeURIComponent(orderId)}/send`),
-        "POST",
-        undefined,
-        idempotencyKey,
-      ),
+    sendOrder: async (
+      organizationId: string,
+      unitId: string,
+      orderId: string,
+      idempotencyKey: string = crypto.randomUUID(),
+      acknowledgeInventoryShortage = false,
+    ) => {
+      const path = pilotPath(organizationId, unitId, `orders/${encodeURIComponent(orderId)}/send`);
+      try {
+        return await idempotentRequest<unknown>(
+          path,
+          "POST",
+          { acknowledgeInventoryShortage },
+          idempotencyKey,
+        );
+      } catch (error) {
+        if (
+          !(error instanceof ApiClientError) ||
+          error.code !== "INVENTORY_SHORTAGE_CONFIRMATION_REQUIRED"
+        )
+          throw error;
+        const rows = Array.isArray(error.details?.products) ? error.details.products : [];
+        const products = [
+          ...new Set(
+            rows.flatMap((row: unknown) => {
+              if (
+                !row ||
+                typeof row !== "object" ||
+                !("name" in row) ||
+                typeof row.name !== "string"
+              )
+                return [];
+              return [row.name];
+            }),
+          ),
+        ];
+        const confirmed = await confirmInventoryShortage({
+          organizationId,
+          unitId,
+          orderId,
+          products,
+        });
+        if (!confirmed)
+          throw new ApiClientError(
+            "Pedido não enviado. Confira os itens antes de lançar.",
+            409,
+            "INVENTORY_SHORTAGE_NOT_CONFIRMED",
+            false,
+          );
+        return idempotentRequest<unknown>(
+          path,
+          "POST",
+          { acknowledgeInventoryShortage: true },
+          idempotencyKey,
+        );
+      }
+    },
     rejectTableQrOrder: (
       organizationId: string,
       unitId: string,
@@ -6232,6 +6296,21 @@ export const api = {
     },
     customerDetail: (organizationId: string, customerId: string) =>
       request<unknown>(growthPath(organizationId, `customers/${encodeURIComponent(customerId)}`)),
+    customerHistory: (
+      organizationId: string,
+      customerId: string,
+      filters?: { limit?: number; cursorAt?: string; cursorKind?: string; cursorId?: string },
+    ) => {
+      const query = new URLSearchParams();
+      if (filters?.limit !== undefined) query.set("limit", String(filters.limit));
+      if (filters?.cursorAt) query.set("cursorAt", filters.cursorAt);
+      if (filters?.cursorKind) query.set("cursorKind", filters.cursorKind);
+      if (filters?.cursorId) query.set("cursorId", filters.cursorId);
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return request<unknown>(
+        growthPath(organizationId, `customers/${encodeURIComponent(customerId)}/history${suffix}`),
+      );
+    },
     createCustomer: (
       organizationId: string,
       body: {
@@ -6399,10 +6478,22 @@ export const api = {
       request<unknown>(
         growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/preview`),
       ),
-    campaignDeliveries: (organizationId: string, campaignId: string) =>
-      request<unknown>(
-        growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/deliveries`),
-      ),
+    campaignDeliveries: (
+      organizationId: string,
+      campaignId: string,
+      filters?: { limit?: number; offset?: number },
+    ) => {
+      const query = new URLSearchParams();
+      if (filters?.limit !== undefined) query.set("limit", String(filters.limit));
+      if (filters?.offset !== undefined) query.set("offset", String(filters.offset));
+      const suffix = query.size > 0 ? `?${query.toString()}` : "";
+      return request<unknown>(
+        growthPath(
+          organizationId,
+          `campaigns/${encodeURIComponent(campaignId)}/deliveries${suffix}`,
+        ),
+      );
+    },
     queueCampaign: (organizationId: string, campaignId: string) =>
       request<unknown>(
         growthPath(organizationId, `campaigns/${encodeURIComponent(campaignId)}/queue`),

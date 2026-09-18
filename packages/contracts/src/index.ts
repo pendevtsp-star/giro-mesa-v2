@@ -1732,6 +1732,7 @@ export const idempotencyKeySchema = z.string().trim().min(8).max(160);
 
 export const publicTableOrderSchema = z
   .object({
+    expectedTotalCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
     items: z
       .array(
         z
@@ -2097,6 +2098,7 @@ export const deliveryNotificationSchema = z
 
 export const publicOrderSchema = z
   .object({
+    expectedTotalCents: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
     fulfillment: z.enum(["pickup", "delivery"]),
     customer: z
       .object({

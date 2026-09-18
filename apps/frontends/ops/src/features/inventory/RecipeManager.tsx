@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import { Badge, Button, Card, EmptyState, Input, NativeSelect } from "@giromesa/ui";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import {
   dateLabel,
@@ -22,13 +22,17 @@ function recipeQuantityLabel(quantityMilli: number): string {
 export function RecipeManager({
   scope,
   inventory,
+  initialProductId,
+  onSaved,
 }: {
   scope: ManagementScope;
   inventory: InventoryData;
+  initialProductId?: string;
+  onSaved?: () => void;
 }) {
   const recipesRemote = useRemote(scope, api.management.recipes, parseRecipes);
   const catalogRemote = useRemote(scope, api.pilot.catalog, parseRecipeCatalog);
-  const [productId, setProductId] = useState("");
+  const [productId, setProductId] = useState(initialProductId ?? "");
   const [inventoryItemId, setInventoryItemId] = useState("");
   const [locationId, setLocationId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -38,6 +42,23 @@ export function RecipeManager({
   const [feedback, setFeedback] = useState("");
   const [success, setSuccess] = useState("");
   const [attempt, setAttempt] = useState<{ fingerprint: string; key: string } | null>(null);
+  const [deactivation, setDeactivation] = useState<{
+    recipeId: string;
+    productId: string;
+    key: string;
+  } | null>(null);
+  const loadedProductId = useRef<string | null>(null);
+  const dirty = useRef(false);
+
+  useEffect(() => {
+    if (recipesRemote.state.status !== "ready") return;
+    if (loadedProductId.current === productId && dirty.current) return;
+    const recipe = recipesRemote.state.data.find((candidate) => candidate.productId === productId);
+    loadedProductId.current = productId;
+    dirty.current = false;
+    setComponents(recipe?.components.map((component) => ({ ...component })) ?? []);
+    setAttempt(null);
+  }, [productId, recipesRemote.state]);
 
   function addComponent() {
     setFeedback("");
@@ -66,6 +87,7 @@ export function RecipeManager({
           lossBasisPoints: recipeLossToBasisPoints(lossPercent),
         },
       ]);
+      dirty.current = true;
       setInventoryItemId("");
       setQuantity("");
       setLossPercent("0");
@@ -111,9 +133,11 @@ export function RecipeManager({
         currentAttempt.key,
       );
       setComponents([]);
+      dirty.current = false;
       setAttempt(null);
       setSuccess("Nova versão ativa criada. A versão anterior foi preservada no histórico.");
       recipesRemote.retry();
+      onSaved?.();
     } catch (error) {
       setFeedback(
         error instanceof Error ? error.message : "Não foi possível salvar a ficha técnica.",
@@ -123,10 +147,42 @@ export function RecipeManager({
     }
   }
 
-  const activeItems = inventory.items.filter((item) => item.active);
+  const activeItems = inventory.items.filter((item) => item.active && item.kind === "ingredient");
   const activeLocations = inventory.locations.filter((location) => location.active);
   const itemById = new Map(inventory.items.map((item) => [item.id, item]));
   const locationById = new Map(inventory.locations.map((location) => [location.id, location]));
+
+  async function deactivateRecipe() {
+    if (!deactivation || submitting) return;
+    setSubmitting(true);
+    setFeedback("");
+    setSuccess("");
+    try {
+      await api.management.deactivateRecipe(
+        scope.organizationId,
+        scope.unitId,
+        deactivation.productId,
+        deactivation.key,
+      );
+      if (productId === deactivation.productId) {
+        dirty.current = false;
+        setComponents([]);
+        setAttempt(null);
+      }
+      setDeactivation(null);
+      setSuccess(
+        "Ficha desativada. O histórico foi preservado e as próximas vendas ficam sem baixa dos insumos desta ficha.",
+      );
+      recipesRemote.retry();
+      onSaved?.();
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : "Não foi possível desativar a ficha técnica.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <RemoteGate remote={catalogRemote}>
@@ -137,14 +193,16 @@ export function RecipeManager({
             const productById = new Map(catalog.products.map((product) => [product.id, product]));
             const prerequisitesReady =
               activeProducts.length > 0 && activeItems.length > 0 && activeLocations.length > 0;
-            const orderedRecipes = [...recipes].sort((a, b) =>
-              (productById.get(a.productId)?.name ?? a.productId).localeCompare(
-                productById.get(b.productId)?.name ?? b.productId,
-                "pt-BR",
-              ),
-            );
+            const orderedRecipes = recipes
+              .filter((recipe) => !initialProductId || recipe.productId === initialProductId)
+              .sort((a, b) =>
+                (productById.get(a.productId)?.name ?? a.productId).localeCompare(
+                  productById.get(b.productId)?.name ?? b.productId,
+                  "pt-BR",
+                ),
+              );
             return (
-              <Card className="recipe-card">
+              <Card aria-busy={submitting} className="recipe-card">
                 <div className="card-header">
                   <div>
                     <p className="eyebrow">Produção e custo</p>
@@ -153,7 +211,8 @@ export function RecipeManager({
                   <Badge tone="info">{recipes.length} ativa(s)</Badge>
                 </div>
                 <p className="recipe-card__intro">
-                  Defina o consumo real de cada venda. Toda alteração cria uma nova versão, sem
+                  Opcional: o produto pode ser vendido sem ficha técnica. Configure os insumos para
+                  acompanhar o consumo real de cada venda. Toda alteração cria uma nova versão, sem
                   reescrever o histórico operacional.
                 </p>
                 {!prerequisitesReady && (
@@ -170,7 +229,7 @@ export function RecipeManager({
                     <label className="compact-field">
                       Produto vendido
                       <NativeSelect
-                        disabled={!activeProducts.length || submitting}
+                        disabled={Boolean(initialProductId) || !activeProducts.length || submitting}
                         onChange={(event) => {
                           setProductId(event.target.value);
                           setSuccess("");
@@ -262,11 +321,13 @@ export function RecipeManager({
                               </span>
                               <Button
                                 aria-label={`Remover ${item?.name ?? "componente"}`}
-                                onClick={() =>
+                                disabled={submitting}
+                                onClick={() => {
+                                  dirty.current = true;
                                   setComponents((current) =>
                                     current.filter((candidate) => candidate !== component),
-                                  )
-                                }
+                                  );
+                                }}
                                 size="sm"
                                 variant="ghost"
                               >
@@ -288,7 +349,7 @@ export function RecipeManager({
                       </p>
                     )}
                     <Button disabled={!prerequisitesReady || submitting} type="submit">
-                      {submitting ? "Salvando versão…" : "Salvar nova versão"}
+                      {submitting ? "Aguarde…" : "Salvar nova versão"}
                     </Button>
                   </form>
                   <section className="recipe-versions" aria-labelledby="active-recipes-title">
@@ -328,6 +389,51 @@ export function RecipeManager({
                                 );
                               })}
                             </ul>
+                            {deactivation?.recipeId === recipe.id ? (
+                              <div className="gm-form-stack">
+                                <p role="alert">
+                                  Desativar a ficha de{" "}
+                                  {productById.get(recipe.productId)?.name ?? "este produto"}? As
+                                  próximas vendas ficam sem baixa automática dos insumos desta
+                                  ficha. Pedidos anteriores e histórico serão preservados.
+                                </p>
+                                <div className="inventory-command-bar__actions">
+                                  <Button
+                                    disabled={submitting}
+                                    onClick={deactivateRecipe}
+                                    size="sm"
+                                    variant="danger"
+                                  >
+                                    {submitting ? "Desativando…" : "Confirmar desativação"}
+                                  </Button>
+                                  <Button
+                                    disabled={submitting}
+                                    onClick={() => setDeactivation(null)}
+                                    size="sm"
+                                    variant="secondary"
+                                  >
+                                    Manter ficha
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <Button
+                                disabled={submitting}
+                                onClick={() => {
+                                  setFeedback("");
+                                  setSuccess("");
+                                  setDeactivation({
+                                    recipeId: recipe.id,
+                                    productId: recipe.productId,
+                                    key: crypto.randomUUID(),
+                                  });
+                                }}
+                                size="sm"
+                                variant="secondary"
+                              >
+                                Desativar ficha técnica
+                              </Button>
+                            )}
                           </article>
                         ))}
                       </div>

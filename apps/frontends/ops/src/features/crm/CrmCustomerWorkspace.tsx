@@ -11,13 +11,74 @@ import {
   SearchField,
   Textarea,
 } from "@giromesa/ui";
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
 import { dateTime, type GrowthScope, RemoteGate, useRemote } from "../../growth.shared";
-import { type CrmCustomerDetail, parseCrmCustomerDetail, parseCrmCustomerPage } from "./crm.model";
+import {
+  type CrmCustomerDetail,
+  type CrmCustomerHistoryCursor,
+  type CrmCustomerHistoryPage,
+  type CrmTimelineEntry,
+  parseCrmCustomerDetail,
+  parseCrmCustomerHistory,
+  parseCrmCustomerPage,
+} from "./crm.model";
 import { type CrmFeedback, CrmFormPanel, crmCurrency, crmError } from "./crm.ui";
 
 const PAGE_SIZE = 30;
+const timelineKinds: Record<string, string> = {
+  service: "Atendimento",
+  reservation: "Reserva",
+  waitlist: "Fila de espera",
+  delivery: "Entrega",
+  campaign: "Campanha",
+  coupon: "Cupom",
+  whatsapp: "WhatsApp",
+  loyalty: "Fidelidade",
+};
+const timelineStatuses: Record<string, string> = {
+  open: "Em aberto",
+  merged: "Unificado",
+  closed: "Encerrado",
+  canceled: "Cancelado",
+  booked: "Agendado",
+  confirmed: "Confirmado",
+  seated: "Na mesa",
+  completed: "Concluído",
+  no_show: "Não compareceu",
+  waiting: "Aguardando",
+  notified: "Avisado",
+  left: "Saiu da fila",
+  draft: "Rascunho",
+  placed: "Recebido",
+  preparing: "Em preparo",
+  ready: "Pronto",
+  dispatched: "Saiu para entrega",
+  delivery_failed: "Tentativa sem sucesso",
+  returned: "Devolvido à loja",
+  pending: "Pendente",
+  blocked: "Envio bloqueado",
+  holdout: "Grupo de controle",
+  queued: "Na fila",
+  sent: "Enviado",
+  delivered: "Entregue",
+  read: "Lido",
+  received: "Recebido",
+  failed: "Falha no envio",
+  skipped: "Não enviado",
+  suppressed: "Envio bloqueado",
+  redeemed: "Resgatado",
+  earn: "Pontos recebidos",
+  redeem: "Pontos utilizados",
+  expire: "Pontos expirados",
+  reverse: "Pontos estornados",
+  adjustment: "Ajuste de pontos",
+};
+const fulfillmentLabels: Record<string, string> = {
+  dine_in: "Consumo no local",
+  pickup: "Retirada",
+  delivery: "Entrega",
+};
 function openNewCustomerPanel() {
   const summary = document.getElementById("crm-new-customer");
   const panel = summary?.closest("details");
@@ -25,21 +86,134 @@ function openNewCustomerPanel() {
   summary?.focus();
 }
 
-function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
+function timelineEntry(entry: CrmTimelineEntry) {
+  return (
+    <article key={`${entry.kind}:${entry.id}:${entry.at}`}>
+      <span aria-hidden="true" />
+      <div>
+        <strong>
+          {entry.kind === "service" || entry.kind === "delivery"
+            ? (fulfillmentLabels[entry.label] ?? "Atendimento")
+            : entry.kind === "loyalty" && entry.label === entry.status
+              ? (timelineStatuses[entry.status] ?? "Movimentação de pontos")
+              : entry.kind === "campaign"
+                ? entry.label
+                    .replace(/^email · /, "E-mail · ")
+                    .replace(/^whatsapp · /, "WhatsApp · ")
+                : entry.label}
+        </strong>
+        <small>
+          {timelineKinds[entry.kind] ?? "Atividade"} ·{" "}
+          {timelineStatuses[entry.status] ?? "Situação indisponível"} · {dateTime(entry.at)}
+        </small>
+      </div>
+      {entry.amountCents !== null && <strong>{crmCurrency.format(entry.amountCents / 100)}</strong>}
+      {entry.amount !== null && <strong>{entry.amount} ponto(s)</strong>}
+    </article>
+  );
+}
+
+function CustomerHistory({ detail, scope }: { detail: CrmCustomerDetail; scope: GrowthScope }) {
+  const [page, setPage] = useState<CrmCustomerHistoryPage>({ items: [], nextCursor: null });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const requestVersion = useRef(0);
+  const load = useCallback(
+    async (cursor: CrmCustomerHistoryCursor | null) => {
+      const version = ++requestVersion.current;
+      setLoading(true);
+      setError("");
+      try {
+        const next = parseCrmCustomerHistory(
+          await api.growth.customerHistory(scope.organizationId, detail.customer.id, {
+            limit: 12,
+            ...(cursor
+              ? { cursorAt: cursor.at, cursorKind: cursor.kind, cursorId: cursor.id }
+              : {}),
+          }),
+        );
+        if (requestVersion.current !== version) return;
+        setPage((previous) => ({
+          items: cursor ? [...previous.items, ...next.items] : next.items,
+          nextCursor: next.nextCursor,
+        }));
+      } catch (cause) {
+        if (requestVersion.current === version)
+          setError(crmError(cause, "Não foi possível carregar o histórico. Tente novamente."));
+      } finally {
+        if (requestVersion.current === version) setLoading(false);
+      }
+    },
+    [scope.organizationId, detail],
+  );
+  useEffect(() => {
+    setPage({ items: [], nextCursor: null });
+    void load(null);
+    return () => {
+      requestVersion.current += 1;
+    };
+  }, [load]);
+
+  return (
+    <section className="crm-profile__section" aria-labelledby="crm-history-title">
+      <div className="crm-section-heading">
+        <div>
+          <strong id="crm-history-title">Histórico do cliente</strong>
+          <small role="status">{page.items.length} evento(s) carregado(s)</small>
+        </div>
+      </div>
+      {page.items.length > 0 && (
+        <div id="crm-customer-history" className="crm-timeline">
+          {page.items.map(timelineEntry)}
+        </div>
+      )}
+      {!loading && !error && page.items.length === 0 && (
+        <div className="crm-inline-empty">
+          <Icon name="clock" size={18} />
+          <p>
+            Nenhuma reserva, atendimento, entrega, campanha, cupom ou movimento de fidelidade
+            vinculado.
+          </p>
+        </div>
+      )}
+      {error && <Callout tone="danger">{error}</Callout>}
+      {(loading || error || page.nextCursor) && (
+        <Button
+          aria-controls={page.items.length ? "crm-customer-history" : undefined}
+          disabled={loading}
+          onClick={() => void load(page.nextCursor)}
+          size="sm"
+          variant="secondary"
+        >
+          {loading
+            ? "Carregando histórico…"
+            : error
+              ? "Tentar novamente"
+              : "Carregar eventos anteriores"}
+        </Button>
+      )}
+      {!loading && !error && page.items.length > 0 && !page.nextCursor && (
+        <small className="muted">Todos os eventos disponíveis foram carregados.</small>
+      )}
+    </section>
+  );
+}
+
+function CustomerProfile({ detail, scope }: { detail: CrmCustomerDetail; scope: GrowthScope }) {
   const { customer, metrics } = detail;
   return (
     <Card aria-labelledby="crm-profile-title" className="crm-profile">
       <header className="crm-profile__header">
         <div>
-          <p className="eyebrow">Cliente 360</p>
+          <p className="eyebrow">Perfil do cliente</p>
           <h2 id="crm-profile-title">{customer.name}</h2>
         </div>
         <div className="crm-profile__badges">
           <Badge tone={detail.consent.email ? "success" : "neutral"}>
-            E-mail {detail.consent.email ? "autorizado" : "sem opt-in"}
+            E-mail {detail.consent.email ? "autorizado" : "sem autorização"}
           </Badge>
           <Badge tone={detail.consent.whatsapp ? "success" : "neutral"}>
-            WhatsApp {detail.consent.whatsapp ? "autorizado" : "sem opt-in"}
+            WhatsApp {detail.consent.whatsapp ? "autorizado" : "sem autorização"}
           </Badge>
         </div>
       </header>
@@ -77,7 +251,7 @@ function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
         <div className="crm-section-heading">
           <div>
             <strong>Fidelidade</strong>
-            <small>Saldo persistido do cliente</small>
+            <small>Saldo de pontos do cliente</small>
           </div>
           <strong className="crm-balance">{detail.loyalty.balance} ponto(s)</strong>
         </div>
@@ -99,11 +273,11 @@ function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
             <dd>{crmCurrency.format((metrics.totalSpentCents ?? 0) / 100)}</dd>
           </div>
           <div>
-            <dt>Ticket médio</dt>
+            <dt>Gasto médio</dt>
             <dd>{crmCurrency.format((metrics.averageTicketCents ?? 0) / 100)}</dd>
           </div>
           <div>
-            <dt>No-show</dt>
+            <dt>Faltas</dt>
             <dd>{metrics.noShows ?? 0}</dd>
           </div>
           <div>
@@ -129,42 +303,220 @@ function CustomerProfile({ detail }: { detail: CrmCustomerDetail }) {
           )}
         </div>
       )}
-      <div className="crm-profile__section">
-        <div className="crm-section-heading">
-          <div>
-            <strong>Timeline operacional</strong>
-            <small>{detail.timeline.length} evento(s) persistido(s)</small>
-          </div>
-        </div>
-        {detail.timeline.length === 0 ? (
-          <div className="crm-inline-empty">
-            <Icon name="clock" size={18} />
-            <p>
-              Nenhuma reserva, atendimento, entrega, campanha, cupom ou movimento de fidelidade
-              vinculado.
-            </p>
-          </div>
-        ) : (
-          <div className="crm-timeline">
-            {detail.timeline.slice(0, 12).map((entry) => (
-              <article key={`${entry.kind}:${entry.id}:${entry.at}`}>
-                <span aria-hidden="true" />
-                <div>
-                  <strong>{entry.label}</strong>
-                  <small>
-                    {entry.kind} · {entry.status} · {dateTime(entry.at)}
-                  </small>
-                </div>
-                {entry.amountCents !== null && (
-                  <strong>{crmCurrency.format(entry.amountCents / 100)}</strong>
-                )}
-                {entry.amount !== null && <strong>{entry.amount} ponto(s)</strong>}
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
+      <CustomerHistory
+        key={`${scope.organizationId}:${scope.unitId}:${customer.id}`}
+        detail={detail}
+        scope={scope}
+      />
     </Card>
+  );
+}
+
+export function canMergeCustomers(targetId: string, sourceId: string, reason: string) {
+  return Boolean(targetId && sourceId && targetId !== sourceId && reason.trim().length >= 3);
+}
+
+export function CrmCustomerMergeForm({
+  scope,
+  targetId,
+  onMerged,
+}: {
+  scope: GrowthScope;
+  targetId: string;
+  onMerged: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [appliedQuery, setAppliedQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [sourceId, setSourceId] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const active = useRef(true);
+  const lookupKey = `${appliedQuery}:${offset}`;
+  const sources = useRemote(
+    scope,
+    () =>
+      api.growth
+        .customerPage(scope.organizationId, {
+          q: appliedQuery || undefined,
+          limit: PAGE_SIZE,
+          offset,
+        })
+        .catch((cause) => {
+          throw new Error(
+            crmError(cause, "Não foi possível buscar cadastros de origem. Tente novamente."),
+          );
+        }),
+    (value) => ({ key: lookupKey, page: parseCrmCustomerPage(value) }),
+    lookupKey,
+  );
+  const page =
+    sources.state.status === "ready" && sources.state.data.key === lookupKey
+      ? sources.state.data.page
+      : null;
+  const source = page?.items.find((customer) => customer.id === sourceId);
+  const searching = !page || sources.refreshing;
+  const canMerge =
+    !busy &&
+    !searching &&
+    !sources.refreshError &&
+    Boolean(source) &&
+    canMergeCustomers(targetId, sourceId, reason);
+
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+
+  function changePage(nextOffset: number) {
+    setSourceId("");
+    setOffset(nextOffset);
+  }
+
+  async function merge(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canMerge) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.growth.mergeCustomer(scope.organizationId, targetId, {
+        sourceCustomerId: sourceId,
+        reason: reason.trim(),
+      });
+      if (!active.current) return;
+      setSourceId("");
+      setReason("");
+      sources.retry();
+      onMerged();
+    } catch (cause) {
+      if (active.current) setError(crmError(cause, "Não foi possível unificar os cadastros."));
+    } finally {
+      if (active.current) setBusy(false);
+    }
+  }
+
+  return (
+    <section
+      className="crm-management-boundary crm-merge-management"
+      aria-labelledby="crm-merge-title"
+    >
+      <h3 id="crm-merge-title">Unificar cadastros duplicados</h3>
+      <p className="muted">
+        O cliente selecionado será mantido; o cadastro de origem será incorporado e arquivado.
+      </p>
+      <form
+        className="crm-search crm-merge-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          setAppliedQuery(query.trim());
+          changePage(0);
+        }}
+      >
+        <label>
+          Buscar cadastro de origem
+          <Input
+            value={query}
+            disabled={busy}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Nome, e-mail ou telefone em todos os clientes"
+          />
+        </label>
+        <Button type="submit" size="sm" variant="secondary" disabled={busy}>
+          Buscar duplicados
+        </Button>
+      </form>
+      <RemoteGate remote={sources}>
+        {() => (
+          <>
+            {sources.refreshError && (
+              <Callout tone="danger">
+                Não foi possível atualizar a busca.{" "}
+                <Button size="sm" variant="secondary" onClick={sources.retry}>
+                  Tentar novamente
+                </Button>
+              </Callout>
+            )}
+            <form className="action-form" onSubmit={(event) => void merge(event)}>
+              <label className="action-form__wide">
+                Cadastro de origem
+                <NativeSelect
+                  required
+                  disabled={busy || searching || Boolean(sources.refreshError)}
+                  value={sourceId}
+                  onChange={(event) => setSourceId(event.target.value)}
+                >
+                  <option value="">
+                    {searching ? "Buscando cadastros…" : "Selecione o cadastro a incorporar"}
+                  </option>
+                  {page?.items
+                    .filter((customer) => customer.id !== targetId)
+                    .map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name} · {customer.email ?? customer.phone ?? "sem contato"}
+                      </option>
+                    ))}
+                </NativeSelect>
+              </label>
+              {page && !searching && (
+                <p className="action-form__wide muted" role="status">
+                  {page.items.some((customer) => customer.id !== targetId)
+                    ? "Busque pelo nome ou contato, ou avance para consultar outros cadastros."
+                    : "Nenhum outro cadastro nesta página. Altere a busca ou consulte a próxima página."}
+                </p>
+              )}
+              {page && page.total > page.limit && (
+                <nav
+                  className="crm-pagination action-form__wide"
+                  aria-label="Páginas de cadastros de origem"
+                >
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy || searching || page.offset === 0}
+                    onClick={() => changePage(Math.max(0, page.offset - page.limit))}
+                  >
+                    Anterior
+                  </Button>
+                  <small>
+                    {page.offset + 1}–{Math.min(page.offset + page.items.length, page.total)} de{" "}
+                    {page.total}
+                  </small>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy || searching || page.offset + page.items.length >= page.total}
+                    onClick={() => changePage(page.offset + page.limit)}
+                  >
+                    Próxima
+                  </Button>
+                </nav>
+              )}
+              <label className="action-form__wide">
+                Justificativa
+                <Input
+                  minLength={3}
+                  required
+                  disabled={busy}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                />
+              </label>
+              {error && (
+                <div className="action-form__wide">
+                  <Callout tone="danger">{error}</Callout>
+                </div>
+              )}
+              <Button type="submit" variant="secondary" disabled={!canMerge}>
+                {busy ? "Unificando…" : "Unificar cadastros"}
+              </Button>
+            </form>
+          </>
+        )}
+      </RemoteGate>
+    </section>
   );
 }
 
@@ -212,8 +564,6 @@ export function CrmCustomerWorkspace({
   const [editNotes, setEditNotes] = useState("");
   const [editTags, setEditTags] = useState("");
   const [archiveReason, setArchiveReason] = useState("");
-  const [mergeSourceId, setMergeSourceId] = useState("");
-  const [mergeReason, setMergeReason] = useState("");
   const [consentCustomerId, setConsentCustomerId] = useState("");
   const [consentDecision, setConsentDecision] = useState<"granted" | "withdrawn">("granted");
   const [consentChannel, setConsentChannel] = useState<"email" | "whatsapp" | "all">("all");
@@ -276,7 +626,8 @@ export function CrmCustomerWorkspace({
       setBirthDate("");
       setFeedback({
         tone: "success",
-        message: "Cliente cadastrado. Consentimento continua separado.",
+        message:
+          "Cliente cadastrado. A autorização para campanhas deve ser registrada separadamente.",
       });
       customers.retry();
     } catch (error) {
@@ -329,36 +680,15 @@ export function CrmCustomerWorkspace({
       setArchiveReason("");
       setSelectedId("");
       setConsentCustomerId("");
-      setFeedback({ tone: "success", message: "Cliente arquivado com auditoria." });
+      setFeedback({
+        tone: "success",
+        message: "Cliente arquivado. A justificativa foi registrada.",
+      });
       customers.retry();
     } catch (error) {
       setFeedback({
         tone: "danger",
         message: crmError(error, "Não foi possível arquivar o cliente."),
-      });
-    } finally {
-      setBusy("");
-    }
-  }
-  async function mergeCustomer(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!selectedDetail || !mergeSourceId || mergeReason.trim().length < 3) return;
-    setBusy("merge");
-    setFeedback(null);
-    try {
-      await api.growth.mergeCustomer(scope.organizationId, selectedDetail.customer.id, {
-        sourceCustomerId: mergeSourceId,
-        reason: mergeReason.trim(),
-      });
-      setMergeSourceId("");
-      setMergeReason("");
-      setFeedback({ tone: "success", message: "Cadastros mesclados com auditoria." });
-      customers.retry();
-      detail.retry();
-    } catch (error) {
-      setFeedback({
-        tone: "danger",
-        message: crmError(error, "Não foi possível mesclar os clientes."),
       });
     } finally {
       setBusy("");
@@ -381,8 +711,8 @@ export function CrmCustomerWorkspace({
         tone: "success",
         message:
           consentDecision === "granted"
-            ? "Consentimento registrado com trilha de auditoria."
-            : "Retirada de consentimento registrada.",
+            ? "Autorização para campanhas registrada."
+            : "Retirada da autorização registrada.",
       });
       customers.retry();
       detail.retry();
@@ -413,9 +743,9 @@ export function CrmCustomerWorkspace({
               ? "Clientes podem estar desatualizados"
               : customers.refreshing || detail.refreshing
                 ? "Sincronizando clientes"
-                : "Clientes persistidos"}
+                : "Clientes atualizados"}
           </Badge>
-          <small>Busca paginada e visão operacional da organização atual.</small>
+          <small>Consulte os clientes e suas autorizações para campanhas.</small>
         </div>
         <Button
           disabled={customers.refreshing || detail.refreshing}
@@ -503,7 +833,7 @@ export function CrmCustomerWorkspace({
                           <small>{customer.email ?? customer.phone ?? "Sem contato"}</small>
                         </span>
                         <Badge tone={customer.marketingOptIn ? "success" : "neutral"}>
-                          {customer.marketingOptIn ? "Opt-in" : "Sem opt-in"}
+                          {customer.marketingOptIn ? "Com autorização" : "Sem autorização"}
                         </Badge>
                       </button>
                     ))}
@@ -540,7 +870,7 @@ export function CrmCustomerWorkspace({
           </RemoteGate>
         </Card>
         {selectedDetail ? (
-          <CustomerProfile detail={selectedDetail} />
+          <CustomerProfile detail={selectedDetail} scope={scope} />
         ) : selectedId ? (
           <Card className="crm-profile" role={detail.refreshError ? "alert" : "status"}>
             {detail.refreshError ? (
@@ -552,19 +882,19 @@ export function CrmCustomerWorkspace({
                 }
                 description={detail.refreshError}
                 icon={<Icon name="alert-circle" size={28} />}
-                title="Não foi possível carregar o Cliente 360"
+                title="Não foi possível carregar o perfil do cliente"
               />
             ) : (
               <div className="remote-state">
                 <span className="spinner" aria-hidden="true" />
-                <strong>Carregando Cliente 360…</strong>
+                <strong>Carregando perfil do cliente…</strong>
               </div>
             )}
           </Card>
         ) : (
           <Card className="crm-profile">
             <EmptyState
-              description="Escolha um cliente para consultar contato, consentimento e fidelidade."
+              description="Escolha um cliente para consultar contato, autorizações e fidelidade."
               icon={<Icon name="user" size={28} />}
               title="Selecione um cliente"
             />
@@ -573,7 +903,7 @@ export function CrmCustomerWorkspace({
       </div>
       {selectedDetail && (
         <CrmFormPanel
-          description="Edite o cadastro, mescle duplicidades ou arquive com justificativa."
+          description="Edite o cadastro, unifique duplicados ou arquive com justificativa."
           title={`Gerenciar ${selectedDetail.customer.name}`}
         >
           <div className="crm-customer-management">
@@ -614,7 +944,7 @@ export function CrmCustomerWorkspace({
                 />
               </label>
               <label className="action-form__wide">
-                Tags
+                Marcadores
                 <Input
                   maxLength={400}
                   onChange={(event) => setEditTags(event.target.value)}
@@ -635,49 +965,19 @@ export function CrmCustomerWorkspace({
                 {busy === "update" ? "Salvando…" : "Salvar alterações"}
               </Button>
             </form>
-            <form
-              className="action-form crm-management-boundary"
-              onSubmit={(event) => void mergeCustomer(event)}
-            >
-              <h3 className="action-form__wide">Mesclar duplicidade</h3>
-              <p className="action-form__wide muted">
-                O cliente selecionado será mantido; o cadastro de origem será incorporado e
-                arquivado.
-              </p>
-              <label>
-                Cadastro de origem
-                <NativeSelect
-                  onChange={(event) => setMergeSourceId(event.target.value)}
-                  required
-                  value={mergeSourceId}
-                >
-                  <option value="">Selecione nesta página</option>
-                  {rows
-                    .filter((customer) => customer.id !== selectedDetail.customer.id)
-                    .map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name} · {customer.email ?? customer.phone ?? "sem contato"}
-                      </option>
-                    ))}
-                </NativeSelect>
-              </label>
-              <label>
-                Justificativa
-                <Input
-                  minLength={3}
-                  onChange={(event) => setMergeReason(event.target.value)}
-                  required
-                  value={mergeReason}
-                />
-              </label>
-              <Button
-                disabled={busy === "merge" || !mergeSourceId || mergeReason.trim().length < 3}
-                type="submit"
-                variant="secondary"
-              >
-                {busy === "merge" ? "Mesclando…" : "Mesclar cadastros"}
-              </Button>
-            </form>
+            <CrmCustomerMergeForm
+              key={`${scope.organizationId}:${scope.unitId}:${selectedDetail.customer.id}`}
+              scope={scope}
+              targetId={selectedDetail.customer.id}
+              onMerged={() => {
+                setFeedback({
+                  tone: "success",
+                  message: "Cadastros unificados. A justificativa foi registrada.",
+                });
+                customers.retry();
+                detail.retry();
+              }}
+            />
             <form
               className="action-form crm-management-boundary"
               onSubmit={(event) => void archiveCustomer(event)}
@@ -705,7 +1005,7 @@ export function CrmCustomerWorkspace({
       )}
       <div className="crm-action-grid">
         <CrmFormPanel
-          description="Cadastro e consentimento permanecem operações separadas."
+          description="Cadastrar um cliente não autoriza o envio de campanhas."
           id="crm-new-customer"
           title="Novo cliente"
         >
@@ -750,8 +1050,8 @@ export function CrmCustomerWorkspace({
           </form>
         </CrmFormPanel>
         <CrmFormPanel
-          description="Concessão e retirada ficam na trilha de auditoria."
-          title="Consentimento de marketing"
+          description="Registre a autorização do cliente ou sua retirada para cada canal."
+          title="Autorização para campanhas"
         >
           <form className="action-form" onSubmit={(event) => void recordConsent(event)}>
             <label className="action-form__wide">
@@ -777,8 +1077,8 @@ export function CrmCustomerWorkspace({
                 }
                 value={consentDecision}
               >
-                <option value="granted">Conceder</option>
-                <option value="withdrawn">Retirar</option>
+                <option value="granted">Registrar autorização</option>
+                <option value="withdrawn">Retirar autorização</option>
               </NativeSelect>
             </label>
             <label>

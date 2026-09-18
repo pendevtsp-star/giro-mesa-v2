@@ -22,6 +22,7 @@ import {
   type ApiKeyInput,
   apiKeySchema,
   type CampaignCancelInput,
+  type CampaignDeliveriesQueryInput,
   type CampaignInput,
   type ConsentInput,
   type CouponInput,
@@ -32,11 +33,13 @@ import {
   type CrmAutomationTestInput,
   type CrmQuickReplyInput,
   type CustomerArchiveInput,
+  type CustomerHistoryQueryInput,
   type CustomerInput,
   type CustomerListQueryInput,
   type CustomerMergeInput,
   type CustomerUpdateInput,
   campaignCancelSchema,
+  campaignDeliveriesQuerySchema,
   campaignSchema,
   consentSchema,
   couponRedemptionSchema,
@@ -47,6 +50,7 @@ import {
   crmAutomationTestSchema,
   crmQuickReplySchema,
   customerArchiveSchema,
+  customerHistoryQuerySchema,
   customerListQuerySchema,
   customerMergeSchema,
   customerSchema,
@@ -175,6 +179,37 @@ export class GrowthController {
     @Param("customerId", ParseUUIDPipe) customerId: string,
   ) {
     return this.growth.customerDetail(request.auth.identityId, organizationId, customerId);
+  }
+
+  @Get("customers/:customerId/history")
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    schema: { type: "integer", minimum: 1, maximum: 100, default: 30 },
+  })
+  @ApiQuery({ name: "cursorAt", required: false, schema: { type: "string", format: "date-time" } })
+  @ApiQuery({
+    name: "cursorKind",
+    required: false,
+    enum: [
+      "service",
+      "reservation",
+      "waitlist",
+      "delivery",
+      "campaign",
+      "coupon",
+      "whatsapp",
+      "loyalty",
+    ],
+  })
+  @ApiQuery({ name: "cursorId", required: false, schema: { type: "string", format: "uuid" } })
+  customerHistory(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Query(new ZodPipe(customerHistoryQuerySchema)) query: CustomerHistoryQueryInput,
+  ) {
+    return this.growth.customerHistory(request.auth.identityId, organizationId, customerId, query);
   }
 
   @Patch("customers/:customerId")
@@ -369,12 +404,28 @@ export class GrowthController {
   }
 
   @Get("campaigns/:campaignId/deliveries")
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    schema: { type: "integer", minimum: 1, maximum: 200, default: 100 },
+  })
+  @ApiQuery({
+    name: "offset",
+    required: false,
+    schema: { type: "integer", minimum: 0, maximum: 1000000, default: 0 },
+  })
   campaignDeliveries(
     @Req() request: AuthenticatedRequest,
     @Param("organizationId", ParseUUIDPipe) organizationId: string,
     @Param("campaignId", ParseUUIDPipe) campaignId: string,
+    @Query(new ZodPipe(campaignDeliveriesQuerySchema)) query: CampaignDeliveriesQueryInput,
   ) {
-    return this.growth.campaignDeliverySummary(request.auth.identityId, organizationId, campaignId);
+    return this.growth.campaignDeliverySummary(
+      request.auth.identityId,
+      organizationId,
+      campaignId,
+      query,
+    );
   }
 
   @Post("campaigns/:campaignId/cancel")

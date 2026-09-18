@@ -70,6 +70,16 @@ const kindLabels: Record<InventoryItemKind, string> = {
   returnable_container: "Vasilhame",
 };
 
+const locationKindLabels: Record<StockLocation["kind"], string> = {
+  warehouse: "Depósito",
+  cooler: "Geladeira",
+  freezer: "Freezer",
+  bar: "Bar",
+  kitchen: "Cozinha",
+  returnables: "Vasilhames",
+  other: "Outro",
+};
+
 function itemKind(item: InventoryItem): InventoryItemKind {
   return item.kind ?? "ingredient";
 }
@@ -85,6 +95,7 @@ interface ItemSummary {
   averageCostCents: number | null;
   low: boolean;
   zero: boolean;
+  negative: boolean;
 }
 
 export function inventoryItemSummaries(data: InventoryData, locationId = "all"): ItemSummary[] {
@@ -138,6 +149,7 @@ export function inventoryItemSummaries(data: InventoryData, locationId = "all"):
       averageCostCents: quantity > 0 ? Math.round(valueCents / quantity) : null,
       low: item.active && availableQuantity > 0 && availableQuantity <= minimum,
       zero: item.active && availableQuantity <= 0,
+      negative: balances.some((balance) => balance.quantity < 0 || balance.availableQuantity < 0),
     };
   });
 }
@@ -278,6 +290,9 @@ export function InventoryWorkspace({
   const { canCount, canTransfer, hasPosition } = inventoryPrerequisites(data);
   const lowCount = summaries.filter((summary) => summary.low).length;
   const zeroCount = summaries.filter((summary) => summary.zero).length;
+  const negativeBalanceCount = data.balances.filter(
+    (balance) => balance.quantity < 0 || balance.availableQuantity < 0,
+  ).length;
   const stockValue = summaries.reduce((sum, summary) => sum + summary.valueCents, 0);
   const expiringLots = data.lots.filter((lot) => {
     if (!lot.expiresAt || lot.quantity <= 0) return false;
@@ -289,8 +304,13 @@ export function InventoryWorkspace({
     const statusMatches =
       statusFilter === "all" ||
       (statusFilter === "zero" && summary.zero) ||
+      (statusFilter === "negative" && summary.negative) ||
       (statusFilter === "low" && summary.low) ||
-      (statusFilter === "normal" && !summary.low && !summary.zero && summary.item.active) ||
+      (statusFilter === "normal" &&
+        !summary.low &&
+        !summary.zero &&
+        !summary.negative &&
+        summary.item.active) ||
       (statusFilter === "inactive" && !summary.item.active);
     const locationMatches =
       locationFilter === "all" ||
@@ -330,7 +350,7 @@ export function InventoryWorkspace({
             footer={`${summaries.length} item(ns)`}
           />
           <StatCard
-            title="Itens zerados"
+            title="Itens sem disponível"
             value={zeroCount}
             icon="alert-circle"
             footer={
@@ -338,7 +358,9 @@ export function InventoryWorkspace({
                 ? "Cadastre os saldos para avaliar"
                 : zeroCount
                   ? "Ação imediata"
-                  : "Operação normal"
+                  : negativeBalanceCount
+                    ? "Conferir saldos por local"
+                    : "Operação normal"
             }
           />
           <StatCard
@@ -373,7 +395,12 @@ export function InventoryWorkspace({
         <SegmentedTabs
           active={view}
           items={[
-            { id: "shift", label: "Turno", count: zeroCount + lowCount },
+            {
+              id: "shift",
+              label: "Turno",
+              count: summaries.filter((summary) => summary.zero || summary.low || summary.negative)
+                .length,
+            },
             { id: "pending", label: "Pendências", count: data.pendingActions.length },
             { id: "balances", label: "Saldos", count: summaries.length },
             { id: "counts", label: "Contagem" },
@@ -430,6 +457,35 @@ export function InventoryWorkspace({
           </Button>
         </div>
       </div>
+
+      {negativeBalanceCount > 0 && (
+        <div
+          className="inventory-system-status inventory-system-status--danger inventory-system-status--action"
+          role="alert"
+        >
+          <Icon name="alert-circle" size={18} />
+          <span>
+            <strong>Estoque precisa de conferência</strong>
+            <small>
+              {negativeBalanceCount} posição(ões) de item/local com saldo físico ou disponível
+              negativo. Confira entradas, contagens e reservas.
+            </small>
+          </span>
+          <Button
+            onClick={() => {
+              setQuery("");
+              setKindFilter("all");
+              setLocationFilter("all");
+              setStatusFilter("negative");
+              onViewChange("balances");
+            }}
+            size="sm"
+            variant="secondary"
+          >
+            Conferir saldos
+          </Button>
+        </div>
+      )}
 
       {data.automation.failed > 0 ? (
         <div className="inventory-system-status inventory-system-status--danger" role="alert">
@@ -1262,7 +1318,8 @@ export function InventoryWorkspace({
                 value={statusFilter}
               >
                 <option value="all">Todas as situações</option>
-                <option value="zero">Zerados</option>
+                <option value="zero">Sem disponível</option>
+                <option value="negative">Saldo negativo por local</option>
                 <option value="low">Abaixo do mínimo</option>
                 <option value="normal">Normais</option>
                 <option value="inactive">Inativos</option>
@@ -1307,19 +1364,22 @@ export function InventoryWorkspace({
                     </strong>
                   </div>
                   <div>
-                    <small>Locais</small>
+                    <small>Físico / disponível por local</small>
                     <span className="inventory-location-pills">
                       {data.balances
                         .filter(
                           (balance) =>
                             balance.inventoryItemId === summary.item.id &&
-                            balance.quantity !== 0 &&
                             (locationFilter === "all" || balance.locationId === locationFilter),
                         )
                         .map((balance) => (
                           <span key={balance.locationId}>
                             {locationById.get(balance.locationId)?.name}:{" "}
-                            <strong>{balance.quantity.toLocaleString("pt-BR")}</strong>
+                            <strong>
+                              {balance.quantity.toLocaleString("pt-BR")} /{" "}
+                              {balance.availableQuantity.toLocaleString("pt-BR")}{" "}
+                              {summary.item.unit}
+                            </strong>
                           </span>
                         ))}
                     </span>
@@ -1328,7 +1388,7 @@ export function InventoryWorkspace({
                     tone={
                       !summary.item.active
                         ? "neutral"
-                        : summary.zero
+                        : summary.zero || summary.negative
                           ? "danger"
                           : summary.low
                             ? "warning"
@@ -1337,11 +1397,13 @@ export function InventoryWorkspace({
                   >
                     {!summary.item.active
                       ? "Inativo"
-                      : summary.zero
-                        ? "Zerado"
-                        : summary.low
-                          ? "Repor"
-                          : "Normal"}
+                      : summary.negative
+                        ? "Conferir saldo"
+                        : summary.zero
+                          ? "Sem disponível"
+                          : summary.low
+                            ? "Repor"
+                            : "Normal"}
                   </Badge>
                   <Badge tone="info">{kindLabels[itemKind(summary.item)]}</Badge>
                   <Button
@@ -1654,7 +1716,8 @@ export function InventoryWorkspace({
                   <span>
                     <strong>{location.name}</strong>
                     <small>
-                      {location.code} · {location.kind} · SLA {location.transferSlaMinutes} min
+                      {location.code} · {locationKindLabels[location.kind]} · conferência em até{" "}
+                      {location.transferSlaMinutes} min
                     </small>
                   </span>
                   <Badge tone={location.active ? "success" : "neutral"}>
@@ -1724,6 +1787,10 @@ export function InventoryWorkspace({
                 </Button>
               </div>
             </div>
+            <p className="inventory-context-note">
+              Use um local para cada freezer e defina a origem padrão de cada bebida em Rota de
+              venda. A reposição continua registrada como transferência entre locais.
+            </p>
             <div className="inventory-settings-list">
               {data.locationItemSettings.map((setting) => (
                 <div key={`${setting.locationId}:${setting.inventoryItemId}`}>
@@ -1744,7 +1811,10 @@ export function InventoryWorkspace({
                       {data.items.find((item) => item.productId === route.productId)?.name ??
                         "Produto"}
                     </strong>
-                    <small>Baixa em {locationById.get(route.locationId)?.name ?? "Setor"}</small>
+                    <small>
+                      {route.stationId ? "Rota da estação" : "Origem padrão"}:{" "}
+                      {locationById.get(route.locationId)?.name ?? "Setor"}
+                    </small>
                   </span>
                   <Badge tone={route.active ? "success" : "neutral"}>
                     {route.active ? "Ativa" : "Inativa"}

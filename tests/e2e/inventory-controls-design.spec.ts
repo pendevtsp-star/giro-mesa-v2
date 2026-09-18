@@ -8,8 +8,9 @@ const locationId = "d1111111-1111-4111-8111-111111111111";
 const itemId = "e1111111-1111-4111-8111-111111111111";
 const lotId = "f1111111-1111-4111-8111-111111111111";
 const destinationId = "d2222222-2222-4222-8222-222222222222";
+const productId = "a2222222-2222-4222-8222-222222222222";
 
-async function mockInventory(page: Page) {
+async function mockInventory(page: Page, negativeLocalBalance = false) {
   await page.addInitScript(
     ({ identityId, organizationId, unitId }) => {
       localStorage.setItem(
@@ -243,6 +244,7 @@ async function mockInventory(page: Page) {
             leadTimeDays: 1,
             allowNegative: false,
             kind: "resale",
+            productId,
             active: true,
           },
         ],
@@ -254,6 +256,27 @@ async function mockInventory(page: Page) {
             reservedQuantity: "0",
             availableQuantity: "18",
             averageCostCents: 250,
+          },
+          ...(negativeLocalBalance
+            ? [
+                {
+                  locationId: destinationId,
+                  inventoryItemId: itemId,
+                  quantity: "-2",
+                  reservedQuantity: "0",
+                  availableQuantity: "-2",
+                  averageCostCents: 250,
+                },
+              ]
+            : []),
+        ],
+        issueRoutes: [
+          {
+            id: "b2222222-2222-4222-8222-222222222222",
+            productId,
+            stationId: null,
+            locationId,
+            active: true,
           },
         ],
         lots: [
@@ -388,6 +411,10 @@ test("envia a lista de transferência após limpar os campos de inclusão", asyn
   await dialog.getByRole("combobox", { name: /^Origem/ }).selectOption(locationId);
   await dialog.getByRole("combobox", { name: /^Destino/ }).selectOption(destinationId);
   await dialog.getByRole("combobox", { name: /^Item de estoque/ }).selectOption(itemId);
+  await expect(
+    dialog.getByText("Origem: 18 UN físicos · 18 disponíveis. Destino: 0 UN físicos."),
+  ).toBeVisible();
+  await expect(dialog.getByText(/entra no destino após a conferência/)).toBeVisible();
   await dialog.getByRole("combobox", { name: /^Lote/ }).selectOption(lotId);
   await dialog.getByLabel("Quantidade", { exact: true }).fill("1,5");
   await dialog.getByLabel("Motivo", { exact: true }).fill("Reposição do bar");
@@ -408,4 +435,105 @@ test("envia a lista de transferência após limpar os campos de inclusão", asyn
       lines: [{ inventoryItemId: itemId, lotId, quantity: "1.5" }],
     },
   ]);
+});
+
+test("carrega a origem padrão existente e permite trocar o freezer em 375 px", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "A jornada cobre o viewport móvel diretamente.");
+  await mockInventory(page);
+  const commands: unknown[] = [];
+  await page.route("**/management/inventory/issue-routes", (route) => {
+    commands.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, json: { id: "route" } });
+  });
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:3112/#/inventory?inventoryView=settings");
+  await page.getByRole("button", { name: "Rota de venda", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Origem da baixa por venda" });
+  await dialog.getByRole("combobox", { name: "Produto", exact: true }).selectOption(productId);
+  await expect(dialog.getByRole("combobox", { name: "Local padrão de saída" })).toHaveValue(
+    locationId,
+  );
+  await expect(dialog.getByText(/Rota atual carregada/)).toBeVisible();
+  await dialog.getByRole("combobox", { name: "Local padrão de saída" }).selectOption(destinationId);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("inventory-freezer-route-375.png"),
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Salvar rota" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(commands).toEqual([{ productId, locationId: destinationId, active: true }]);
+  await page.getByRole("button", { name: "Rota de venda", exact: true }).click();
+  await expect(dialog.getByRole("combobox", { name: "Produto", exact: true })).toHaveValue("");
+  await expect(dialog.getByRole("combobox", { name: "Local padrão de saída" })).toHaveValue("");
+});
+
+test("destaca saldo local negativo mesmo com saldo total positivo", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "A jornada cobre o viewport móvel diretamente.");
+  await mockInventory(page, true);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:3112/#/inventory");
+  const alert = page.getByRole("alert").filter({ hasText: "Estoque precisa de conferência" });
+  await expect(alert).toContainText("1 posição(ões) de item/local");
+  await alert.getByRole("button", { name: "Conferir saldos" }).click();
+  await expect(page.getByRole("combobox", { name: "Filtrar por situação" })).toHaveValue(
+    "negative",
+  );
+  const balance = page.locator(".inventory-balance-row");
+  await expect(balance).toHaveCount(1);
+  await expect(balance).toContainText("16 UN");
+  await expect(balance).toContainText("Bar: -2 / -2 UN");
+  await expect(balance).toContainText("Conferir saldo");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("inventory-negative-local-375.png"),
+    fullPage: true,
+  });
+});
+
+test("cadastra revenda por caixa antes de vincular o Cardápio em 375 px", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "A jornada cobre o viewport móvel diretamente.");
+  await mockInventory(page);
+  const commands: Record<string, unknown>[] = [];
+  await page.route("**/management/inventory/items", (route) => {
+    commands.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, json: { id: "e2222222-2222-4222-8222-222222222222" } });
+  });
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto("http://127.0.0.1:3112/#/inventory");
+  await page.getByRole("button", { name: "Novo item", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Novo item de estoque" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Nome do item", { exact: true }).fill("Cerveja 600 ml");
+  await dialog.getByRole("combobox", { name: "Tipo de item" }).selectOption("resale");
+  await dialog.getByRole("combobox", { name: "Unidade de estoque" }).selectOption("un");
+  await dialog.getByLabel("Unidade de compra", { exact: true }).fill("caixa");
+  await dialog.getByLabel("Conversão para estoque").fill("24");
+  await expect(dialog.getByRole("combobox", { name: /Produto do Cardápio/ })).toHaveValue("");
+  await expect(
+    dialog.getByText(/Vincule um produto do Cardápio para configurar vasilhames/),
+  ).toBeVisible();
+  await expect(dialog.getByRole("combobox", { name: "Vasilhame vinculado" })).toHaveCount(0);
+  await expect(dialog.getByRole("button", { name: "Salvar item" })).toBeEnabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath("inventory-resale-unlinked-375.png"),
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Salvar item" }).click();
+  await expect(dialog).not.toBeVisible();
+  expect(commands).toHaveLength(1);
+  expect(commands[0]).toMatchObject({
+    name: "Cerveja 600 ml",
+    kind: "resale",
+    unit: "un",
+    purchaseUnit: "caixa",
+    purchaseToStockFactor: "24",
+  });
+  expect(commands[0]).not.toHaveProperty("productId");
+  expect(commands[0]).not.toHaveProperty("returnableContainerItemId");
 });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  aggregateProductSchema,
   bulkPriceSchema,
   importCatalogSchema,
   productSchema,
@@ -23,6 +24,15 @@ const product = {
 };
 
 describe("advanced catalog boundaries", () => {
+  it("accepts an inventory link only when creating a resale product", () => {
+    const linked = { ...product, productType: "resale", inventoryItemId: categoryId };
+    assert.equal(productSchema.safeParse(linked).success, true);
+    assert.equal(productSchema.safeParse({ ...linked, inventoryItemId: "invalid" }).success, false);
+    assert.equal(productSchema.safeParse({ ...linked, productType: "prepared" }).success, false);
+    assert.equal(productSchema.safeParse({ ...linked, productType: undefined }).success, false);
+    assert.equal("inventoryItemId" in aggregateProductSchema.parse(linked), false);
+  });
+
   it("accepts a nullable schedule and rejects embedded image data", () => {
     assert.equal(productSchema.safeParse(product).success, true);
     assert.equal(

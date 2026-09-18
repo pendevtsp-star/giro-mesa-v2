@@ -16,11 +16,6 @@ Directory-based community: tests/e2e
 | test:commercial landing and login meet WCAG AA@L11 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/accessibility.spec.ts | 11-18 |
 | test:public menu entry point meets WCAG AA@L20 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/accessibility.spec.ts | 20-23 |
 | document | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/commercial-api-fixture.mjs | 3-11 |
-| mockFinance | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 8-184 |
-| json | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 16-16 |
-| test:financeiro mantém agenda e ações legíveis no desktop e em 375 px@L186 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 186-211 |
-| test:A jornada cobre 1440 px e 375 px.@L189 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 189-189 |
-| test:navegação para outro módulo não preserva a rolagem do financeiro@L213 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/finance-design.spec.ts | 213-231 |
 | test:login operacional mantém campos legíveis e associados@L4 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/ops-auth-design.spec.ts | 4-34 |
 | test:A própria jornada cobre desktop e mobile.@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/ops-auth-design.spec.ts | 5-5 |
 | test:backoffice mostra a prontidão DoseClub sem overflow em 375 px@L7 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/tests/e2e/platform-doseclub.spec.ts | 7-120 |
@@ -67,36 +62,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `expect` (121 edge(s))
-- `getByRole` (70 edge(s))
-- `toBeVisible` (63 edge(s))
-- `endsWith` (28 edge(s))
-- `goto` (27 edge(s))
-- `fulfill` (25 edge(s))
-- `getByText` (24 edge(s))
-- `click` (23 edge(s))
-- `evaluate` (21 edge(s))
-- `toBe` (18 edge(s))
+- `expect` (111 edge(s))
+- `getByRole` (64 edge(s))
+- `toBeVisible` (56 edge(s))
+- `goto` (25 edge(s))
+- `fulfill` (23 edge(s))
+- `endsWith` (23 edge(s))
+- `getByText` (19 edge(s))
+- `click` (18 edge(s))
 - `locator` (17 edge(s))
-- `route` (16 edge(s))
-- `getByLabel` (15 edge(s))
+- `evaluate` (16 edge(s))
+- `toBe` (16 edge(s))
+- `route` (15 edge(s))
 - `toHaveAttribute` (14 edge(s))
-- `setViewportSize` (12 edge(s))
+- `getByLabel` (13 edge(s))
+- `setViewportSize` (10 edge(s))
 
 ### Incoming
 
-- `expect` (120 edge(s))
-- `getByRole` (70 edge(s))
-- `toBeVisible` (63 edge(s))
-- `goto` (27 edge(s))
-- `getByText` (24 edge(s))
-- `click` (23 edge(s))
-- `evaluate` (21 edge(s))
-- `toBe` (18 edge(s))
+- `expect` (110 edge(s))
+- `getByRole` (64 edge(s))
+- `toBeVisible` (56 edge(s))
+- `goto` (25 edge(s))
+- `getByText` (19 edge(s))
+- `click` (18 edge(s))
 - `locator` (17 edge(s))
+- `evaluate` (16 edge(s))
+- `toBe` (16 edge(s))
 - `fulfill` (16 edge(s))
-- `getByLabel` (15 edge(s))
 - `endsWith` (15 edge(s))
 - `toHaveAttribute` (14 edge(s))
 - `route` (13 edge(s))
-- `setViewportSize` (12 edge(s))
+- `getByLabel` (13 edge(s))
+- `setViewportSize` (10 edge(s))

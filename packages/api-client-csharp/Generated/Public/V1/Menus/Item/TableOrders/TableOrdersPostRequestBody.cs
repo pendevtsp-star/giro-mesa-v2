@@ -12,6 +12,8 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
     public partial class TableOrdersPostRequestBody : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The expectedTotalCents property</summary>
+        public int? ExpectedTotalCents { get; set; }
         /// <summary>The items property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -38,6 +40,7 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "expectedTotalCents", n => { ExpectedTotalCents = n.GetIntValue(); } },
                 { "items", n => { Items = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders.TableOrdersPostRequestBody_items>(global::GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders.TableOrdersPostRequestBody_items.CreateFromDiscriminatorValue)?.AsList(); } },
             };
         }
@@ -48,6 +51,7 @@ namespace GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteIntValue("expectedTotalCents", ExpectedTotalCents);
             writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.Public.V1.Menus.Item.TableOrders.TableOrdersPostRequestBody_items>("items", Items);
         }
     }

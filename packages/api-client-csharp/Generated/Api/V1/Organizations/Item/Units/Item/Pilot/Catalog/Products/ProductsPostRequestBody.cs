@@ -102,6 +102,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
 #else
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl ImageUrl { get; set; }
 #endif
+        /// <summary>The inventoryItemId property</summary>
+        public Guid? InventoryItemId { get; set; }
         /// <summary>The modifierGroupIds property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -244,6 +246,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
                 { "estimatedPrepTimeMinutes", n => { EstimatedPrepTimeMinutes = n.GetIntValue(); } },
                 { "fiscal", n => { Fiscal = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal.CreateFromDiscriminatorValue); } },
                 { "imageUrl", n => { ImageUrl = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl.CreateFromDiscriminatorValue); } },
+                { "inventoryItemId", n => { InventoryItemId = n.GetGuidValue(); } },
                 { "modifierGroupIds", n => { ModifierGroupIds = n.GetCollectionOfPrimitiveValues<Guid?>()?.AsList(); } },
                 { "name", n => { Name = n.GetStringValue(); } },
                 { "pairing", n => { Pairing = n.GetObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing>(global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing.CreateFromDiscriminatorValue); } },
@@ -282,6 +285,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.
             writer.WriteIntValue("estimatedPrepTimeMinutes", EstimatedPrepTimeMinutes);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody_fiscal>("fiscal", Fiscal);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_imageUrl>("imageUrl", ImageUrl);
+            writer.WriteGuidValue("inventoryItemId", InventoryItemId);
             writer.WriteCollectionOfPrimitiveValues<Guid?>("modifierGroupIds", ModifierGroupIds);
             writer.WriteStringValue("name", Name);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Catalog.Products.ProductsPostRequestBody.ProductsPostRequestBody_pairing>("pairing", Pairing);

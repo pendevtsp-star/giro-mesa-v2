@@ -147,7 +147,7 @@ export async function getPublicMenu(
   }
   try {
     const response = await fetch(`${apiUrl}/public/v1/menus/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (!response.ok) throw new Error("Menu indisponível");
     const snapshot = normalizePublicMenuSnapshot(await response.json());

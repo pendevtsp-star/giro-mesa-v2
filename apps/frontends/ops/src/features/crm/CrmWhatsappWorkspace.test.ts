@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiClientError } from "../../api";
-import { conversationNeedsReply, requestEvolutionQr } from "./CrmWhatsappWorkspace";
-import { crmError } from "./crm.ui";
+import {
+  conversationNeedsReply,
+  requestEvolutionQr,
+  whatsappStatusLabel,
+} from "./CrmWhatsappWorkspace";
+import { crmError, crmFailureMessage } from "./crm.ui";
 
 describe("QR Code da Evolution Go", () => {
   it("configura a integração ausente antes de buscar o QR Code", async () => {
@@ -21,10 +25,37 @@ describe("QR Code da Evolution Go", () => {
     expect(configure).not.toHaveBeenCalled();
   });
 
-  it("explica quando a licença do provedor ainda não foi ativada", () => {
-    expect(crmError(new ApiClientError("erro", 503, "EVOLUTION_HTTP_503", true), "erro")).toBe(
-      "A licença da Evolution Go ainda não foi ativada neste ambiente.",
+  it("explica indisponibilidade sem atribuir todo 503 à licença", () => {
+    const message = crmError(new ApiClientError("erro", 503, "EVOLUTION_HTTP_503", true), "erro");
+    expect(message).toContain("indisponível");
+    expect(message).not.toMatch(/licença|Evolution|503/);
+    expect(crmFailureMessage("EVOLUTION_HTTP_503", "erro")).toBe(message);
+  });
+
+  it("preserva orientações operacionais e não expõe erros internos", () => {
+    const fallback = "Não foi possível concluir. Tente novamente.";
+    expect(crmError(new Error("secret provider response"), fallback)).toBe(fallback);
+    expect(
+      crmError(new ApiClientError("CUSTOMER_INSERT_FAILED", 500, "UNKNOWN", true), fallback),
+    ).toBe(fallback);
+    expect(
+      crmError(new ApiClientError("Sua sessão expirou.", 401, "UNAUTHORIZED", false), fallback),
+    ).toBe("Sua sessão expirou.");
+    expect(crmFailureMessage("WHATSAPP_DELIVERY_UNCERTAIN", fallback)).toContain(
+      "antes de reenviar",
     );
+    expect(crmFailureMessage("UNKNOWN_CODE", fallback)).toBe(fallback);
+    expect(whatsappStatusLabel("queued")).toBe("Na fila");
+    expect(whatsappStatusLabel("suppressed")).toContain("regras de envio");
+    expect(whatsappStatusLabel("unknown_internal_status")).toBe("Aguardando atualização");
+  });
+
+  it("não pede QR se a configuração falha", async () => {
+    const failure = new ApiClientError("erro", 503, "EVOLUTION_HTTP_503", true);
+    const configure = vi.fn().mockRejectedValue(failure);
+    const load = vi.fn();
+    await expect(requestEvolutionQr(false, configure, load)).rejects.toBe(failure);
+    expect(load).not.toHaveBeenCalled();
   });
 });
 

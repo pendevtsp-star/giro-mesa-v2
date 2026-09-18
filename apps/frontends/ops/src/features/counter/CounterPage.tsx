@@ -136,6 +136,11 @@ export function counterPaymentAttemptIdFromHash(hash: string): string | null {
   return attemptId || null;
 }
 
+export function counterActionFromHash(hash: string): "new" | null {
+  const query = hash.split("?")[1];
+  return query && new URLSearchParams(query).get("action") === "new" ? "new" : null;
+}
+
 export function counterCustomerOptionValue(customer: Pick<Customer, "name" | "phone" | "email">) {
   const contact = customer.phone ?? customer.email;
   return contact ? `${customer.name} · ${contact}` : customer.name;
@@ -202,6 +207,7 @@ export function RealCounterPage({
   const overviewRef = useRef<HTMLElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const quickOpenFormRef = useRef<HTMLFormElement>(null);
   const queueScrollRef = useRef({ x: 0, y: 0 });
   const restoringOverviewRef = useRef(false);
 
@@ -244,6 +250,9 @@ export function RealCounterPage({
   );
   const [stageFilter, setStageFilter] = useState<CounterQueueStage>("all");
   const [page, setPage] = useState(1);
+  const [newOrderRequested, setNewOrderRequested] = useState(() =>
+    typeof window === "undefined" ? false : counterActionFromHash(window.location.hash) === "new",
+  );
   const [guests, setGuests] = useState(1);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
@@ -265,7 +274,10 @@ export function RealCounterPage({
       const tabId = counterTabIdFromHash(window.location.hash);
       setSelected(tabId);
       setPaymentAttemptId(counterPaymentAttemptIdFromHash(window.location.hash));
+      const isNewOrder = counterActionFromHash(window.location.hash) === "new";
+      setNewOrderRequested(isNewOrder);
     };
+    syncSelectedTab();
     window.addEventListener("hashchange", syncSelectedTab);
     return () => window.removeEventListener("hashchange", syncSelectedTab);
   }, []);
@@ -282,6 +294,25 @@ export function RealCounterPage({
     parseCounterQueue,
     `${stageFilter}:${channelFilter}:${debouncedQuery}:${page}`,
   );
+  useEffect(() => {
+    if (!newOrderRequested || embedded || queue.state.status !== "ready") return;
+    const frame = window.requestAnimationFrame(() => {
+      if (!selected) {
+        const control =
+          quickOpenFormRef.current?.querySelector<HTMLElement>("select, input, button");
+        if (!control) return;
+        control.focus();
+      }
+      const url = new URL(window.location.href);
+      const [route = "#/counter", query = ""] = url.hash.split("?");
+      const params = new URLSearchParams(query);
+      params.delete("action");
+      url.hash = params.size ? `${route}?${params}` : route;
+      window.history.replaceState(window.history.state, "", url);
+      setNewOrderRequested(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [embedded, newOrderRequested, queue.state.status, selected]);
   const floor = useRemote(
     scope,
     () => scope.load("floor", undefined, () => api.pilot.floor(scope.organizationId, scope.unitId)),
@@ -437,6 +468,7 @@ export function RealCounterPage({
                   <form
                     className="inline-form counter-open-form"
                     onSubmit={(event) => void open(event)}
+                    ref={quickOpenFormRef}
                   >
                     <Label className="grid gap-1.5">
                       Atendimento

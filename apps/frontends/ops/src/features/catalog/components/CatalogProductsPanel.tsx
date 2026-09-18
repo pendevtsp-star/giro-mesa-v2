@@ -47,7 +47,7 @@ type CatalogProductsPanelProps = {
   toggleAvailability: (product: CatalogProduct) => Promise<void> | void;
   toggleCategoryAvailability: (categoryId: string) => Promise<void> | void;
   toggleCategoryCollapse: (categoryId: string) => void;
-  updateProductInlineDeliveryPrice: (productId: string, priceCents: number) => void;
+  updateProductInlineDeliveryPrice: (productId: string, priceCents: number | null) => void;
   updateProductInlinePrice: (productId: string, priceCents: number) => void;
   viewMode: "grid" | "list" | "table";
 };
@@ -188,7 +188,7 @@ function ProductView({
     props.setEditingProduct({ ...product, description: product.description || "" });
     props.setEditingProductPrice((product.priceCents / 100).toFixed(2).replace(".", ","));
     props.setEditingProductDeliveryPrice(
-      product.deliveryPriceCents
+      product.deliveryPriceCents != null
         ? (product.deliveryPriceCents / 100).toFixed(2).replace(".", ",")
         : "",
     );
@@ -238,7 +238,7 @@ function ProductTable({
   callbacks: ProductCallbacks;
   catalogLanguage: CatalogProductsPanelProps["catalogLanguage"];
   items: CatalogProduct[];
-  onUpdateDeliveryPrice: (productId: string, priceCents: number) => void;
+  onUpdateDeliveryPrice: (productId: string, priceCents: number | null) => void;
   onUpdatePrice: (productId: string, priceCents: number) => void;
 }) {
   return (
@@ -248,18 +248,21 @@ function ProductTable({
           <tr>
             <th>Status</th>
             <th>Item / Prato</th>
-            <th>Preço Salão (R$)</th>
-            <th>Preço para entrega (R$)</th>
+            <th>Salão / balcão (R$)</th>
+            <th>Delivery (R$)</th>
             <th>CMV %</th>
-            <th>Margem</th>
+            <th>Margem bruta estimada</th>
             <th className="catalog-products-table__actions-heading">Ações Rápidas</th>
           </tr>
         </thead>
         <tbody>
           {items.map((product) => {
-            const cost = product.costCents || 0;
-            const cmv = product.priceCents > 0 ? Math.round((cost / product.priceCents) * 100) : 0;
-            const margin = product.priceCents - cost;
+            const cost = productCost(product);
+            const cmv =
+              cost != null && product.priceCents > 0
+                ? Math.round((cost / product.priceCents) * 100)
+                : null;
+            const margin = cost == null ? null : product.priceCents - cost;
 
             return (
               <tr data-available={product.available} key={product.id}>
@@ -279,6 +282,7 @@ function ProductTable({
                     {product.imageUrl && <img alt={product.name} src={product.imageUrl} />}
                     <div>
                       <strong>{translatedName(product, catalogLanguage)}</strong>
+                      <ProductInventorySummary product={product} />
                       <div className="gm-observability-row">
                         {product.ncm && <span>NCM {product.ncm}</span>}
                         {!!product.modifierGroupIds?.length && (
@@ -293,8 +297,9 @@ function ProductTable({
                 <td>
                   <QuickPriceInput
                     defaultValue={product.priceCents}
+                    label={`Preço salão / balcão de ${product.name}`}
                     onCommit={(priceCents) =>
-                      priceCents > 0 && onUpdatePrice(product.id, priceCents)
+                      priceCents != null && priceCents >= 0 && onUpdatePrice(product.id, priceCents)
                     }
                     title="Edição rápida: digite e clique fora para salvar"
                   />
@@ -302,18 +307,25 @@ function ProductTable({
                 <td>
                   <QuickPriceInput
                     defaultValue={product.deliveryPriceCents}
+                    label={`Preço delivery de ${product.name}`}
                     onCommit={(priceCents) => onUpdateDeliveryPrice(product.id, priceCents)}
-                    placeholder="—"
-                    title="Preço para entrega: digite e clique fora para salvar"
+                    placeholder={(product.priceCents / 100).toFixed(2).replace(".", ",")}
+                    title="Digite e clique fora para salvar. Deixe vazio para usar o preço do salão."
                   />
+                  <small className="catalog-price-note">
+                    {product.deliveryPriceCents == null ? "Usa preço do salão" : "Preço específico"}
+                  </small>
                 </td>
                 <td>
-                  <strong className="catalog-products-table__cmv" data-tone={cmvTone(cmv)}>
-                    {cmv > 0 ? `${cmv}%` : "—"}
+                  <strong
+                    className="catalog-products-table__cmv"
+                    data-tone={cmv == null ? undefined : cmvTone(cmv)}
+                  >
+                    {cmv == null ? "—" : `${cmv}%`}
                   </strong>
                 </td>
                 <td>
-                  <strong>{margin > 0 ? formatMoney(margin) : "—"}</strong>
+                  <strong>{margin == null ? "—" : formatMoney(margin)}</strong>
                 </td>
                 <td>
                   <ProductIconActions callbacks={callbacks} product={product} />
@@ -329,12 +341,14 @@ function ProductTable({
 
 function QuickPriceInput({
   defaultValue,
+  label,
   onCommit,
   placeholder,
   title,
 }: {
   defaultValue?: number | null;
-  onCommit: (priceCents: number) => void;
+  label: string;
+  onCommit: (priceCents: number | null) => void;
   placeholder?: string;
   title: string;
 }) {
@@ -348,8 +362,13 @@ function QuickPriceInput({
     <Label className="catalog-quick-price">
       <span>R$</span>
       <Input
+        aria-label={label}
+        inputMode="decimal"
         onBlur={() => {
-          onCommit(priceToCents(value));
+          const priceCents = value.trim() ? priceToCents(value) : null;
+          if (priceCents !== (defaultValue ?? null) && (priceCents == null || priceCents >= 0)) {
+            onCommit(priceCents);
+          }
           setValue(confirmedValue);
         }}
         onChange={(event) => setValue(event.target.value)}
@@ -397,12 +416,7 @@ function ProductList({
                 </p>
               </div>
             </div>
-            <div className="catalog-product-card__price">
-              <strong>{formatMoney(product.priceCents)}</strong>
-              {product.deliveryPriceCents != null && (
-                <small>Delivery: {formatMoney(product.deliveryPriceCents)}</small>
-              )}
-            </div>
+            <ProductPrices product={product} />
           </div>
           <div className="catalog-product-card__actions">
             <ProductOperationalActions callbacks={callbacks} product={product} />
@@ -411,6 +425,26 @@ function ProductList({
         </Card>
       ))}
     </div>
+  );
+}
+
+function ProductPrices({ product }: { product: CatalogProduct }) {
+  return (
+    <dl className="catalog-product-prices" aria-label={`Preços de ${product.name}`}>
+      <div>
+        <dt>Salão / balcão</dt>
+        <dd>{formatMoney(product.priceCents)}</dd>
+      </div>
+      <div>
+        <dt>Delivery</dt>
+        <dd>
+          {formatMoney(product.deliveryPriceCents ?? product.priceCents)}
+          <small className="catalog-price-note">
+            {product.deliveryPriceCents == null ? "Usa preço do salão" : "Preço específico"}
+          </small>
+        </dd>
+      </div>
+    </dl>
   );
 }
 
@@ -451,11 +485,12 @@ function ProductGrid({
             <div className="catalog-product-grid__content">
               <div className="catalog-product-grid__heading">
                 <h3>{translatedName(product, catalogLanguage)}</h3>
-                <strong>{formatMoney(product.priceCents)}</strong>
               </div>
               {translatedDescription(product, catalogLanguage) && (
                 <p>{translatedDescription(product, catalogLanguage)}</p>
               )}
+              <ProductPrices product={product} />
+              <ProductInventorySummary product={product} />
               <div className="gm-observability-row">
                 {product.productType === "resale" && (
                   <span className="gm-pill" data-tone="info">
@@ -467,13 +502,10 @@ function ProductGrid({
                     <Icon name="clock" size={11} /> {product.estimatedPrepTimeMinutes}m
                   </span>
                 )}
-                {product.costCents != null && product.priceCents > 0 && (
+                {productCost(product) != null && product.priceCents > 0 && (
                   <span className="gm-pill" data-tone="positive">
-                    Margem {marginPercent(product)}%
+                    Margem bruta estimada {marginPercent(product)}%
                   </span>
-                )}
-                {product.deliveryPriceCents != null && (
-                  <span className="gm-pill">Deliv: {formatMoney(product.deliveryPriceCents)}</span>
                 )}
               </div>
             </div>
@@ -550,9 +582,9 @@ function ProductMetadata({
       {product.productType === "resale" && (
         <span className="gm-pill" data-tone="info">
           <Icon name="catalog" size={12} /> Revenda
-          {product.currentStockUnits != null ? ` (${product.currentStockUnits} un em estoque)` : ""}
         </span>
       )}
+      <ProductInventorySummary product={product} />
       {product.eanBarcode && <span className="gm-pill">EAN: {product.eanBarcode}</span>}
       {product.availabilitySchedule?.windows[0] && (
         <span className="gm-pill" data-tone="purple">
@@ -568,7 +600,7 @@ function ProductMetadata({
           <Icon name="alerts" size={12} />
           {product.dailyStockRemaining === 0
             ? "Esgotado por hoje"
-            : `Restam ${product.dailyStockRemaining} un`}
+            : `Limite diário: restam ${product.dailyStockRemaining} un`}
         </span>
       )}
       {product.estimatedPrepTimeMinutes != null && (
@@ -576,13 +608,13 @@ function ProductMetadata({
           <Icon name="clock" size={12} /> {product.estimatedPrepTimeMinutes} min
         </span>
       )}
-      {product.costCents != null && product.priceCents > 0 && (
+      {productCost(product) != null && product.priceCents > 0 && (
         <span
           className="gm-pill"
           data-tone={margin >= 60 ? "positive" : "warning"}
-          title={`Custo: ${formatMoney(product.costCents)}`}
+          title={`Custo de referência: ${formatMoney(productCost(product) ?? 0)}. Antes de taxas e despesas.`}
         >
-          <Icon name="finance" size={12} /> Margem {margin}%
+          <Icon name="finance" size={12} /> Margem bruta estimada {margin}%
         </span>
       )}
       {!!product.suggestedProductIds?.length && (
@@ -776,9 +808,40 @@ function discountedPrice(
   return Math.max(0, priceCents - promotion.discountValue);
 }
 
+function productCost(product: CatalogProduct) {
+  return product.inventory?.estimatedCostCents ?? product.costCents;
+}
+
 function marginPercent(product: CatalogProduct) {
-  if (product.costCents == null || product.priceCents <= 0) return 0;
-  return Math.round(((product.priceCents - product.costCents) / product.priceCents) * 100);
+  const cost = productCost(product);
+  if (cost == null || product.priceCents <= 0) return 0;
+  return Math.round(((product.priceCents - cost) / product.priceCents) * 100);
+}
+
+function ProductInventorySummary({ product }: { product: CatalogProduct }) {
+  const inventory = product.inventory;
+  if (!inventory) return null;
+  const quantity = (value: number) => value.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+  if (inventory.physicalQuantity != null && inventory.availableQuantity != null) {
+    return (
+      <span
+        className="gm-pill"
+        title="Saldo físico e saldo após reservas e bloqueios, somados nos locais ativos. Confira a origem de baixa no estoque."
+      >
+        Físico: {quantity(inventory.physicalQuantity)} {inventory.stockUnit} · Disponível:{" "}
+        {quantity(inventory.availableQuantity)} {inventory.stockUnit}
+      </span>
+    );
+  }
+  return (
+    <span className="gm-pill">
+      {inventory.recipeVersion
+        ? `Ficha técnica v${inventory.recipeVersion}`
+        : product.productType === "resale"
+          ? "Sem vínculo de estoque"
+          : "Ficha técnica opcional"}
+    </span>
+  );
 }
 
 function cmvTone(cmv: number) {

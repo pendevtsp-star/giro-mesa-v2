@@ -27,7 +27,7 @@ const tab = {
   totalCents: 0,
 };
 
-type CreateBehavior = "timeout-once" | "permanent";
+type CreateBehavior = "timeout-once" | "permanent" | "stock-warning";
 type CounterCalls = { createKeys: string[]; sendKeys: string[] };
 
 async function mockCounterApi(
@@ -43,7 +43,7 @@ async function mockCounterApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "counter-continuity-e2e",
-        schemaVersion: 82,
+        schemaVersion: 84,
         database: "up",
         integrations: {},
         capabilities: [
@@ -79,7 +79,7 @@ async function mockCounterApi(
         });
         return;
       }
-      if (!acceptedCreateKeys.has(key)) {
+      if (behavior === "timeout-once" && !acceptedCreateKeys.has(key)) {
         acceptedCreateKeys.add(key);
         await route.fulfill({ status: 503, json: { code: "API_UNAVAILABLE", message: "Timeout" } });
         return;
@@ -89,6 +89,19 @@ async function mockCounterApi(
     }
     if (request.method() === "POST" && url.pathname.endsWith("/orders/order-continuity/send")) {
       calls.sendKeys.push(request.headers()["idempotency-key"]);
+      if (
+        behavior === "stock-warning" &&
+        request.postDataJSON()?.acknowledgeInventoryShortage !== true
+      ) {
+        await route.fulfill({
+          status: 409,
+          json: {
+            code: "INVENTORY_SHORTAGE_CONFIRMATION_REQUIRED",
+            products: [{ id: "product-espresso", name: "Café Continuidade" }],
+          },
+        });
+        return;
+      }
       await route.fulfill({ json: { order: { id: "order-continuity", status: "sent" } } });
       return;
     }
@@ -238,8 +251,46 @@ async function openCounter(page: Page) {
 
 async function addAndSend(page: Page) {
   await page.getByRole("button", { name: "Adicionar Café Continuidade", exact: true }).click();
+  if (!(await page.getByRole("button", { name: /Enviar 1 item/ }).isVisible())) {
+    await page.getByRole("button", { name: /Comanda 1 item/ }).click();
+  }
   await page.getByRole("button", { name: /Enviar 1 item/ }).click();
 }
+
+test("atalho de nova comanda foca o formulário sem enviar e preserva o alvo existente", async ({
+  page,
+}) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  const postRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/v1/")) {
+      postRequests.push(request.url());
+    }
+  });
+  await mockCounterApi(page, "timeout-once", calls);
+  await page.goto("/#/counter?action=new");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/#/counter?action=new");
+    const firstField = page
+      .locator(".counter-open-form")
+      .getByRole("combobox", { name: /^Atendimento/ });
+    await expect(firstField).toBeFocused();
+    await expect(firstField).toBeInViewport();
+    await expect(page).toHaveURL(/#\/counter$/);
+  }
+
+  await page.goto(`/#/counter?action=new&tab=${tab.id}&paymentAttempt=attempt-counter`);
+  await expect(page.getByRole("button", { name: "Voltar para a fila" })).toBeVisible();
+  await expect(page).toHaveURL(
+    new RegExp(`#\\/counter\\?tab=${tab.id}&paymentAttempt=attempt-counter$`),
+  );
+  expect(postRequests).toEqual([]);
+  expect(calls.createKeys).toEqual([]);
+  expect(calls.sendKeys).toEqual([]);
+});
 
 test("retoma após timeout e recarga com a mesma idempotência", async ({ page }) => {
   const calls: CounterCalls = { createKeys: [], sendKeys: [] };
@@ -259,6 +310,43 @@ test("retoma após timeout e recarga com a mesma idempotência", async ({ page }
   expect(calls.createKeys.length).toBeGreaterThanOrEqual(2);
   expect(new Set(calls.createKeys)).toEqual(new Set([calls.createKeys[0]]));
   expect(calls.sendKeys).toHaveLength(1);
+});
+
+test("avisa estoque sem expor dados internos e envia somente após confirmação em 375 px", async ({
+  page,
+}, testInfo) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "stock-warning", calls);
+  await page.setViewportSize({ width: 375, height: 850 });
+  await openCounter(page);
+  await addAndSend(page);
+  const warning = page.getByRole("dialog", { name: "Conferir estoque" });
+  await expect(warning).toContainText("Café Continuidade");
+  await expect(warning).toContainText("ficará registrada");
+  expect(calls.sendKeys).toHaveLength(1);
+  await expectNoHorizontalOverflow(page);
+  await warning.screenshot({ path: testInfo.outputPath("stock-warning-375.png") });
+  await warning.getByRole("button", { name: "Lançar mesmo assim" }).click();
+  await expect(warning).not.toBeVisible();
+  await expect(page.getByText("Pedido enviado à produção.")).toBeVisible();
+  expect(calls.sendKeys).toHaveLength(2);
+  expect(calls.sendKeys[0]).toBe(calls.sendKeys[1]);
+  expect(calls.createKeys).toHaveLength(1);
+});
+
+test("voltar do aviso de estoque não envia nem duplica o pedido", async ({ page }) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "stock-warning", calls);
+  await openCounter(page);
+  await addAndSend(page);
+  const warning = page.getByRole("dialog", { name: "Conferir estoque" });
+  await warning.getByRole("button", { name: "Voltar ao pedido" }).click();
+  await expect(warning).not.toBeVisible();
+  await expect(
+    page.getByText("Pedido não enviado. Confira os itens antes de lançar."),
+  ).toBeVisible();
+  expect(calls.sendKeys).toHaveLength(1);
+  expect(calls.createKeys).toHaveLength(1);
 });
 
 async function expectNoHorizontalOverflow(page: Page) {

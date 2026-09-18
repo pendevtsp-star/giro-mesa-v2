@@ -23,6 +23,7 @@ import {
 } from "../../management.shared";
 import { routeHref } from "../../router";
 import { canAccess } from "../../rules";
+import { overviewDestinationHref } from "./dashboard-navigation";
 import { ShiftHandoverPanel } from "./ShiftHandoverPanel";
 
 export function overviewPriorityHref(item: OverviewData["priorities"][number]): string {
@@ -39,7 +40,7 @@ export function overviewPriorityHref(item: OverviewData["priorities"][number]): 
   return base;
 }
 
-function metricIcon(metric: OverviewData["metrics"][number]): IconName {
+function metricIcon(metric: Pick<OverviewData["metrics"][number], "id" | "route">): IconName {
   if (metric.route === "reports" || metric.id.includes("sales") || metric.id.includes("revenue")) {
     return "finance";
   }
@@ -57,6 +58,20 @@ function metricIcon(metric: OverviewData["metrics"][number]): IconName {
   }
   if (metric.route === "delivery") {
     return "delivery";
+  }
+  if (
+    [
+      "counter",
+      "cash",
+      "people",
+      "purchases",
+      "reservations",
+      "multiunit",
+      "catalog",
+      "crm",
+    ].includes(metric.route)
+  ) {
+    return metric.route as IconName;
   }
   return "dashboard";
 }
@@ -90,6 +105,7 @@ export function RealDashboard({
   const [alertDigest, setAlertDigest] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<"all" | "mine" | "unassigned">("all");
   const [showAllPriorities, setShowAllPriorities] = useState(false);
+  const [showAllActivity, setShowAllActivity] = useState(false);
   const visited = useRef(false);
   const visitedScope = useRef("");
   const seenPriorities = useRef<Set<string> | null>(null);
@@ -116,6 +132,7 @@ export function RealDashboard({
       seenPriorities.current = null;
       setPriorityFilter("all");
       setShowAllPriorities(false);
+      setShowAllActivity(false);
     }
   }, [organizationId, unitId]);
 
@@ -222,12 +239,13 @@ export function RealDashboard({
           .slice(0, 6);
         const quickActions = overview.quickActions
           .filter((item) => canAccess(profile, item.route))
-          .slice(0, 3);
+          .slice(0, 6);
         const activity = overview.activity.filter(
           (item) => !item.route || canAccess(profile, item.route),
         );
         const unavailableSources = new Set(overview.unavailableSources);
-        const freshSources = overview.sources.filter(({ status }) => status === "fresh").length;
+        const dataUncertain = unavailableSources.size > 0 || remote.stale;
+        const largestUnitSales = Math.max(1, ...overview.multiunit.map((unit) => unit.salesCents));
         const canOpenOperationalShift =
           overview.activeShift === null &&
           ["owner", "manager"].includes(overview.profileId) &&
@@ -240,7 +258,7 @@ export function RealDashboard({
                 <strong>{unitName}</strong>
                 <span>
                   {overview.activeShift
-                    ? `${overview.activeShift.label} · iniciado ${relativeStart(overview.activeShift.startsAt)}`
+                    ? `${overview.activeShift.label} · iniciado ${relativeTime(overview.activeShift.startsAt)}`
                     : operationalProfile(overview.profileId)
                       ? "Sem turno operacional aberto"
                       : "Visão gerencial da unidade"}
@@ -255,9 +273,6 @@ export function RealDashboard({
                     Abrir operação
                   </a>
                 )}
-                <time dateTime={overview.generatedAt}>
-                  Atualizado às {time(overview.generatedAt)}
-                </time>
               </div>
             </section>
 
@@ -277,228 +292,109 @@ export function RealDashboard({
               </Card>
             )}
 
-            {(overview.unavailableSources.length > 0 || remote.stale || remote.updating) && (
-              <Card
-                className={`dashboard-partial flex-row flex-wrap items-center gap-3 p-3 ${remote.updating && overview.unavailableSources.length === 0 ? "dashboard-partial--updating" : ""}`}
-                role={overview.unavailableSources.length > 0 || remote.stale ? "alert" : "status"}
-              >
-                <div className="dashboard-partial__summary">
-                  <strong>
-                    {remote.updating && overview.unavailableSources.length === 0
-                      ? "Atualizando dados"
-                      : remote.stale
-                        ? "Dados desatualizados"
-                        : `${overview.unavailableSources.length} ${overview.unavailableSources.length === 1 ? "fonte indisponível" : "fontes indisponíveis"}`}
-                  </strong>
-                  <span>
-                    {remote.updating && overview.unavailableSources.length === 0
-                      ? "A última resposta válida permanece visível durante a consulta."
-                      : remote.stale
-                        ? "Não foi possível confirmar uma nova atualização. Os dados abaixo são da última resposta válida."
-                        : `Dados parcialmente atualizados. ${freshSources} de ${overview.sources.length} fontes responderam às ${time(overview.generatedAt)}.`}
+            <div
+              className={`dashboard-data-status ${dataUncertain ? "dashboard-data-status--warning" : ""}`}
+            >
+              <details className="dashboard-freshness">
+                <summary>
+                  <Icon
+                    name={dataUncertain ? "alerts" : remote.updating ? "refresh" : "check"}
+                    size={15}
+                  />
+                  <span role={dataUncertain ? "alert" : "status"}>
+                    {remote.stale
+                      ? "Dados desatualizados"
+                      : unavailableSources.size
+                        ? unavailableSources.size === 1
+                          ? `${sourceLabel(overview.unavailableSources[0] ?? "")} sem atualização`
+                          : `${unavailableSources.size} áreas sem atualização`
+                        : remote.updating
+                          ? "Atualizando dados…"
+                          : `Dados atualizados às ${time(overview.generatedAt)}`}
                   </span>
-                </div>
-                <div className="dashboard-partial__actions">
-                  <Button
-                    aria-busy={remote.updating}
-                    disabled={remote.updating || busyAction !== null}
-                    onClick={remote.retry}
-                    size="sm"
-                    type="button"
-                    variant="secondary"
-                  >
-                    {remote.updating ? "Atualizando…" : "Atualizar dados"}
-                  </Button>
-                  {overview.unavailableSources.length > 0 && (
-                    <details className="dashboard-source-details">
-                      <summary>Ver detalhes</summary>
-                      <div className="dashboard-source-retries">
-                        {overview.unavailableSources.map((source) => (
-                          <Button
-                            disabled={busyAction === `source:${source}` || remote.updating}
-                            key={source}
-                            onClick={() => void retrySource(source as OverviewSourceId)}
-                            size="sm"
-                            type="button"
-                            variant="secondary"
-                          >
-                            {busyAction === `source:${source}`
-                              ? "Consultando…"
-                              : `Tentar ${sourceLabel(source)}`}
-                          </Button>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              </Card>
-            )}
-
-            <Card className="dashboard-priorities">
-              <div className="card-header">
-                <div>
-                  <h2>Faça agora</h2>
-                  <p className="dashboard-muted">Pendências do turno, em ordem de urgência.</p>
-                </div>
-                <Badge
-                  tone={
-                    allPriorities.length || overview.unavailableSources.length
-                      ? "warning"
-                      : "success"
-                  }
-                >
-                  {allPriorities.length
-                    ? `${allPriorities.length} ${allPriorities.length === 1 ? "pendência" : "pendências"}`
-                    : overview.unavailableSources.length
-                      ? "Dados parciais"
-                      : "Tudo em dia"}
-                </Badge>
-              </div>
-              {allPriorities.length > 0 && (
-                <fieldset
-                  aria-label="Filtrar prioridades por responsável"
-                  className="dashboard-priority-filters"
-                >
-                  {(
-                    [
-                      ["all", "Todas", allPriorities.length],
-                      [
-                        "mine",
-                        "Comigo",
-                        allPriorities.filter((item) => item.assignedTo?.isMe).length,
-                      ],
-                      [
-                        "unassigned",
-                        "Sem responsável",
-                        allPriorities.filter((item) => !item.assignedTo).length,
-                      ],
-                    ] as const
-                  ).map(([filter, label, count]) => (
-                    <Button
-                      aria-pressed={priorityFilter === filter}
-                      key={filter}
-                      onClick={() => {
-                        setPriorityFilter(filter);
-                        setShowAllPriorities(false);
-                      }}
-                      size="sm"
-                      type="button"
-                      variant={priorityFilter === filter ? "secondary" : "ghost"}
-                    >
-                      {label} <span className="dashboard-priority-count">{count}</span>
-                    </Button>
-                  ))}
-                </fieldset>
-              )}
-              {priorities.length ? (
-                <div className="dashboard-priority-list">
-                  {priorities.map((item) => (
-                    <article
-                      className="dashboard-priority"
-                      key={`${item.id}:${item.occurrenceKey}`}
-                    >
-                      <span
-                        aria-label={toneLabel(item.tone)}
-                        className={`dashboard-status dashboard-status--${item.tone}`}
-                        role="img"
-                      />
-                      <a className="dashboard-priority__main" href={overviewPriorityHref(item)}>
-                        <strong>{item.title}</strong>
-                        <small>{item.detail}</small>
-                        {item.assignedTo && (
-                          <Badge tone={item.assignedTo.isMe ? "success" : "info"}>
-                            {item.assignedTo.isMe
-                              ? "Assumida por você"
-                              : `Com ${item.assignedTo.name}`}
-                          </Badge>
-                        )}
-                      </a>
-                      <div className="dashboard-priority__controls">
-                        <a
-                          className="dashboard-priority__action gm-button gm-button--secondary gm-button--sm"
-                          href={overviewPriorityHref(item)}
+                  <span className="dashboard-freshness__toggle">Ver detalhes</span>
+                  <Icon name="chevron-down" size={14} />
+                </summary>
+                {remote.stale && (
+                  <p className="dashboard-muted">
+                    A última resposta válida permanece visível. Tente atualizar novamente.
+                  </p>
+                )}
+                <div className="dashboard-source-list">
+                  {overview.sources.map((source) => (
+                    <div key={source.id}>
+                      <span>
+                        <i
+                          aria-hidden="true"
+                          className={`dashboard-source-dot dashboard-source-dot--${remote.stale ? "unavailable" : source.status}`}
+                        />
+                        {sourceLabel(source.id)}
+                      </span>
+                      <time dateTime={source.checkedAt}>{time(source.checkedAt)}</time>
+                      {source.status === "fresh" ? (
+                        <span className="dashboard-muted">
+                          {remote.stale ? "Última consulta" : "Atualizada"}
+                        </span>
+                      ) : (
+                        <Button
+                          disabled={busyAction !== null || remote.updating}
+                          onClick={() => void retrySource(source.id)}
+                          size="sm"
+                          variant="secondary"
                         >
-                          {item.actionLabel} <Icon name="chevron-right" size={14} />
-                        </a>
-                        <details className="dashboard-priority__more">
-                          <summary>Mais ações</summary>
-                          <div>
-                            <Button
-                              disabled={busyAction !== null || item.assignedTo?.isMe}
-                              onClick={() => void actOnPriority(item, "claim")}
-                              size="sm"
-                              type="button"
-                              variant="secondary"
-                            >
-                              Assumir
-                            </Button>
-                            <Button
-                              disabled={busyAction !== null}
-                              onClick={() => void actOnPriority(item, "snooze")}
-                              size="sm"
-                              type="button"
-                              variant="ghost"
-                            >
-                              Adiar 15 min
-                            </Button>
-                            <Button
-                              disabled={busyAction !== null}
-                              onClick={() => void actOnPriority(item, "resolve")}
-                              size="sm"
-                              type="button"
-                              variant="secondary"
-                            >
-                              Marcar tratada
-                            </Button>
-                          </div>
-                        </details>
-                      </div>
-                    </article>
+                          {busyAction === `source:${source.id}`
+                            ? "Consultando…"
+                            : `Tentar ${sourceLabel(source.id)}`}
+                        </Button>
+                      )}
+                    </div>
                   ))}
                 </div>
-              ) : allPriorities.length ? (
-                <EmptyState
-                  icon={<Icon name="check" />}
-                  description="Use Todas para acompanhar as outras pendências do turno."
-                  title={
-                    priorityFilter === "mine"
-                      ? "Nenhuma pendência com você"
-                      : "Todas têm responsável"
+              </details>
+              {dataUncertain && (
+                <Button
+                  aria-busy={remote.updating}
+                  disabled={remote.updating || busyAction !== null}
+                  onClick={() =>
+                    unavailableSources.size === 1 && !remote.stale
+                      ? void retrySource(overview.unavailableSources[0] as OverviewSourceId)
+                      : remote.retry()
                   }
-                />
-              ) : (
-                <EmptyState
-                  description={
-                    overview.unavailableSources.length
-                      ? "Parte das fontes não respondeu. Atualize os dados antes de concluir que não há pendências."
-                      : "Nenhuma exceção exige ação neste momento."
-                  }
-                  icon={overview.unavailableSources.length ? "!" : "✓"}
-                  title={
-                    overview.unavailableSources.length
-                      ? "Sem prioridades confirmadas"
-                      : "Operação em dia"
-                  }
-                />
+                  size="sm"
+                  type="button"
+                  variant="secondary"
+                >
+                  {remote.updating || busyAction?.startsWith("source:")
+                    ? "Atualizando…"
+                    : "Tentar novamente"}
+                </Button>
               )}
-              {filteredPriorities.length > 5 && (
-                <div className="dashboard-priority-footer">
-                  <span role="status">
-                    Exibindo {priorities.length} de {filteredPriorities.length}
-                  </span>
-                  <Button
-                    onClick={() => setShowAllPriorities((current) => !current)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
+            </div>
+
+            <nav aria-label="Atalhos" className="dashboard-quick-actions">
+              <h2>Atalhos</h2>
+              <div className="dashboard-quick-actions__list">
+                {quickActions.map((action) => (
+                  <a
+                    className="gm-button gm-button--secondary"
+                    href={overviewDestinationHref(action)}
+                    key={action.id}
                   >
-                    {showAllPriorities
-                      ? "Mostrar só as 5 primeiras"
-                      : `Ver todas as ${filteredPriorities.length} pendências`}
-                  </Button>
-                </div>
-              )}
-            </Card>
+                    <Icon name={metricIcon({ id: action.id, route: action.route })} size={17} />
+                    {action.label}
+                    <Icon name="chevron-right" size={14} />
+                  </a>
+                ))}
+                {canAccess(profile, "settings") && (
+                  <a
+                    className="gm-button gm-button--ghost"
+                    href={`${routeHref("settings")}?section=setup`}
+                  >
+                    <Icon name="settings" size={16} /> Preparar a unidade
+                  </a>
+                )}
+              </div>
+            </nav>
 
             {metrics.length ? (
               <section aria-label="Indicadores principais" className="dashboard-metrics">
@@ -507,7 +403,7 @@ export function RealDashboard({
                   return (
                     <a
                       className={`dashboard-metric dashboard-metric--${metric.tone}`}
-                      href={routeHref(metric.route)}
+                      href={overviewDestinationHref(metric)}
                       key={metric.id}
                     >
                       <Card
@@ -520,7 +416,7 @@ export function RealDashboard({
                           </span>
                         </div>
                         <div className="dashboard-metric__body">
-                          <strong>{metric.value}</strong>
+                          <strong>{sourceUnavailable ? "—" : metric.value}</strong>
                           <small>{metric.detail}</small>
                         </div>
                         {metric.goal &&
@@ -574,11 +470,219 @@ export function RealDashboard({
               </Card>
             )}
 
-            {overview.multiunit.length > 0 && (
+            <div className="dashboard-workgrid">
+              <Card className="dashboard-priorities">
+                <div className="card-header">
+                  <div>
+                    <h2>Faça agora</h2>
+                    <p className="dashboard-muted">Pendências do turno, em ordem de urgência.</p>
+                  </div>
+                  <Badge tone={allPriorities.length || dataUncertain ? "warning" : "success"}>
+                    {allPriorities.length
+                      ? `${allPriorities.length} ${allPriorities.length === 1 ? "pendência" : "pendências"}`
+                      : dataUncertain
+                        ? "Dados parciais"
+                        : "Tudo em dia"}
+                  </Badge>
+                </div>
+                {allPriorities.length > 0 && (
+                  <fieldset
+                    aria-label="Filtrar prioridades por responsável"
+                    className="dashboard-priority-filters"
+                  >
+                    {(
+                      [
+                        ["all", "Todas", allPriorities.length],
+                        [
+                          "mine",
+                          "Comigo",
+                          allPriorities.filter((item) => item.assignedTo?.isMe).length,
+                        ],
+                        [
+                          "unassigned",
+                          "Sem responsável",
+                          allPriorities.filter((item) => !item.assignedTo).length,
+                        ],
+                      ] as const
+                    ).map(([filter, label, count]) => (
+                      <Button
+                        aria-pressed={priorityFilter === filter}
+                        key={filter}
+                        onClick={() => {
+                          setPriorityFilter(filter);
+                          setShowAllPriorities(false);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant={priorityFilter === filter ? "secondary" : "ghost"}
+                      >
+                        {label} <span className="dashboard-priority-count">{count}</span>
+                      </Button>
+                    ))}
+                  </fieldset>
+                )}
+                {priorities.length ? (
+                  <div className="dashboard-priority-list">
+                    {priorities.map((item) => (
+                      <article
+                        className="dashboard-priority"
+                        key={`${item.id}:${item.occurrenceKey}`}
+                      >
+                        <span
+                          aria-label={toneLabel(item.tone)}
+                          className={`dashboard-status dashboard-status--${item.tone}`}
+                          role="img"
+                        />
+                        <a className="dashboard-priority__main" href={overviewPriorityHref(item)}>
+                          <strong>{item.title}</strong>
+                          <small>{item.detail}</small>
+                          {item.assignedTo && (
+                            <Badge tone={item.assignedTo.isMe ? "success" : "info"}>
+                              {item.assignedTo.isMe
+                                ? "Assumida por você"
+                                : `Com ${item.assignedTo.name}`}
+                            </Badge>
+                          )}
+                        </a>
+                        <div className="dashboard-priority__controls">
+                          <a
+                            className="dashboard-priority__action gm-button gm-button--secondary gm-button--sm"
+                            href={overviewPriorityHref(item)}
+                          >
+                            {item.actionLabel} <Icon name="chevron-right" size={14} />
+                          </a>
+                          <details className="dashboard-priority__more">
+                            <summary>Mais ações</summary>
+                            <div>
+                              <Button
+                                disabled={busyAction !== null || item.assignedTo?.isMe}
+                                onClick={() => void actOnPriority(item, "claim")}
+                                size="sm"
+                                type="button"
+                                variant="secondary"
+                              >
+                                Assumir
+                              </Button>
+                              <Button
+                                disabled={busyAction !== null}
+                                onClick={() => void actOnPriority(item, "snooze")}
+                                size="sm"
+                                type="button"
+                                variant="ghost"
+                              >
+                                Adiar 15 min
+                              </Button>
+                              <Button
+                                disabled={busyAction !== null}
+                                onClick={() => void actOnPriority(item, "resolve")}
+                                size="sm"
+                                type="button"
+                                variant="secondary"
+                              >
+                                Marcar tratada
+                              </Button>
+                            </div>
+                          </details>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : allPriorities.length ? (
+                  <EmptyState
+                    icon={<Icon name="check" />}
+                    description="Use Todas para acompanhar as outras pendências do turno."
+                    title={
+                      priorityFilter === "mine"
+                        ? "Nenhuma pendência com você"
+                        : "Todas têm responsável"
+                    }
+                  />
+                ) : (
+                  <EmptyState
+                    description={
+                      dataUncertain
+                        ? "Atualize os dados para confirmar as pendências da unidade."
+                        : "Nenhuma exceção exige ação neste momento."
+                    }
+                    icon={dataUncertain ? "!" : "✓"}
+                    title={dataUncertain ? "Sem prioridades confirmadas" : "Operação em dia"}
+                  />
+                )}
+                {filteredPriorities.length > 5 && (
+                  <div className="dashboard-priority-footer">
+                    <span role="status">
+                      Exibindo {priorities.length} de {filteredPriorities.length}
+                    </span>
+                    <Button
+                      onClick={() => setShowAllPriorities((current) => !current)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {showAllPriorities
+                        ? "Mostrar só as 5 primeiras"
+                        : `Ver todas as ${filteredPriorities.length} pendências`}
+                    </Button>
+                  </div>
+                )}
+              </Card>
+
+              <Card className="dashboard-pulse dashboard-movement">
+                <div className="card-header">
+                  <div>
+                    <h2>Movimento do turno</h2>
+                    <p className="dashboard-muted">Acompanhe e abra cada etapa</p>
+                  </div>
+                  <Badge tone={overview.activeShift ? "success" : "neutral"}>
+                    {overview.activeShift ? "Turno aberto" : "Sem turno"}
+                  </Badge>
+                </div>
+                {pulse.length ? (
+                  <div className="dashboard-pulse__grid">
+                    {pulse.map((item) => {
+                      const content = (
+                        <>
+                          <Icon
+                            name={
+                              item.route
+                                ? metricIcon({ id: item.id, route: item.route })
+                                : "dashboard"
+                            }
+                            size={18}
+                          />
+                          <strong>{unavailableSources.has(item.source) ? "—" : item.value}</strong>
+                          <span>{item.label}</span>
+                          {unavailableSources.has(item.source) && <small>Sem atualização</small>}
+                        </>
+                      );
+                      return item.route ? (
+                        <a
+                          href={overviewDestinationHref({ id: item.id, route: item.route })}
+                          key={item.id}
+                        >
+                          {content}
+                        </a>
+                      ) : (
+                        <div key={item.id}>{content}</div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="dashboard-muted">
+                    {dataUncertain
+                      ? "Atualize os dados para consultar o movimento."
+                      : "Sem atividade registrada no turno atual."}
+                  </p>
+                )}
+              </Card>
+            </div>
+
+            {overview.multiunit.length > 1 && canAccess(profile, "multiunit") && (
               <Card className="dashboard-multiunit">
                 <div className="card-header">
                   <div>
-                    <h2>Onde agir primeiro</h2>
+                    <h2>Suas unidades</h2>
+                    <p className="dashboard-muted">Vendas e pontos de atenção</p>
                   </div>
                   <a href={routeHref("multiunit")}>Comparar tudo →</a>
                 </div>
@@ -587,6 +691,13 @@ export function RealDashboard({
                     <a href={routeHref("multiunit")} key={unit.unitId}>
                       <span>{index + 1}</span>
                       <strong>{unit.name}</strong>
+                      <meter
+                        aria-label={`Vendas de ${unit.name}`}
+                        aria-valuetext={money(unit.salesCents)}
+                        min={0}
+                        max={largestUnitSales}
+                        value={Math.max(0, unit.salesCents)}
+                      />
                       <small>
                         {money(unit.salesCents)} · margem{" "}
                         {unit.marginCents === null ? "sem cobertura" : money(unit.marginCents)}
@@ -601,78 +712,17 @@ export function RealDashboard({
             )}
 
             <div className="dashboard-secondary">
-              {["owner", "manager"].includes(overview.profileId) && (
-                <ShiftHandoverPanel scope={scope} />
-              )}
-              <Card className="dashboard-pulse">
-                <div className="card-header">
-                  <div>
-                    <h2>Pulso do turno</h2>
-                  </div>
-                  <Badge tone={overview.activeShift ? "success" : "neutral"}>
-                    {overview.activeShift ? "Turno aberto" : "Sem turno"}
-                  </Badge>
-                </div>
-                {pulse.length ? (
-                  <div className="dashboard-pulse__grid">
-                    {pulse.map((item) => {
-                      const content = (
-                        <>
-                          <span>{item.label}</span>
-                          <strong>{item.value}</strong>
-                        </>
-                      );
-                      return item.route ? (
-                        <a href={routeHref(item.route)} key={item.id}>
-                          {content}
-                        </a>
-                      ) : (
-                        <div key={item.id}>{content}</div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="dashboard-muted">Sem atividade registrada no turno atual.</p>
-                )}
-              </Card>
-              <Card className="dashboard-quick-actions">
-                <div className="card-header">
-                  <div>
-                    <h2>Próximas ações</h2>
-                  </div>
-                </div>
-                {quickActions.length ? (
-                  <div className="dashboard-quick-actions__list">
-                    {quickActions.map((action) => (
-                      <a href={routeHref(action.route)} key={action.id}>
-                        <span>{action.label}</span>
-                        <span aria-hidden="true">→</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="dashboard-muted">Use o menu para acessar seus módulos.</p>
-                )}
-                {canAccess(profile, "settings") && (
-                  <a
-                    className="gm-button gm-button--secondary gm-button--sm"
-                    href={`${routeHref("settings")}?section=setup`}
-                  >
-                    Preparar a unidade <Icon name="chevron-right" size={14} />
-                  </a>
-                )}
-              </Card>
               <Card className="dashboard-activity">
                 <div className="card-header">
                   <div>
-                    <h2>O que mudou</h2>
+                    <h2>Atividade recente</h2>
                     <p className="dashboard-muted">Desde sua última visita</p>
                   </div>
                   <Badge tone="info">{activity.length}</Badge>
                 </div>
                 {activity.length ? (
                   <div className="dashboard-activity__list">
-                    {activity.map((item) => {
+                    {(showAllActivity ? activity : activity.slice(0, 4)).map((item) => {
                       const content = (
                         <>
                           <strong>{item.label}</strong>
@@ -692,38 +742,27 @@ export function RealDashboard({
                   </div>
                 ) : (
                   <p className="dashboard-muted">
-                    Nenhuma mudança relevante desde a última visita.
+                    {unavailableSources.has("activity")
+                      ? "Atividades sem atualização. Tente novamente nos detalhes dos dados."
+                      : "Nenhuma mudança relevante desde a última visita."}
                   </p>
                 )}
-              </Card>
-              <Card className="dashboard-freshness">
-                <div className="card-header">
-                  <div>
-                    <h2>Fontes consultadas</h2>
-                  </div>
-                </div>
-                <div className="dashboard-source-list">
-                  {overview.sources.map((source) => (
-                    <div key={source.id}>
-                      <span>
-                        <i
-                          className={`dashboard-source-dot dashboard-source-dot--${source.status}`}
-                        />
-                        {sourceLabel(source.id)}
-                      </span>
-                      <time dateTime={source.checkedAt}>
-                        {source.status === "fresh"
-                          ? time(source.checkedAt)
-                          : `Tentativa ${time(source.checkedAt)}`}
-                      </time>
-                      <Badge tone={source.status === "fresh" ? "success" : "warning"}>
-                        {source.status === "fresh" ? "Atualizada" : "Indisponível"}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                {activity.length > 4 && (
+                  <Button
+                    aria-expanded={showAllActivity}
+                    onClick={() => setShowAllActivity((current) => !current)}
+                    size="sm"
+                    variant="ghost"
+                  >
+                    {showAllActivity ? "Ver menos" : `Ver mais (${activity.length - 4})`}
+                  </Button>
+                )}
               </Card>
             </div>
+
+            {["owner", "manager"].includes(overview.profileId) && (
+              <ShiftHandoverPanel scope={scope} />
+            )}
 
             <PreferencesForm
               busy={busyAction === "preferences"}
@@ -752,7 +791,7 @@ function PreferencesForm({
     setDraft((current) => ({ ...current, thresholds: { ...current.thresholds, [key]: next } }));
   return (
     <details className="dashboard-preferences">
-      <summary>Configurar metas e alertas</summary>
+      <summary>Personalizar visão</summary>
       <form
         onSubmit={(event) => {
           event.preventDefault();
@@ -773,7 +812,7 @@ function PreferencesForm({
           Alertas dentro do sistema
         </label>
         <label>
-          Severidade mínima
+          Mostrar alertas a partir de
           <NativeSelect
             onChange={(event) =>
               setDraft((current) => ({
@@ -797,7 +836,7 @@ function PreferencesForm({
           value={draft.digestMinutes}
         />
         <NumberField
-          label="Atraso KDS"
+          label="Atraso na produção"
           max={120}
           min={5}
           onChange={(next) => threshold("kdsDelayMinutes", next)}
@@ -813,7 +852,7 @@ function PreferencesForm({
           value={draft.thresholds.stockCoverageDays}
         />
         <NumberField
-          label="Risco de delivery"
+          label="Risco de atraso na entrega"
           max={120}
           min={0}
           onChange={(next) => threshold("deliveryRiskMinutes", next)}
@@ -835,28 +874,28 @@ function PreferencesForm({
           <span>R$</span>
         </label>
         <NumberField
-          label="Máx. KDS atrasados"
+          label="Limite de pedidos atrasados"
           max={1000}
           min={0}
           onChange={(next) => threshold("maxKdsDelayed", next)}
           value={draft.thresholds.maxKdsDelayed}
         />
         <NumberField
-          label="Máx. rupturas"
+          label="Limite de itens sem estoque"
           max={1000}
           min={0}
           onChange={(next) => threshold("maxStockouts", next)}
           value={draft.thresholds.maxStockouts}
         />
         <NumberField
-          label="Máx. deliveries atrasados"
+          label="Limite de entregas atrasadas"
           max={1000}
           min={0}
           onChange={(next) => threshold("maxDeliveryDelayed", next)}
           value={draft.thresholds.maxDeliveryDelayed}
         />
         <NumberField
-          label="Máx. conciliações"
+          label="Limite de conciliações pendentes"
           max={10000}
           min={0}
           onChange={(next) => threshold("maxReconciliations", next)}
@@ -941,14 +980,6 @@ function relativeTime(value: string) {
   if (minutes < 60) return `há ${minutes} min`;
   const hours = Math.floor(minutes / 60);
   return hours < 24 ? `há ${hours} h` : `há ${Math.floor(hours / 24)} dia(s)`;
-}
-function relativeStart(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "em horário indisponível";
-  const minutes = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60_000));
-  if (minutes < 60) return `há ${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  return `há ${hours}h${minutes % 60 ? ` ${minutes % 60}min` : ""}`;
 }
 function money(cents: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);

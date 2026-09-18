@@ -22,7 +22,7 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
         status: "ok",
         version: "2.0.0",
         buildSha: "dashboard-e2e",
-        schemaVersion: 82,
+        schemaVersion: 84,
         database: "up",
         integrations: {},
         capabilities: [
@@ -94,15 +94,32 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
                 unavailableSources: [],
                 sources: [
                   { id: "operations", status: "fresh", checkedAt: "2026-08-16T22:30:00.000Z" },
+                  {
+                    id: "operationalShift",
+                    status: "fresh",
+                    checkedAt: "2026-08-16T22:30:00.000Z",
+                  },
+                  { id: "cash", status: "fresh", checkedAt: "2026-08-16T22:29:00.000Z" },
                 ],
                 activity: [
-                  {
-                    id: "activity-1",
-                    label: "Pedido atualizado",
-                    detail: "Mesa 4",
-                    occurredAt: "2026-08-16T22:20:00.000Z",
+                  ...[
+                    ["Pedido pronto para servir", "Mesa 4", "2026-08-16T22:28:00.000Z"],
+                    ["Comanda atualizada", "Mesa 12", "2026-08-16T22:24:00.000Z"],
+                    ["Estoque crítico identificado", "Cerveja pilsen", "2026-08-16T22:19:00.000Z"],
+                    ["Entrega saiu para rota", "Pedido #842", "2026-08-16T22:14:00.000Z"],
+                    ["Reserva confirmada", "Grupo de 6 pessoas", "2026-08-16T22:08:00.000Z"],
+                    [
+                      "Fechamento parcial registrado",
+                      "Caixa principal",
+                      "2026-08-16T22:03:00.000Z",
+                    ],
+                  ].map(([label, detail, occurredAt], index) => ({
+                    id: `activity-${index + 1}`,
+                    label,
+                    detail,
+                    occurredAt,
                     route: profile.route,
-                  },
+                  })),
                 ],
                 multiunit:
                   profile.profileId === "owner"
@@ -114,6 +131,14 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
                           marginCents: 48000,
                           alerts: 1,
                           tone: "warning",
+                        },
+                        {
+                          unitId: "unit-norte",
+                          name: "Unidade Norte",
+                          salesCents: 98000,
+                          marginCents: 39200,
+                          alerts: 0,
+                          tone: "success",
                         },
                       ]
                     : [],
@@ -134,13 +159,32 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
                 },
                 lastVisitedAt: "2026-08-16T22:00:00.000Z",
                 partialSource: null,
-                metrics: [1, 2, 3, 4].map((index) => ({
-                  id: `metric-${index}`,
-                  label: `Indicador ${index}`,
-                  value: String(index),
-                  detail: `Detalhe ${index}`,
-                  tone: index === 1 ? "warning" : "neutral",
-                  route: profile.route,
+                metrics: [
+                  [
+                    "pending-approvals",
+                    "Aprovações pendentes",
+                    "2",
+                    "Aguardando decisão",
+                    "warning",
+                  ],
+                  ["occupancy", "Ocupação", "80%", "8 de 10 mesa(s)", "info"],
+                  ["open-tabs", "Comandas abertas", "3", "R$ 80,00", "neutral"],
+                  ["late-kds", "Pedidos atrasados", "1", "Acima de 15 minutos", "danger"],
+                ].map(([id, label, value, detail, tone]) => ({
+                  id,
+                  label,
+                  value,
+                  detail,
+                  tone,
+                  route:
+                    profile.profileId === "manager"
+                      ? ({
+                          "pending-approvals": "counter",
+                          occupancy: "salon",
+                          "open-tabs": "counter",
+                          "late-kds": "kds",
+                        }[id] ?? profile.route)
+                      : profile.route,
                   source: "operations",
                   comparison: { label: "vs. período anterior", value: "+10%", tone: "success" },
                   goal: { label: "Dentro da meta", tone: "success" },
@@ -194,14 +238,55 @@ async function mockDashboardApi(page: Page, profile: (typeof profiles)[number], 
                 ],
                 pulse: [
                   {
-                    id: "pulse",
-                    label: "Atividade",
-                    value: "2",
-                    route: profile.route,
+                    id: "open-tabs",
+                    label: "Comandas abertas",
+                    value: "3",
+                    route: "counter",
+                    source: "operations",
+                  },
+                  {
+                    id: "kds-preparing",
+                    label: "Em preparo",
+                    value: "3",
+                    route: "kds",
+                    source: "operations",
+                  },
+                  {
+                    id: "kds-ready",
+                    label: "Prontos para servir",
+                    value: "1",
+                    route: "kds",
+                    source: "operations",
+                  },
+                  {
+                    id: "received",
+                    label: "Recebido no turno",
+                    value: "R$ 100,00",
+                    route: "cash",
+                    source: "operations",
+                  },
+                  {
+                    id: "active-team",
+                    label: "Equipe ativa",
+                    value: "6",
+                    route: "people",
                     source: "operations",
                   },
                 ],
-                quickActions: [{ id: "quick", label: "Abrir módulo", route: profile.route }],
+                quickActions: ["owner", "manager"].includes(profile.profileId)
+                  ? [
+                      { id: "new-tab", label: "Abrir comanda", route: "counter" },
+                      { id: "salon", label: "Mesas", route: "salon" },
+                      { id: "kds", label: "Produção", route: "kds" },
+                      { id: "cash", label: "Caixa", route: "cash" },
+                      ...(profile.profileId === "owner"
+                        ? [
+                            { id: "reports", label: "Relatórios", route: "reports" },
+                            { id: "finance", label: "Financeiro", route: "finance" },
+                          ]
+                        : [{ id: "people", label: "Equipe", route: "people" }]),
+                    ]
+                  : [{ id: "quick-orders", label: "Acompanhar pedidos", route: profile.route }],
               }
             : null;
 
@@ -226,7 +311,7 @@ test("back office cadastra e pesquisa tenant, trata incidentes e explicita dados
         status: "ok",
         version: "2.0.0",
         buildSha: "platform-e2e",
-        schemaVersion: 82,
+        schemaVersion: 84,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -602,7 +687,7 @@ test("prioridades e preferências usam mutações auditáveis", async ({ page })
   expect(claim.postDataJSON()).toMatchObject({ action: "claim", occurrenceKey: "b".repeat(64) });
   expect(claim.headers()["idempotency-key"]).toBeTruthy();
 
-  await page.getByText("Configurar metas e alertas").click();
+  await page.getByText("Personalizar visão").click();
   const preferencesRequest = page.waitForRequest(
     (request) =>
       request.method() === "PUT" && request.url().endsWith("/management/overview/preferences"),
@@ -707,7 +792,7 @@ test("passagem de turno preserva ciência após falha e mostra todas as pendênc
 });
 
 for (const profile of profiles) {
-  test(`visão geral real orienta o perfil ${profile.profileId}`, async ({ page }) => {
+  test(`visão geral real orienta o perfil ${profile.profileId}`, async ({ page }, testInfo) => {
     await mockDashboardApi(page, profile);
     await page.goto("/#/dashboard");
     await page.getByRole("button", { name: "Abrir operação" }).click();
@@ -723,12 +808,30 @@ for (const profile of profiles) {
     await expect(
       page.locator(`a.dashboard-metric[href="#/${profile.route}"]`).first(),
     ).toBeVisible();
+    if (profile.profileId === "owner") {
+      await expect(page.locator(".dashboard-multiunit")).toBeVisible();
+    } else {
+      await expect(page.locator(".dashboard-multiunit")).toHaveCount(0);
+    }
 
     if (profile.profileId === "owner") {
       const accessibility = await new AxeBuilder({ page })
         .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
         .analyze();
       expect(accessibility.violations).toEqual([]);
+      for (const width of [1440, 375]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const theme of ["light", "dark"]) {
+          await page.evaluate(
+            (value) => document.documentElement.setAttribute("data-theme", value),
+            theme,
+          );
+          await page.locator(".dashboard-multiunit").screenshot({
+            path: testInfo.outputPath(`dashboard-units-${theme}-${width}.png`),
+            animations: "disabled",
+          });
+        }
+      }
     }
 
     await page.setViewportSize({ width: 375, height: 812 });
@@ -748,6 +851,71 @@ for (const profile of profiles) {
     await expect(page.locator('.mobile-bottom-nav a[href="#/dashboard"]')).toBeVisible();
   });
 }
+
+test("visão geral compacta atalhos, fontes e atividade sem perder os gates do perfil", async ({
+  page,
+}, testInfo) => {
+  await mockDashboardApi(page, profiles[1]);
+  await page.goto("/#/dashboard");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+
+  const shortcuts = page.locator(".dashboard-quick-actions");
+  await expect(page.getByRole("heading", { name: "Atalhos" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Movimento do turno" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Atividade recente" })).toBeVisible();
+  await expect(shortcuts.getByRole("link", { name: "Abrir comanda" })).toHaveAttribute(
+    "href",
+    "#/counter?action=new",
+  );
+  expect(
+    await shortcuts.evaluate((element) =>
+      [".dashboard-metrics", ".dashboard-priorities"].every((selector) => {
+        const target = document.querySelector(selector);
+        return Boolean(
+          target && element.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING,
+        );
+      }),
+    ),
+  ).toBe(true);
+  await expect(page.locator(".dashboard-multiunit")).toHaveCount(0);
+
+  const freshness = page.locator(".dashboard-freshness");
+  await expect(freshness.getByRole("status")).toContainText("Dados atualizados às");
+  await expect(page.locator(".dashboard-source-list")).toBeHidden();
+  await freshness.locator("summary").click();
+  await expect(page.locator(".dashboard-source-list")).toBeVisible();
+
+  const activity = page.locator(".dashboard-activity__list > *");
+  await expect(activity).toHaveCount(4);
+  await page.getByRole("button", { name: /Ver mais/ }).click();
+  await expect(activity).toHaveCount(6);
+
+  await freshness.locator("summary").click();
+  await page.getByRole("button", { name: "Ver menos" }).click();
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    window.scrollTo(0, 0);
+  });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  for (const [theme, width] of [
+    ["light", 1440],
+    ["dark", 1440],
+    ["dark", 375],
+  ] as const) {
+    await page.evaluate(
+      (value) => document.documentElement.setAttribute("data-theme", value),
+      theme,
+    );
+    await page.setViewportSize({ width, height: 900 });
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    await page.screenshot({
+      path: testInfo.outputPath(`dashboard-compact-${theme}-${width}.png`),
+      animations: "disabled",
+    });
+  }
+});
 
 test("visão geral diferencia dados parciais de operação sem pendências", async ({ page }) => {
   const profile = profiles[1];
@@ -777,6 +945,7 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
         activeShift: null,
         unavailableSources: ["delivery", "inventory", "multiunit", "reservations"],
         sources: [
+          { id: "operations", status: "fresh", checkedAt: "2026-08-16T22:30:00.000Z" },
           { id: "delivery", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
           { id: "inventory", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
           { id: "multiunit", status: "unavailable", checkedAt: "2026-08-16T22:30:00.000Z" },
@@ -805,7 +974,19 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
         },
         lastVisitedAt: null,
         partialSource: null,
-        metrics: [],
+        metrics: [
+          {
+            id: "sales",
+            label: "Vendas no turno",
+            value: "R$ 1.248,50",
+            detail: "última resposta válida",
+            tone: "success",
+            route: "salon",
+            source: "operations",
+            comparison: { label: "vs. período anterior", value: "+10%", tone: "success" },
+            goal: { label: "Dentro da meta", tone: "success" },
+          },
+        ],
         priorities: [],
         pulse: [],
         quickActions: [],
@@ -815,18 +996,17 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
   await page.goto("/#/dashboard");
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
-  const partialAlert = page
-    .getByRole("alert")
-    .filter({ hasText: "Dados parcialmente atualizados" });
-  await expect(partialAlert).toContainText("4 fontes indisponíveis");
+  const partialAlert = page.getByRole("alert").filter({ hasText: "4 áreas sem atualização" });
+  await expect(partialAlert).toContainText("4 áreas sem atualização");
   expect((await partialAlert.boundingBox())?.height).toBeLessThanOrEqual(160);
   const prioritiesHeading = page.getByRole("heading", { name: "Faça agora" });
   await expect(prioritiesHeading).toBeVisible();
   expect((await prioritiesHeading.boundingBox())?.y).toBeLessThan(700);
   await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
+  await expect(page.getByText("Vendas no turno", { exact: true })).toBeVisible();
   await expect(page.getByText("Tudo em dia")).toHaveCount(0);
 
-  const refreshAll = page.getByRole("button", { name: "Atualizar dados", exact: true });
+  const refreshAll = page.locator(".dashboard-data-status > button");
   await expect(refreshAll).toHaveCount(1);
   const refreshRequest = page.waitForRequest((request) => {
     const url = new URL(request.url());
@@ -839,16 +1019,20 @@ test("visão geral diferencia dados parciais de operação sem pendências", asy
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await automaticRefreshStarted;
   await expect(refreshAll).toBeEnabled();
-  await expect(refreshAll).toHaveText("Atualizar dados");
+  await expect(refreshAll).toHaveText("Tentar novamente");
   await expect(page.getByText("Atualizando dados", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
   releaseAutomaticRefresh();
   await expect(page.getByText("Dados desatualizados", { exact: true })).toBeVisible();
   await expect(page.getByText("Sem prioridades confirmadas")).toBeVisible();
+  await expect(page.getByText("Vendas no turno", { exact: true })).toBeVisible();
 
-  await expect(page.getByRole("button", { name: /^Tentar / })).toHaveCount(0);
-  await page.locator(".dashboard-source-details > summary").click();
-  await expect(page.getByRole("button", { name: /^Tentar / })).toHaveCount(4);
+  const sourceRetries = page
+    .locator(".dashboard-freshness")
+    .getByRole("button", { name: /^Tentar / });
+  await expect(sourceRetries).toHaveCount(0);
+  await page.locator(".dashboard-freshness > summary").click();
+  await expect(sourceRetries).toHaveCount(4);
   const retry = page.waitForRequest((request) => {
     const url = new URL(request.url());
     return (

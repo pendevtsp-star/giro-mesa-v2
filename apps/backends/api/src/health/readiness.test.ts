@@ -56,6 +56,7 @@ describe("database readiness", () => {
             "growth_delivery_status.failure_states",
             "pos_tabs.linked_service_columns",
             "pos_bill_printing_policies",
+            "management_inventory_items.optional_resale_product",
           ],
         });
         return true;
@@ -77,6 +78,7 @@ describe("database readiness", () => {
       deliveryFailures: false,
       linkedAccounts: true,
       billPrintingPolicy: "present",
+      optionalResaleProduct: true,
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -108,6 +110,7 @@ describe("database readiness", () => {
       deliveryFailures: true,
       linkedAccounts: false,
       billPrintingPolicy: null as string | null,
+      optionalResaleProduct: true,
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -124,6 +127,38 @@ describe("database readiness", () => {
     );
     readiness.linkedAccounts = true;
     readiness.billPrintingPolicy = "present";
+    await service.assertReady();
+  });
+
+  it("does not declare schema 84 ready until stock-first resale is migrated", async () => {
+    const readiness = {
+      management: "present",
+      tableQrMetrics: "present",
+      operationalPush: "present",
+      whatsappMessages: "present",
+      crmAutomations: "present",
+      crmQuickReplies: "present",
+      edgeHubPairings: "present",
+      financeAttachments: "present",
+      settlementPayments: true,
+      deliveryFailures: true,
+      linkedAccounts: true,
+      billPrintingPolicy: "present",
+      optionalResaleProduct: false,
+    };
+    const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
+    const service = new DatabaseReadinessService(database);
+    await assert.rejects(
+      () => service.assertReady(),
+      (error: unknown) => {
+        assert.ok(error instanceof ServiceUnavailableException);
+        assert.deepEqual((error.getResponse() as { missingRelations: string[] }).missingRelations, [
+          "management_inventory_items.optional_resale_product",
+        ]);
+        return true;
+      },
+    );
+    readiness.optionalResaleProduct = true;
     await service.assertReady();
   });
 });

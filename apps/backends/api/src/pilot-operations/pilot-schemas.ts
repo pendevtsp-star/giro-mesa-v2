@@ -232,7 +232,13 @@ const productBaseSchema = z.object({
     .optional(),
 });
 
-export const productSchema = productBaseSchema.superRefine(validateStationRouting);
+export const productSchema = productBaseSchema
+  .extend({ inventoryItemId: id.optional() })
+  .superRefine(validateStationRouting)
+  .refine((value) => !value.inventoryItemId || value.productType === "resale", {
+    path: ["inventoryItemId"],
+    message: "Somente produtos de revenda podem vincular um item de estoque diretamente.",
+  });
 
 export const updateProductSchema = z.object({
   categoryId: id.optional(),
@@ -252,11 +258,11 @@ export const productUnitConfigSchema = z
     stationIds: z.array(id).min(1).max(50),
     stationRouting: stationRoutingSchema,
     dailyStock: z.number().int().min(0).max(1_000_000).nullable().optional(),
-    autoDeductStock: z.boolean().default(false),
+    autoDeductStock: z.boolean().optional(),
   })
   .superRefine(validateStationRouting);
 
-export const aggregateProductSchema = productSchema;
+export const aggregateProductSchema = productBaseSchema.superRefine(validateStationRouting);
 export const reorderSchema = z
   .object({
     items: z
@@ -1061,6 +1067,12 @@ export const moveItemsSchema = z.object({
     .min(1)
     .max(500),
 });
+
+export const sendOrderSchema = z
+  .object({ acknowledgeInventoryShortage: z.boolean().optional() })
+  .strict()
+  .default({});
+export type SendOrderInput = z.infer<typeof sendOrderSchema>;
 
 export const orderSchema = z.object({
   items: z

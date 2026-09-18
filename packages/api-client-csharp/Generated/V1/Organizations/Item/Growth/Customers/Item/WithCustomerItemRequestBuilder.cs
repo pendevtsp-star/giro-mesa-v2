@@ -2,6 +2,7 @@
 #pragma warning disable CS0618
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Archive;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Consents;
+using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.History;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Merge;
 using GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.OptOutToken;
 using Microsoft.Kiota.Abstractions.Extensions;
@@ -29,6 +30,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Consents.ConsentsRequestBuilder Consents
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Consents.ConsentsRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The history property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.History.HistoryRequestBuilder History
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.History.HistoryRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The merge property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.Item.Merge.MergeRequestBuilder Merge

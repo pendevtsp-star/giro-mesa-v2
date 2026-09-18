@@ -4,6 +4,7 @@ import { it } from "node:test";
 import {
   identities,
   managementInventoryClosings,
+  managementInventoryItems,
   managementInventoryMovements,
   managementNfeImportLines,
   managementPeople,
@@ -145,7 +146,7 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
             status: "new",
             newItem: {
               name: "Produto novo",
-              kind: "ingredient",
+              kind: "resale",
               unit: "UN",
               purchaseToStockFactor: "1",
             },
@@ -188,6 +189,12 @@ it("confirms an NF-e atomically once and keeps the import tenant isolated", asyn
     ]);
     assert.equal(balance[0]?.quantity, "2.000");
     assert.equal(receipts.length, 1);
+    const [newResale] = await database.db
+      .select()
+      .from(managementInventoryItems)
+      .where(eq(managementInventoryItems.id, storedLine.inventoryItemId));
+    assert.equal(newResale?.kind, "resale");
+    assert.equal(newResale?.productId, null);
     await assert.rejects(
       management.importNfe(identity.id, organization.id, unit.id, `duplicate-${randomUUID()}`, {
         xml,

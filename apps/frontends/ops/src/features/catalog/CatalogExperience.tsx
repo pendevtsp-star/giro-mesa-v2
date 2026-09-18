@@ -16,7 +16,6 @@ import {
   type PilotScope,
   type ProductSizeVariation,
   priceToCents,
-  type RecipeIngredient,
   type SpicinessLevel,
   slugify,
 } from "../../operations.shared";
@@ -37,6 +36,7 @@ import {
 import { autoTranslateProduct } from "./catalog.translation";
 import { CatalogBcgModal } from "./components/CatalogBcgModal";
 import { CatalogFilters } from "./components/CatalogFilters";
+import { CatalogInventoryPicker } from "./components/CatalogInventoryPicker";
 import { CatalogManagementHeader } from "./components/CatalogManagementHeader";
 import { CatalogProductEditorModal } from "./components/CatalogProductEditorModal";
 import { CatalogProductsPanel } from "./components/CatalogProductsPanel";
@@ -128,7 +128,7 @@ export function CatalogExperience({
 
   async function updateProductInlineDeliveryPrice(
     productId: string,
-    newDeliveryPriceCents: number,
+    newDeliveryPriceCents: number | null,
   ) {
     const product = catalog.products.find((candidate) => candidate.id === productId);
     if (!product) {
@@ -663,54 +663,9 @@ export function CatalogExperience({
   // QR Codes Generator Modal State
   const [editingProductReason, setEditingProductReason] = useState("");
   const [productType, setProductType] = useState<"prepared" | "resale">("prepared");
+  const [inventoryItemId, setInventoryItemId] = useState("");
   const [eanBarcode, setEanBarcode] = useState("");
   const autoDeductStock = true;
-
-  // Ficha Técnica & Markup Builder State
-  const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
-  const [ingName, setIngName] = useState("");
-  const [ingQty, setIngQty] = useState("");
-  const [ingUnit, setIngUnit] = useState<"g" | "kg" | "ml" | "l" | "un">("g");
-  const [ingCost, setIngCost] = useState("");
-  const [targetMarkup, setTargetMarkup] = useState<number>(3.0);
-
-  function addIngredient() {
-    if (!ingName.trim() || !ingQty || !ingCost) return;
-    const costCents = priceToCents(ingCost);
-    const qty = parseFloat(ingQty.replace(",", "."));
-    if (Number.isNaN(qty) || qty <= 0 || costCents <= 0) return;
-
-    const newIng: RecipeIngredient = {
-      id: `ing-${crypto.randomUUID()}`,
-      name: ingName.trim(),
-      quantity: qty,
-      unit: ingUnit,
-      costCents: costCents,
-    };
-    const updated = [...recipeIngredients, newIng];
-    setRecipeIngredients(updated);
-    setIngName("");
-    setIngQty("");
-    setIngCost("");
-
-    const totalCostCents = updated.reduce((acc, i) => acc + i.costCents, 0);
-    setCost((totalCostCents / 100).toFixed(2).replace(".", ","));
-  }
-
-  function removeIngredient(id: string) {
-    const updated = recipeIngredients.filter((i) => i.id !== id);
-    setRecipeIngredients(updated);
-    const totalCostCents = updated.reduce((acc, i) => acc + i.costCents, 0);
-    setCost(totalCostCents > 0 ? (totalCostCents / 100).toFixed(2).replace(".", ",") : "");
-  }
-
-  function applySuggestedMarkupPrice(totalCostCents: number) {
-    const suggestedPrice = Math.round(totalCostCents * targetMarkup);
-    setPrice((suggestedPrice / 100).toFixed(2).replace(".", ","));
-    setFeedback(
-      `Preço sugerido de R$ ${(suggestedPrice / 100).toFixed(2).replace(".", ",")} (${targetMarkup.toFixed(1)} vezes o custo) aplicado.`,
-    );
-  }
 
   async function createCategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -982,13 +937,14 @@ export function CatalogExperience({
   }
 
   function duplicateProduct(product: CatalogProduct) {
+    setInventoryItemId("");
     setProductName(`${product.name} (Cópia)`);
     setCategoryId(product.categoryId);
     setDescription(product.description || "");
     setImageUrl(product.imageUrl || "");
     setPrice((product.priceCents / 100).toFixed(2).replace(".", ","));
     setDeliveryPrice(
-      product.deliveryPriceCents
+      product.deliveryPriceCents != null
         ? (product.deliveryPriceCents / 100).toFixed(2).replace(".", ",")
         : "",
     );
@@ -1519,6 +1475,7 @@ export function CatalogExperience({
       }
       const body = {
         categoryId: selectedCategory,
+        inventoryItemId: productType === "resale" ? inventoryItemId || undefined : undefined,
         ean: eanBarcode.trim() || undefined,
         name: productName.trim(),
         description: description.trim() || undefined,
@@ -1560,12 +1517,7 @@ export function CatalogExperience({
         availabilitySchedule: schedule,
         allergenIds: selectedAllergens,
         modifierGroupIds: selectedModifiers,
-        recipe: recipeIngredients.map((ingredient) => ({
-          ingredientName: ingredient.name,
-          quantityMilli: Math.max(1, Math.round(ingredient.quantity * 1_000)),
-          unit: ingredient.unit,
-          lossBasisPoints: 0,
-        })),
+        recipe: [],
       };
       await api.pilot.createProduct(
         scope.organizationId,
@@ -1585,7 +1537,7 @@ export function CatalogExperience({
       setProductNcm("");
       setProductCfop("");
       setProductType("prepared");
-      setRecipeIngredients([]);
+      setInventoryItemId("");
       setSelectedTags([]);
       setSuggestedProducts([]);
       setScheduleStart("");
@@ -1594,7 +1546,11 @@ export function CatalogExperience({
       setSelectedAllergens([]);
       setSelectedModifiers([]);
       setStationIds([]);
-      setFeedback("Produto criado e disponibilizado nesta unidade.");
+      setFeedback(
+        inventoryItemId && productType === "resale"
+          ? "Produto criado e vinculado ao estoque. Configure as embalagens retornáveis em Editar item."
+          : "Produto criado e disponibilizado nesta unidade.",
+      );
       onRetry?.();
     } catch (error) {
       setFeedback(
@@ -1607,6 +1563,12 @@ export function CatalogExperience({
   }
 
   const searchTerm = search.toLowerCase().trim();
+
+  if (!catalog.canManage) {
+    return (
+      <p role="status">A configuração do cardápio está disponível para a gestão desta unidade.</p>
+    );
+  }
 
   return (
     <div className="growth-stack">
@@ -1938,7 +1900,10 @@ export function CatalogExperience({
               className="catalog-product-type__option"
               data-selected={productType === "prepared" || undefined}
               type="button"
-              onClick={() => setProductType("prepared")}
+              onClick={() => {
+                setProductType("prepared");
+                setInventoryItemId("");
+              }}
             >
               <Icon name="salon" size={14} />
               <span>Produto Preparado / Cozinha</span>
@@ -1953,6 +1918,21 @@ export function CatalogExperience({
               <span>Produto de Revenda (Bebidas / Estoque Direto)</span>
             </Button>
           </div>
+
+          {productType === "resale" && (
+            <CatalogInventoryPicker
+              key={`${scope.organizationId}:${scope.unitId}`}
+              scope={scope}
+              value={inventoryItemId}
+              onChange={(item) => {
+                setInventoryItemId(item?.id ?? "");
+                if (item) {
+                  setProductName(item.name);
+                  setEanBarcode(item.barcode ?? "");
+                }
+              }}
+            />
+          )}
 
           <Label className="gm-field items-stretch">
             Nome do Produto
@@ -1993,27 +1973,32 @@ export function CatalogExperience({
             </>
           )}
 
-          <Label className="gm-field items-stretch">
-            Preço Salão (R$)
-            <Input
-              inputMode="decimal"
-              data-currency="brl"
-              onChange={(event) => setPrice(event.target.value)}
-              placeholder="0,00"
-              required
-              value={price}
-            />
-          </Label>
-          <Label className="gm-field items-stretch">
-            Preço para entrega (opcional)
-            <Input
-              inputMode="decimal"
-              data-currency="brl"
-              onChange={(event) => setDeliveryPrice(event.target.value)}
-              placeholder="Ex: 35,00"
-              value={deliveryPrice}
-            />
-          </Label>
+          <fieldset className="action-form__wide gm-form-grid gm-form-grid--split min-w-0">
+            <legend>Preços por canal</legend>
+            <Label className="gm-field items-stretch">
+              Preço Salão (R$)
+              <Input
+                inputMode="decimal"
+                data-currency="brl"
+                onChange={(event) => setPrice(event.target.value)}
+                placeholder="0,00"
+                required
+                value={price}
+              />
+              <small>Também usado no balcão.</small>
+            </Label>
+            <Label className="gm-field items-stretch">
+              Preço Delivery (R$, opcional)
+              <Input
+                inputMode="decimal"
+                data-currency="brl"
+                onChange={(event) => setDeliveryPrice(event.target.value)}
+                placeholder="Usar preço do salão"
+                value={deliveryPrice}
+              />
+              <small>Deixe vazio para acompanhar o preço do salão.</small>
+            </Label>
+          </fieldset>
           <Label className="gm-field items-stretch">
             {productType === "resale"
               ? "Custo de Compra Unitário (R$)"
@@ -2151,199 +2136,12 @@ export function CatalogExperience({
             className="action-form__wide"
             style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}
           >
-            {/* Sub-Accordion 1: Ficha Técnica (Apenas para produtos preparados) */}
             {productType === "prepared" && (
-              <details className="catalog-sub-accordion" open={recipeIngredients.length > 0}>
-                <summary>
-                  <div className="catalog-inline-center-8">
-                    <Icon name="finance" size={15} />
-                    <span>Ficha técnica e sugestão de preço</span>
-                  </div>
-                  {recipeIngredients.length > 0 && (
-                    <span
-                      style={{
-                        fontSize: "0.74rem",
-                        color: "var(--gm-brand)",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {recipeIngredients.length} insumo(s) • CMV{" "}
-                      {formatMoney(recipeIngredients.reduce((a, b) => a + b.costCents, 0))}
-                    </span>
-                  )}
-                </summary>
-                <div className="catalog-sub-accordion__content">
-                  {recipeIngredients.length > 0 && (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                      {recipeIngredients.map((ing) => (
-                        <div
-                          key={ing.id}
-                          style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            background: "var(--gm-surface)",
-                            padding: "6px 10px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--gm-border)",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          <div className="catalog-inline-center-8">
-                            <span style={{ fontWeight: 650, color: "var(--gm-ink)" }}>
-                              {ing.name}
-                            </span>
-                            <span style={{ color: "var(--gm-muted)", fontSize: "0.74rem" }}>
-                              {ing.quantity} {ing.unit}
-                            </span>
-                          </div>
-                          <div className="catalog-inline-center-10">
-                            <strong className="catalog-ink">{formatMoney(ing.costCents)}</strong>
-                            <Button
-                              type="button"
-                              className="catalog-card-icon-btn catalog-card-icon-btn--danger"
-                              style={{ width: "24px", height: "24px" }}
-                              onClick={() => removeIngredient(ing.id)}
-                              title="Remover insumo"
-                            >
-                              <Icon name="x" size={11} />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "2fr 1fr 1fr 1.2fr auto",
-                      gap: "6px",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Input
-                      placeholder="Insumo (ex: Filé Mignon)"
-                      value={ingName}
-                      onChange={(e) => setIngName(e.target.value)}
-                      className="catalog-input-compact"
-                    />
-                    <Input
-                      type="number"
-                      min="0.1"
-                      step="any"
-                      placeholder="Qtd (200)"
-                      value={ingQty}
-                      onChange={(e) => setIngQty(e.target.value)}
-                      className="catalog-input-compact"
-                    />
-                    <NativeSelect
-                      value={ingUnit}
-                      onChange={(e) => setIngUnit(e.target.value as typeof ingUnit)}
-                      style={{
-                        padding: "5px 6px",
-                        fontSize: "0.78rem",
-                        borderRadius: "6px",
-                        border: "1px solid var(--gm-border)",
-                        background: "var(--gm-surface)",
-                        color: "var(--gm-ink)",
-                      }}
-                    >
-                      <option value="g">g</option>
-                      <option value="kg">kg</option>
-                      <option value="ml">ml</option>
-                      <option value="l">L</option>
-                      <option value="un">un</option>
-                    </NativeSelect>
-                    <Input
-                      placeholder="Custo R$ (9,50)"
-                      value={ingCost}
-                      onChange={(e) => setIngCost(e.target.value)}
-                      className="catalog-input-compact"
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      style={{ padding: "0 10px", height: "30px", fontSize: "0.76rem" }}
-                      onClick={addIngredient}
-                      disabled={!ingName.trim() || !ingQty || !ingCost}
-                    >
-                      <Icon name="plus" size={12} />
-                      <span>Adicionar</span>
-                    </Button>
-                  </div>
-
-                  {recipeIngredients.length > 0 &&
-                    (() => {
-                      const totalCostCents = recipeIngredients.reduce((a, b) => a + b.costCents, 0);
-                      const suggestedPriceCents = Math.round(totalCostCents * targetMarkup);
-                      return (
-                        <div
-                          style={{
-                            background: "rgba(37, 99, 235, 0.05)",
-                            border: "1px dashed rgba(37, 99, 235, 0.3)",
-                            borderRadius: "6px",
-                            padding: "8px 12px",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            flexWrap: "wrap",
-                            gap: "8px",
-                            fontSize: "0.8rem",
-                          }}
-                        >
-                          <div className="catalog-inline-center-8">
-                            <span className="catalog-ink">Multiplicar o custo por:</span>
-                            <div className="catalog-inline-4">
-                              {[2.5, 3.0, 3.5, 4.0].map((m) => (
-                                <Button
-                                  key={m}
-                                  type="button"
-                                  onClick={() => setTargetMarkup(m)}
-                                  style={{
-                                    padding: "2px 8px",
-                                    borderRadius: "4px",
-                                    fontSize: "0.74rem",
-                                    fontWeight: 700,
-                                    cursor: "pointer",
-                                    border:
-                                      targetMarkup === m
-                                        ? "1px solid var(--gm-brand)"
-                                        : "1px solid var(--gm-border)",
-                                    background:
-                                      targetMarkup === m ? "var(--gm-brand)" : "var(--gm-surface)",
-                                    color: targetMarkup === m ? "#fff" : "var(--gm-ink)",
-                                  }}
-                                >
-                                  {m.toFixed(1)}x
-                                </Button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="catalog-inline-center-10">
-                            <span>
-                              Sugerido:{" "}
-                              <strong style={{ color: "var(--gm-brand)" }}>
-                                {formatMoney(suggestedPriceCents)}
-                              </strong>
-                            </span>
-                            <Button
-                              type="button"
-                              className="catalog-card-btn catalog-card-btn--active"
-                              style={{ height: "26px", fontSize: "0.74rem" }}
-                              onClick={() => applySuggestedMarkupPrice(totalCostCents)}
-                            >
-                              <Icon name="check" size={12} />
-                              <span>Usar no Preço</span>
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                </div>
-              </details>
+              <p className="catalog-price-note">
+                A ficha técnica é opcional. Depois de salvar, abra Editar item → Estoque e ficha
+                técnica para vincular insumos e seus locais de baixa. O produto pode ser vendido sem
+                ficha.
+              </p>
             )}
 
             {/* Sub-Accordion 2: Horários, Tempo de Preparo & Esgotamento */}
@@ -3441,6 +3239,7 @@ export function CatalogExperience({
       )}
 
       <CatalogProductEditorModal
+        onInventorySaved={onRetry}
         autoTranslateProduct={autoTranslateProduct}
         busy={busy}
         catalog={catalog}

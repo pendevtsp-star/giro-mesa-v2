@@ -107,9 +107,9 @@ const nfeNewItemSchema = z
     purchaseUnit: z.string().trim().min(1).max(20).optional(),
     purchaseToStockFactor: positiveQuantity.default("1"),
   })
-  .refine((value) => value.kind !== "resale" || value.productId, {
+  .refine((value) => value.kind === "resale" || !value.productId, {
     path: ["productId"],
-    message: "Item de revenda deve estar vinculado a um produto do cardápio.",
+    message: "Somente itens de revenda podem vincular um produto do cardápio diretamente.",
   });
 
 export const nfeImportReviewSchema = z.object({

@@ -164,7 +164,7 @@ async function mockProductionApi(
         status: "ok",
         version: "2.0.0",
         buildSha: "e2e-real",
-        schemaVersion: 82,
+        schemaVersion: 84,
         capabilities: [
           "table_qr_lifecycle_v1",
           "table_qr_metrics_v1",
@@ -459,6 +459,46 @@ async function expectWcagAa(page: Page) {
     .analyze();
   expect(result.violations).toEqual([]);
 }
+
+test("notificações mantêm texto e ações dentro do painel", async ({ page }, testInfo) => {
+  await mockProductionApi(page);
+  await page.goto("/#/salon");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const trigger = page.getByRole("button", { name: "2 atenções operacionais" });
+  const dialog = page.getByRole("dialog", { name: "Atenções da operação" });
+
+  for (const width of [1440, 743, 375]) {
+    await page.setViewportSize({ width, height: 812 });
+    for (const theme of ["light", "dark"]) {
+      await page.locator("html").evaluate((element, value) => {
+        element.setAttribute("data-theme", value);
+      }, theme);
+      await trigger.click();
+      await expect(dialog.getByText("Chamados, pedidos e falhas de impressão.")).toBeVisible();
+      const body = dialog.locator(".gm-modal__body");
+      const bounds = await body.boundingBox();
+      if (!bounds) throw new Error("Corpo das notificações não está visível");
+      expect(await body.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0);
+      for (const button of await dialog.locator(".operational-attention-actions button").all()) {
+        const action = await button.boundingBox();
+        if (!action) throw new Error("Ação de notificação não está visível");
+        expect(action.x).toBeGreaterThanOrEqual(bounds.x);
+        expect(action.x + action.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+        expect(action.y + action.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+      }
+      await dialog.locator(".gm-modal").screenshot({
+        path: testInfo.outputPath(`notifications-${width}-${theme}.png`),
+      });
+      await page.keyboard.press("Escape");
+      await expect(trigger).toBeFocused();
+    }
+  }
+
+  await trigger.click();
+  await dialog.getByRole("button", { name: "Abrir", exact: true }).first().click();
+  await expect(page.getByRole("dialog", { name: "Mesa 03", exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+});
 
 test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => {
   await mockProductionApi(page);
@@ -2481,7 +2521,7 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
 
   await page.locator("#new-product-details > summary").click();
   await expect(page.getByRole("button", { name: "Produto Preparado / Cozinha" })).toBeEnabled();
-  await expect(page.getByLabel("Preço para entrega (opcional)")).toBeEnabled();
+  await expect(page.getByLabel(/^Preço Delivery \(R\$, opcional\)/)).toBeEnabled();
   await expect(page.getByLabel("Custo Unitário / Insumos (R$)")).toBeEnabled();
   await expect(page.getByLabel("Foto do Prato (Opcional)")).toBeEnabled();
   await expect(page.getByText("Dados fiscais do produto")).toBeVisible();
