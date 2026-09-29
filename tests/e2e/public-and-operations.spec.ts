@@ -4,7 +4,7 @@
 const siteUrl = process.env.SITE_E2E_URL ?? "http://localhost:3110";
 
 test("landing communicates the trial and exposes the legal map", async ({ page }) => {
-  await page.goto(siteUrl);
+  await page.goto(siteUrl, { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.locator(".hero-actions .button-primary")).toHaveAttribute(
     "href",
@@ -15,10 +15,17 @@ test("landing communicates the trial and exposes the legal map", async ({ page }
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await expect(page.locator(".hero-grid--text-only")).toHaveCSS(
-    "grid-template-columns",
-    /^\d+(\.\d+)?px$/,
-  );
+  await expect(page.locator(".landing-page .hero-grid")).toHaveCSS("display", "flex");
+  await expect(page.locator(".hero-scenes__tab")).toHaveCount(3);
+  await expect(page.locator('.hero-scenes__tab[aria-current="true"]')).toHaveCount(1);
+  await expect
+    .poll(() =>
+      page
+        .locator(".hero-scenes__photo")
+        .first()
+        .evaluate((image: HTMLImageElement) => (image.complete ? image.naturalWidth : 0)),
+    )
+    .toBeGreaterThan(0);
   await page.locator(".hero-actions a[href*='#produto']").click();
   await expect(page.locator("#produto")).toBeInViewport();
   await expect

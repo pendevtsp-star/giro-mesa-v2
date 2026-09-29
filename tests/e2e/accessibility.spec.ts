@@ -9,7 +9,7 @@ async function expectWcagAa(page: Page) {
 }
 
 test("commercial landing and login meet WCAG AA", async ({ page }) => {
-  await page.goto("http://localhost:3110");
+  await page.goto("http://localhost:3110", { waitUntil: "domcontentloaded" });
   await expectWcagAa(page);
   await page.goto("http://localhost:3110/login");
   await expectWcagAa(page);

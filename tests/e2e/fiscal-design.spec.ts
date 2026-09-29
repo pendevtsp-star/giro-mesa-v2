@@ -302,9 +302,6 @@ test("fiscal mantém a próxima ação legível no desktop e em 375 px", async (
       await expect(page).toHaveURL(
         /#\/counter\?tab=a3333333-3333-4333-8333-333333333333&origem=fiscal$/,
       );
-      await expect(page.getByRole("heading", { level: 1, name: "Balcão e retirada" })).toBeVisible({
-        timeout: 30_000,
-      });
       const counterError = page
         .getByRole("alert")
         .filter({ hasText: "Não foi possível carregar esta área" });

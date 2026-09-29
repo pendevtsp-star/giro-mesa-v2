@@ -7,9 +7,10 @@ const siteUrl = process.env.SITE_E2E_URL ?? "http://localhost:3110";
 test("site comercial não cria overflow nos breakpoints suportados", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "A matriz de larguras já inclui mobile.");
 
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto(siteUrl, { waitUntil: "domcontentloaded" });
   for (const width of widths) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto(siteUrl);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     const layout = await page.evaluate(() => ({
       viewport: window.innerWidth,

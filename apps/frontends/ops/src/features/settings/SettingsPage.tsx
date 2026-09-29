@@ -377,12 +377,15 @@ export function SettingsPage({
     return () => globalThis.clearInterval(timer);
   }, []);
 
+  const settingsAvailable = settings !== null;
   useEffect(() => {
-    if (!settings || typeof window === "undefined") return;
+    if (!settingsAvailable || typeof window === "undefined") return;
     const section = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("section");
     if (!section) return;
-    window.requestAnimationFrame(() => focusSettingsSection(section));
-  }, [settings]);
+    // Follow the deep link when data arrives, without scrolling again on every edit.
+    const frame = window.requestAnimationFrame(() => focusSettingsSection(section));
+    return () => window.cancelAnimationFrame(frame);
+  }, [settingsAvailable]);
 
   const openState = useMemo(() => {
     if (!settings) return null;

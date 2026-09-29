@@ -245,6 +245,23 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    await page
+      .getByRole("navigation", { name: "Seções das configurações" })
+      .getByRole("button", { name: "Marca e cardápio", exact: true })
+      .click();
+    const slogan = page.getByLabel("Slogan", { exact: true });
+    await slogan.click();
+    await slogan.press("End");
+    await slogan.pressSequentially(" QA");
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    await expect(slogan).toHaveValue("Feito na hora QA");
+    await expect(slogan).toBeFocused();
+    await expect(slogan).toBeInViewport();
     const settingsUrl = page.url();
     await page.evaluate(() => {
       document.body.tabIndex = -1;

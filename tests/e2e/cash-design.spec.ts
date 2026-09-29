@@ -251,29 +251,30 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await expect(page.getByRole("heading", { name: "Contas e caixa" })).toBeVisible();
     await page.getByRole("button", { name: "Turno", exact: true }).click();
     await expect(page.getByText("Contagem cega", { exact: true })).toBeVisible();
-    const mainRegister = page.getByRole("button", {
-      name: "Selecionar Caixa principal, aberto",
-    });
-    const barRegister = page.getByRole("button", { name: "Selecionar Bar, aberto" });
-    await expect(mainRegister).toBeVisible();
-    await expect(mainRegister).toHaveAttribute("aria-pressed", "true");
-    await expect(barRegister).toBeVisible();
-    await expect(page.getByText("Responsável: Operador").first()).toBeVisible();
-    await expect(page.getByText("2 gavetas em operação", { exact: true })).toBeVisible();
-    await expect(page.getByText("1 comanda(s) com saldo pendente")).toBeVisible();
+    const registerPicker = page.getByRole("combobox", { name: "Gaveta em uso" });
+    await expect(registerPicker).toHaveValue(registerId);
+    await expect(registerPicker.locator("option")).toHaveText([
+      "Caixa principal · Aberto",
+      "Bar · Aberto",
+    ]);
+    await expect(page.locator(".cash-operation-header__meta")).toContainText("Operador: Operador");
+    await expect(page.getByText("2 caixas abertos", { exact: true })).toBeVisible();
+    await expect(page.locator(".cash-pending-banner__header strong")).toHaveText(
+      "1 comanda a receber · R$ 50,00",
+    );
 
     await expect(page.getByRole("heading", { name: "Fechar turno" })).toHaveCount(0);
     await page.getByRole("button", { name: "Fechar caixa" }).click();
     const countedInput = page.getByLabel("Dinheiro contado");
     await countedInput.fill("149,00");
-    await barRegister.click();
-    await expect(barRegister).toHaveAttribute("aria-pressed", "true");
+    await registerPicker.selectOption(barRegisterId);
+    await expect(registerPicker).toHaveValue(barRegisterId);
     await expect(page.getByRole("heading", { name: "Fechar turno" })).toHaveCount(0);
-    await mainRegister.click();
+    await registerPicker.selectOption(registerId);
     await page.getByRole("button", { name: "Fechar caixa" }).click();
     await expect(page.getByLabel("Dinheiro contado")).toHaveValue("");
     await page.getByLabel("Dinheiro contado").fill("149,00");
-    await page.getByRole("button", { name: "Revisar Contagem e Fechar Caixa" }).click();
+    await page.getByRole("button", { name: "Revisar contagem" }).click();
     await expect(
       page.getByText("Ao confirmar, o turno será encerrado e as diferenças ficarão registradas."),
     ).toBeVisible();

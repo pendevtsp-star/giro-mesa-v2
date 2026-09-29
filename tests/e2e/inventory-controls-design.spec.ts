@@ -361,7 +361,7 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     await moreAreas.getByRole("button", { name: "Vasilhames" }).click();
     await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
     await expect(page.getByText("Mesa 12").first()).toBeVisible();
-    await page.getByText("Reconciliação do setor", { exact: true }).click();
+    await expect(page.locator(".returnables-reconciliation")).toHaveAttribute("open", "");
     await expect(page.getByText("Última divergência de contagem")).toBeVisible();
     await expect(page.getByText("Caução é opcional.")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -512,11 +512,12 @@ test("cadastra revenda por caixa antes de vincular o Cardápio em 375 px", async
   await dialog.getByLabel("Nome do item", { exact: true }).fill("Cerveja 600 ml");
   await dialog.getByRole("combobox", { name: "Tipo de item" }).selectOption("resale");
   await dialog.getByRole("combobox", { name: "Unidade de estoque" }).selectOption("un");
+  await dialog.getByText("Compra e identificação", { exact: true }).click();
   await dialog.getByLabel("Unidade de compra", { exact: true }).fill("caixa");
   await dialog.getByLabel("Conversão para estoque").fill("24");
-  await expect(dialog.getByRole("combobox", { name: /Produto do Cardápio/ })).toHaveValue("");
+  await expect(dialog.getByRole("combobox", { name: "Produto no cardápio" })).toHaveValue("");
   await expect(
-    dialog.getByText(/Vincule um produto do Cardápio para configurar vasilhames/),
+    dialog.getByText(/Para controlar vasilhames, vincule um produto no cardápio/),
   ).toBeVisible();
   await expect(dialog.getByRole("combobox", { name: "Vasilhame vinculado" })).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Salvar item" })).toBeEnabled();
