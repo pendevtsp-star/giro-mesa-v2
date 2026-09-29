@@ -1307,30 +1307,57 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
         closedAt: new Date(Date.now() - 48 * 60 * 60_000),
         promisedAt: null,
         readyNotifiedAt: null,
+        label: `Delivery readiness ${runId}`,
       })
       .where(eq(posTabs.id, concurrentTab.id));
-    const queueStage = async (stage: "all" | "delivered" = "all") => {
+    const queueStage = async (stage: "all" | "ready" | "delivered" = "all") => {
       const queue = await pos.listCounterQueue(owner.id, organization.id, unit.id, {
         stage,
         channel: "delivery",
-        query: "",
+        query: `Delivery readiness ${runId}`,
         page: 1,
         limit: 100,
       });
-      assert.equal(queue.pagination.total, queue.counts[stage]);
-      return queue.items.find((item) => item.id === concurrentTab.id)?.queueStage;
+      assert.equal(
+        queue.pagination.total,
+        stage === "ready" ? queue.counts.readyForHandoff : queue.counts[stage],
+      );
+      return {
+        stage: queue.items.find((item) => item.id === concurrentTab.id)?.queueStage,
+        readyForHandoff: queue.counts.readyForHandoff,
+      };
     };
-    assert.equal(await queueStage(), "production");
+    assert.deepEqual(await queueStage(), { stage: "production", readyForHandoff: 0 });
     await database.db
       .update(deliveryOrders)
       .set({ status: "ready" })
       .where(eq(deliveryOrders.id, adjustedDelivery.id));
-    assert.equal(await queueStage(), "ready");
+    assert.deepEqual(await queueStage(), { stage: "ready", readyForHandoff: 1 });
+    assert.deepEqual(await queueStage("ready"), { stage: "ready", readyForHandoff: 1 });
+    await database.db
+      .update(posTabs)
+      .set({ readyNotifiedAt: new Date() })
+      .where(eq(posTabs.id, concurrentTab.id));
+    assert.deepEqual(await queueStage(), { stage: "waiting", readyForHandoff: 1 });
+    assert.deepEqual(await queueStage("ready"), { stage: "waiting", readyForHandoff: 1 });
     await database.db
       .update(deliveryOrders)
       .set({ status: "dispatched" })
       .where(eq(deliveryOrders.id, adjustedDelivery.id));
-    assert.equal(await queueStage(), "waiting");
+    assert.deepEqual(await queueStage(), { stage: "waiting", readyForHandoff: 0 });
+    assert.deepEqual(await queueStage("ready"), { stage: undefined, readyForHandoff: 0 });
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "delivery_failed" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.deepEqual(await queueStage(), { stage: "waiting", readyForHandoff: 0 });
+    assert.deepEqual(await queueStage("ready"), { stage: undefined, readyForHandoff: 0 });
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "returned" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.deepEqual(await queueStage(), { stage: "waiting", readyForHandoff: 0 });
+    assert.deepEqual(await queueStage("ready"), { stage: undefined, readyForHandoff: 0 });
     await database.db
       .update(posTabs)
       .set({ closedAt: new Date() })
@@ -1339,13 +1366,13 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       .update(deliveryOrders)
       .set({ status: "completed" })
       .where(eq(deliveryOrders.id, adjustedDelivery.id));
-    assert.equal(await queueStage(), undefined);
-    assert.equal(await queueStage("delivered"), "delivered");
+    assert.deepEqual(await queueStage(), { stage: undefined, readyForHandoff: 0 });
+    assert.deepEqual(await queueStage("delivered"), { stage: "delivered", readyForHandoff: 0 });
     await database.db
       .update(deliveryOrders)
       .set({ status: "canceled" })
       .where(eq(deliveryOrders.id, adjustedDelivery.id));
-    assert.equal(await queueStage(), undefined);
+    assert.deepEqual(await queueStage(), { stage: undefined, readyForHandoff: 0 });
   } finally {
     await database.onModuleDestroy();
   }

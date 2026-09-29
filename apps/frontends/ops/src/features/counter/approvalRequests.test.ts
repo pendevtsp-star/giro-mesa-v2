@@ -170,12 +170,21 @@ describe("etapas do balcão", () => {
   it("consome etapa, contagens e paginação autoritativas", () => {
     const queue = parseCounterQueue({
       items: [item],
-      counts: { all: 4, new: 1, production: 1, ready: 1, waiting: 1, delivered: 2, late: 0 },
+      counts: {
+        all: 4,
+        new: 1,
+        production: 1,
+        ready: 1,
+        readyForHandoff: 2,
+        waiting: 1,
+        delivered: 2,
+        late: 0,
+      },
       pagination: { page: 1, limit: 50, total: 4, totalPages: 1 },
     });
 
     expect(queue.items[0]?.queueStage).toBe("ready");
-    expect(queue.counts).toMatchObject({ all: 4, delivered: 2 });
+    expect(queue.counts).toMatchObject({ all: 4, readyForHandoff: 2, delivered: 2 });
     expect(queue.pagination).toEqual({ page: 1, limit: 50, total: 4, totalPages: 1 });
   });
 
@@ -183,7 +192,16 @@ describe("etapas do balcão", () => {
     expect(() =>
       parseCounterQueue({
         items: [{ ...item, queueStage: "unknown" }],
-        counts: { all: 1, new: 0, production: 0, ready: 1, waiting: 0, delivered: 0, late: 0 },
+        counts: {
+          all: 1,
+          new: 0,
+          production: 0,
+          ready: 1,
+          readyForHandoff: 1,
+          waiting: 0,
+          delivered: 0,
+          late: 0,
+        },
         pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
       }),
     ).toThrow("formato inesperado");

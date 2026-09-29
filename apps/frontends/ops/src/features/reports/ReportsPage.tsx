@@ -1300,6 +1300,7 @@ function FinancialRow({
 
 function formatTimestamp(value: string | null, timezone?: string | null): string {
   if (!value) return "Não informado";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return dateLabel(value);
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("pt-BR", {
@@ -1329,6 +1330,7 @@ const indicatorLabels: Record<string, string> = {
 const reportSourceLabels: Record<string, string> = {
   pos_tabs: "Contas do atendimento",
   pos_tab_payments: "Pagamentos das contas",
+  pos_payment_reversals: "Estornos do PDV",
   pos_order_items: "Itens vendidos",
   management_receivable_payments: "Recebimentos financeiros",
   management_payable_payments: "Pagamentos financeiros",

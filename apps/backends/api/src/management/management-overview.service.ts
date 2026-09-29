@@ -12,7 +12,6 @@ import {
   managementOverviewPreferences,
   managementOverviewPriorityStates,
   managementPurchaseOrders,
-  managementReceivableLines,
   managementReconciliationEntries,
   managementStockBalances,
   managementTimeEntries,
@@ -26,6 +25,8 @@ import {
   posTabEvents,
   posTabPayments,
   posTabs,
+  reportRevenueCostRows,
+  reportRevenueCostRowsQuery,
   reservations,
   units,
   waitlistEntries,
@@ -36,6 +37,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { isApprovalActive } from "../pilot-operations/pilot-rules.js";
+import { profitabilityCoverage } from "./management.rules.js";
 import type { OverviewPriorityActionInput, OverviewSourceInput } from "./management.schemas.js";
 import { ManagementService } from "./management.service.js";
 import {
@@ -197,7 +199,7 @@ export class ManagementOverviewService {
           : undefined,
         needsFinance
           ? this.optional("finance", unavailableSources, sources, () =>
-              this.loadFinance(organizationId, unitId, dayStart),
+              this.loadFinance(organizationId, unitId, generatedAt),
             )
           : undefined,
         needsCash
@@ -617,9 +619,9 @@ export class ManagementOverviewService {
   private async loadMultiunit(organizationId: string, dayStart: Date, now: Date) {
     const dayStartIso = dayStart.toISOString();
     const nowIso = now.toISOString();
-    const [unitRows, salesRows, marginRows, kdsRows, deliveryRows] = await Promise.all([
+    const [unitRows, salesRows, kdsRows, deliveryRows] = await Promise.all([
       this.database.db
-        .select({ id: units.id, name: units.name })
+        .select({ id: units.id, name: units.name, timezone: units.timezone })
         .from(units)
         .where(and(eq(units.organizationId, organizationId), eq(units.active, true))),
       this.database.db
@@ -633,33 +635,6 @@ export class ManagementOverviewService {
         .from(posTabs)
         .where(eq(posTabs.organizationId, organizationId))
         .groupBy(posTabs.unitId),
-      this.database.db
-        .select({
-          unitId: managementReceivableLines.unitId,
-          revenueCents:
-            sql<number>`coalesce(sum(${managementReceivableLines.revenueCents}), 0)`.mapWith(
-              Number,
-            ),
-          costCents: sql<number>`coalesce(sum(${managementReceivableLines.costCents}), 0)`.mapWith(
-            Number,
-          ),
-          missingCosts:
-            sql<number>`count(*) filter (where ${managementReceivableLines.costCents} is null)`.mapWith(
-              Number,
-            ),
-        })
-        .from(managementReceivableLines)
-        .innerJoin(
-          managementAccountsReceivable,
-          eq(managementReceivableLines.receivableId, managementAccountsReceivable.id),
-        )
-        .where(
-          and(
-            eq(managementReceivableLines.organizationId, organizationId),
-            eq(managementAccountsReceivable.competenceDate, dayStart.toISOString().slice(0, 10)),
-          ),
-        )
-        .groupBy(managementReceivableLines.unitId),
       this.database.db
         .select({
           unitId: posKdsTickets.unitId,
@@ -684,10 +659,36 @@ export class ManagementOverviewService {
         .groupBy(deliveryOrders.unitId),
     ]);
     const salesByUnit = new Map(salesRows.map((row) => [row.unitId, row.salesCents]));
+    const marginRows =
+      unitRows.length === 0
+        ? []
+        : await this.database.db.execute<{
+            unitId: string;
+            revenueCents: number | string;
+            costCents: number | string | null;
+          }>(
+            sql.join(
+              unitRows.map((unit) => {
+                const today = new Intl.DateTimeFormat("en-CA", { timeZone: unit.timezone }).format(
+                  now,
+                );
+                return sql`select ${unit.id}::text as "unitId", "revenueCents", "costCents"
+        from (${reportRevenueCostRowsQuery({ organizationId, unitId: unit.id, timezone: unit.timezone, from: today, to: today })}) costs`;
+              }),
+              sql` union all `,
+            ),
+          );
     const marginByUnit = new Map(
-      marginRows.map((row) => [
-        row.unitId,
-        row.missingCosts ? null : row.revenueCents - row.costCents,
+      unitRows.map((unit) => [
+        unit.id,
+        profitabilityCoverage(
+          marginRows
+            .filter((row) => row.unitId === unit.id)
+            .map((row) => ({
+              revenueCents: Number(row.revenueCents),
+              costCents: row.costCents === null ? null : Number(row.costCents),
+            })),
+        ).grossMarginCents,
       ]),
     );
     const kdsByUnit = new Map(kdsRows.map((row) => [row.unitId, row.alerts]));
@@ -1133,10 +1134,16 @@ export class ManagementOverviewService {
   private async loadFinance(
     organizationId: string,
     unitId: string,
-    dayStart: Date,
+    now: Date,
   ): Promise<NonNullable<OverviewSnapshot["finance"]>> {
-    const today = dayStart.toISOString().slice(0, 10);
-    const sevenDays = new Date(dayStart.getTime() + 7 * 24 * 60 * 60_000)
+    const [unit] = await this.database.db
+      .select({ timezone: units.timezone })
+      .from(units)
+      .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
+      .limit(1);
+    if (!unit) throw new Error("UNIT_NOT_FOUND");
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: unit.timezone }).format(now);
+    const sevenDays = new Date(new Date(today).getTime() + 7 * 24 * 60 * 60_000)
       .toISOString()
       .slice(0, 10);
     const [payableRows, receivableRows, reconciliationRows, marginRows] = await Promise.all([
@@ -1214,40 +1221,17 @@ export class ManagementOverviewService {
             inArray(managementReconciliationEntries.status, ["unmatched", "divergent"]),
           ),
         ),
-      this.database.db
-        .select({
-          revenueCents:
-            sql<number>`coalesce(sum(${managementReceivableLines.revenueCents}), 0)`.mapWith(
-              Number,
-            ),
-          costCents: sql<number>`coalesce(sum(${managementReceivableLines.costCents}), 0)`.mapWith(
-            Number,
-          ),
-          missingCosts:
-            sql<number>`count(*) filter (where ${managementReceivableLines.costCents} is null)`.mapWith(
-              Number,
-            ),
-        })
-        .from(managementReceivableLines)
-        .innerJoin(
-          managementAccountsReceivable,
-          eq(managementReceivableLines.receivableId, managementAccountsReceivable.id),
-        )
-        .where(
-          and(
-            eq(managementReceivableLines.organizationId, organizationId),
-            eq(managementReceivableLines.unitId, unitId),
-            eq(managementAccountsReceivable.competenceDate, today),
-          ),
-        ),
+      reportRevenueCostRows(this.database.db, {
+        organizationId,
+        unitId,
+        timezone: unit.timezone,
+        from: today,
+        to: today,
+      }),
     ]);
     const payable = payableRows[0];
     const receivable = receivableRows[0];
-    const margin = marginRows[0];
-    const grossMarginCents =
-      margin && margin.missingCosts === 0 && margin.revenueCents === (receivable?.todayCents ?? 0)
-        ? margin.revenueCents - margin.costCents
-        : null;
+    const grossMarginCents = profitabilityCoverage(marginRows).grossMarginCents;
     return {
       overduePayables: payable?.overdue ?? 0,
       overduePayablesCents: payable?.overdueCents ?? 0,

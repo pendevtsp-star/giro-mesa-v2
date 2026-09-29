@@ -233,6 +233,17 @@ describe("relatórios operacionais", () => {
     expect(html).toContain("Mão de obra");
     expect(html).toContain("Fiscal e pagamentos");
     expect(html).toContain("Previsão");
+    expect(html).toContain("Dados até 16/08/2026, 11:59");
+  });
+
+  it("preserva o dia local quando o corte dos dados não contém horário", () => {
+    const meta = emptyReport.meta;
+    if (!meta) throw new Error("Fixture de relatório sem metadados");
+    const html = renderToStaticMarkup(
+      <ReportContent data={{ ...emptyReport, meta: { ...meta, dataThrough: "2026-08-16" } }} />,
+    );
+    expect(html).toContain("Dados até 16/08/2026");
+    expect(html).not.toContain("Dados até 15/08/2026");
   });
 
   it("renderiza mão de obra, conciliação e previsão sem inventar cobertura", () => {

@@ -63,7 +63,7 @@ Directory-based community: apps/backends
 | consumeComparablePasswordWork | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 777-780 |
 | beginIdentitySession | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 782-834 |
 
-*... and 1703 more members.*
+*... and 1646 more members.*
 
 ## Execution Flows
 
@@ -83,21 +83,21 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (1118 edge(s))
-- `where` (641 edge(s))
+- `eq` (956 edge(s))
 - `equal` (621 edge(s))
-- `from` (499 edge(s))
-- `values` (434 edge(s))
-- `select` (402 edge(s))
-- `insert` (399 edge(s))
-- `and` (328 edge(s))
+- `where` (592 edge(s))
+- `from` (459 edge(s))
+- `values` (422 edge(s))
+- `insert` (391 edge(s))
+- `select` (363 edge(s))
 - `Param` (277 edge(s))
 - `ParseUUIDPipe` (271 edge(s))
-- `returning` (257 edge(s))
-- `limit` (245 edge(s))
+- `and` (269 edge(s))
+- `returning` (245 edge(s))
+- `limit` (219 edge(s))
 - `ok` (210 edge(s))
-- `map` (200 edge(s))
-- `update` (174 edge(s))
+- `map` (171 edge(s))
+- `update` (166 edge(s))
 
 ### Incoming
 

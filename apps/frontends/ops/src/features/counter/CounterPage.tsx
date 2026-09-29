@@ -53,7 +53,7 @@ const counterQueueLabels: Record<CounterQueueStage, string> = {
   new: "Novos",
   production: "Em produção",
   ready: "Prontos",
-  waiting: "Aguardando",
+  waiting: "Pós-preparo",
   delivered: "Entregues",
   late: "Atrasados",
 };
@@ -128,7 +128,7 @@ export function buildWhatsAppReadyLink(
 
 export interface CounterQueueResponse {
   items: Array<ReturnType<typeof parseTab> & { queueStage: Exclude<CounterQueueStage, "all"> }>;
-  counts: Record<CounterQueueStage, number>;
+  counts: Record<CounterQueueStage, number> & { readyForHandoff: number };
   pagination: { page: number; limit: number; total: number; totalPages: number };
 }
 
@@ -211,6 +211,7 @@ export function parseCounterQueue(value: unknown): CounterQueueResponse {
       new: parseNumber(counts.new),
       production: parseNumber(counts.production),
       ready: parseNumber(counts.ready),
+      readyForHandoff: parseNumber(counts.readyForHandoff),
       waiting: parseNumber(counts.waiting),
       delivered: parseNumber(counts.delivered),
       late: parseNumber(counts.late),
@@ -222,6 +223,13 @@ export function parseCounterQueue(value: unknown): CounterQueueResponse {
       totalPages: parseNumber(pagination.totalPages),
     },
   };
+}
+
+export function counterStageCount(
+  counts: CounterQueueResponse["counts"],
+  stage: CounterQueueStage,
+) {
+  return stage === "ready" ? counts.readyForHandoff : counts[stage];
 }
 
 export function RealCounterPage({
@@ -1008,7 +1016,7 @@ export function RealCounterPage({
                   </div>
                   <div className="counter-metric-pill counter-metric-pill--ready">
                     <span>Prontos p/ entrega</span>
-                    <strong>{counterQueue.counts.ready}</strong>
+                    <strong>{counterQueue.counts.readyForHandoff}</strong>
                   </div>
                   {counterQueue.counts.late > 0 && (
                     <div className="counter-metric-pill counter-metric-pill--late">
@@ -1081,7 +1089,7 @@ export function RealCounterPage({
                         variant="ghost"
                       >
                         <span>{counterQueueLabels[stage]}</span>
-                        <small>{counterQueue.counts[stage]}</small>
+                        <small>{counterStageCount(counterQueue.counts, stage)}</small>
                       </Button>
                     ))}
                   </fieldset>

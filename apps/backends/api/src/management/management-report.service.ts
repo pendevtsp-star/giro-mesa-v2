@@ -4,12 +4,7 @@ import {
   buildReportArtifact,
   type Database,
   identities,
-  managementAccountsPayable,
-  managementAccountsReceivable,
   managementIdempotency,
-  managementPayablePayments,
-  managementReceivableLines,
-  managementReceivablePayments,
   managementReportAlerts,
   managementReportBudgets,
   managementReportCostBackfills,
@@ -26,6 +21,9 @@ import {
   posProducts,
   posTabPayments,
   posTabs,
+  type ReportFinancialMetric,
+  reportFinancialRowsQuery,
+  reportRevenueCostRowsQuery,
   reservations,
   units,
 } from "@giromesa/db";
@@ -38,7 +36,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { MetricsService, reportEmailDeliveryConfigured } from "../health/health.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
@@ -761,7 +759,12 @@ export class ManagementReportService {
             cashFlow: {
               coverage: report.meta.coverage.cashFlow,
               dataThrough: report.meta.dataThrough,
-              sources: ["management_receivable_payments", "management_payable_payments"],
+              sources: [
+                "pos_tab_payments",
+                "pos_payment_reversals",
+                "management_receivable_payments",
+                "management_payable_payments",
+              ],
             },
             profitability: {
               coverage: report.meta.coverage.costs,
@@ -1350,172 +1353,41 @@ export class ManagementReportService {
     offset: number,
   ): Promise<JsonResponse[]> {
     const limit = query.limit + 1;
-    if (query.key === "cash_inflows") {
-      const localDate = sql<string>`timezone(${timezone}, ${managementReceivablePayments.receivedAt})::date`;
-      const rows = await this.database.db
-        .select({
-          id: managementReceivablePayments.id,
-          occurredAt: managementReceivablePayments.receivedAt,
-          localDate: localDate.mapWith(String),
-          amountCents: managementReceivablePayments.amountCents,
-        })
-        .from(managementReceivablePayments)
-        .where(
-          and(
-            eq(managementReceivablePayments.organizationId, organizationId),
-            eq(managementReceivablePayments.unitId, unitId),
-            eq(managementReceivablePayments.status, "posted"),
-            gte(localDate, query.from),
-            lte(localDate, query.to),
-          ),
-        )
-        .orderBy(
-          desc(managementReceivablePayments.receivedAt),
-          desc(managementReceivablePayments.id),
-        )
-        .limit(limit)
-        .offset(offset);
+    if (
+      ["cash_inflows", "cash_outflows", "competence_revenue", "competence_expenses"].includes(
+        query.key,
+      )
+    ) {
+      const rows = await this.database.db.execute(sql`
+        select * from (${reportFinancialRowsQuery(
+          {
+            organizationId,
+            unitId,
+            timezone,
+            from: query.from,
+            to: query.to,
+          },
+          query.key as ReportFinancialMetric,
+        )}) events
+        order by "localDate" desc, "occurredAt" desc nulls last, "referenceId" desc, "referenceType" desc
+        limit ${limit} offset ${offset}`);
       return rows.map((row) => ({
-        referenceId: row.id,
-        localDate: row.localDate,
-        amountCents: row.amountCents,
-        occurredAt: row.occurredAt.toISOString(),
-        referenceType: "receivable_payment",
-        label: "Entrada realizada",
-        quantity: 1,
-      }));
-    }
-    if (query.key === "cash_outflows") {
-      const localDate = sql<string>`timezone(${timezone}, ${managementPayablePayments.paidAt})::date`;
-      const rows = await this.database.db
-        .select({
-          id: managementPayablePayments.id,
-          occurredAt: managementPayablePayments.paidAt,
-          localDate: localDate.mapWith(String),
-          amountCents: managementPayablePayments.amountCents,
-        })
-        .from(managementPayablePayments)
-        .where(
-          and(
-            eq(managementPayablePayments.organizationId, organizationId),
-            eq(managementPayablePayments.unitId, unitId),
-            eq(managementPayablePayments.status, "posted"),
-            gte(localDate, query.from),
-            lte(localDate, query.to),
-          ),
-        )
-        .orderBy(desc(managementPayablePayments.paidAt), desc(managementPayablePayments.id))
-        .limit(limit)
-        .offset(offset);
-      return rows.map((row) => ({
-        referenceId: row.id,
-        localDate: row.localDate,
-        amountCents: row.amountCents,
-        occurredAt: row.occurredAt.toISOString(),
-        referenceType: "payable_payment",
-        label: "Saída realizada",
-        quantity: 1,
-      }));
-    }
-    if (query.key === "competence_revenue") {
-      const rows = await this.database.db
-        .select({
-          id: managementAccountsReceivable.id,
-          localDate: managementAccountsReceivable.competenceDate,
-          amountCents: managementAccountsReceivable.amountCents,
-        })
-        .from(managementAccountsReceivable)
-        .where(
-          and(
-            eq(managementAccountsReceivable.organizationId, organizationId),
-            eq(managementAccountsReceivable.unitId, unitId),
-            gte(managementAccountsReceivable.competenceDate, query.from),
-            lte(managementAccountsReceivable.competenceDate, query.to),
-          ),
-        )
-        .orderBy(
-          desc(managementAccountsReceivable.competenceDate),
-          desc(managementAccountsReceivable.id),
-        )
-        .limit(limit)
-        .offset(offset);
-      return rows.map((row) => ({
-        referenceId: row.id,
-        localDate: row.localDate,
-        amountCents: row.amountCents,
-        occurredAt: null,
-        referenceType: "receivable",
-        label: "Receita por competência",
-        quantity: 1,
-      }));
-    }
-    if (query.key === "competence_expenses") {
-      const rows = await this.database.db
-        .select({
-          id: managementAccountsPayable.id,
-          localDate: managementAccountsPayable.competenceDate,
-          amountCents: managementAccountsPayable.amountCents,
-        })
-        .from(managementAccountsPayable)
-        .where(
-          and(
-            eq(managementAccountsPayable.organizationId, organizationId),
-            eq(managementAccountsPayable.unitId, unitId),
-            isNull(managementAccountsPayable.purchaseReceiptId),
-            gte(managementAccountsPayable.competenceDate, query.from),
-            lte(managementAccountsPayable.competenceDate, query.to),
-          ),
-        )
-        .orderBy(desc(managementAccountsPayable.competenceDate), desc(managementAccountsPayable.id))
-        .limit(limit)
-        .offset(offset);
-      return rows.map((row) => ({
-        referenceId: row.id,
-        localDate: row.localDate,
-        amountCents: row.amountCents,
-        occurredAt: null,
-        referenceType: "payable",
-        label: "Despesa por competência",
-        quantity: 1,
+        ...row,
+        amountCents: Number(row.amountCents),
+        occurredAt: row.occurredAt ? new Date(row.occurredAt as string).toISOString() : null,
       }));
     }
     if (query.key === "cmv") {
-      const rows = await this.database.db
-        .select({
-          id: managementReceivableLines.id,
-          localDate: managementAccountsReceivable.competenceDate,
-          amountCents: managementReceivableLines.costCents,
-        })
-        .from(managementReceivableLines)
-        .innerJoin(
-          managementAccountsReceivable,
-          and(
-            eq(managementAccountsReceivable.organizationId, organizationId),
-            eq(managementAccountsReceivable.unitId, unitId),
-            eq(managementAccountsReceivable.id, managementReceivableLines.receivableId),
-          ),
-        )
-        .where(
-          and(
-            eq(managementReceivableLines.organizationId, organizationId),
-            eq(managementReceivableLines.unitId, unitId),
-            isNotNull(managementReceivableLines.costCents),
-            gte(managementAccountsReceivable.competenceDate, query.from),
-            lte(managementAccountsReceivable.competenceDate, query.to),
-          ),
-        )
-        .orderBy(
-          desc(managementAccountsReceivable.competenceDate),
-          desc(managementReceivableLines.id),
-        )
-        .limit(limit)
-        .offset(offset);
+      const rows = await this.database.db.execute(sql`
+        select "referenceId", "referenceType", "localDate", "costCents" as "amountCents"
+        from (${reportRevenueCostRowsQuery({ organizationId, unitId, timezone, from: query.from, to: query.to })}) costs
+        where "costCents" is not null
+        order by "localDate" desc, "referenceId" desc, "referenceType" desc
+        limit ${limit} offset ${offset}`);
       return rows.map((row) => ({
-        referenceId: row.id,
-        localDate: row.localDate,
-        amountCents: row.amountCents,
+        ...row,
+        amountCents: Number(row.amountCents),
         occurredAt: null,
-        referenceType: "receivable_line",
         label: "CMV",
         quantity: 1,
       }));
@@ -1690,79 +1562,37 @@ export class ManagementReportService {
         quantity: (paymentRow?.quantity ?? 0) + (reversalRow?.quantity ?? 0),
       };
     }
-    if (query.key === "cash_inflows" || query.key === "cash_outflows") {
-      const table =
-        query.key === "cash_inflows" ? managementReceivablePayments : managementPayablePayments;
-      const occurredAt =
-        query.key === "cash_inflows"
-          ? managementReceivablePayments.receivedAt
-          : managementPayablePayments.paidAt;
-      const localDate = sql<string>`timezone(${timezone}, ${occurredAt})::date`;
-      const [row] = await this.database.db
-        .select({
-          amountCents: sql<number>`coalesce(sum(${table.amountCents}), 0)`.mapWith(Number),
-          quantity: sql<number>`count(*)::int`.mapWith(Number),
-        })
-        .from(table)
-        .where(
-          and(
-            eq(table.organizationId, organizationId),
-            eq(table.unitId, unitId),
-            eq(table.status, "posted"),
-            gte(localDate, query.from),
-            lte(localDate, query.to),
-          ),
-        );
-      return total(row);
-    }
-    if (query.key === "competence_revenue" || query.key === "competence_expenses") {
-      const table =
-        query.key === "competence_revenue"
-          ? managementAccountsReceivable
-          : managementAccountsPayable;
-      const filters = [
-        eq(table.organizationId, organizationId),
-        eq(table.unitId, unitId),
-        gte(table.competenceDate, query.from),
-        lte(table.competenceDate, query.to),
-      ];
-      if (query.key === "competence_expenses")
-        filters.push(isNull(managementAccountsPayable.purchaseReceiptId));
-      const [row] = await this.database.db
-        .select({
-          amountCents: sql<number>`coalesce(sum(${table.amountCents}), 0)`.mapWith(Number),
-          quantity: sql<number>`count(*)::int`.mapWith(Number),
-        })
-        .from(table)
-        .where(and(...filters));
-      return total(row);
+    if (
+      ["cash_inflows", "cash_outflows", "competence_revenue", "competence_expenses"].includes(
+        query.key,
+      )
+    ) {
+      const [row] = await this.database.db.execute<{
+        amountCents: number | string;
+        quantity: number;
+      }>(sql`
+        select coalesce(sum("amountCents"), 0)::bigint as "amountCents", count(*)::int as quantity
+        from (${reportFinancialRowsQuery(
+          {
+            organizationId,
+            unitId,
+            timezone,
+            from: query.from,
+            to: query.to,
+          },
+          query.key as ReportFinancialMetric,
+        )}) events`);
+      return { amountCents: Number(row?.amountCents ?? 0), quantity: Number(row?.quantity ?? 0) };
     }
     if (query.key === "cmv") {
-      const [row] = await this.database.db
-        .select({
-          amountCents:
-            sql<number>`coalesce(sum(${managementReceivableLines.costCents}), 0)`.mapWith(Number),
-          quantity: sql<number>`count(*)::int`.mapWith(Number),
-        })
-        .from(managementReceivableLines)
-        .innerJoin(
-          managementAccountsReceivable,
-          and(
-            eq(managementAccountsReceivable.organizationId, organizationId),
-            eq(managementAccountsReceivable.unitId, unitId),
-            eq(managementAccountsReceivable.id, managementReceivableLines.receivableId),
-          ),
-        )
-        .where(
-          and(
-            eq(managementReceivableLines.organizationId, organizationId),
-            eq(managementReceivableLines.unitId, unitId),
-            isNotNull(managementReceivableLines.costCents),
-            gte(managementAccountsReceivable.competenceDate, query.from),
-            lte(managementAccountsReceivable.competenceDate, query.to),
-          ),
-        );
-      return total(row);
+      const [row] = await this.database.db.execute<{
+        amountCents: number | string;
+        quantity: number;
+      }>(sql`
+        select coalesce(sum("costCents"), 0)::bigint as "amountCents", count(*)::int as quantity
+        from (${reportRevenueCostRowsQuery({ organizationId, unitId, timezone, from: query.from, to: query.to })}) costs
+        where "costCents" is not null`);
+      return { amountCents: Number(row?.amountCents ?? 0), quantity: Number(row?.quantity ?? 0) };
     }
     const [row] = await this.database.db
       .select({

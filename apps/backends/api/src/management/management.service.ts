@@ -108,6 +108,8 @@ import {
   posTabs,
   posTerminalProfiles,
   readFiscalArtifact,
+  reportFinancialTotals,
+  reportRevenueCostRows,
   roleBindings,
   terminalOperatorPins,
   terminalSessions,
@@ -19115,26 +19117,23 @@ export class ManagementService {
       paymentMethodsByMethod.set(reversal.method, current);
     }
     const paymentMethods = [...paymentMethodsByMethod.values()];
-    const receivableIds = receivables.map((entry) => entry.id);
-    const lines =
-      receivableIds.length === 0
-        ? []
-        : await this.database.db
-            .select({
-              revenueCents: managementReceivableLines.revenueCents,
-              costCents: managementReceivableLines.costCents,
-            })
-            .from(managementReceivableLines)
-            .where(
-              and(
-                eq(managementReceivableLines.organizationId, organizationId),
-                eq(managementReceivableLines.unitId, unitId),
-                inArray(managementReceivableLines.receivableId, receivableIds),
-              ),
-            );
+    const lines = await reportRevenueCostRows(this.database.db, {
+      organizationId,
+      unitId,
+      timezone: unit.timezone,
+      from: period.from,
+      to: period.to,
+    });
     const coverage = profitabilityCoverage(lines);
-    const revenueCents = receivables.reduce((sum, entry) => sum + entry.amountCents, 0);
-    const operatingExpensesCents = payables.reduce((sum, entry) => sum + entry.amountCents, 0);
+    const financials = await reportFinancialTotals(this.database.db, {
+      organizationId,
+      unitId,
+      timezone: unit.timezone,
+      from: period.from,
+      to: period.to,
+    });
+    const revenueCents = financials.competence_revenue.amountCents;
+    const operatingExpensesCents = financials.competence_expenses.amountCents;
     const cmvCents =
       coverage.coverage === "complete" && coverage.revenueCents === revenueCents
         ? coverage.cmvCents
@@ -19148,6 +19147,9 @@ export class ManagementService {
       period.comparisonMode,
     );
     const sourceDates = [
+      ...Object.values(financials).flatMap((metric) =>
+        metric.dataThrough ? [metric.dataThrough] : [],
+      ),
       ...payablePayments.map((entry) => entry.localDate),
       ...receivablePayments.map((entry) => entry.localDate),
       ...payables.map((entry) => entry.competenceDate),
@@ -19591,11 +19593,11 @@ export class ManagementService {
         dataThrough: sourceDates.sort().at(-1) ?? null,
         sourceCounts: {
           posSales: dailyChannelSales.reduce((sum, entry) => sum + entry.quantity, 0),
-          receivablePayments: receivablePayments.length,
-          payablePayments: payablePayments.length,
+          receivablePayments: financials.cash_inflows.quantity,
+          payablePayments: financials.cash_outflows.quantity,
           receivables: receivables.length,
           payables: payables.length,
-          costLines: lines.length,
+          costLines: lines.reduce((sum, line) => sum + line.sourceCostLineCount, 0),
         },
         coverage: {
           sales: salesCoverage,
@@ -19604,11 +19606,9 @@ export class ManagementService {
         },
       },
       cashFlow: {
-        inflowsCents: receivablePayments.reduce((sum, entry) => sum + entry.amountCents, 0),
-        outflowsCents: payablePayments.reduce((sum, entry) => sum + entry.amountCents, 0),
-        netCents:
-          receivablePayments.reduce((sum, entry) => sum + entry.amountCents, 0) -
-          payablePayments.reduce((sum, entry) => sum + entry.amountCents, 0),
+        inflowsCents: financials.cash_inflows.amountCents,
+        outflowsCents: financials.cash_outflows.amountCents,
+        netCents: financials.cash_inflows.amountCents - financials.cash_outflows.amountCents,
         basis: "realized_payments_unit_timezone",
       },
       incomeStatement: {

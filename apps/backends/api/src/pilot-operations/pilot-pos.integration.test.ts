@@ -2916,6 +2916,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     );
     assert.equal(newQueue.items[0]?.queueStage, "new");
     assert.equal(newQueue.counts.all, 1);
+    assert.equal(newQueue.counts.readyForHandoff, 0);
     assert.deepEqual(newQueue.pagination, { page: 1, limit: 1, total: 1, totalPages: 1 });
 
     const queueOrder = await pos.createOrder(
@@ -3056,6 +3057,7 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     });
     assert.equal(productionQueue.items[0]?.id, queueTabId);
     assert.equal(productionQueue.items[0]?.queueStage, "production");
+    assert.equal(productionQueue.counts.readyForHandoff, 0);
 
     await pos.transitionKds(
       identity.id,
@@ -3097,6 +3099,8 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       stage: "ready",
     });
     assert.equal(readyQueue.items[0]?.queueStage, "ready");
+    assert.equal(readyQueue.counts.readyForHandoff, 1);
+    assert.equal(readyQueue.pagination.total, 1);
 
     await pos.notifyReady(
       identity.id,
@@ -3110,6 +3114,13 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       stage: "waiting",
     });
     assert.equal(waitingQueue.items[0]?.queueStage, "waiting");
+    assert.equal(waitingQueue.counts.readyForHandoff, 1);
+    const notifiedReadyQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      stage: "ready",
+    });
+    assert.equal(notifiedReadyQueue.items[0]?.queueStage, "waiting");
+    assert.equal(notifiedReadyQueue.pagination.total, 1);
 
     const secondQueueOrder = await pos.createOrder(
       identity.id,
@@ -3135,6 +3146,12 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       { ...queueQuery, stage: "production" },
     );
     assert.equal(resumedProductionQueue.items[0]?.queueStage, "production");
+    assert.equal(resumedProductionQueue.counts.readyForHandoff, 0);
+    const resumedReadyQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
+      ...queueQuery,
+      stage: "ready",
+    });
+    assert.equal(resumedReadyQueue.pagination.total, 0);
     const wrongChannelQueue = await pos.listCounterQueue(identity.id, organizationA.id, unitA.id, {
       ...queueQuery,
       channel: "delivery",

@@ -5363,6 +5363,7 @@ export class PilotPosService {
          group by orders.tab_id
       ), queue as (
         select tabs.*,
+               delivery.status as delivery_status,
                case
                  when tabs.fulfillment_type = 'delivery' then case
                    when delivery.status = 'completed' then 'delivered'
@@ -5404,6 +5405,11 @@ export class PilotPosService {
     const activeQueueFilter = sql`(
       (queue.fulfillment_type <> 'delivery' and queue.status = 'open')
       or (queue.fulfillment_type = 'delivery' and queue.queue_stage <> 'delivered')
+    )`;
+    const readyForHandoffFilter = sql`(
+      ${activeQueueFilter}
+      and queue.queue_stage in ('ready', 'waiting')
+      and (queue.fulfillment_type <> 'delivery' or queue.delivery_status = 'ready')
     )`;
     const baseFilter = sql`
       ${channelFilter}
@@ -5463,7 +5469,8 @@ export class PilotPosService {
          where ${baseFilter}
            and (
              (${query.stage} = 'all' and ${activeQueueFilter})
-             or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
+             or (${query.stage} = 'ready' and ${readyForHandoffFilter})
+             or (${query.stage} not in ('all', 'ready') and queue.queue_stage = ${query.stage})
            )
          order by case queue.queue_stage
                     when 'late' then 0
@@ -5484,6 +5491,7 @@ export class PilotPosService {
         new: number;
         production: number;
         ready: number;
+        readyForHandoff: number;
         waiting: number;
         delivered: number;
         late: number;
@@ -5494,12 +5502,14 @@ export class PilotPosService {
                count(*) filter (where queue.queue_stage = 'new')::int as new,
                count(*) filter (where queue.queue_stage = 'production')::int as production,
                count(*) filter (where queue.queue_stage = 'ready')::int as ready,
+               count(*) filter (where ${readyForHandoffFilter})::int as "readyForHandoff",
                count(*) filter (where queue.queue_stage = 'waiting')::int as waiting,
                count(*) filter (where queue.queue_stage = 'delivered')::int as delivered,
                count(*) filter (where queue.queue_stage = 'late')::int as late,
                count(*) filter (
                  where (${query.stage} = 'all' and ${activeQueueFilter})
-                    or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
+                    or (${query.stage} = 'ready' and ${readyForHandoffFilter})
+                    or (${query.stage} not in ('all', 'ready') and queue.queue_stage = ${query.stage})
                )::int as "selectedTotal"
           from queue
          where ${baseFilter}
@@ -5510,6 +5520,7 @@ export class PilotPosService {
       new: summary?.new ?? 0,
       production: summary?.production ?? 0,
       ready: summary?.ready ?? 0,
+      readyForHandoff: summary?.readyForHandoff ?? 0,
       waiting: summary?.waiting ?? 0,
       delivered: summary?.delivered ?? 0,
       late: summary?.late ?? 0,

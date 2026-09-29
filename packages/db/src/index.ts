@@ -18,6 +18,7 @@ export * from "./management-schema.js";
 export * from "./operations-schema.js";
 export * from "./platform-schema.js";
 export * from "./report-artifacts.js";
+export * from "./report-financials.js";
 export * from "./report-schema.js";
 export * from "./schema.js";
 export * from "./settlement-schema.js";

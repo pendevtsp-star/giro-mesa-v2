@@ -5,9 +5,11 @@ import {
   counterCustomerFromOption,
   counterCustomerOptionValue,
   counterPaymentAttemptIdFromHash,
+  counterStageCount,
   counterTabIdFromHash,
   isValidCounterPhone,
   parseCounterCustomers,
+  parseCounterQueue,
 } from "./CounterPage";
 
 describe("atalho para a venda no balcão", () => {
@@ -92,4 +94,32 @@ describe("aviso de pedido pronto", () => {
     expect(link).toContain("https://wa.me/5511999990000?");
     expect(decodeURIComponent(link ?? "")).toContain("aguarda saída para entrega");
   });
+});
+
+it("usa o agregado de pedidos prontos para saída sem incluir toda a fila de espera", () => {
+  const queue = {
+    items: [],
+    counts: {
+      all: 9,
+      new: 0,
+      production: 0,
+      ready: 2,
+      readyForHandoff: 3,
+      waiting: 5,
+      delivered: 0,
+      late: 2,
+    },
+    pagination: { page: 1, limit: 1, total: 9, totalPages: 9 },
+  };
+  const parsed = parseCounterQueue(queue);
+  expect(parsed.counts).toMatchObject({
+    readyForHandoff: 3,
+    waiting: 5,
+    late: 2,
+  });
+  expect(counterStageCount(parsed.counts, "ready")).toBe(3);
+  expect(counterStageCount(parsed.counts, "waiting")).toBe(5);
+  expect(() =>
+    parseCounterQueue({ ...queue, counts: { ...queue.counts, readyForHandoff: undefined } }),
+  ).toThrow();
 });

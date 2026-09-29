@@ -6,6 +6,8 @@ import {
   managementReportExports,
   outboxEvents,
   parseReportCsv,
+  reportFinancialTotals,
+  reportRevenueCostRowsQuery,
 } from "@giromesa/db";
 import { hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
 import { sql } from "drizzle-orm";
@@ -562,7 +564,7 @@ export async function processDueReportSchedules(
         );
       const canEmail = schedule.delivery === "email" && recipientHas("reports:export");
       const includeCosts = recipientHas("reports:costs:read");
-      const [aggregate, cashRows, incomeRows, products, categories, paymentMethods, familyRows] =
+      const [aggregate, financials, incomeRows, products, categories, paymentMethods, familyRows] =
         await Promise.all([
           tx.execute<ReportAggregateRow>(sql`
         select timezone(${schedule.timezone}, closed_at)::date::text as date,
@@ -582,50 +584,25 @@ export async function processDueReportSchedules(
         group by 1, fulfillment_type
         order by 1, fulfillment_type
       `),
+          reportFinancialTotals(tx, {
+            organizationId: schedule.organization_id,
+            unitId: schedule.unit_id,
+            timezone: schedule.timezone,
+            from: period.from,
+            to: period.to,
+          }),
           tx.execute<Record<string, number | string>>(sql`
-            select
-              (select coalesce(sum(amount_cents), 0)::bigint
-                 from management_receivable_payments
-                where organization_id = ${schedule.organization_id}
-                  and unit_id = ${schedule.unit_id}
-                  and timezone(${schedule.timezone}, received_at)::date between ${period.from}::date and ${period.to}::date) as inflows_cents,
-              (select coalesce(sum(amount_cents), 0)::bigint
-                 from management_payable_payments
-                where organization_id = ${schedule.organization_id}
-                  and unit_id = ${schedule.unit_id}
-                  and timezone(${schedule.timezone}, paid_at)::date between ${period.from}::date and ${period.to}::date) as outflows_cents
-          `),
-          tx.execute<Record<string, number | string>>(sql`
-            with selected_receivables as (
-              select id, organization_id, unit_id, amount_cents
-              from management_accounts_receivable
-              where organization_id = ${schedule.organization_id}
-                and unit_id = ${schedule.unit_id}
-                and competence_date between ${period.from}::date and ${period.to}::date
-            ), line_totals as (
-              select count(lines.id)::int as cost_line_count,
-                     count(lines.id) filter (where lines.cost_cents is null)::int as missing_cost_lines,
-                     coalesce(sum(lines.revenue_cents), 0)::bigint as line_revenue_cents,
-                     coalesce(sum(lines.cost_cents), 0)::bigint as cmv_cents
-              from selected_receivables as receivables
-              inner join management_receivable_lines as lines
-                on lines.organization_id = receivables.organization_id
-               and lines.unit_id = receivables.unit_id
-               and lines.receivable_id = receivables.id
-            )
-            select
-              (select coalesce(sum(amount_cents), 0)::bigint from selected_receivables) as revenue_cents,
-              (select coalesce(sum(payables.amount_cents), 0)::bigint
-                 from management_accounts_payable as payables
-                where payables.organization_id = ${schedule.organization_id}
-                  and payables.unit_id = ${schedule.unit_id}
-                  and payables.purchase_receipt_id is null
-                  and payables.competence_date between ${period.from}::date and ${period.to}::date) as expenses_cents,
-              line_totals.cost_line_count,
-              line_totals.missing_cost_lines,
-              line_totals.line_revenue_cents,
-              line_totals.cmv_cents
-            from line_totals
+            select count(*)::int as cost_line_count,
+              count(*) filter (where "costCents" is null)::int as missing_cost_lines,
+              coalesce(sum("revenueCents"), 0)::bigint as line_revenue_cents,
+              coalesce(sum("costCents"), 0)::bigint as cmv_cents
+            from (${reportRevenueCostRowsQuery({
+              organizationId: schedule.organization_id,
+              unitId: schedule.unit_id,
+              timezone: schedule.timezone,
+              from: period.from,
+              to: period.to,
+            })}) cost_rows
           `),
           tx.execute<ReportBreakdownRow>(sql`
             select products.id::text as key, products.name as label,
@@ -754,7 +731,6 @@ export async function processDueReportSchedules(
           `)),
         );
       }
-      const cash = cashRows[0] ?? { inflows_cents: 0, outflows_cents: 0 };
       const income = incomeRows[0] ?? {
         revenue_cents: 0,
         expenses_cents: 0,
@@ -763,7 +739,7 @@ export async function processDueReportSchedules(
         line_revenue_cents: 0,
         cmv_cents: 0,
       };
-      const revenueCents = Number(income.revenue_cents);
+      const revenueCents = financials.competence_revenue.amountCents;
       const costLineCount = Number(income.cost_line_count);
       const missingCostLines = Number(income.missing_cost_lines);
       const costCoverage =
@@ -776,7 +752,7 @@ export async function processDueReportSchedules(
         costCoverage === "complete" && Number(income.line_revenue_cents) === revenueCents
           ? Number(income.cmv_cents)
           : null;
-      const expensesCents = Number(income.expenses_cents);
+      const expensesCents = financials.competence_expenses.amountCents;
       const grossMarginCents = cmvCents === null ? null : revenueCents - cmvCents;
       const channels = [...aggregate]
         .reduce<Map<string, ReportBreakdownRow>>((byChannel, row) => {
@@ -806,9 +782,9 @@ export async function processDueReportSchedules(
       const report: ScheduledReportData = {
         sales: [...aggregate],
         cashFlow: {
-          inflowsCents: Number(cash.inflows_cents),
-          outflowsCents: Number(cash.outflows_cents),
-          netCents: Number(cash.inflows_cents) - Number(cash.outflows_cents),
+          inflowsCents: financials.cash_inflows.amountCents,
+          outflowsCents: financials.cash_outflows.amountCents,
+          netCents: financials.cash_inflows.amountCents - financials.cash_outflows.amountCents,
         },
         incomeStatement: {
           revenueCents,

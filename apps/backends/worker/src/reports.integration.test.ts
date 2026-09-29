@@ -199,6 +199,7 @@ test("claims each scheduled execution once and gates email by current permission
           createdByIdentityId: owner.id,
           method: scenario.method,
           amountCents: scenario.amount,
+          createdAt: "closedAt" in scenario ? scenario.closedAt : insidePeriod,
         })
         .returning();
       assert.ok(payment);
@@ -223,6 +224,29 @@ test("claims each scheduled execution once and gates email by current permission
       }
     }
 
+    const [advanceTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        openedByIdentityId: owner.id,
+        status: "open",
+        subtotalCents: 1500,
+        totalCents: 1500,
+      })
+      .returning();
+    assert.ok(advanceTab);
+    await database.db.insert(posTabPayments).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      tabId: advanceTab.id,
+      createdByIdentityId: owner.id,
+      method: "cash",
+      amountCents: 500,
+      receivedCents: 1000,
+      changeCents: 500,
+      createdAt: insidePeriod,
+    });
     const claims = await Promise.all([
       processDueReportSchedules(database.db, { now, limit: 10 }),
       processDueReportSchedules(database.db, { now, limit: 10 }),
@@ -244,6 +268,20 @@ test("claims each scheduled execution once and gates email by current permission
     assert.match(inAppExport.content, /dre/);
     assert.match(inAppExport.content, /detalhamento_channels/);
     assert.equal(inAppExport.sha256, reportContentSha256(inAppExport.content));
+    const financialRows = parseReportCsv(inAppExport.content);
+    assert.equal(
+      Number(
+        financialRows.find((row) => row.seção === "fluxo_caixa" && row.chave === "entradas")
+          ?.valor_centavos,
+      ),
+      6700,
+    );
+    assert.equal(
+      Number(
+        financialRows.find((row) => row.seção === "dre" && row.chave === "receita")?.valor_centavos,
+      ),
+      22200,
+    );
     const paymentRows = parseReportCsv(inAppExport.content)
       .filter((row) => row.seção === "detalhamento_paymentMethods")
       .map((row) => ({
