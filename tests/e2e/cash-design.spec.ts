@@ -291,8 +291,43 @@ test("caixa mantém contagem cega e fechamento legível em 375 px", async ({ pag
     await expect(page.getByRole("heading", { name: "Histórico de turnos" })).toBeVisible();
     await expect(page.getByText(/Revisar divergência/)).toBeVisible();
     await expect(page.getByRole("heading", { name: "Resultado da conferência" })).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-      true,
+    const horizontalLayout = await page.evaluate(() => {
+      const viewport = innerWidth;
+      const overflowing = Array.from(document.body.querySelectorAll("*"))
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            element,
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            height: rect.height,
+          };
+        })
+        .filter(
+          ({ element, left, right, height }) =>
+            height > 0 &&
+            getComputedStyle(element).visibility !== "hidden" &&
+            (left < 0 || right > viewport),
+        )
+        .sort((a, b) => b.right - a.right)
+        .slice(0, 15)
+        .map(({ element, left, right }) => ({
+          tag: element.tagName.toLowerCase(),
+          className: typeof element.className === "string" ? element.className : "",
+          parentClassName:
+            typeof element.parentElement?.className === "string"
+              ? element.parentElement.className
+              : "",
+          left,
+          right,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          text: element.textContent?.trim().slice(0, 60),
+        }));
+      return { viewport, documentWidth: document.documentElement.scrollWidth, overflowing };
+    });
+    expect(horizontalLayout.documentWidth, JSON.stringify(horizontalLayout)).toBeLessThanOrEqual(
+      horizontalLayout.viewport,
     );
   }
 
