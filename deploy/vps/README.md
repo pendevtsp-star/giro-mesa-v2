@@ -20,7 +20,7 @@ O V2 usa o projeto Compose `giromesa-v2-pilot`, banco próprio e releases imutá
 4. Publique target e recovery pelo workflow `Publish pilot images`. Ele só aceita CI de `push` da `main`, assina cada digest com role/source/authorization e gera manifestos separados. Com a matriz recovery vazia, a promoção permanece bloqueada por desenho.
 5. Baixe juntos o JSON, o bundle Sigstore e o checksum de ambos os releases, além de `giromesa-recovery-validation-<sha>.json` no mesmo diretório do manifesto recovery. Configure `GIROMESA_IMAGE_ATTESTATION_FILE`; bundle e checksum são descobertos pelos sufixos `.bundle` e `.sha256`, ou definidos explicitamente.
 6. Crie um Docker config dedicado somente à leitura do GHCR. Defina `GIROMESA_DOCKER_CONFIG_DIRECTORY`; o diretório deve ter modo `0700` e `config.json`, modo `0600`. Não reutilize credenciais administrativas.
-7. Instale o bootstrap por uma cadeia independente, nunca pelo hash informado pelo próprio checkout. O runbook/configuration management deve provisionar por canal independente o Cosign `ghcr.io/sigstore/cosign/cosign@sha256:b29487e48205d875c324c79583e2806d9d269c0fa299e0861bbec023d8430c8b`; não confie inicialmente no `image-lock.json` ainda não verificado. Com esse pin, valide o bundle do manifesto contra a identidade exata `publish-images.yml@refs/heads/main`, issuer `token.actions.githubusercontent.com` e o SHA da `main` aprovado pelo operador. Extraia então `releaseFiles["deploy/vps/deploy-entrypoint.sh"]` do JSON assinado, compare o arquivo byte a byte com esse SHA-256 e só depois copie atomicamente para `/opt/giromesa/shared/trust/deploy-entrypoint.sh`, proprietário root e modo `0555`. Forneça esse hash em `GIROMESA_TRUSTED_ENTRYPOINT_SHA256`. Rotações repetem a validação pelo bootstrap antigo antes da troca; automação de configuração pode provisionar o mesmo hash por canal independente.
+7. Instale o bootstrap por uma cadeia independente, nunca pelo hash informado pelo próprio checkout. O runbook/configuration management deve provisionar por canal independente o Cosign `ghcr.io/sigstore/cosign/cosign@sha256:b29487e48205d875c324c79583e2806d9d269c0fa299e0861bbec023d8430c8b`; não confie inicialmente no `image-lock.json` ainda não verificado. Com esse pin, valide os bundles target e recovery contra a identidade exata `publish-images.yml@refs/heads/main`, issuer `token.actions.githubusercontent.com`, repositório `pendevtsp-star/giro-mesa-v2`, SHA da `main` aprovado e trigger `workflow_run`. Extraia então `releaseFiles["deploy/vps/deploy-entrypoint.sh"]` do JSON assinado, confira o arquivo byte a byte e preserve o bootstrap anterior antes de copiar atomicamente o novo para `/opt/giromesa/shared/trust/deploy-entrypoint.sh`, proprietário root e modo `0555`. Forneça esse hash em `GIROMESA_TRUSTED_ENTRYPOINT_SHA256`. Se o bootstrap antigo recusar uma nova allowlist de arquivos, repita a validação independente com o pin antes da rotação; não relaxe a assinatura nem execute scripts diretamente da release.
 8. Execute `ensure-cloudflare-dns.sh` e `provision-ingress.sh`, depois valide login, salão, balcão, QR, KDS, caixa e Edge Hub.
 
 Defina `GIROMESA_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<target-sha>` e `GIROMESA_RECOVERY_RELEASE_DIRECTORY=/srv/apps/giromesa-v2/releases/<recovery-sha>`, juntamente com os dois pares manifesto/bundle, e inicie somente por `/opt/giromesa/shared/trust/deploy-entrypoint.sh deploy`. O script interno recusa execução direta.
@@ -33,37 +33,30 @@ O backup requer `GIROMESA_BACKUP_MANIFEST_HMAC_KEY_BASE64` e `GIROMESA_BACKUP_CO
 
 ## Rollback
 
-`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0084_inventory_resale_before_catalog`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
+`rollback-app.sh` não reverte banco e recusa execução direta. O único ponto de entrada é `/opt/giromesa/shared/trust/deploy-entrypoint.sh rollback`, com `GIROMESA_RELEASE_DIRECTORY` apontando para o release atual assinado e `GIROMESA_RECOVERY_RELEASE_DIRECTORY`/`ROLLBACK_RELEASE_SHA` apontando para o recovery assinado já pré-validado. No schema `0088_cash_payment_exchange`, a matriz `rollback-compatibility.json` não autoriza rollback in-place: sem uma transição comprovada, siga obrigatoriamente o restore integral declarado na própria matriz. O drill deve validar banco, objetos e configuração cifrada, vincular os artefatos e migrations de origem/alvo e executar o smoke SQL antes da promoção. Só adicione uma transição após existir SHA imutável e evidência CI específica para aquele par de schema e release.
 
-O recovery `785cc0e59bcecf652a11f478871b6582dc0789bd` foi validado para schema 84 em PostgreSQL 16/17, upgrade legado e runtime, conforme [evidência de 18 de setembro](../../docs/evidence/release-2026-09-18.md). A matriz vincula esse SHA ao JSON original e checksum do run `35361685839`. O recovery anterior `2baa3098091d10638e604083c28a3bac9c8f4397` cobre schema 83 e não autoriza recuperação no schema 84. As pendências de homologação de integrações e dispositivos permanecem separadas da saúde desta release.
+O recovery candidato `8db1be7c17f9c6cdd672e13e0bdac5974f24b876` foi validado para schema 88 em PostgreSQL 16/17, upgrade legado de `0026_doseclub_integration` até 88 e runtime, conforme [JSON original da validação](../../docs/evidence/recovery/8db1be7c-validation-0088.json) do [run 36634779764](https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/36634779764), SHA-256 `bbffa5ea67af3271472c4b33b8fafcd09e4c8c5d3c9693f924d2d55a1954c2f8`. O recovery de schema 84 não autoriza recuperação no schema 88. A homologação de integrações e dispositivos permanece separada da saúde da release.
 
-## Preparar schema 84 em dois commits
+## Autorizar schema 88 em dois commits
 
-O primeiro commit é candidato, não uma autorização de promoção: `package.json.productionBaseline` usa `level: candidate`, migration 84 pendente e referências nulas. O checker continua recusando esse estado. `recovery-compatibility.json` declara alvo 84 sem transições; `rollback-compatibility.json` exige schema 84 e restore completo. Não copie o SHA ou o resultado de schema 83 para esses campos.
+O primeiro commit, `8db1be7c17f9c6cdd672e13e0bdac5974f24b876`, publicou o candidato na `main` com `productionBaseline.level: candidate`, migration 88 pendente e referências nulas. O checker recusou a promoção; `recovery-compatibility.json` declarava alvo 88 sem transições e `rollback-compatibility.json` exigia schema 88 com restore completo. O [CI candidato](https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/36634758941) falhou apenas nas três asserções de metadata ainda fixadas em schema 84; os demais jobs e o [Security](https://github.com/pendevtsp-star/giro-mesa-v2/actions/runs/36634758805) concluíram com sucesso. Essas falhas de metadata exigem o segundo commit e novo CI completo.
 
-O workflow `validate-recovery.yml` só executa na `main`. Ele obtém o validador do SHA da `main` que recebeu o dispatch e coloca o candidato em `candidate/`. O script `scripts/validate-recovery-candidate.sh` lê o alvo de `packages/db/drizzle/meta/_journal.json` no checkout principal; lê o schema de recuperação no mesmo arquivo do candidato. Portanto, publicar o candidato apenas numa branch enquanto a `main` ainda está no schema 83 não basta para validar schema 84.
+O workflow `validate-recovery.yml` só executa na `main`. Ele obtém o validador do SHA da `main` que recebeu o dispatch e coloca o candidato em `candidate/`. O script `scripts/validate-recovery-candidate.sh` lê o alvo de `packages/db/drizzle/meta/_journal.json` no checkout principal e o schema de recuperação no candidato. Por isso, o candidato precisou estar na `main` com o alvo 88 antes da validação independente.
 
-Depois da revisão dos arquivos e dos checks locais, os comandos abaixo descrevem a publicação autorizada. Substitua os valores entre `<...>` por resultados reais; não os grave como evidência.
+O primeiro commit e sua validação já ocorreram. Os comandos abaixo permitem reproduzir a inspeção da evidência publicada; não substituem a conferência do JSON e checksum originais.
 
 ```powershell
-rtk proxy git diff --cached --stat
-rtk proxy git diff --cached --check
-rtk proxy git commit -m "feat: refine operations and connect catalog to inventory"
-rtk proxy git rev-parse HEAD
-rtk proxy git push origin HEAD:main
-rtk proxy gh workflow run validate-recovery.yml --ref main -f recovery_sha=<SHA_CANDIDATO_84>
-rtk proxy gh run list --workflow validate-recovery.yml --limit 5 --json databaseId,headSha,status,conclusion,url
-rtk proxy gh run view <RUN_RECOVERY> --json status,conclusion,jobs,url
-rtk proxy gh run download <RUN_RECOVERY> --name giromesa-recovery-validation-<SHA_CANDIDATO_84> --dir scratch/recovery-0084
+rtk proxy gh run view 36634779764 --json status,conclusion,jobs,url
+rtk proxy gh run download 36634779764 --name giromesa-recovery-validation-8db1be7c17f9c6cdd672e13e0bdac5974f24b876 --dir scratch/recovery-0088-final
 ```
 
-O CI do primeiro commit pode falhar nos gates que ainda fixam a evidência anterior: isso não autoriza ignorar outras falhas nem promover. O workflow de recuperação é independente desses gates de metadata. Confira sucesso do run, checksum do JSON e os vínculos: `recoveryArtifact=git:<SHA_CANDIDATO_84>`, `targetMigration=0084_inventory_resale_before_catalog`, `postgresMajors=[16,17]`, `schemaLevels=[84,84]`, upgrade legado, saúde da API, estabilidade do worker, outbox e verificações de segurança aprovados.
+O run concluiu com sucesso. O checksum do JSON original confere `bbffa5ea67af3271472c4b33b8fafcd09e4c8c5d3c9693f924d2d55a1954c2f8`; seus vínculos são `recoveryArtifact=git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876`, `targetMigration=0088_cash_payment_exchange`, `postgresMajors=[16,17]`, `schemaLevels=[88,88]`, upgrade legado, saúde da API, estabilidade do worker, outbox e verificações de segurança aprovados.
 
-No segundo commit, após obter essas provas:
+No segundo commit, vincule somente estas provas:
 
-1. Copie o JSON real para `docs/evidence/recovery/<sha-curto>-validation-0084.json`; registre o SHA-256 e a URL do run sem alterar o conteúdo da evidência.
-2. Vincule `productionBaseline.artifact`, `migration.evidence` e cada `gateResults.*.evidence` a `git:<SHA_CANDIDATO_84>`. Use `software-ready`, migration `verified` e gates `passed` somente com os checks correspondentes comprovados; documente separadamente qualquer gate de metadata que tenha bloqueado o CI candidato.
-3. Autorize em `recovery-compatibility.json` o candidato real, migration/appliedAfter 84 e o novo JSON/hash/run. Preserve somente origens cobertas pelo validator e inclua o schema 83 de origem e o 84 já aplicado. Os valores `appliedBeforeWhen` devem vir do journal. Mantenha `rollback-compatibility.json.transitions=[]` enquanto não houver prova de rollback in-place.
+1. Preserve os bytes originais em `docs/evidence/recovery/8db1be7c-validation-0088.json` e vincule seu SHA-256 e URL do run.
+2. Vincule `productionBaseline.artifact`, `migration.evidence` e cada `gateResults.*.evidence` a `git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876`. `software-ready`, migration `verified` e gates `passed` descrevem o candidato validado; o segundo commit ainda precisa passar seus próprios gates.
+3. Autorize em `recovery-compatibility.json` o candidato, migration/appliedAfter 88 e o JSON/hash/run reais. As 19 origens são as 15 da matriz anterior mais 0085–0088 do journal, todas dentro do upgrade sequencial comprovado a partir de 0026. Dezoito valores `appliedBeforeWhen` vêm do journal atual; o `0026_doseclub_integration` histórico usa `legacyUpgrade.sourceAppliedAt` do JSON original, pois a entrada 0026 do journal atual tem outra identidade. Mantenha `rollback-compatibility.json.transitions=[]` sem prova de rollback in-place.
 4. Atualize os valores fixos de release nos testes `scripts/deploy-hardening.test.mjs` e `scripts/validate-recovery-workflow.test.mjs` para a evidência real; não remova verificações para fazer o candidato parecer aprovado.
 
 ```powershell
@@ -71,12 +64,12 @@ rtk proxy pnpm production:baseline
 rtk proxy pnpm supply-chain:check
 rtk proxy node --test scripts/check-production-baseline.test.mjs scripts/deploy-hardening.test.mjs scripts/validate-recovery-workflow.test.mjs
 rtk proxy git diff --cached --check
-rtk proxy git commit -m "chore(release): authorize verified schema 84 recovery"
+rtk proxy git commit -m "chore(release): authorize verified schema 88 recovery"
 rtk proxy git push origin HEAD:main
 rtk proxy gh run list --branch main --limit 8 --json databaseId,name,headSha,status,conclusion,url
 ```
 
-O segundo SHA precisa concluir CI, Security e todos os jobs de `Publish pilot images`, incluindo recovery/provenance. Gere OpenAPI, clientes TS/C#, builds e bundle nativo pelos scripts existentes antes do commit que os publica. A promoção usa exclusivamente o entrypoint confiável descrito acima, com backup pré-migração completo e verificação posterior de `current`, SHA, schema 84, digests, health, reinícios e endpoints públicos. Limpeza de disco continua sendo uma operação separada, limitada aos alvos descartáveis autorizados e inventariados.
+O segundo SHA precisa concluir CI, Security e todos os jobs de `Publish pilot images`, incluindo recovery/provenance. Gere OpenAPI, clientes TS/C#, builds e bundle nativo pelos scripts existentes antes do commit que os publica. A promoção usa exclusivamente o entrypoint confiável descrito acima, com backup pré-migração completo e verificação posterior de `current`, SHA, schema 88, digests, health, reinícios e endpoints públicos. Limpeza de disco continua sendo uma operação separada, limitada aos alvos descartáveis autorizados e inventariados.
 
 ## Domínios
 

@@ -38,21 +38,21 @@
     "db:seed": "node --env-file-if-exists=.env scripts/run-with-env.mjs pnpm --filter @giromesa/db db:seed"
   },
   "productionBaseline": {
-    "level": "candidate",
-    "artifact": null,
+    "level": "software-ready",
+    "artifact": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876",
     "migration": {
       "id": "0088_cash_payment_exchange",
-      "status": "pending",
-      "evidence": null
+      "status": "verified",
+      "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
     },
     "gateResults": {
       "automated": {
-        "status": "pending",
-        "evidence": null
+        "status": "passed",
+        "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
       },
       "security": {
-        "status": "pending",
-        "evidence": null
+        "status": "passed",
+        "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
       }
     }
   },

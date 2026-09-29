@@ -752,7 +752,7 @@ test("application rollback only accepts immutable releases and refuses database 
   assert.doesNotMatch(rollback, /requiredAppliedMigration"\) == "0045_strong_pride"/);
   const matrix = JSON.parse(readFileSync(compatibilityMatrix, "utf8"));
   assert.equal(matrix.schemaVersion, 2);
-  assert.equal(matrix.requiredAppliedMigration, "0084_inventory_resale_before_catalog");
+  assert.equal(matrix.requiredAppliedMigration, "0088_cash_payment_exchange");
   assert.deepEqual(matrix.transitions, []);
   assert.deepEqual(matrix.fullRestore, {
     required: true,
@@ -869,7 +869,7 @@ test("pre-migration backup binds the migration actually applied in the source da
   assert.match(deploy, /testedUpgrade/);
   assert.match(deploy, /RECOVERY_SCHEMA_COMPATIBILITY_UNPROVEN/);
   const recovery = JSON.parse(readFileSync(recoveryMatrix, "utf8"));
-  assert.equal(recovery.targetMigration, "0084_inventory_resale_before_catalog");
+  assert.equal(recovery.targetMigration, "0088_cash_payment_exchange");
   assert.deepEqual(
     recovery.transitions.map(({ appliedBefore, appliedBeforeWhen }) => ({
       appliedBefore,
@@ -897,14 +897,18 @@ test("pre-migration backup binds the migration actually applied in the source da
       { appliedBefore: "0082_delivery_failure_states", appliedBeforeWhen: "1788972000001" },
       { appliedBefore: "0083_linked_service_accounts", appliedBeforeWhen: "1789065000000" },
       { appliedBefore: "0084_inventory_resale_before_catalog", appliedBeforeWhen: "1789660800000" },
+      { appliedBefore: "0085_customer_delivery_address", appliedBeforeWhen: "1789750800000" },
+      { appliedBefore: "0086_pos_delivery_financial_print", appliedBeforeWhen: "1789750800001" },
+      { appliedBefore: "0087_manual_payment_reversal", appliedBeforeWhen: "1789750800002" },
+      { appliedBefore: "0088_cash_payment_exchange", appliedBeforeWhen: "1789750800003" },
     ],
   );
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
-    assert.equal(transition.recoveryMigration, "0084_inventory_resale_before_catalog");
-    assert.equal(transition.recoveryArtifact, "git:785cc0e59bcecf652a11f478871b6582dc0789bd");
+    assert.equal(transition.recoveryMigration, "0088_cash_payment_exchange");
+    assert.equal(transition.recoveryArtifact, "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/35361685839$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/36634779764$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });
