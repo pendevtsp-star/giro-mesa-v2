@@ -74,6 +74,32 @@ const buildkitValidator = join(root, "deploy", "vps", "validate-buildkit-attesta
 const compatibilityMatrix = join(root, "deploy", "vps", "rollback-compatibility.json");
 const recoveryMatrix = join(root, "deploy", "vps", "recovery-compatibility.json");
 
+test("embedded Python in trusted deployment and recovery scripts compiles", () => {
+  const blocks = [];
+  for (const script of [
+    trustedEntrypoint,
+    deployScript,
+    imageProvenance,
+    rollbackScript,
+    backupScript,
+    restoreScript,
+  ]) {
+    const matches = [
+      ...readFileSync(script, "utf8").matchAll(/<<'PY'\r?\n([\s\S]*?)\r?\nPY(?:\r?\n|$)/g),
+    ];
+    assert.ok(matches.length > 0, `No Python blocks found in ${script}`);
+    for (const [index, match] of matches.entries()) {
+      blocks.push([`${script}:block-${index + 1}`, match[1]]);
+    }
+  }
+  const result = spawnSync(
+    process.platform === "win32" ? "python" : "python3",
+    ["-c", "import json,sys\nfor name,source in json.load(sys.stdin): compile(source,name,'exec')"],
+    { input: JSON.stringify(blocks), encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, output(result));
+});
+
 function posix(path) {
   return path.replaceAll("\\", "/");
 }
@@ -1015,7 +1041,11 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(provenance, /"package\.json"/);
   assert.match(readFileSync(trustedEntrypoint, "utf8"), /"package\.json"/);
   assert.equal(workflow.split("deploy/vps/ensure-runtime-env.sh").length - 1, 2);
-  for (const file of ["backup-to-r2.py", "giromesa-backup-r2.service", "giromesa-backup-r2.timer"]) {
+  for (const file of [
+    "backup-to-r2.py",
+    "giromesa-backup-r2.service",
+    "giromesa-backup-r2.timer",
+  ]) {
     assert.equal(workflow.split(`deploy/vps/${file}`).length - 1, 2);
     assert.ok(provenance.includes(`"deploy/vps/${file}"`));
     assert.ok(readFileSync(trustedEntrypoint, "utf8").includes(`"deploy/vps/${file}"`));
