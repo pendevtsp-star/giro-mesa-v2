@@ -1301,6 +1301,11 @@
   .cash-entry > strong:last-child {
     grid-column: 2;
   }
+
+  .cash-entry > .cash-history__result {
+    grid-column: 2;
+    min-width: 0;
+  }
 }
 
 .cash-workspace-tabs {
