@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildWhatsAppReadyLink,
   counterActionFromHash,
   counterCustomerFromOption,
   counterCustomerOptionValue,
   counterPaymentAttemptIdFromHash,
   counterTabIdFromHash,
   isValidCounterPhone,
+  parseCounterCustomers,
 } from "./CounterPage";
 
 describe("atalho para a venda no balcão", () => {
@@ -48,6 +50,32 @@ describe("seleção de cliente do CRM", () => {
     });
     expect(counterCustomerFromOption(customers, "Cliente digitado manualmente")).toBeNull();
   });
+
+  it("lê apenas o perfil operacional mínimo com endereço principal estruturado", () => {
+    expect(
+      parseCounterCustomers({
+        items: [
+          {
+            id: "customer-1",
+            name: "Ana Souza",
+            phone: "+5511999990000",
+            defaultDeliveryAddress: {
+              street: "Rua Central",
+              number: "10",
+              neighborhood: "Centro",
+              city: "São Paulo",
+              state: "sp",
+              postalCode: "01001-000",
+              reference: "Portão azul",
+            },
+          },
+        ],
+      })[0],
+    ).toMatchObject({
+      id: "customer-1",
+      defaultDeliveryAddress: { state: "SP", reference: "Portão azul" },
+    });
+  });
 });
 
 describe("telefone operacional", () => {
@@ -55,5 +83,13 @@ describe("telefone operacional", () => {
     expect(isValidCounterPhone("(11) 99876-5432")).toBe(true);
     expect(isValidCounterPhone("abcdefghij")).toBe(false);
     expect(isValidCounterPhone("12345678")).toBe(false);
+  });
+});
+
+describe("aviso de pedido pronto", () => {
+  it("informa saída para entrega sem prometer retirada", () => {
+    const link = buildWhatsAppReadyLink("(11) 99999-0000", "Ana", "42", "delivery");
+    expect(link).toContain("https://wa.me/5511999990000?");
+    expect(decodeURIComponent(link ?? "")).toContain("aguarda saída para entrega");
   });
 });

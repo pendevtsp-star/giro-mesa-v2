@@ -1,8 +1,10 @@
 import {
   bool,
+  type DeliveryAddress,
   InvalidGrowthPayloadError,
   number,
   optionalText,
+  parseDeliveryAddress,
   type Row,
   record,
   records,
@@ -14,6 +16,7 @@ export interface CrmCustomer {
   name: string;
   email: string | null;
   phone: string | null;
+  defaultDeliveryAddress: DeliveryAddress | null;
   birthDate: string | null;
   marketingOptIn: boolean;
   emailMarketingOptIn: boolean;
@@ -286,6 +289,7 @@ function customerRow(row: Row): CrmCustomer {
     name: text(row.name),
     email: optionalText(row.email),
     phone: optionalText(row.phone),
+    defaultDeliveryAddress: parseDeliveryAddress(row.defaultDeliveryAddress),
     birthDate: optionalText(row.birthDate),
     marketingOptIn: bool(row.marketingOptIn),
     emailMarketingOptIn:

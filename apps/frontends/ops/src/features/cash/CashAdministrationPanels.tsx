@@ -11,6 +11,7 @@ import {
   operationalKey,
 } from "../../management.shared";
 import { formatMoney } from "../../rules";
+import { cashHandoverCandidates } from "./cash";
 
 function approvalLabel(kind: "supply" | "withdrawal" | "transfer") {
   return kind === "supply" ? "Suprimento" : kind === "transfer" ? "Transferência" : "Sangria";
@@ -23,6 +24,7 @@ export function CashAdministrationPanels({
   scope,
   onChanged,
   section,
+  identityId,
 }: {
   data: CashData;
   online: boolean;
@@ -30,6 +32,7 @@ export function CashAdministrationPanels({
   scope: ManagementScope;
   onChanged: () => void;
   section: "operations" | "settings";
+  identityId?: string;
 }) {
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
@@ -146,9 +149,7 @@ export function CashAdministrationPanels({
 
   const pendingApprovals = data.approvals.filter((approval) => approval.status === "pending");
   const handoverCandidates = openShift
-    ? data.operators.filter(
-        (operator) => operator.identityId !== openShift.currentResponsibleIdentityId,
-      )
+    ? cashHandoverCandidates(data.operators, openShift.currentResponsibleIdentityId, identityId)
     : [];
   return (
     <>
@@ -205,18 +206,19 @@ export function CashAdministrationPanels({
         <Card className="cash-approvals" hidden={section !== "operations"}>
           <div className="card-header">
             <div>
-              <p className="eyebrow">Custódia entre gavetas</p>
-              <h2>Transferências aguardando aceite</h2>
+              <h2>Transferências pendentes</h2>
             </div>
             <Badge tone="warning">{data.pendingTransfers.length}</Badge>
           </div>
-          <label>
-            Observação da decisão
-            <Input
-              onChange={(event) => setTransferDecisionNote(event.target.value)}
-              value={transferDecisionNote}
-            />
-          </label>
+          {data.pendingTransfers.some((transfer) => transfer.canDecide) && (
+            <label>
+              Motivo (obrigatório para rejeitar)
+              <Input
+                onChange={(event) => setTransferDecisionNote(event.target.value)}
+                value={transferDecisionNote}
+              />
+            </label>
+          )}
           <div className="cash-approval-list">
             {data.pendingTransfers.map((transfer) => (
               <div className="cash-approval" key={transfer.id}>
@@ -263,8 +265,7 @@ export function CashAdministrationPanels({
         <Card className="cash-approvals" hidden={section !== "operations"}>
           <div className="card-header">
             <div>
-              <p className="eyebrow">Alçada gerencial</p>
-              <h2>Movimentos aguardando decisão</h2>
+              <h2>Aprovações pendentes</h2>
             </div>
             <Badge tone="warning">{pendingApprovals.length}</Badge>
           </div>
@@ -341,11 +342,7 @@ export function CashAdministrationPanels({
         <Card className="cash-settings" hidden={section !== "settings"}>
           <div className="card-header">
             <div>
-              <p className="eyebrow">Administração</p>
               <h2>Política e terminais</h2>
-              <p className="cash-card-desc">
-                Aprovações, alertas e gaveta usada por cada terminal.
-              </p>
             </div>
           </div>
           {data.capabilities.canManageCashSettings && (

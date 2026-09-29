@@ -17,6 +17,9 @@ import {
   dispatchSchema,
   evolutionConfigurationSchema,
   evolutionWebhookSchema,
+  operationalCustomerListQuerySchema,
+  operationalCustomerSchema,
+  operationalCustomerUpdateSchema,
   publicCouponValidationSchema,
   publicReservationSchema,
   publicWaitlistSchema,
@@ -72,6 +75,58 @@ describe("growth API boundaries", () => {
     );
     assert.equal(couponUpdateSchema.safeParse({}).success, false);
     assert.equal(campaignCancelSchema.safeParse({ reason: "x" }).success, false);
+  });
+
+  it("accepts an optional structured customer delivery address and keeps operational lookup narrow", () => {
+    const address = {
+      street: "Rua Central",
+      number: "10",
+      neighborhood: "Centro",
+      city: "São Paulo",
+      state: "sp",
+      postalCode: "01001-000",
+    };
+    assert.equal(
+      customerUpdateSchema.parse({ defaultDeliveryAddress: address }).defaultDeliveryAddress?.state,
+      "SP",
+    );
+    assert.equal(
+      customerUpdateSchema.safeParse({ defaultDeliveryAddress: { ...address, city: undefined } })
+        .success,
+      false,
+    );
+    assert.deepEqual(
+      operationalCustomerListQuerySchema.parse({
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        q: "  Maria  ",
+      }),
+      { unitId: "f898be18-4f20-4e20-93b3-75468c80646e", q: "Maria", limit: 20, offset: 0 },
+    );
+    assert.equal(
+      operationalCustomerSchema.safeParse({
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        name: "Maria Silva",
+        phone: "+55 11 99999-9999",
+        defaultDeliveryAddress: address,
+        idempotencyKey: "operational-customer-0001",
+      }).success,
+      true,
+    );
+    assert.equal(
+      operationalCustomerSchema.safeParse({
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        name: "Maria Silva",
+        idempotencyKey: "short",
+      }).success,
+      false,
+    );
+    assert.equal(
+      operationalCustomerUpdateSchema.safeParse({
+        unitId: "f898be18-4f20-4e20-93b3-75468c80646e",
+        defaultDeliveryAddress: address,
+      }).success,
+      true,
+    );
   });
 
   it("bounds reception lists and validates reservation periods", () => {
@@ -134,6 +189,10 @@ describe("growth API boundaries", () => {
     assert.equal(query.limit, 25);
     assert.equal(query.query, "Maria");
     assert.equal(query.scheduled, true);
+    assert.equal(
+      deliveryOrderQuerySchema.parse({ orderRef: "f898be18-4f20-4e20-93b3-75468c80646e" }).orderRef,
+      "f898be18-4f20-4e20-93b3-75468c80646e",
+    );
     assert.ok(query.updatedSince);
     assert.equal(query.updatedSince.toISOString(), "2026-08-16T15:00:00.000Z");
     assert.equal(deliveryOrderQuerySchema.safeParse({ limit: "201" }).success, false);

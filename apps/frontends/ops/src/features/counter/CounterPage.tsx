@@ -1,3 +1,4 @@
+import { type DeliveryAddressInput, deliveryAddressSchema } from "@giromesa/contracts";
 import {
   Badge,
   Button,
@@ -6,12 +7,13 @@ import {
   Icon,
   Input,
   Label,
+  Modal,
   NativeSelect,
   SearchField,
 } from "@giromesa/ui";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useId, useRef, useState } from "react";
 import { api } from "../../api";
-import { type Customer, parseCustomerPage } from "../../growth.shared";
+import { parseDeliveryZones } from "../../growth.shared";
 import { pilotMutation } from "../../operational-dispatch";
 import {
   InvalidPilotPayloadError,
@@ -25,10 +27,16 @@ import {
   text,
   useRemote,
 } from "../../operations.shared";
+import { profiles } from "../../profiles";
 import { formatMoney } from "../../rules";
-
+import {
+  DeliveryAddressFields,
+  emptyDeliveryAddress,
+  formatDeliveryAddress,
+} from "../delivery/DeliveryAddressFields";
 import { TabWorkspace } from "./CounterWorkspace";
 import { isValidOperationalPhone } from "./contact";
+import { counterShortcutAction } from "./counter-shortcuts";
 import { quickOrderPromisedAtToIso } from "./promisedAt";
 
 export type CounterQueueStage =
@@ -67,21 +75,18 @@ export const COUNTER_PRESETS = [
     label: "Retirada",
     icon: "purchases",
     fulfillment: "pickup" as const,
-    defaultMinutes: 20,
   },
   {
     id: "dine_in",
     label: "Balcão local",
     icon: "counter",
     fulfillment: "dine_in" as const,
-    defaultMinutes: null,
   },
   {
     id: "delivery",
     label: "Delivery",
     icon: "delivery",
     fulfillment: "delivery" as const,
-    defaultMinutes: 45,
   },
 ] as const;
 
@@ -104,13 +109,20 @@ export function buildWhatsAppReadyLink(
   phone: string,
   customerName?: string | null,
   label?: string | null,
+  fulfillment: "pickup" | "dine_in" | "delivery" = "pickup",
 ) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 8) return null;
   const fullPhone = digits.length <= 11 ? `55${digits}` : digits;
   const namePart = customerName ? `Olá, ${customerName}!` : "Olá!";
   const orderPart = label ? ` (pedido ${label})` : "";
-  const text = `${namePart} Seu pedido${orderPart} no GiroMesa está pronto para retirada. Aguardamos você!`;
+  const message =
+    fulfillment === "delivery"
+      ? "está pronto e aguarda saída para entrega."
+      : fulfillment === "dine_in"
+        ? "está pronto para consumo no local."
+        : "está pronto para retirada. Aguardamos você!";
+  const text = `${namePart} Seu pedido${orderPart} ${message}`;
   return `https://wa.me/${fullPhone}?text=${encodeURIComponent(text)}`;
 }
 
@@ -141,12 +153,34 @@ export function counterActionFromHash(hash: string): "new" | null {
   return query && new URLSearchParams(query).get("action") === "new" ? "new" : null;
 }
 
-export function counterCustomerOptionValue(customer: Pick<Customer, "name" | "phone" | "email">) {
+type CounterCustomer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email?: string | null;
+  defaultDeliveryAddress?: DeliveryAddressInput | null;
+};
+
+export function parseCounterCustomers(value: unknown): CounterCustomer[] {
+  return records(record(value).items).map((customer) => ({
+    id: text(customer.id),
+    name: text(customer.name),
+    phone: typeof customer.phone === "string" ? customer.phone : null,
+    defaultDeliveryAddress:
+      customer.defaultDeliveryAddress == null
+        ? null
+        : deliveryAddressSchema.parse(customer.defaultDeliveryAddress),
+  }));
+}
+
+export function counterCustomerOptionValue(
+  customer: Pick<CounterCustomer, "name" | "phone" | "email">,
+) {
   const contact = customer.phone ?? customer.email;
   return contact ? `${customer.name} · ${contact}` : customer.name;
 }
 
-export function counterCustomerFromOption(customers: Customer[], value: string) {
+export function counterCustomerFromOption(customers: CounterCustomer[], value: string) {
   const normalizedValue = value.trim().toLocaleLowerCase("pt-BR");
   if (!normalizedValue) return null;
   return (
@@ -208,10 +242,16 @@ export function RealCounterPage({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const quickOpenFormRef = useRef<HTMLFormElement>(null);
+  const newOrderChooserRef = useRef<HTMLDivElement>(null);
+  const newOrderButtonRef = useRef<HTMLButtonElement>(null);
+  const newOrderReturnFocusRef = useRef<HTMLElement | null>(null);
+  const focusNewOrderFormRef = useRef(false);
+  const scheduleRef = useRef<HTMLDetailsElement>(null);
   const queueScrollRef = useRef({ x: 0, y: 0 });
   const restoringOverviewRef = useRef(false);
 
   function selectTab(tabId: string | null, trigger?: HTMLElement) {
+    setNewOrderFormVisible(false);
     if (tabId) {
       returnFocusRef.current = trigger ?? null;
       queueScrollRef.current = { x: window.scrollX, y: window.scrollY };
@@ -237,7 +277,12 @@ export function RealCounterPage({
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [readyNotificationConsent, setReadyNotificationConsent] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryAddress, setDeliveryAddress] =
+    useState<DeliveryAddressInput>(emptyDeliveryAddress);
+  const [deliveryZoneId, setDeliveryZoneId] = useState("");
+  const [saveCustomer, setSaveCustomer] = useState(false);
+  const [saveCustomerAddress, setSaveCustomerAddress] = useState(false);
+  const customerSaveKey = useRef<string | null>(null);
   const [fulfillmentType, setFulfillmentType] = useState<"dine_in" | "pickup" | "delivery">(
     "pickup",
   );
@@ -255,10 +300,39 @@ export function RealCounterPage({
   );
   const [guests, setGuests] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [newOrderChooserOpen, setNewOrderChooserOpen] = useState(false);
+  const [newOrderFormVisible, setNewOrderFormVisible] = useState(false);
+  function closeNewOrder() {
+    if (busy) return;
+    setNewOrderFormVisible(false);
+    window.requestAnimationFrame(() => {
+      const target = newOrderReturnFocusRef.current;
+      (target?.isConnected
+        ? target
+        : (newOrderButtonRef.current ?? closeButtonRef.current ?? overviewRef.current)
+      )?.focus();
+    });
+  }
+  const canOpenOrder = profiles
+    .find((profile) => profile.id === scope.profileId)
+    ?.permissions.includes("counter.operate");
   const [feedback, setFeedback] = useState("");
   const [promisedAtError, setPromisedAtError] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const customerOptionsId = useId();
+  const zones = useRemote(
+    scope,
+    () =>
+      fulfillmentType === "delivery"
+        ? api.growth.deliveryZones(scope.organizationId, scope.unitId)
+        : Promise.resolve([]),
+    parseDeliveryZones,
+    fulfillmentType,
+  );
+  const activeZones =
+    zones.state.status === "ready" ? zones.state.data.filter((zone) => zone.active) : [];
+  const effectiveZoneId =
+    deliveryZoneId || (activeZones.length === 1 ? (activeZones[0]?.id ?? "") : "");
   const hasValidCustomerPhone =
     customerPhone.trim().length > 0 && isValidCounterPhone(customerPhone);
   useEffect(() => {
@@ -294,15 +368,84 @@ export function RealCounterPage({
     parseCounterQueue,
     `${stageFilter}:${channelFilter}:${debouncedQuery}:${page}`,
   );
+  const chooseNewOrder = useCallback(
+    (type: "dine_in" | "pickup" | "delivery") => {
+      if (busy || !canOpenOrder || queue.state.status !== "ready") return;
+      setFulfillmentType(type);
+      setNewOrderFormVisible(true);
+      focusNewOrderFormRef.current = true;
+      setNewOrderChooserOpen(false);
+    },
+    [busy, canOpenOrder, queue.state.status],
+  );
+  useEffect(() => {
+    if (embedded) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (busy || !canOpenOrder || queue.state.status !== "ready") return;
+      if (newOrderChooserOpen) {
+        const target = event.target;
+        if (
+          event.defaultPrevented ||
+          event.repeat ||
+          event.isComposing ||
+          event.altKey ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          !(target instanceof Element) ||
+          target.closest("dialog") !== newOrderChooserRef.current?.closest("dialog") ||
+          target.closest("input, textarea, select, [contenteditable='true']")
+        )
+          return;
+        const type =
+          event.key === "1"
+            ? "dine_in"
+            : event.key === "2"
+              ? "pickup"
+              : event.key === "3"
+                ? "delivery"
+                : null;
+        if (!type) return;
+        event.preventDefault();
+        chooseNewOrder(type);
+        return;
+      }
+      if (
+        counterShortcutAction(event) !== "new" ||
+        document.querySelector("dialog[open], [role='dialog'][aria-modal='true']") ||
+        panelRef.current?.querySelector('[aria-busy="true"]')
+      )
+        return;
+      event.preventDefault();
+      if (!newOrderFormVisible) {
+        newOrderReturnFocusRef.current =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }
+      setNewOrderChooserOpen(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    busy,
+    canOpenOrder,
+    chooseNewOrder,
+    embedded,
+    newOrderChooserOpen,
+    newOrderFormVisible,
+    queue.state.status,
+  ]);
+  useEffect(() => {
+    if (newOrderChooserOpen || !newOrderFormVisible || !focusNewOrderFormRef.current) return;
+    const frame = window.requestAnimationFrame(() => {
+      focusNewOrderFormRef.current = false;
+      quickOpenFormRef.current?.querySelector<HTMLElement>("input:not([disabled])")?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [newOrderChooserOpen, newOrderFormVisible]);
   useEffect(() => {
     if (!newOrderRequested || embedded || queue.state.status !== "ready") return;
     const frame = window.requestAnimationFrame(() => {
-      if (!selected) {
-        const control =
-          quickOpenFormRef.current?.querySelector<HTMLElement>("select, input, button");
-        if (!control) return;
-        control.focus();
-      }
+      if (canOpenOrder) setNewOrderChooserOpen(true);
       const url = new URL(window.location.href);
       const [route = "#/counter", query = ""] = url.hash.split("?");
       const params = new URLSearchParams(query);
@@ -312,7 +455,7 @@ export function RealCounterPage({
       setNewOrderRequested(false);
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [embedded, newOrderRequested, queue.state.status, selected]);
+  }, [canOpenOrder, embedded, newOrderRequested, queue.state.status]);
   const floor = useRemote(
     scope,
     () => scope.load("floor", undefined, () => api.pilot.floor(scope.organizationId, scope.unitId)),
@@ -330,14 +473,30 @@ export function RealCounterPage({
       window.scrollTo(queueScrollRef.current.x, queueScrollRef.current.y);
     }
   }, [selected, queue.state.status]);
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!selected || !panel) return;
+    const resize = () =>
+      panel.style.setProperty(
+        "--counter-panel-top",
+        `${Math.max(16, panel.getBoundingClientRect().top)}px`,
+      );
+    resize();
+    window.addEventListener("resize", resize);
+    window.addEventListener("scroll", resize, { passive: true });
+    return () => {
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("scroll", resize);
+    };
+  }, [selected]);
   const customers = useRemote(
     scope,
     () =>
-      api.growth.customerPage(scope.organizationId, {
-        q: debouncedCustomerSearch || undefined,
+      api.growth.operationalCustomers(scope.organizationId, scope.unitId, {
+        q: (selectedCustomerId ? customerName : debouncedCustomerSearch) || undefined,
         limit: 20,
       }),
-    parseCustomerPage,
+    parseCounterCustomers,
     debouncedCustomerSearch,
   );
   const customerOptions = customers.state.status === "ready" ? customers.state.data : null;
@@ -363,19 +522,54 @@ export function RealCounterPage({
             promisedAt = quickOrderPromisedAtToIso(promisedDate, promisedTime);
           } catch (error) {
             setPromisedAtError(error instanceof Error ? error.message : "Informe um prazo válido.");
+            if (scheduleRef.current) {
+              scheduleRef.current.closest(".counter-open-advanced")?.setAttribute("open", "");
+              scheduleRef.current.open = true;
+              scheduleRef.current.querySelector("input")?.focus();
+            }
             return;
           }
           setBusy(true);
           try {
+            const address =
+              fulfillmentType === "delivery"
+                ? deliveryAddressSchema.parse(deliveryAddress)
+                : undefined;
+            if (address && !effectiveZoneId)
+              throw new Error("Selecione uma zona de entrega antes de abrir o pedido.");
+            let customerId = selectedCustomerId;
+            if (customerId && address && saveCustomerAddress) {
+              await api.growth.updateOperationalCustomerAddress(
+                scope.organizationId,
+                scope.unitId,
+                customerId,
+                address,
+              );
+            }
+            if (saveCustomer && !customerId) {
+              customerSaveKey.current ??= crypto.randomUUID();
+              const result = record(
+                await api.growth.createOperationalCustomer(scope.organizationId, scope.unitId, {
+                  name: customerName.trim(),
+                  phone: customerPhone.trim() || undefined,
+                  defaultDeliveryAddress: address,
+                  idempotencyKey: customerSaveKey.current,
+                }),
+              );
+              customerId = text(record(result.customer).id);
+              setSelectedCustomerId(customerId);
+              setSaveCustomer(false);
+            }
             const body = {
               label: label.trim() || undefined,
               guestCount: guests,
-              customerId: selectedCustomerId ?? undefined,
+              customerId: customerId ?? undefined,
               customerName: customerName.trim() || undefined,
               customerPhone: customerPhone.trim() || undefined,
               readyNotificationConsent: hasValidCustomerPhone && readyNotificationConsent,
-              deliveryAddress:
-                fulfillmentType === "delivery" ? deliveryAddress.trim() || undefined : undefined,
+              deliveryAddress: address ? formatDeliveryAddress(address) : undefined,
+              deliveryAddressDetails: address,
+              deliveryZoneId: address ? effectiveZoneId : undefined,
               fulfillmentType,
               promisedAt: promisedAt ?? undefined,
             };
@@ -395,7 +589,11 @@ export function RealCounterPage({
             setCustomerPhone("");
             setPhoneError("");
             setReadyNotificationConsent(false);
-            setDeliveryAddress("");
+            setDeliveryAddress(emptyDeliveryAddress);
+            setDeliveryZoneId("");
+            setSaveCustomer(false);
+            setSaveCustomerAddress(false);
+            customerSaveKey.current = null;
             setPromisedDate("");
             setPromisedTime("");
             queue.retry();
@@ -410,15 +608,9 @@ export function RealCounterPage({
         function applyPreset(preset: (typeof COUNTER_PRESETS)[number]) {
           setFulfillmentType(preset.fulfillment);
           setGuests(1);
-          if (preset.defaultMinutes) {
-            const { date, time } = calculatePromisedPreset(preset.defaultMinutes);
-            setPromisedDate(date);
-            setPromisedTime(time);
-            setPromisedAtError("");
-          } else {
-            setPromisedDate("");
-            setPromisedTime("");
-          }
+          setPromisedDate("");
+          setPromisedTime("");
+          setPromisedAtError("");
         }
 
         function applyMinutes(minutes: number) {
@@ -431,6 +623,371 @@ export function RealCounterPage({
         return (
           <div className="counter-operation-container">
             <div
+              className={
+                embedded ? "counter-overview-actions" : "page-heading counter-page-heading"
+              }
+            >
+              {!embedded && <h1>Balcão e retirada</h1>}
+              {!selected && canOpenOrder && (
+                <Button
+                  aria-haspopup="dialog"
+                  aria-keyshortcuts={embedded ? undefined : "Alt+n"}
+                  disabled={busy}
+                  ref={newOrderButtonRef}
+                  onClick={(event) => {
+                    newOrderReturnFocusRef.current = event.currentTarget;
+                    setNewOrderChooserOpen(true);
+                  }}
+                  type="button"
+                >
+                  <Icon name="plus" size={16} /> Novo pedido
+                  {!embedded && (
+                    <span className="counter-shortcut-hint" aria-hidden="true">
+                      Alt N
+                    </span>
+                  )}
+                </Button>
+              )}
+            </div>
+            <Modal
+              isOpen={newOrderChooserOpen}
+              onClose={() => setNewOrderChooserOpen(false)}
+              title="Novo pedido"
+              size="sm"
+            >
+              <div className="gm-form-stack" ref={newOrderChooserRef}>
+                <p>Escolha o tipo ou pressione 1, 2 ou 3.</p>
+                {(["dine_in", "pickup", "delivery"] as const).map((type, index) => (
+                  <Button
+                    aria-keyshortcuts={String(index + 1)}
+                    disabled={busy || !canOpenOrder}
+                    key={type}
+                    onClick={() => chooseNewOrder(type)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {index + 1} ·{" "}
+                    {type === "dine_in" ? "Local" : type === "pickup" ? "Retirada" : "Delivery"}
+                  </Button>
+                ))}
+              </div>
+            </Modal>
+            <Modal
+              isOpen={newOrderFormVisible}
+              onClose={closeNewOrder}
+              closeDisabled={busy}
+              title="Novo pedido"
+              size="xl"
+              contentClassName="counter-operation counter-new-order"
+            >
+              <div className="counter-quick-open-header">
+                <div className="counter-quick-presets">
+                  {COUNTER_PRESETS.map((preset) => (
+                    <Button
+                      className={
+                        fulfillmentType === preset.fulfillment ? "counter-preset-btn--active" : ""
+                      }
+                      key={preset.id}
+                      aria-pressed={fulfillmentType === preset.fulfillment}
+                      onClick={() => applyPreset(preset)}
+                      size="sm"
+                      type="button"
+                      variant={fulfillmentType === preset.fulfillment ? "primary" : "secondary"}
+                    >
+                      <Icon name={preset.icon} size={16} />
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <form
+                className="inline-form counter-open-form"
+                onSubmit={(event) => void open(event)}
+                ref={quickOpenFormRef}
+              >
+                <div className="counter-field gap-3">
+                  {customerOptions ? (
+                    <>
+                      <Label className="grid gap-1.5">
+                        Buscar cliente cadastrado
+                        <Input
+                          autoComplete="off"
+                          list={customerOptionsId}
+                          onChange={(event) => {
+                            const value = event.target.value;
+                            const customer = counterCustomerFromOption(customerOptions, value);
+                            setCustomerSearch(value);
+                            setSelectedCustomerId(customer?.id ?? null);
+                            if (!customer) return;
+                            setCustomerName(customer.name);
+                            setCustomerPhone(customer.phone ?? "");
+                            setDeliveryAddress(
+                              customer.defaultDeliveryAddress ?? emptyDeliveryAddress,
+                            );
+                            setSaveCustomer(false);
+                            setSaveCustomerAddress(false);
+                            setPhoneError("");
+                            setReadyNotificationConsent(false);
+                          }}
+                          placeholder="Nome ou telefone"
+                          type="search"
+                          value={customerSearch}
+                        />
+                      </Label>
+                      <datalist id={customerOptionsId}>
+                        {customerOptions.map((customer) => (
+                          <option key={customer.id} value={counterCustomerOptionValue(customer)} />
+                        ))}
+                      </datalist>
+                      {selectedCustomer ? (
+                        <small role="status">Cliente vinculado</small>
+                      ) : customerOptions.length === 0 ? (
+                        <small>Nenhum cliente cadastrado. Preencha os dados manualmente.</small>
+                      ) : null}
+                    </>
+                  ) : customers.state.status === "loading" ? (
+                    <small role="status">Carregando clientes cadastrados…</small>
+                  ) : (
+                    <small role="alert">
+                      Clientes indisponíveis. Você ainda pode preencher os dados manualmente.
+                      <Button onClick={customers.retry} size="sm" type="button" variant="ghost">
+                        Tentar novamente
+                      </Button>
+                    </small>
+                  )}
+                  <Label className="grid gap-1.5">
+                    Nome do cliente
+                    <Input
+                      onChange={(event) => {
+                        setCustomerName(event.target.value);
+                        customerSaveKey.current = null;
+                        setSelectedCustomerId(null);
+                      }}
+                      placeholder={saveCustomer ? "Nome do novo cliente" : "Opcional"}
+                      required={saveCustomer}
+                      value={customerName}
+                    />
+                  </Label>
+                </div>
+                {!selectedCustomerId && (
+                  <Label className="counter-save-customer">
+                    <input
+                      type="checkbox"
+                      checked={saveCustomer}
+                      onChange={(event) => setSaveCustomer(event.target.checked)}
+                    />
+                    Salvar como novo cliente
+                  </Label>
+                )}
+                <details
+                  className="counter-open-advanced"
+                  open={fulfillmentType === "delivery" || saveCustomer}
+                >
+                  <summary>
+                    {fulfillmentType === "delivery" ? "Contato e entrega" : "Dados do pedido"}
+                    <Icon name="chevron-down" size={16} />
+                  </summary>
+                  <div>
+                    <div className="counter-field">
+                      <Label className="grid gap-1.5">
+                        Telefone
+                        <Input
+                          aria-describedby={phoneError ? "counter-phone-error" : undefined}
+                          aria-invalid={Boolean(phoneError)}
+                          inputMode="tel"
+                          onBlur={() =>
+                            setPhoneError(
+                              isValidCounterPhone(customerPhone)
+                                ? ""
+                                : "Informe um telefone válido com DDD.",
+                            )
+                          }
+                          onChange={(event) => {
+                            const nextPhone = event.target.value;
+                            setCustomerPhone(nextPhone);
+                            customerSaveKey.current = null;
+                            setSelectedCustomerId(null);
+                            setPhoneError("");
+                            if (!nextPhone.trim() || !isValidCounterPhone(nextPhone)) {
+                              setReadyNotificationConsent(false);
+                            }
+                          }}
+                          onInvalid={() => setPhoneError("Informe um telefone válido com DDD.")}
+                          pattern="\\+?[0-9 ()-]{8,30}"
+                          type="tel"
+                          value={customerPhone}
+                        />
+                      </Label>
+                      {phoneError && (
+                        <small className="counter-field-error" id="counter-phone-error">
+                          {phoneError}
+                        </small>
+                      )}
+                    </div>
+                    <Label className="counter-notification-consent">
+                      <input
+                        className="accent-primary"
+                        checked={readyNotificationConsent}
+                        disabled={!hasValidCustomerPhone}
+                        onChange={(event) => setReadyNotificationConsent(event.target.checked)}
+                        type="checkbox"
+                      />
+                      Cliente autorizou aviso de pedido pronto
+                    </Label>
+                    {fulfillmentType !== "dine_in" && (
+                      <details className="counter-schedule gm-disclosure" ref={scheduleRef}>
+                        <summary>
+                          Agendar pedido · opcional
+                          <Icon name="chevron-down" size={16} />
+                        </summary>
+                        <fieldset
+                          aria-describedby={
+                            promisedAtError ? "counter-promised-at-error" : undefined
+                          }
+                          className="promised-at-field"
+                        >
+                          <div className="promised-at-field__legend-row">
+                            <legend className="gm-sr-only">Horário combinado</legend>
+                            <div className="counter-minute-chips">
+                              {PROMISED_MINUTES_PRESETS.map((mins) => (
+                                <Button
+                                  key={mins}
+                                  onClick={() => applyMinutes(mins)}
+                                  size="sm"
+                                  type="button"
+                                  variant="secondary"
+                                >
+                                  <Icon name="plus" size={12} />
+                                  {mins} min
+                                </Button>
+                              ))}
+                            </div>
+                            {(promisedDate || promisedTime) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  setPromisedDate("");
+                                  setPromisedTime("");
+                                  setPromisedAtError("");
+                                }}
+                              >
+                                Limpar horário
+                              </Button>
+                            )}
+                          </div>
+                          <Label className="grid gap-1.5">
+                            <span>Data</span>
+                            <Input
+                              aria-invalid={Boolean(promisedAtError)}
+                              onChange={(event) => {
+                                setPromisedDate(event.target.value);
+                                setPromisedAtError("");
+                              }}
+                              type="date"
+                              value={promisedDate}
+                            />
+                          </Label>
+                          <Label className="grid gap-1.5">
+                            <span>Hora</span>
+                            <Input
+                              aria-invalid={Boolean(promisedAtError)}
+                              lang="pt-BR"
+                              onChange={(event) => {
+                                setPromisedTime(event.target.value);
+                                setPromisedAtError("");
+                              }}
+                              type="time"
+                              value={promisedTime}
+                            />
+                          </Label>
+                          {promisedAtError && (
+                            <small className="counter-field-error" id="counter-promised-at-error">
+                              {promisedAtError}
+                            </small>
+                          )}
+                        </fieldset>
+                      </details>
+                    )}
+                    {fulfillmentType === "delivery" && (
+                      <div className="inline-form__wide counter-delivery-fields">
+                        <DeliveryAddressFields
+                          value={deliveryAddress}
+                          onChange={(address) => {
+                            setDeliveryAddress(address);
+                            customerSaveKey.current = null;
+                          }}
+                        />
+                        {selectedCustomerId && (
+                          <Label className="counter-save-customer">
+                            <input
+                              type="checkbox"
+                              checked={saveCustomerAddress}
+                              onChange={(event) => setSaveCustomerAddress(event.target.checked)}
+                            />
+                            Atualizar endereço no cadastro do cliente
+                          </Label>
+                        )}
+                        <Label className="gm-form-field counter-delivery-zone">
+                          Zona de entrega
+                          <NativeSelect
+                            required
+                            value={effectiveZoneId}
+                            onChange={(event) => setDeliveryZoneId(event.target.value)}
+                          >
+                            <option value="">Selecione a zona</option>
+                            {activeZones.map((zone) => (
+                              <option key={zone.id} value={zone.id}>
+                                {zone.name} · {formatMoney(zone.feeCents)}
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </Label>
+                        {zones.state.status === "loading" ? (
+                          <small role="status">Carregando zonas…</small>
+                        ) : zones.state.status === "error" ? (
+                          <p role="alert">{zones.state.message}</p>
+                        ) : activeZones.length === 0 ? (
+                          <p role="alert">Cadastre uma zona ativa em Entregas para continuar.</p>
+                        ) : null}
+                      </div>
+                    )}
+                    <Label className="grid gap-1.5">
+                      Referência interna
+                      <Input
+                        onChange={(event) => setLabel(event.target.value)}
+                        placeholder="Opcional"
+                        value={label}
+                      />
+                    </Label>
+                    <Label className="grid gap-1.5 counter-guests-field">
+                      Pessoas
+                      <Input
+                        min={1}
+                        onChange={(event) => setGuests(Number(event.target.value))}
+                        type="number"
+                        value={guests}
+                      />
+                    </Label>
+                  </div>
+                </details>
+                <div className="counter-new-order-actions">
+                  <Button disabled={busy} onClick={closeNewOrder} type="button" variant="secondary">
+                    Cancelar
+                  </Button>
+                  <Button disabled={busy || guests < 1} type="submit">
+                    {busy ? "Abrindo…" : "Abrir e pedir"}
+                  </Button>
+                </div>
+                {feedback && (
+                  <p className="counter-form-error" role="alert">
+                    {feedback}
+                  </p>
+                )}
+              </form>
+            </Modal>
+            <div
               className={`ops-layout counter-operation ${selected ? "counter-operation--selected" : "counter-operation--idle"} ${embedded ? "counter-page--embedded" : ""}`}
             >
               <section
@@ -439,258 +996,6 @@ export function RealCounterPage({
                 ref={overviewRef}
                 tabIndex={-1}
               >
-                <Card className="counter-quick-open-card">
-                  <div className="counter-quick-open-header">
-                    <div>
-                      <p className="eyebrow">Ponto de Atendimento</p>
-                      <h2>Nova comanda rápida</h2>
-                    </div>
-                    <div className="counter-quick-presets">
-                      {COUNTER_PRESETS.map((preset) => (
-                        <Button
-                          className={
-                            fulfillmentType === preset.fulfillment
-                              ? "counter-preset-btn--active"
-                              : ""
-                          }
-                          key={preset.id}
-                          onClick={() => applyPreset(preset)}
-                          size="sm"
-                          type="button"
-                          variant={fulfillmentType === preset.fulfillment ? "primary" : "secondary"}
-                        >
-                          <Icon name={preset.icon} size={16} />
-                          {preset.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <form
-                    className="inline-form counter-open-form"
-                    onSubmit={(event) => void open(event)}
-                    ref={quickOpenFormRef}
-                  >
-                    <Label className="grid gap-1.5">
-                      Atendimento
-                      <NativeSelect
-                        onChange={(event) =>
-                          setFulfillmentType(event.target.value as typeof fulfillmentType)
-                        }
-                        value={fulfillmentType}
-                      >
-                        <option value="pickup">Retirada</option>
-                        <option value="dine_in">Consumo no local</option>
-                        <option value="delivery">Delivery</option>
-                      </NativeSelect>
-                    </Label>
-                    <div className="counter-field gap-3">
-                      {customerOptions ? (
-                        <>
-                          <Label className="grid gap-1.5">
-                            Buscar cliente cadastrado
-                            <Input
-                              autoComplete="off"
-                              list={customerOptionsId}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                const customer = counterCustomerFromOption(customerOptions, value);
-                                setCustomerSearch(value);
-                                setSelectedCustomerId(customer?.id ?? null);
-                                if (!customer) return;
-                                setCustomerName(customer.name);
-                                setCustomerPhone(customer.phone ?? "");
-                                setPhoneError("");
-                                setReadyNotificationConsent(false);
-                              }}
-                              placeholder="Nome, telefone ou e-mail"
-                              type="search"
-                              value={customerSearch}
-                            />
-                          </Label>
-                          <datalist id={customerOptionsId}>
-                            {customerOptions.map((customer) => (
-                              <option
-                                key={customer.id}
-                                value={counterCustomerOptionValue(customer)}
-                              />
-                            ))}
-                          </datalist>
-                          {selectedCustomer ? (
-                            <small role="status">
-                              Cliente vinculado. Nome e telefone ficam registrados nesta comanda.
-                            </small>
-                          ) : customerOptions.length === 0 ? (
-                            <small>Nenhum cliente cadastrado. Preencha os dados manualmente.</small>
-                          ) : null}
-                        </>
-                      ) : customers.state.status === "loading" ? (
-                        <small role="status">Carregando clientes cadastrados…</small>
-                      ) : (
-                        <small role="alert">
-                          Clientes indisponíveis. Você ainda pode preencher os dados manualmente.
-                          <Button onClick={customers.retry} size="sm" type="button" variant="ghost">
-                            Tentar novamente
-                          </Button>
-                        </small>
-                      )}
-                      <Label className="grid gap-1.5">
-                        Nome do cliente
-                        <Input
-                          onChange={(event) => {
-                            setCustomerName(event.target.value);
-                            setSelectedCustomerId(null);
-                          }}
-                          placeholder="Opcional — número automático"
-                          value={customerName}
-                        />
-                      </Label>
-                    </div>
-                    <details
-                      className="counter-open-advanced"
-                      open={fulfillmentType === "delivery"}
-                    >
-                      <summary>Prazo e identificação</summary>
-                      <div>
-                        <div className="counter-field">
-                          <Label className="grid gap-1.5">
-                            Telefone
-                            <Input
-                              aria-describedby={phoneError ? "counter-phone-error" : undefined}
-                              aria-invalid={Boolean(phoneError)}
-                              inputMode="tel"
-                              onBlur={() =>
-                                setPhoneError(
-                                  isValidCounterPhone(customerPhone)
-                                    ? ""
-                                    : "Informe um telefone válido com DDD.",
-                                )
-                              }
-                              onChange={(event) => {
-                                const nextPhone = event.target.value;
-                                setCustomerPhone(nextPhone);
-                                setSelectedCustomerId(null);
-                                setPhoneError("");
-                                if (!nextPhone.trim() || !isValidCounterPhone(nextPhone)) {
-                                  setReadyNotificationConsent(false);
-                                }
-                              }}
-                              onInvalid={() => setPhoneError("Informe um telefone válido com DDD.")}
-                              pattern="\\+?[0-9 ()-]{8,30}"
-                              type="tel"
-                              value={customerPhone}
-                            />
-                          </Label>
-                          {phoneError && (
-                            <small className="counter-field-error" id="counter-phone-error">
-                              {phoneError}
-                            </small>
-                          )}
-                        </div>
-                        <Label className="counter-notification-consent items-start rounded-md border border-border bg-muted p-3 leading-snug">
-                          <input
-                            className="accent-primary"
-                            checked={readyNotificationConsent}
-                            disabled={!hasValidCustomerPhone}
-                            onChange={(event) => setReadyNotificationConsent(event.target.checked)}
-                            type="checkbox"
-                          />
-                          Cliente autorizou receber o aviso de pedido pronto
-                        </Label>
-                        {fulfillmentType !== "dine_in" && (
-                          <fieldset
-                            aria-describedby={
-                              promisedAtError ? "counter-promised-at-error" : undefined
-                            }
-                            className="promised-at-field"
-                          >
-                            <div className="promised-at-field__legend-row">
-                              <legend>Prometido para</legend>
-                              <div className="counter-minute-chips">
-                                <span>Atalhos:</span>
-                                {PROMISED_MINUTES_PRESETS.map((mins) => (
-                                  <Button
-                                    key={mins}
-                                    onClick={() => applyMinutes(mins)}
-                                    size="sm"
-                                    type="button"
-                                    variant="secondary"
-                                  >
-                                    +{mins} min
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                            <Label className="grid gap-1.5">
-                              <span>Data</span>
-                              <Input
-                                aria-invalid={Boolean(promisedAtError)}
-                                onChange={(event) => {
-                                  setPromisedDate(event.target.value);
-                                  setPromisedAtError("");
-                                }}
-                                type="date"
-                                value={promisedDate}
-                              />
-                            </Label>
-                            <Label className="grid gap-1.5">
-                              <span>Hora</span>
-                              <Input
-                                aria-invalid={Boolean(promisedAtError)}
-                                lang="pt-BR"
-                                onChange={(event) => {
-                                  setPromisedTime(event.target.value);
-                                  setPromisedAtError("");
-                                }}
-                                type="time"
-                                value={promisedTime}
-                              />
-                            </Label>
-                            {promisedAtError && (
-                              <small className="counter-field-error" id="counter-promised-at-error">
-                                {promisedAtError}
-                              </small>
-                            )}
-                          </fieldset>
-                        )}
-                        {fulfillmentType === "delivery" && (
-                          <Label className="inline-form__wide grid gap-1.5">
-                            Endereço
-                            <Input
-                              onChange={(event) => setDeliveryAddress(event.target.value)}
-                              required
-                              value={deliveryAddress}
-                            />
-                          </Label>
-                        )}
-                        <Label className="grid gap-1.5">
-                          Referência interna
-                          <Input
-                            onChange={(event) => setLabel(event.target.value)}
-                            placeholder="Opcional"
-                            value={label}
-                          />
-                        </Label>
-                        <Label className="grid gap-1.5">
-                          Pessoas
-                          <Input
-                            min={1}
-                            onChange={(event) => setGuests(Number(event.target.value))}
-                            type="number"
-                            value={guests}
-                          />
-                        </Label>
-                      </div>
-                    </details>
-                    <Button disabled={busy || guests < 1} type="submit">
-                      {busy ? "Abrindo…" : "Abrir e pedir"}
-                    </Button>
-                    {feedback && (
-                      <p className="counter-form-error" role="alert">
-                        {feedback}
-                      </p>
-                    )}
-                  </form>
-                </Card>
                 {/* COCKPIT DE MÉTRICAS DA FILA */}
                 <div className="counter-metrics-bar">
                   <div className="counter-metric-pill">
@@ -815,6 +1120,7 @@ export function RealCounterPage({
                             tab.customerName,
                             tab.label ??
                               (tab.displayNumber ? `Balcão ${tab.displayNumber}` : undefined),
+                            tab.fulfillmentType,
                           )
                         : null;
                     return (
@@ -858,7 +1164,7 @@ export function RealCounterPage({
 
                           <div className="counter-queue-card__details">
                             <span className="counter-queue-card__customer">
-                              {tab.customerName ?? `${tab.guestCount} pessoa(s)`}
+                              {tab.customerName !== tab.label ? tab.customerName : null}
                               {tab.customerPhone && (
                                 <small className="counter-queue-card__phone">
                                   {tab.customerPhone}
@@ -938,7 +1244,7 @@ export function RealCounterPage({
                       description={
                         hasQueueFilters
                           ? "Ajuste a etapa, o canal ou a busca para ver outras comandas."
-                          : "Abra a primeira comanda rápida acima."
+                          : "Use Novo pedido para iniciar um atendimento."
                       }
                       icon="☰"
                       title={hasQueueFilters ? "Nenhuma comanda encontrada" : "Fila vazia"}
@@ -1003,6 +1309,7 @@ export function RealCounterPage({
                     <Icon name="x" size={16} /> Voltar para a fila
                   </Button>
                   <TabWorkspace
+                    keyboardShortcuts={!embedded}
                     initialPaymentAttemptId={paymentAttemptId}
                     key={selected}
                     scope={scope}

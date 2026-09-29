@@ -57,6 +57,39 @@ export type SalonPreflightItem = {
   blocking: boolean;
 };
 
+export function selectSalonOpenTabs(
+  tabs: readonly PosTab[],
+  tables: ReadonlyArray<Pick<FloorTable, "id" | "active">>,
+) {
+  const activeTableIds = new Set(tables.filter((table) => table.active).map((table) => table.id));
+  const uniqueTabs = new Map<string, PosTab>();
+
+  for (const tab of tabs) {
+    if (tab.status === "open" && tab.tableId && activeTableIds.has(tab.tableId)) {
+      uniqueTabs.set(tab.id, tab);
+    }
+  }
+
+  return [...uniqueTabs.values()];
+}
+
+export function countSalonGuests(tabs: readonly PosTab[]): number {
+  const services = new Map<string, PosTab>();
+  for (const tab of tabs) {
+    const rootId = tab.serviceRootTabId ?? tab.id;
+    const current = services.get(rootId);
+    if (
+      !current ||
+      tab.id === rootId ||
+      (current.id !== rootId && tab.guestCount > current.guestCount)
+    ) {
+      services.set(rootId, tab);
+    }
+  }
+  // ponytail: sem a raiz, o maior valor conhecido evita somar pessoas por conta; precisão exige a raiz.
+  return [...services.values()].reduce((sum, tab) => sum + tab.guestCount, 0);
+}
+
 export function buildSalonPreflight(floor: PilotFloor): SalonPreflightItem[] {
   const activeRooms = floor.rooms.filter((room) => room.active);
   const activeTables = floor.tables.filter((table) => table.active);

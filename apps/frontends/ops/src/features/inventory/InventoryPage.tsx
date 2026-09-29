@@ -1048,7 +1048,7 @@ export function RealInventoryPage({
             </p>
             {(confirmation.kind === "cancel-production" ||
               confirmation.kind === "cancel-transfer") && (
-              <Label>
+              <Label className="gm-field items-stretch">
                 <span>Motivo</span>
                 <Textarea
                   autoFocus

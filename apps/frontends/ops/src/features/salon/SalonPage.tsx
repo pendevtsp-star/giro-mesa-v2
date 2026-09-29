@@ -40,9 +40,9 @@ import { ServiceModePicker } from "./ServiceModePicker";
 import {
   buildSalonPreflight,
   buildTableTimeline,
-  DEFAULT_SALON_ROLE_CONFIG,
+  countSalonGuests,
   resolveShiftServiceMode,
-  SALON_ROLE_CONFIG,
+  selectSalonOpenTabs,
   tableNextAction,
 } from "./salon-operations";
 import { buildSequentialTableNames, MAX_TABLE_BATCH } from "./tableNames";
@@ -425,6 +425,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
+      if (
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
+      )
+        return;
       if (event.key === "Escape") {
         closeFloatingMenus(salonShellRef.current);
       }
@@ -962,8 +972,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         const advancedFilterCount =
           Number(roomFilter !== "all") +
           Number(Boolean(data.activeShift) && sectionFilter !== "all");
-        const totalActiveSalonCents = data.openTabs.reduce((sum, open) => sum + open.totalCents, 0);
-        const activeOpenTabs = data.openTabs.filter((open) => open.status === "open");
+        const activeOpenTabs = selectSalonOpenTabs(data.openTabs, allActiveTables);
+        const totalActiveSalonCents = activeOpenTabs.reduce(
+          (sum, open) => sum + open.totalCents,
+          0,
+        );
         const totalSeats = allActiveTables.reduce((sum, item) => sum + item.seats, 0);
         const occupiedTablesList = activeTables.filter((item) =>
           ["occupied", "attention", "closing"].includes(displayStatus(item)),
@@ -974,9 +987,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             return group ? groupMembers(group.id) : [item.id];
           }),
         );
-        const occupiedSeats = data.openTabs
-          .filter((open) => open.tableId && occupiedTableIds.has(open.tableId))
-          .reduce((sum, open) => sum + open.guestCount, 0);
+        const occupiedSeats = countSalonGuests(
+          activeOpenTabs.filter((open) => open.tableId && occupiedTableIds.has(open.tableId)),
+        );
         const tableOccupancyRate =
           counts.all > 0 ? Math.round((occupiedTablesList.length / counts.all) * 100) : 0;
         const seatOccupancyRate =
@@ -986,12 +999,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
             ? Math.round(totalActiveSalonCents / occupiedTablesList.length)
             : 0;
 
-        const currentStaffMember = data.staff.find(
-          (person) => person.identityId === scope.identityId,
-        );
-        const activeUserName = currentStaffMember?.displayName ?? "Operador";
-
-        const roleConfig = SALON_ROLE_CONFIG[scope.profileId] ?? DEFAULT_SALON_ROLE_CONFIG;
         const joinTableIds = [
           ...new Set(
             joinSelection.flatMap((id) => {
@@ -1260,43 +1267,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
         const selectedShiftSection = shiftSectionAssignments.find(
           ({ section }) => section.id === assignmentSectionId,
         );
-        const ownSectionIds = new Set(
-          data.shiftSectionStaff
-            .filter((row) => row.identityId === scope.identityId)
-            .map((row) => row.shiftSectionId),
-        );
-        const ownTableIds = new Set(
-          data.shiftSectionTables
-            .filter((row) => ownSectionIds.has(row.shiftSectionId))
-            .map((row) => row.tableId),
-        );
-        const ownCalls = activeCalls.filter((call) => ownTableIds.has(call.tableId)).length;
-        const ownReady = readyTables.filter((item) => ownTableIds.has(item.id)).length;
-        const roleFocus =
-          scope.profileId === "cashier"
-            ? {
-                label: "Fila do caixa",
-                detail: `${counts.closing} conta(s) · ${attentionSummary.failedPrints + attentionSummary.printConfirmations} impressão(ões)`,
-              }
-            : scope.profileId === "waiter"
-              ? {
-                  label: "Minha operação",
-                  detail: `${ownTableIds.size} mesa(s) · ${ownReady} pronta(s) · ${ownCalls} chamado(s)`,
-                }
-              : scope.profileId === "receptionist"
-                ? {
-                    label: "Recepção",
-                    detail: `${counts.available} livre(s) · ${counts.reserved} reservada(s)`,
-                  }
-                : scope.profileId === "busser"
-                  ? {
-                      label: "Giro do salão",
-                      detail: `${counts.turnover} mesa(s) aguardando liberação`,
-                    }
-                  : {
-                      label: "Operação geral",
-                      detail: `${priorityCount} prioridade(s) · ${tableOccupancyRate}% ocupado`,
-                    };
         const handoverGroups = [
           ...data.openTabs
             .reduce(
@@ -2418,18 +2388,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                 className="salon-command-center__header"
                 role={floor.refreshError ? "alert" : "status"}
               >
-                <div className="salon-command-center__identity">
-                  <span className="salon-role-indicator__avatar" aria-hidden="true">
-                    <Icon name="user" size={16} />
-                  </span>
-                  <span>
-                    <small>
-                      {activeUserName} · {roleConfig.title}
-                    </small>
-                    <strong>{roleFocus.label}</strong>
-                    <small>{roleFocus.detail}</small>
-                  </span>
-                </div>
                 <div className="salon-command-center__health">
                   <span>
                     <StatusDot
@@ -2479,11 +2437,14 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       size="sm"
                       variant={preflightReady === preflight.length ? "ghost" : "secondary"}
                     >
-                      Prontidão {preflightReady}/{preflight.length}
+                      {preflightReady === preflight.length
+                        ? "Configurar"
+                        : `Prontidão ${preflightReady}/${preflight.length}`}
                     </Button>
                   )}
-                  {canConfigure && (
+                  {(canConfigure || (data.capabilities?.canAccessAllTabs && data.activeShift)) && (
                     <Button
+                      aria-expanded={showMetricsCockpit}
                       onClick={() => setShowMetricsCockpit((current) => !current)}
                       size="sm"
                       variant="ghost"
@@ -2508,7 +2469,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <summary>
                     <Icon name="clock" size={16} />
                     <strong>{data.activeShift?.label ?? "Nenhum turno aberto"}</strong>
-                    <span>{data.activeShift ? "Gerenciar turno" : "Abrir atendimento"}</span>
+                    <span>{data.activeShift ? "Turno e equipe" : "Abrir atendimento"}</span>
                     <Icon name="chevron-down" size={16} />
                   </summary>
                   <div className="salon-shift-control__body">
@@ -2737,16 +2698,16 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
 
               {canConfigure && showMetricsCockpit && (
                 <div className="salon-metrics-cockpit">
-                  <Card className="salon-metric-card">
+                  <Card className="salon-metric-card salon-metric-card--revenue">
                     <div className="salon-metric-card__header">
-                      <span>Faturamento em aberto</span>
+                      <span>Valor das comandas abertas</span>
                       <Icon name="cash" size={16} />
                     </div>
                     <strong>{formatMoney(totalActiveSalonCents)}</strong>
-                    <small>{activeOpenTabs.length} comanda(s) ativas no salão</small>
+                    <small>{activeOpenTabs.length} comanda(s) aberta(s) em mesas</small>
                   </Card>
 
-                  <Card className="salon-metric-card">
+                  <Card className="salon-metric-card salon-metric-card--occupancy">
                     <div className="salon-metric-card__header">
                       <span>Ocupação do salão</span>
                       <Icon name="salon" size={16} />
@@ -2768,7 +2729,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                     </small>
                   </Card>
 
-                  <Card className="salon-metric-card">
+                  <Card className="salon-metric-card salon-metric-card--ticket">
                     <div className="salon-metric-card__header">
                       <span>Ticket médio / mesa</span>
                       <Icon name="catalog" size={16} />
@@ -2828,6 +2789,90 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </Card>
                 </div>
               )}
+
+              {showMetricsCockpit &&
+                (canConfigure || data.capabilities?.canAccessAllTabs) &&
+                data.activeShift && (
+                  <section className="service-load-panel" aria-label="Praças e equipe">
+                    <header className="service-load-panel__header">
+                      <div>
+                        <h2>Praças e equipe</h2>
+                        <Badge tone="info">
+                          {operationalLoad.sections.length}{" "}
+                          {operationalLoad.sections.length === 1 ? "praça" : "praças"}
+                        </Badge>
+                      </div>
+                      {canManageShift && (
+                        <Button onClick={openShiftSetup} size="sm" variant="secondary">
+                          Ajustar distribuição
+                        </Button>
+                      )}
+                    </header>
+                    <div className="service-load-panel__body">
+                      <section aria-label="Carga por praça">
+                        <h3>Praças</h3>
+                        <div className="service-load-grid">
+                          {operationalLoad.sections.length === 0 && <p>Nenhuma praça no turno.</p>}
+                          {operationalLoad.sections.map((section) => (
+                            <article key={section.id} style={{ borderLeftColor: section.color }}>
+                              <h4>{section.name}</h4>
+                              <dl className="service-load-stats">
+                                <div>
+                                  <dt>Mesas ocupadas</dt>
+                                  <dd>
+                                    {section.occupied}
+                                    <small> / {section.tables}</small>
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt>Pessoas</dt>
+                                  <dd>{section.guests}</dd>
+                                </div>
+                                <div data-attention={section.calls > 0}>
+                                  <dt>Chamados</dt>
+                                  <dd>{section.calls}</dd>
+                                </div>
+                              </dl>
+                              {data.capabilities?.canAccessAllTabs && (
+                                <small>{formatMoney(section.totalCents)} em comandas abertas</small>
+                              )}
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                      <section aria-label="Carga por responsável">
+                        <h3>Equipe</h3>
+                        <div className="service-load-grid">
+                          {operationalLoad.staff.length === 0 && (
+                            <p>Nenhum responsável no turno.</p>
+                          )}
+                          {operationalLoad.staff.map((person) => (
+                            <article key={person.identityId}>
+                              <h4>{person.displayName}</h4>
+                              <dl className="service-load-stats">
+                                <div>
+                                  <dt>Praças</dt>
+                                  <dd>{person.sections}</dd>
+                                </div>
+                                <div>
+                                  <dt>Comandas</dt>
+                                  <dd>{person.tabs}</dd>
+                                </div>
+                                <div>
+                                  <dt>Pessoas</dt>
+                                  <dd>{person.guests}</dd>
+                                </div>
+                              </dl>
+                              {data.capabilities?.canAccessAllTabs && (
+                                <small>{formatMoney(person.totalCents)} em comandas abertas</small>
+                              )}
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    </div>
+                  </section>
+                )}
 
               <div className="salon-command-bar salon-command-bar--real">
                 <SalonSearch
@@ -2992,61 +3037,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </Button>
                 )}
               </div>
-
-              {(canConfigure || data.capabilities?.canAccessAllTabs) && data.activeShift && (
-                <details className="service-load-panel">
-                  <summary>
-                    <span>
-                      <strong>Carga por praça e responsável</strong>
-                    </span>
-                    <Badge tone="neutral">{operationalLoad.sections.length} praça(s)</Badge>
-                  </summary>
-                  <div className="service-load-panel__body">
-                    <section>
-                      <strong>Praças</strong>
-                      <div className="service-load-grid">
-                        {operationalLoad.sections.map((section) => (
-                          <article key={section.id} style={{ borderLeftColor: section.color }}>
-                            <strong>{section.name}</strong>
-                            <small>
-                              {section.occupied}/{section.tables} mesa(s) · {section.guests}{" "}
-                              pessoa(s)
-                            </small>
-                            <small>
-                              {section.calls} chamado(s)
-                              {data.capabilities?.canAccessAllTabs
-                                ? ` · ${formatMoney(section.totalCents)}`
-                                : ""}
-                            </small>
-                          </article>
-                        ))}
-                      </div>
-                    </section>
-                    <section>
-                      <strong>Equipe</strong>
-                      <div className="service-load-grid">
-                        {operationalLoad.staff.map((person) => (
-                          <article key={person.identityId}>
-                            <strong>{person.displayName}</strong>
-                            <small>
-                              {person.sections} praça(s) · {person.tabs} comanda(s) ·{" "}
-                              {person.guests} pessoa(s)
-                            </small>
-                            {data.capabilities?.canAccessAllTabs && (
-                              <small>{formatMoney(person.totalCents)} em aberto</small>
-                            )}
-                          </article>
-                        ))}
-                      </div>
-                      {canManageShift && (
-                        <Button onClick={openShiftSetup} size="sm" variant="ghost">
-                          Ajustar distribuição
-                        </Button>
-                      )}
-                    </section>
-                  </div>
-                </details>
-              )}
             </section>
 
             {canConfigure && (
@@ -3136,10 +3126,13 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   </fieldset>
                   {setupSection === "space" ? (
                     <div className="quick-actions-grid floor-management__forms floor-management__forms--real">
-                      <form className="action-form" onSubmit={(event) => void createRoom(event)}>
+                      <form
+                        className="action-form salon-space-form salon-space-form--room"
+                        onSubmit={(event) => void createRoom(event)}
+                      >
                         <h3>{managedRoomId ? "Editar ambiente físico" : "Novo ambiente físico"}</h3>
-                        <Label>
-                          Gerenciar
+                        <Label className="gm-field items-stretch">
+                          Ambiente
                           <NativeSelect
                             onChange={(event) => {
                               const nextId = event.target.value;
@@ -3160,7 +3153,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               ))}
                           </NativeSelect>
                         </Label>
-                        <Label>
+                        <Label className="gm-field items-stretch">
                           Nome
                           <Input
                             minLength={2}
@@ -3169,27 +3162,29 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             value={roomName}
                           />
                         </Label>
-                        <Button disabled={busy || roomName.trim().length < 2} type="submit">
-                          {busy ? "Salvando…" : managedRoomId ? "Salvar nome" : "Criar ambiente"}
-                        </Button>
-                        {managedRoomId && (
-                          <Button
-                            disabled={busy}
-                            onClick={() => void archiveRoom()}
-                            type="button"
-                            variant="danger"
-                          >
-                            Arquivar ambiente
+                        <div className="gm-toolbar salon-space-form__actions">
+                          <Button disabled={busy || roomName.trim().length < 2} type="submit">
+                            {busy ? "Salvando…" : managedRoomId ? "Salvar nome" : "Criar ambiente"}
                           </Button>
-                        )}
+                          {managedRoomId && (
+                            <Button
+                              disabled={busy}
+                              onClick={() => void archiveRoom()}
+                              type="button"
+                              variant="danger"
+                            >
+                              Arquivar ambiente
+                            </Button>
+                          )}
+                        </div>
                       </form>
                       <form
-                        className="action-form action-form--tables"
+                        className="action-form action-form--tables salon-space-form"
                         onSubmit={(event) => void createTables(event)}
                       >
                         <h3>Adicionar mesas</h3>
                         <fieldset className="table-create-mode">
-                          <legend>Quantidade</legend>
+                          <legend>Como adicionar</legend>
                           <Button
                             aria-pressed={tableMode === "single"}
                             onClick={() => setTableMode("single")}
@@ -3206,7 +3201,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </Button>
                         </fieldset>
                         {tableMode === "single" ? (
-                          <Label className="action-form__wide">
+                          <Label className="gm-field items-stretch action-form__wide">
                             Identificação
                             <Input
                               maxLength={60}
@@ -3219,7 +3214,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </Label>
                         ) : (
                           <>
-                            <Label className="action-form__wide">
+                            <Label className="gm-field items-stretch action-form__wide">
                               Prefixo
                               <Input
                                 maxLength={50}
@@ -3228,7 +3223,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 value={tablePrefix}
                               />
                             </Label>
-                            <Label>
+                            <Label className="gm-field items-stretch">
                               Iniciar em
                               <Input
                                 min={1}
@@ -3238,7 +3233,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                 value={tableStart}
                               />
                             </Label>
-                            <Label>
+                            <Label className="gm-field items-stretch">
                               Quantidade
                               <Input
                                 max={MAX_TABLE_BATCH}
@@ -3259,7 +3254,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             </p>
                           </>
                         )}
-                        <Label>
+                        <Label className="gm-field items-stretch">
                           Lugares por mesa
                           <Input
                             max={100}
@@ -3270,7 +3265,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             value={tableSeats}
                           />
                         </Label>
-                        <Label>
+                        <Label className="gm-field items-stretch">
                           Ambiente
                           <NativeSelect
                             onChange={(event) => setRoomId(event.target.value)}
@@ -3299,11 +3294,11 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </Button>
                       </form>
                       <form
-                        className="action-form"
+                        className="action-form salon-space-form"
                         onSubmit={(event) => void saveManagedTable(event)}
                       >
                         <h3>Gerenciar mesa</h3>
-                        <Label className="action-form__wide">
+                        <Label className="gm-field items-stretch action-form__wide">
                           Mesa
                           <NativeSelect
                             onChange={(event) => {
@@ -3324,7 +3319,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             ))}
                           </NativeSelect>
                         </Label>
-                        <Label className="action-form__wide">
+                        <Label className="gm-field items-stretch action-form__wide">
                           Identificação
                           <Input
                             disabled={!managedTableId}
@@ -3335,7 +3330,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             value={managedTableLabel}
                           />
                         </Label>
-                        <Label>
+                        <Label className="gm-field items-stretch">
                           Lugares
                           <Input
                             disabled={!managedTableId}
@@ -3347,7 +3342,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                             value={managedTableSeats}
                           />
                         </Label>
-                        <Label>
+                        <Label className="gm-field items-stretch">
                           Ambiente
                           <NativeSelect
                             disabled={!managedTableId}
@@ -3367,28 +3362,30 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               ))}
                           </NativeSelect>
                         </Label>
-                        <Button
-                          disabled={
-                            busy ||
-                            !managedTableId ||
-                            !managedTableRoomId ||
-                            !managedTableLabel.trim() ||
-                            !Number.isInteger(managedTableSeats) ||
-                            managedTableSeats < 1 ||
-                            managedTableSeats > 100
-                          }
-                          type="submit"
-                        >
-                          {busy ? "Salvando…" : "Salvar mesa"}
-                        </Button>
-                        <Button
-                          disabled={busy || !managedTableId}
-                          onClick={() => void archiveManagedTable()}
-                          type="button"
-                          variant="danger"
-                        >
-                          Arquivar mesa
-                        </Button>
+                        <div className="gm-toolbar salon-space-form__actions">
+                          <Button
+                            disabled={
+                              busy ||
+                              !managedTableId ||
+                              !managedTableRoomId ||
+                              !managedTableLabel.trim() ||
+                              !Number.isInteger(managedTableSeats) ||
+                              managedTableSeats < 1 ||
+                              managedTableSeats > 100
+                            }
+                            type="submit"
+                          >
+                            {busy ? "Salvando…" : "Salvar mesa"}
+                          </Button>
+                          <Button
+                            disabled={busy || !managedTableId}
+                            onClick={() => void archiveManagedTable()}
+                            type="button"
+                            variant="danger"
+                          >
+                            Arquivar mesa
+                          </Button>
+                        </div>
                       </form>
                     </div>
                   ) : (
@@ -4538,11 +4535,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       aria-pressed={workspaceMode === "operate"}
                       onClick={() => switchWorkspaceMode("operate")}
                       type="button"
+                      variant={workspaceMode === "operate" ? "secondary" : "ghost"}
                     >
                       Operar
                     </Button>
                     {canEditSpace && (
-                      <Button onClick={openSpaceSetup} type="button">
+                      <Button onClick={openSpaceSetup} type="button" variant="ghost">
                         Editar espaço
                       </Button>
                     )}
@@ -4551,6 +4549,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         aria-pressed={workspaceMode === "shift"}
                         onClick={() => switchWorkspaceMode("shift")}
                         type="button"
+                        variant={workspaceMode === "shift" ? "secondary" : "ghost"}
                       >
                         Organizar turno
                       </Button>
@@ -5061,12 +5060,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                     <small> · {groupTabs.length} contas</small>
                                   )}
                                 </>
-                              ) : groupTabs.length ? (
-                                <span>Panorama protegido</span>
+                              ) : !canOperateTable(item) ? (
+                                <span>Ver panorama</span>
                               ) : status === "available" ? (
                                 <span>Abrir</span>
                               ) : (
-                                <span>{canOperateTable(item) ? "Atender" : "Ver panorama"}</span>
+                                <span>Atender</span>
                               )}
                             </div>
                           </div>
@@ -5246,12 +5245,12 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   variant="ghost"
                                 >
                                   <Icon name="salon" size={14} />
-                                  <span>Mudar Mesa</span>
+                                  <span>Mudar mesa</span>
                                 </Button>
                               )}
                               {canReorganizeTurn && (
                                 <details className="table-more-actions" data-salon-floating-menu>
-                                  <summary>Mais ações</summary>
+                                  <summary>Organizar mesa</summary>
                                   <div>
                                     {data.activeShift && (
                                       <Button
@@ -5367,27 +5366,6 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           </Button>
                         </div>
                       )}
-                      {selectedTimeline.length > 0 && (
-                        <details className="salon-table-timeline">
-                          <summary>Linha do tempo da mesa</summary>
-                          <ol>
-                            {selectedTimeline.map((item) => (
-                              <li key={item.id}>
-                                <time dateTime={item.at}>
-                                  {new Date(item.at).toLocaleTimeString("pt-BR", {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </time>
-                                <span>
-                                  <strong>{item.label}</strong>
-                                  {item.detail && <small>{item.detail}</small>}
-                                </span>
-                              </li>
-                            ))}
-                          </ol>
-                        </details>
-                      )}
                       {selectedCanOperate && selectedGroup && (
                         <div className="group-workspace-bar group-workspace-bar--real">
                           <span>
@@ -5475,7 +5453,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                       {!selectedCanOperate ? (
                         <Card className="table-start table-start--protected">
                           <div>
-                            <h2>Atendimento de outra praça</h2>
+                            <h2>Atendimento de outro responsável</h2>
                             <span>
                               {table.responsibleDisplayName
                                 ? `Responsável: ${table.responsibleDisplayName}. `
@@ -5488,13 +5466,41 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                         </Card>
                       ) : tab && canOpenTableWorkspace(accessForTable(table), tab.id) ? (
                         <TabWorkspace
+                          attendanceActions={["move", "merge"]}
                           compactHeading
                           initialView={selectedCall?.kind === "bill" ? "account" : "order"}
                           key={tab.id}
+                          keyboardShortcuts
                           scope={scope}
                           tabId={tab.id}
                           floor={data}
                           onChanged={floor.retry}
+                          tableActivity={
+                            selectedTimeline.length > 0 && (
+                              <section
+                                className="salon-table-timeline"
+                                aria-label="Histórico da mesa"
+                              >
+                                <strong>Histórico da mesa</strong>
+                                <ol>
+                                  {selectedTimeline.map((item) => (
+                                    <li key={item.id}>
+                                      <time dateTime={item.at}>
+                                        {new Date(item.at).toLocaleTimeString("pt-BR", {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </time>
+                                      <span>
+                                        <strong>{item.label}</strong>
+                                        {item.detail && <small>{item.detail}</small>}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </section>
+                            )
+                          }
                         />
                       ) : table.status === "needs_cleaning" || table.status === "cleaning" ? (
                         <Card className="table-start">
@@ -5528,7 +5534,7 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                           <div className="table-start__header">
                             <div className="table-start__tags">
                               <Badge tone={table.status === "reserved" ? "warning" : "success"}>
-                                {table.status === "reserved" ? "Mesa reservada" : "Mesa disponível"}
+                                {table.status === "reserved" ? "Reservada" : "Livre"}
                               </Badge>
                               <span className="table-start__capacity">{table.seats} lugares</span>
                               <span className="table-start__separator" aria-hidden="true">
@@ -5547,11 +5553,9 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                                   ? "Abrir comanda rápida"
                                   : "Iniciar atendimento"}
                             </h2>
-                            <p>
-                              {table.status === "reserved"
-                                ? "A confirmação abre uma nova comanda vazia; nenhum item é herdado da reserva."
-                                : "Defina o número de pessoas para abrir a comanda e iniciar os pedidos imediatamente."}
-                            </p>
+                            {table.status === "reserved" && (
+                              <p>A confirmação abre uma nova comanda vazia.</p>
+                            )}
                           </div>
                           <div className="table-start__controls">
                             {!selectedUsesQuickFlow && (
@@ -5639,10 +5643,8 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                               {busy
                                 ? "Abrindo…"
                                 : table.status === "reserved"
-                                  ? "Confirmar chegada e pedir"
-                                  : selectedUsesQuickFlow
-                                    ? "Abrir e pedir"
-                                    : "Abrir atendimento e pedir"}
+                                  ? "Confirmar e pedir"
+                                  : "Abrir e pedir"}
                             </Button>
                           </div>
                         </section>
@@ -5682,6 +5684,26 @@ export function RealSalonPage({ scope }: { scope: PilotScope }) {
                   <div className="salon-shortcut-item">
                     <kbd>Esc</kbd>
                     <span>Fechar gavetas e modais abertos</span>
+                  </div>
+                  <div className="salon-shortcut-item">
+                    <kbd>Alt</kbd> + <kbd>1</kbd>
+                    <span>Abrir Pedido na mesa selecionada</span>
+                  </div>
+                  <div className="salon-shortcut-item">
+                    <kbd>Alt</kbd> + <kbd>2</kbd>
+                    <span>Abrir Conta na mesa selecionada</span>
+                  </div>
+                  <div className="salon-shortcut-item">
+                    <kbd>Alt</kbd> + <kbd>3</kbd>
+                    <span>Abrir Pré-conta e impressão</span>
+                  </div>
+                  <div className="salon-shortcut-item">
+                    <kbd>Alt</kbd> + <kbd>R</kbd>
+                    <span>Ir para recebimento quando o caixa estiver autorizado</span>
+                  </div>
+                  <div className="salon-shortcut-item">
+                    <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
+                    <span>Enviar o pedido em edição para produção</span>
                   </div>
                   <div className="salon-shortcut-item">
                     <kbd>?</kbd>

@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-18T18:45:00Z",
+  "establishment": {
+    "displayName": "Casa Giro Centro",
+    "legalName": "Casa Giro Alimentos Ltda",
+    "document": "12.345.678/0001-90",
+    "address": "Rua Central, 42 - Centro - Recife/PE",
+    "phone": "(81) 3333-4444",
+    "openingHours": "Seg a Sab, 11h as 23h",
+    "timezone": "America/Recife",
+    "logoRaster": { "encoding": "escpos-raster", "widthDots": 16, "heightDots": 2, "dataBase64": "/wAA/w==" }
+  },
+  "context": {
+    "tabId": "fixture-tab",
+    "label": "Delivery 014",
+    "displayNumber": 14,
+    "tableLabel": null,
+    "areaName": null,
+    "squareName": null,
+    "waiterDisplayName": "Equipe A",
+    "fulfillmentType": "delivery",
+    "guestCount": 1,
+    "status": "open",
+    "openedAt": "2026-09-18T18:10:00Z",
+    "closedAt": null,
+    "durationMinutes": 35
+  },
+  "totals": {
+    "subtotalCents": 4500,
+    "discountCents": 500,
+    "serviceChargeCents": 0,
+    "serviceChargeBasisPoints": 0,
+    "serviceChargeOptional": false,
+    "suggestedTotalCents": 4700,
+    "serviceTaxNotice": null,
+    "deliveryFeeCents": 700,
+    "tipCents": 0,
+    "totalCents": 4700,
+    "grossPaidCents": 2000,
+    "reversedCents": 0,
+    "paidCents": 2000,
+    "remainingCents": 2700
+  },
+  "items": [
+    {
+      "id": "fixture-item",
+      "orderId": "fixture-order",
+      "productName": "Hamburguer artesanal da casa",
+      "quantity": 2,
+      "unitPriceCents": 2000,
+      "modifiersCents": 500,
+      "grossCents": 4500,
+      "discountCents": 500,
+      "netCents": 4000,
+      "status": "ready",
+      "seatNumber": null,
+      "course": null,
+      "notes": "Molho separado",
+      "modifiers": [{ "name": "Queijo extra", "quantity": 2, "unitDeltaCents": 250, "totalDeltaCents": 500 }]
+    }
+  ],
+  "payments": [{ "id": "fixture-payment", "method": "pix", "amountCents": 2000, "financialStatus": "posted", "createdAt": "2026-09-18T18:11:00Z" }],
+  "delivery": {
+    "orderId": "fixture-order",
+    "status": "dispatched",
+    "customerName": "Cliente de exemplo",
+    "customerPhone": "(81) 99999-1234",
+    "address": {
+      "street": "Rua das Flores",
+      "number": "100",
+      "complement": "Apto 302",
+      "reference": "Portaria azul",
+      "neighborhood": "Boa Vista",
+      "city": "Recife",
+      "state": "PE",
+      "postalCode": "50050-000"
+    },
+    "notes": "Chamar na portaria",
+    "promisedAt": "2026-09-18T19:00:00Z",
+    "courier": { "name": "Entregador de exemplo", "reference": "fixture-courier", "phone": "(81) 98888-4321" }
+  },
+  "print": { "isReprint": true }
+}

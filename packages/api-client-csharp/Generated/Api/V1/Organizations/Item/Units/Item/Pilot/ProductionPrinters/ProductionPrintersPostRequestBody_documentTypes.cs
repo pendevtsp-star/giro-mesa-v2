@@ -24,5 +24,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Producti
         #pragma warning disable CS1591
         Kds_ticket,
         #pragma warning restore CS1591
+        [EnumMember(Value = "delivery_slip")]
+        #pragma warning disable CS1591
+        Delivery_slip,
+        #pragma warning restore CS1591
     }
 }

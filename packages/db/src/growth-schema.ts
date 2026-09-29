@@ -91,6 +91,7 @@ export const growthCustomers = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 180 }).notNull(),
     requestFingerprint: varchar("request_fingerprint", { length: 64 }).notNull(),
     birthDate: varchar("birth_date", { length: 10 }),
+    defaultDeliveryAddress: jsonb("default_delivery_address").$type<Record<string, unknown>>(),
     notes: varchar("notes", { length: 1000 }),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     marketingOptIn: boolean("marketing_opt_in").notNull().default(false),
@@ -106,6 +107,10 @@ export const growthCustomers = pgTable(
     uniqueIndex("growth_customers_org_email_unique")
       .on(table.organizationId, table.email)
       .where(sql`${table.email} is not null and ${table.archivedAt} is null`),
+    uniqueIndex("growth_customers_org_idempotency_key_unique").on(
+      table.organizationId,
+      table.idempotencyKey,
+    ),
     index("growth_customers_org_phone_idx").on(table.organizationId, table.phone),
     foreignKey({
       name: "growth_customer_default_unit_tenant_fk",

@@ -257,7 +257,70 @@ async function addAndSend(page: Page) {
   await page.getByRole("button", { name: /Enviar 1 item/ }).click();
 }
 
-test("atalho de nova comanda foca o formulário sem enviar e preserva o alvo existente", async ({
+test("fila abre o formulário em modal após escolher o tipo e preserva campos ao cancelar", async ({
+  page,
+}) => {
+  const calls: CounterCalls = { createKeys: [], sendKeys: [] };
+  await mockCounterApi(page, "timeout-once", calls);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/#/counter");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const form = page.locator(".counter-open-form");
+  const chooser = page.getByRole("dialog", { name: "Novo pedido", exact: true });
+  const formDialog = chooser.filter({ has: form });
+  const newOrder = page.getByRole("button", { name: "Novo pedido", exact: true });
+  const queue = page.locator(".counter-queue-list");
+
+  await expect(form).toHaveCount(0);
+  await expect(queue).toContainText(tab.label);
+  const titleBounds = await page
+    .getByRole("heading", { name: "Balcão e retirada", exact: true })
+    .evaluate((element) => element.getBoundingClientRect().toJSON());
+  const buttonBounds = await newOrder.evaluate((element) =>
+    element.getBoundingClientRect().toJSON(),
+  );
+  expect(buttonBounds.left).toBeGreaterThan(titleBounds.right);
+  expect(
+    Math.abs(titleBounds.top + titleBounds.height / 2 - buttonBounds.top - buttonBounds.height / 2),
+  ).toBeLessThanOrEqual(2);
+  await newOrder.click();
+  await expect(chooser).toBeVisible();
+  await expect(form).toHaveCount(0);
+  for (const option of ["1 · Local", "2 · Retirada", "3 · Delivery"]) {
+    await expect(chooser.getByRole("button", { name: option, exact: true })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
+  await expect(chooser).not.toBeVisible();
+  await expect(form).toHaveCount(0);
+  await expect(queue).toBeVisible();
+  await expect(newOrder).toBeFocused();
+
+  await newOrder.click();
+  await chooser.getByRole("button", { name: "2 · Retirada", exact: true }).click();
+  await expect(formDialog).toBeVisible();
+  await expect(form).toBeVisible();
+  await form.getByLabel("Nome do cliente", { exact: true }).fill("Cliente em edição");
+  await formDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(formDialog).not.toBeVisible();
+  await expect(form).toHaveCount(0);
+  await expect(queue).toBeVisible();
+  await expect(newOrder).toBeFocused();
+  await page.keyboard.press("Alt+n");
+  await expect(chooser).toBeVisible();
+  await expect(form).toHaveCount(0);
+  await page.keyboard.press("2");
+  await expect(form.getByLabel("Nome do cliente", { exact: true })).toHaveValue(
+    "Cliente em edição",
+  );
+  await formDialog.getByRole("button", { name: "Fechar", exact: true }).click();
+  await expect(formDialog).not.toBeVisible();
+  await expect(queue).toBeVisible();
+  await expect(newOrder).toBeFocused();
+  expect(calls.createKeys).toEqual([]);
+  expect(calls.sendKeys).toEqual([]);
+});
+
+test("atalho de nova comanda abre o seletor sem enviar e preserva o alvo existente", async ({
   page,
 }) => {
   const calls: CounterCalls = { createKeys: [], sendKeys: [] };
@@ -274,16 +337,16 @@ test("atalho de nova comanda foca o formulário sem enviar e preserva o alvo exi
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/#/counter?action=new");
-    const firstField = page
-      .locator(".counter-open-form")
-      .getByRole("combobox", { name: /^Atendimento/ });
-    await expect(firstField).toBeFocused();
-    await expect(firstField).toBeInViewport();
+    const chooser = page.getByRole("dialog", { name: "Novo pedido", exact: true });
+    await expect(chooser).toBeVisible();
+    await expect(chooser.getByRole("button", { name: "Fechar", exact: true })).toBeFocused();
+    await expect(chooser).toBeInViewport();
+    await expect(page.locator(".counter-open-form")).toHaveCount(0);
     await expect(page).toHaveURL(/#\/counter$/);
   }
 
   await page.goto(`/#/counter?action=new&tab=${tab.id}&paymentAttempt=attempt-counter`);
-  await expect(page.getByRole("button", { name: "Voltar para a fila" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Novo pedido", exact: true })).toBeVisible();
   await expect(page).toHaveURL(
     new RegExp(`#\\/counter\\?tab=${tab.id}&paymentAttempt=attempt-counter$`),
   );
@@ -391,14 +454,19 @@ async function expectControlsContained(page: Page, selector: string) {
 test("mantém os campos da abertura contidos na coluna operacional estreita", async ({ page }) => {
   const calls: CounterCalls = { createKeys: [], sendKeys: [] };
   await mockCounterApi(page, "timeout-once", calls);
-  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.setViewportSize({ width: 375, height: 900 });
   await openCounter(page);
+  await page.keyboard.press("Alt+n");
+  await page
+    .getByRole("dialog", { name: "Novo pedido", exact: true })
+    .getByRole("button", { name: "2 · Retirada", exact: true })
+    .click();
 
   const advanced = page.locator(".counter-open-advanced");
   const openCardWidth = await page
-    .locator(".counter-quick-open-card")
+    .locator(".counter-new-order")
     .evaluate((element) => element.getBoundingClientRect().width);
-  expect(openCardWidth).toBeLessThan(600);
+  expect(openCardWidth).toBeLessThanOrEqual(375);
   await advanced.locator("summary").click();
   await expect(advanced).toHaveAttribute("open", "");
   await expectControlsContained(page, ".counter-open-advanced > div");
@@ -415,8 +483,8 @@ test("troca de painel preserva cabeçalho e deixa o fim de cada fluxo alcançáv
 
   const panel = page.locator("#counter-order-panel");
   const tabs = page.getByRole("navigation", { name: "Ações do atendimento" });
-  const orderTab = tabs.getByRole("button", { name: "Lançar pedido" });
-  const accountTab = tabs.getByRole("button", { name: "Conta e pagamento" });
+  const orderTab = tabs.getByRole("button", { name: "Pedido", exact: true });
+  const accountTab = tabs.getByRole("button", { name: "Conta", exact: true });
   await page.getByRole("button", { name: "Adicionar Café Continuidade", exact: true }).click();
   await expect(orderTab).toHaveAttribute("aria-current", "page");
 
@@ -443,7 +511,7 @@ test("troca de painel preserva cabeçalho e deixa o fim de cada fluxo alcançáv
     const tabs = document.querySelector<HTMLElement>(".service-workspace-actions");
     const account = document.querySelector<HTMLElement>(".service-account-area");
     const charges = [...document.querySelectorAll<HTMLElement>(".account-disclosure")].find(
-      (element) => element.textContent?.includes("Taxa de serviço e gorjeta"),
+      (element) => element.textContent?.includes("Gorjeta e desconto"),
     );
     const tabRect = tabs?.getBoundingClientRect();
     const accountRect = account?.getBoundingClientRect();
@@ -475,7 +543,7 @@ test("troca de painel preserva cabeçalho e deixa o fim de cada fluxo alcançáv
   });
   const chargeDisclosure = page
     .locator(".account-disclosure")
-    .filter({ hasText: "Taxa de serviço e gorjeta" });
+    .filter({ hasText: "Gorjeta e desconto" });
   await chargeDisclosure.locator("summary").click();
   await chargeDisclosure.scrollIntoViewIfNeeded();
   await expectControlsContained(page, ".account-charge-grid");
@@ -513,6 +581,20 @@ test("retorna a fila preservando rascunho, filtros, foco e tema", async ({ page 
   await expect(page.getByRole("button", { name: /Enviar 1 item/ })).toBeVisible();
   expect(calls.createKeys).toHaveLength(0);
   expect(calls.sendKeys).toHaveLength(0);
+
+  await page.keyboard.press("Alt+n");
+  await page
+    .getByRole("dialog", { name: "Novo pedido", exact: true })
+    .getByRole("button", { name: "2 · Retirada", exact: true })
+    .click();
+  const formDialog = page.getByRole("dialog", { name: "Novo pedido", exact: true });
+  await expect(formDialog.locator(".counter-open-form")).toBeVisible();
+  await expect(panel).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(formDialog).not.toBeVisible();
+  await expect(panel).toBeVisible();
+  await expect(draft).toContainText("Caf\u00e9 Continuidade");
+  await expect(page.getByRole("button", { name: /Enviar 1 item/ })).toBeVisible();
 
   const viewports = [
     { width: 360, height: 760 },

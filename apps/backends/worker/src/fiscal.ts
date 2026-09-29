@@ -108,6 +108,7 @@ export function buildNfcePayload(input: {
   buyerPresence: 1 | 4;
   totalCents: number;
   extraCents: number;
+  deliveryFeeCents?: number;
   lines: FiscalLine[];
   payments: FiscalPayment[];
 }) {
@@ -115,6 +116,14 @@ export function buildNfcePayload(input: {
     throw new FiscalDeliveryError("FISCAL_ISSUER_DOCUMENT_INVALID", false);
   }
   if (input.lines.length === 0) throw new FiscalDeliveryError("FISCAL_SALE_WITHOUT_ITEMS", false);
+  const deliveryFeeCents = input.deliveryFeeCents ?? 0;
+  if (
+    !Number.isSafeInteger(deliveryFeeCents) ||
+    deliveryFeeCents < 0 ||
+    (deliveryFeeCents > 0 && input.buyerPresence !== 4)
+  ) {
+    throw new FiscalDeliveryError("FISCAL_DELIVERY_FEE_INVALID", false);
+  }
   if (input.payments.reduce((sum, item) => sum + item.amountCents, 0) !== input.totalCents) {
     throw new FiscalDeliveryError("FISCAL_PAYMENT_TOTAL_MISMATCH", false);
   }
@@ -157,6 +166,7 @@ export function buildNfcePayload(input: {
       valor_unitario_tributavel: cents(line.unitPriceCents),
       valor_desconto: cents(line.discountCents),
       valor_outras_despesas: index === 0 ? cents(input.extraCents) : 0,
+      ...(deliveryFeeCents > 0 ? { valor_frete: index === 0 ? cents(deliveryFeeCents) : 0 } : {}),
       icms_origem: origin,
       icms_situacao_tributaria: icms,
       pis_situacao_tributaria: pis,
@@ -165,7 +175,8 @@ export function buildNfcePayload(input: {
       ...(cClassTrib ? { ibs_cbs_classificacao_tributaria: cClassTrib } : {}),
     };
   });
-  const itemTotal = input.lines.reduce((sum, line) => sum + line.netCents, 0) + input.extraCents;
+  const itemTotal =
+    input.lines.reduce((sum, line) => sum + line.netCents, 0) + input.extraCents + deliveryFeeCents;
   if (itemTotal !== input.totalCents) {
     throw new FiscalDeliveryError("FISCAL_ITEM_TOTAL_MISMATCH", false);
   }
@@ -554,12 +565,13 @@ async function issueClosedTab(db: Database, event: ClaimedOutboxEvent) {
       subtotal_cents: number;
       discount_cents: number;
       service_charge_cents: number;
+      delivery_fee_cents: number;
       tip_cents: number;
       fulfillment_type: string;
       closed_at: Date;
       competence: string;
     }>(sql`
-      select id, status, total_cents, subtotal_cents, discount_cents, service_charge_cents,
+      select id, status, total_cents, subtotal_cents, discount_cents, service_charge_cents, delivery_fee_cents,
              tip_cents, fulfillment_type, closed_at,
              to_char(date_trunc('month', closed_at at time zone (
                select timezone from units
@@ -659,6 +671,7 @@ async function issueClosedTab(db: Database, event: ClaimedOutboxEvent) {
         buyerPresence: tab.fulfillment_type === "delivery" ? 4 : 1,
         totalCents: Number(tab.total_cents),
         extraCents: Number(tab.service_charge_cents) + Number(tab.tip_cents),
+        deliveryFeeCents: Number(tab.delivery_fee_cents),
         lines,
         payments: fiscalPayments,
       });

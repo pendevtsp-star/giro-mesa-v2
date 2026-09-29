@@ -81,6 +81,7 @@ export const customerSchema = z.object({
   name: z.string().trim().min(2).max(160),
   email: z.string().trim().email().max(254).nullable().optional(),
   phone: z.string().trim().min(8).max(40).nullable().optional(),
+  defaultDeliveryAddress: deliveryAddressSchema.nullable().optional(),
   birthDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -100,6 +101,35 @@ export const customerListQuerySchema = z
   })
   .strict();
 export type CustomerListQueryInput = z.infer<typeof customerListQuerySchema>;
+
+export const operationalCustomerListQuerySchema = z
+  .object({
+    unitId: id,
+    q: z.string().trim().max(120).optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(20),
+    offset: z.coerce.number().int().min(0).default(0),
+  })
+  .strict();
+export type OperationalCustomerListQueryInput = z.infer<typeof operationalCustomerListQuerySchema>;
+
+export const operationalCustomerSchema = z
+  .object({
+    unitId: id,
+    name: z.string().trim().min(2).max(160),
+    phone: z.string().trim().min(8).max(40).nullable().optional(),
+    defaultDeliveryAddress: deliveryAddressSchema.nullable().optional(),
+    idempotencyKey,
+  })
+  .strict();
+export type OperationalCustomerInput = z.infer<typeof operationalCustomerSchema>;
+
+export const operationalCustomerUpdateSchema = z
+  .object({
+    unitId: id,
+    defaultDeliveryAddress: deliveryAddressSchema.nullable(),
+  })
+  .strict();
+export type OperationalCustomerUpdateInput = z.infer<typeof operationalCustomerUpdateSchema>;
 
 export const customerHistoryKindSchema = z.enum([
   "service",
@@ -453,6 +483,7 @@ const deliveryOrderStatus = z.enum([
 
 export const deliveryOrderQuerySchema = z
   .object({
+    orderRef: id.optional(),
     status: deliveryOrderStatus.optional(),
     updatedSince: dateTime.optional(),
     limit: z.coerce.number().int().min(1).max(200).default(100),

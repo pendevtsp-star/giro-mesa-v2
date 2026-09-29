@@ -1,6 +1,6 @@
 .site-footer {
   padding: 75px 0 25px;
-  background: #101c16;
+  background: var(--gm-ink);
   color: #f5f6f3;
 }
 .site-footer .logo-mark {
@@ -21,7 +21,8 @@
 }
 .site-footer h2 {
   margin: 4px 0 18px;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: #8fa098;

@@ -7,7 +7,29 @@
 .returnables-buckets {
   display: grid;
   gap: var(--gm-space-3);
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.returnables-reconciliation > summary {
+  align-items: center;
+  display: flex;
+  gap: var(--gm-space-3);
+  justify-content: space-between;
+}
+
+.returnables-reconciliation__label {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.returnables-reconciliation__label small {
+  color: var(--gm-muted);
+  font-weight: 400;
+}
+
+.returnables-buckets--secondary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  padding: var(--gm-space-3);
 }
 
 .returnables-state,
@@ -140,8 +162,8 @@
 }
 
 @media (max-width: 1180px) {
-  .returnables-buckets {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .returnables-buckets--secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

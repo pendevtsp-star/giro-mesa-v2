@@ -1,3 +1,4 @@
+import { paymentReversalCreateSchema } from "@giromesa/contracts";
 import { apiRequest } from "../../api";
 
 export type IntegratedPaymentMethod = "credit_card" | "debit_card" | "pix";
@@ -10,6 +11,18 @@ export type PaymentAttemptStatus =
   | "canceled"
   | "unknown"
   | "reversed";
+
+export function getPosPaymentAccess(
+  profileId: string,
+  terminalPaymentMode: "disabled" | "cashier" | "homologated_pos",
+) {
+  const cashierRole = ["owner", "manager", "cashier"].includes(profileId);
+  return {
+    cashierPaymentEnabled: cashierRole && terminalPaymentMode === "cashier",
+    integratedPaymentEnabled:
+      (cashierRole || profileId === "waiter") && terminalPaymentMode === "homologated_pos",
+  };
+}
 
 export interface PaymentCapabilities {
   installationId: string;
@@ -211,11 +224,52 @@ function parseAttemptAction(value: unknown): AttemptActionResponse {
   return { attempt: parsePaymentAttempt(row.attempt), action: parseAction(row.action) };
 }
 
+export function parseManualPaymentReversal(value: unknown, paymentId: string) {
+  const row = object(value, "correção do pagamento");
+  const reversal = object(row.reversal, "correção do pagamento");
+  if (
+    reversal.paymentId !== paymentId ||
+    reversal.status !== "approved" ||
+    row.action !== null ||
+    !Number.isSafeInteger(reversal.amountCents) ||
+    Number(reversal.amountCents) <= 0
+  ) {
+    throw new Error("A correção não foi confirmada. Confira o pagamento antes de continuar.");
+  }
+  return {
+    reversal: {
+      id: text(reversal.id, "id"),
+      paymentId,
+      status: "approved" as const,
+      amountCents: Number(reversal.amountCents),
+    },
+    action: null,
+  };
+}
+
 function root(organizationId: string, unitId: string) {
   return `/v1/organizations/${encodeURIComponent(organizationId)}/units/${encodeURIComponent(unitId)}/pilot`;
 }
 
 export const posPayments = {
+  manualReversal: async (
+    organizationId: string,
+    unitId: string,
+    paymentId: string,
+    input: { reason: string },
+    idempotencyKey: string,
+  ) =>
+    parseManualPaymentReversal(
+      await apiRequest<unknown>(
+        `${root(organizationId, unitId)}/payments/${encodeURIComponent(paymentId)}/reversals`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
+          body: JSON.stringify(paymentReversalCreateSchema.parse(input)),
+        },
+      ),
+      paymentId,
+    ),
   capabilities: async (organizationId: string, unitId: string, installationId: string) =>
     parsePaymentCapabilities(
       await apiRequest<unknown>(

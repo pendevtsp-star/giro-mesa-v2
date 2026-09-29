@@ -65,7 +65,7 @@ public sealed class PrintJobExecutor(
 public static class PrintJobRules
 {
     private static readonly HashSet<string> DocumentTypes = new(
-        ["partial_statement", "payment_statement", "final_receipt", "kds_ticket"],
+        ["partial_statement", "payment_statement", "final_receipt", "kds_ticket", "delivery_slip"],
         StringComparer.Ordinal);
 
     public static string? Validate(PrintRequest request)

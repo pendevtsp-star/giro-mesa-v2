@@ -62,11 +62,7 @@ export function CatalogBcgModal({ open, onClose, products, bcgProducts }: Catalo
   );
 
   return (
-    <Modal
-      isOpen={open}
-      title="Matriz de Engenharia de Cardápio (Menu Engineering Matrix)"
-      onClose={onClose}
-    >
+    <Modal isOpen={open} title="Desempenho dos produtos" onClose={onClose}>
       <div className="catalog-bcg-modal">
         <p className="catalog-muted-copy-085">
           Classificação estratégica dos pratos baseada no cruzamento de{" "}

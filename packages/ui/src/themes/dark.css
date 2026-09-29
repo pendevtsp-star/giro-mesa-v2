@@ -30,7 +30,8 @@
   --gm-shell-border: hsl(158, 10%, 23%);
   --gm-shell-text: hsl(150, 18%, 96%);
   --gm-shell-muted: hsl(154, 11%, 70%);
-  --gm-topbar: color-mix(in srgb, var(--gm-paper) 92%, transparent);
+  --gm-topbar-solid: var(--gm-paper);
+  --gm-topbar: color-mix(in srgb, var(--gm-topbar-solid) 80%, transparent);
   --gm-action: hsl(155, 64%, 32%);
   --gm-action-hover: hsl(155, 66%, 27%);
   --gm-shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.2);

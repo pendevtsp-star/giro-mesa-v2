@@ -195,6 +195,7 @@ import {
   type TerminalProfileInput,
   type TipInput,
   type TransferTabInput,
+  tabDiscountSchema,
   tableBatchSchema,
   tableEditSchema,
   tableGroupSchema,
@@ -1412,6 +1413,25 @@ export class PilotPosController {
     @Body(new ZodPipe(tipSchema)) body: TipInput,
   ) {
     return this.pos.setTip(
+      request.auth.identityId,
+      organizationId,
+      unitId,
+      tabId,
+      idempotencyKey,
+      body,
+    );
+  }
+
+  @Post("tabs/:tabId/discount")
+  discountTab(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("unitId", ParseUUIDPipe) unitId: string,
+    @Param("tabId", ParseUUIDPipe) tabId: string,
+    @Headers("idempotency-key") idempotencyKey: string,
+    @Body(new ZodPipe(tabDiscountSchema)) body: DiscountInput,
+  ) {
+    return this.pos.discountTab(
       request.auth.identityId,
       organizationId,
       unitId,

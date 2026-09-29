@@ -88,9 +88,11 @@ describe("operational capabilities", () => {
     assert.equal(hasPermission("delivery", "operations:payments:record"), false);
   });
 
-  it("limits delivery operations to the operational delivery profile", () => {
+  it("allows dispatch for delivery and cashier without extending waiter privileges", () => {
     assert.equal(hasPermission("delivery", "operations:delivery:operate"), true);
     assert.equal(hasPermission("manager", "operations:delivery:operate"), true);
+    assert.equal(hasPermission("cashier", "operations:delivery:operate"), true);
+    assert.equal(hasPermission("cashier", "customers:write"), false);
     assert.equal(hasPermission("waiter", "operations:delivery:operate"), false);
   });
 

@@ -59,10 +59,13 @@ export function CatalogProductEditorModal({
         <Modal
           isOpen={editingProduct !== null}
           onClose={() => setEditingProduct(null)}
-          title={`Editar Item: ${editingProduct.name}`}
+          title={`Editar produto: ${editingProduct.name}`}
           size="lg"
         >
-          <form onSubmit={(event) => void updateProduct(event)} className="gm-form-stack">
+          <form
+            onSubmit={(event) => void updateProduct(event)}
+            className="gm-form-stack catalog-product-editor-form"
+          >
             {/* Bloco de Foto do Prato */}
             <div className="catalog-editor-photo">
               <div className="catalog-editor-photo__preview">
@@ -80,12 +83,8 @@ export function CatalogProductEditorModal({
               </div>
 
               <div className="catalog-editor-photo__content">
-                <strong className="catalog-editor-photo__title">
-                  Foto do Prato para o Cardápio
-                </strong>
-                <span className="catalog-editor-photo__hint">
-                  Exibida no Cardápio Digital QR, no PDV e na impressão. (PNG, JPG ou WEBP até 5MB)
-                </span>
+                <strong className="catalog-editor-photo__title">Foto do produto</strong>
+                <span className="catalog-editor-photo__hint">JPG, PNG ou WEBP, até 5 MB.</span>
                 <div className="catalog-editor-photo__actions">
                   <Label className="gm-button gm-button--secondary gm-button--sm catalog-editor-photo__upload">
                     <Icon name="upload" size={12} />
@@ -179,7 +178,7 @@ export function CatalogProductEditorModal({
             {/* Dados Básicos */}
             <div className="gm-form-grid gm-form-grid--split">
               <Label className="gm-field">
-                Nome do Prato *
+                Nome do produto *
                 <Input
                   minLength={2}
                   required
@@ -250,7 +249,7 @@ export function CatalogProductEditorModal({
               {editingProduct.stationIds.length > 1 && (
                 <div className="grid gap-2 sm:grid-cols-2">
                   {editingProduct.stationIds.map((stationId) => (
-                    <Label key={stationId}>
+                    <Label className="gm-field items-stretch" key={stationId}>
                       Etapa · {catalog.stations.find((station) => station.id === stationId)?.name}
                       <NativeSelect
                         onChange={(event) =>
@@ -296,7 +295,7 @@ export function CatalogProductEditorModal({
             <fieldset className="gm-form-grid gm-form-grid--split min-w-0">
               <legend>Preços por canal</legend>
               <Label className="gm-field items-stretch">
-                Preço Salão & Balcão (R$) *
+                Preço salão e balcão (R$) *
                 <Input
                   data-currency="brl"
                   value={editingProductPrice}
@@ -320,7 +319,7 @@ export function CatalogProductEditorModal({
               </Label>
             </fieldset>
             <Label className="gm-field">
-              Motivo do Ajuste (Auditoria)
+              Motivo do ajuste (auditoria)
               <Input
                 value={editingProductReason}
                 onChange={(e) => setEditingProductReason(e.target.value)}
@@ -330,7 +329,7 @@ export function CatalogProductEditorModal({
             </Label>
 
             <Label className="gm-field">
-              Descrição & Ingredientes do Prato
+              Descrição e ingredientes
               <Textarea
                 rows={2}
                 value={editingProduct.description || ""}
@@ -364,6 +363,7 @@ export function CatalogProductEditorModal({
                         const isSelected = (editingProduct.modifierGroupIds || []).includes(grp.id);
                         return (
                           <Button
+                            aria-pressed={isSelected}
                             key={grp.id}
                             type="button"
                             onClick={() => {
@@ -626,13 +626,11 @@ export function CatalogProductEditorModal({
             </div>
 
             {/* Histórico de Auditoria de Preços */}
-            <div className="catalog-editor-audit">
-              <div className="catalog-editor-audit__heading">
+            <details className="catalog-editor-audit">
+              <summary className="catalog-editor-audit__heading">
                 <Icon name="finance" size={14} />
-                <strong className="catalog-editor-audit__title">
-                  Histórico de Auditoria de Preços
-                </strong>
-              </div>
+                <strong className="catalog-editor-audit__title">Histórico de preços</strong>
+              </summary>
               {editingProduct.priceHistory && editingProduct.priceHistory.length > 0 ? (
                 <div className="catalog-editor-audit__history">
                   {editingProduct.priceHistory.map((h) => (
@@ -662,13 +660,13 @@ export function CatalogProductEditorModal({
                 </div>
               ) : (
                 <p className="catalog-editor-audit__empty">
-                  Nenhuma alteração de preço registrada ainda para este prato.
+                  Nenhuma alteração de preço registrada para este produto.
                 </p>
               )}
-            </div>
+            </details>
 
             <div className="catalog-editor-actions">
-              <Button variant="ghost" type="button" onClick={() => setEditingProduct(null)}>
+              <Button variant="secondary" type="button" onClick={() => setEditingProduct(null)}>
                 Cancelar
               </Button>
               <Button
@@ -680,7 +678,7 @@ export function CatalogProductEditorModal({
                 type="submit"
                 variant="primary"
               >
-                {busy === "update-product" ? "Salvando…" : "Salvar Alterações"}
+                {busy === "update-product" ? "Salvando…" : "Salvar alterações"}
               </Button>
             </div>
           </form>

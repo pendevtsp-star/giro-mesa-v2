@@ -44,19 +44,26 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
   const source = row(payload);
   const establishment = row(source.establishment);
   const context = row(source.context);
+  const legacyTab = row(source.tab);
   const totals = row(source.totals);
   const split = row(source.split);
   const hasSplit = Object.keys(split).length > 0;
+  const delivery = row(source.delivery);
+  const address = row(delivery.address);
+  const courier = row(delivery.courier);
 
   return {
     schemaVersion: 2,
-    generatedAt: text(source.generatedAt) ?? new Date(0).toISOString(),
+    generatedAt: text(source.generatedAt) ?? "",
     establishment: {
       displayName:
-        text(establishment.displayName, establishment.tradeName, establishment.name) ?? "GIROMESA",
-      legalName:
-        text(establishment.legalName, establishment.displayName, establishment.tradeName) ??
-        "GIROMESA",
+        text(
+          establishment.displayName,
+          establishment.tradeName,
+          establishment.name,
+          source.establishmentName,
+        ) ?? "GIROMESA",
+      legalName: text(establishment.legalName) ?? "",
       document: text(establishment.document, establishment.cnpj),
       address: text(establishment.address),
       phone: text(establishment.phone),
@@ -65,17 +72,17 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
       logoUrl: safeLogoUrl(establishment.logoUrl),
     },
     context: {
-      tabId: text(context.tabId) ?? "unknown",
-      label: text(context.label, context.tableLabel) ?? "Comanda",
+      tabId: text(context.tabId, legacyTab.id) ?? "unknown",
+      label: text(context.label, context.tableLabel, legacyTab.label) ?? "Comanda",
       displayNumber: nullableInteger(context.displayNumber),
       tableLabel: text(context.tableLabel),
       areaName: text(context.areaName),
       squareName: text(context.squareName),
       waiterDisplayName: text(context.waiterDisplayName, context.waiterName),
-      fulfillmentType: text(context.fulfillmentType) ?? "dine_in",
-      guestCount: Math.max(0, integer(context.guestCount)),
-      status: text(context.status) ?? "open",
-      openedAt: text(context.openedAt) ?? new Date(0).toISOString(),
+      fulfillmentType: text(context.fulfillmentType, legacyTab.fulfillmentType) ?? "",
+      guestCount: Math.max(0, integer(context.guestCount ?? legacyTab.guestCount)),
+      status: text(context.status, legacyTab.status) ?? "",
+      openedAt: text(context.openedAt, legacyTab.openedAt) ?? "",
       closedAt: text(context.closedAt),
       durationMinutes: Math.max(0, integer(context.durationMinutes)),
     },
@@ -93,6 +100,7 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
       reversedCents: integer(totals.reversedCents),
       paidCents: integer(totals.paidCents),
       remainingCents: integer(totals.remainingCents),
+      deliveryFeeCents: integer(totals.deliveryFeeCents),
     },
     items: rows(source.items).map((item, index) => ({
       id: text(item.id) ?? `item-${index + 1}`,
@@ -101,12 +109,14 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
       quantity: Math.max(1, integer(item.quantity, 1)),
       unitPriceCents: integer(item.unitPriceCents),
       modifiersCents: integer(item.modifiersCents),
-      grossCents: integer(item.grossCents),
+      grossCents:
+        nullableInteger(item.grossCents) ?? integer(item.netCents) + integer(item.discountCents),
       discountCents: integer(item.discountCents),
       netCents: integer(item.netCents),
       status: text(item.status) ?? "active",
       seatNumber: nullableInteger(item.seatNumber),
       course: text(item.course),
+      notes: text(item.notes),
       modifiers: rows(item.modifiers).flatMap((modifier) => {
         const name = text(modifier.name, modifier.label);
         return name
@@ -122,19 +132,69 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
       }),
     })),
     payments: rows(source.payments).flatMap((payment, index) => {
-      const amountCents = integer(payment.amountCents);
-      return amountCents > 0
+      const reversedCents = Math.max(0, integer(payment.reversedCents));
+      const amountCents =
+        nullableInteger(payment.netAmountCents) ??
+        Math.max(0, integer(payment.amountCents) - reversedCents);
+      const receivedCents = payment.receivedCents;
+      const changeCents = payment.changeCents;
+      const cashExchange =
+        payment.method === "cash" &&
+        typeof receivedCents === "number" &&
+        Number.isSafeInteger(receivedCents) &&
+        receivedCents > 0 &&
+        typeof changeCents === "number" &&
+        Number.isSafeInteger(changeCents) &&
+        changeCents >= 0 &&
+        receivedCents - changeCents === amountCents + reversedCents
+          ? { receivedCents, changeCents }
+          : {};
+      return amountCents > 0 || reversedCents > 0
         ? [
             {
               id: text(payment.id) ?? `payment-${index + 1}`,
               method: text(payment.method) ?? "other",
               amountCents,
+              netAmountCents: amountCents,
+              reversedCents,
+              ...cashExchange,
               financialStatus: "posted" as const,
               createdAt: text(payment.createdAt) ?? new Date(0).toISOString(),
             },
           ]
         : [];
     }),
+    print: { isReprint: row(source.print).isReprint === true },
+    ...(Object.keys(delivery).length > 0
+      ? {
+          delivery: {
+            orderId: text(delivery.orderId) ?? "unknown",
+            status: text(delivery.status) ?? "",
+            customerName: text(delivery.customerName),
+            customerPhone: text(delivery.customerPhone),
+            address: {
+              street: text(address.street) ?? "",
+              number: text(address.number) ?? "",
+              complement: text(address.complement) ?? undefined,
+              reference: text(address.reference) ?? undefined,
+              neighborhood: text(address.neighborhood) ?? "",
+              city: text(address.city) ?? "",
+              state: text(address.state) ?? "",
+              postalCode: text(address.postalCode) ?? "",
+            },
+            notes: text(delivery.notes),
+            promisedAt: text(delivery.promisedAt),
+            courier:
+              Object.keys(courier).length > 0
+                ? {
+                    name: text(courier.name) ?? "",
+                    reference: text(courier.reference) ?? "",
+                    phone: text(courier.phone),
+                  }
+                : null,
+          },
+        }
+      : {}),
     ...(hasSplit
       ? {
           split: {
@@ -151,14 +211,17 @@ export function normalizeBrowserReceiptPayload(payload: unknown): PrintDocumentP
 }
 
 const documentLabels: Record<PrintDocumentType, string> = {
-  partial_statement: "EXTRATO PARCIAL",
+  partial_statement: "PRÉ-CONTA",
   payment_statement: "EXTRATO DE PAGAMENTOS",
   final_receipt: "COMPROVANTE FINAL",
+  delivery_slip: "VIA DE ENTREGA",
 };
 
 const fulfillmentLabels: Record<string, string> = {
   dine_in: "Consumo no local",
   pickup: "Retirada",
+  takeaway: "Retirada",
+  counter: "Balcão",
   delivery: "Entrega",
 };
 
@@ -175,18 +238,43 @@ const splitLabels: Record<string, string> = {
   fixed_amount: "Valor fixo por parte",
 };
 
+const statusLabels: Record<string, string> = {
+  draft: "Rascunho",
+  placed: "Recebido",
+  confirmed: "Confirmado",
+  completed: "Entregue",
+  queued: "Pendente",
+  in_progress: "Em preparo",
+  served: "Entregue",
+  open: "Aberto",
+  closed: "Encerrado",
+  pending: "Pendente",
+  accepted: "Aceito",
+  preparing: "Em preparo",
+  ready: "Pronto",
+  out_for_delivery: "Saiu para entrega",
+  dispatched: "Saiu para entrega",
+  delivered: "Entregue",
+  canceled: "Cancelado",
+  delivery_failed: "Entrega não concluída",
+  returned: "Devolvido",
+};
+
 function localDateTime(value: string, timezone: string) {
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? null
-    : parsed.toLocaleString("pt-BR", {
-        timeZone: timezone,
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
+  if (Number.isNaN(parsed.getTime())) return null;
+  try {
+    return parsed.toLocaleString("pt-BR", {
+      timeZone: timezone,
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return null;
+  }
 }
 
 function AmountRow({ label, cents }: { label: string; cents: number }) {
@@ -208,13 +296,34 @@ export function BrowserReceipt({
   const receipt = normalizeBrowserReceiptPayload(payload);
   const printedAt = localDateTime(receipt.generatedAt, receipt.establishment.timezone);
   const openedAt = localDateTime(receipt.context.openedAt, receipt.establishment.timezone);
+  const delivery = documentType === "delivery_slip" ? receipt.delivery : undefined;
+  const promisedAt = delivery?.promisedAt
+    ? localDateTime(delivery.promisedAt, receipt.establishment.timezone)
+    : null;
   return (
-    <article className="receipt-print-only" data-schema-version={receipt.schemaVersion}>
+    <article
+      className="receipt-print-only"
+      data-document-type={documentType}
+      data-schema-version={receipt.schemaVersion}
+    >
       <header className="receipt-print-brand">
-        {receipt.establishment.logoUrl && <img alt="" src={receipt.establishment.logoUrl} />}
+        {receipt.establishment.logoUrl && (
+          <img
+            alt=""
+            src={receipt.establishment.logoUrl}
+            referrerPolicy="no-referrer"
+            onError={(event) => {
+              event.currentTarget.hidden = true;
+            }}
+          />
+        )}
         <div>
           <strong>{receipt.establishment.displayName}</strong>
-          <span>{receipt.establishment.legalName}</span>
+          {receipt.establishment.legalName &&
+            receipt.establishment.legalName.toLocaleLowerCase() !==
+              receipt.establishment.displayName.toLocaleLowerCase() && (
+              <span>{receipt.establishment.legalName}</span>
+            )}
           {receipt.establishment.document && <span>CNPJ: {receipt.establishment.document}</span>}
           {receipt.establishment.address && <span>END: {receipt.establishment.address}</span>}
           {receipt.establishment.phone && <span>TEL: {receipt.establishment.phone}</span>}
@@ -223,23 +332,66 @@ export function BrowserReceipt({
           )}
         </div>
       </header>
+      {receipt.print?.isReprint && (
+        <p className="receipt-print-reprint">
+          <strong>SEGUNDA VIA</strong>
+        </p>
+      )}
       <h1>{documentLabels[documentType]}</h1>
       <hr />
       <h2>{receipt.context.label}</h2>
+      {receipt.context.tableLabel && receipt.context.tableLabel !== receipt.context.label && (
+        <h2>{receipt.context.tableLabel}</h2>
+      )}
+      {receipt.context.displayNumber !== null && (
+        <p>
+          <strong>PEDIDO {receipt.context.displayNumber}</strong>
+        </p>
+      )}
       <div className="receipt-print-context">
         <span>
           {fulfillmentLabels[receipt.context.fulfillmentType] ?? receipt.context.fulfillmentType}
           {receipt.context.guestCount > 0 ? ` · ${receipt.context.guestCount} pessoa(s)` : ""}
         </span>
+        {receipt.context.status && (
+          <span>STATUS: {statusLabels[receipt.context.status] ?? receipt.context.status}</span>
+        )}
         {receipt.context.areaName && <span>ÁREA: {receipt.context.areaName}</span>}
         {receipt.context.squareName && <span>PRAÇA: {receipt.context.squareName}</span>}
         {receipt.context.waiterDisplayName && (
           <span>ATENDENTE: {receipt.context.waiterDisplayName}</span>
         )}
         {openedAt && <span>INÍCIO: {openedAt}</span>}
-        <span>TEMPO DE CONSUMO: {receipt.context.durationMinutes} min</span>
+        {documentType !== "delivery_slip" && receipt.context.durationMinutes > 0 && (
+          <span>TEMPO DE CONSUMO: {receipt.context.durationMinutes} min</span>
+        )}
         {printedAt && <span>IMPRESSO: {printedAt}</span>}
       </div>
+      {delivery && (
+        <section className="receipt-print-context" aria-label="Dados da entrega">
+          <hr />
+          {delivery.status && (
+            <strong>ENTREGA: {statusLabels[delivery.status] ?? delivery.status}</strong>
+          )}
+          {delivery.customerName && <strong>CLIENTE: {delivery.customerName}</strong>}
+          {delivery.customerPhone && <span>TEL: {delivery.customerPhone}</span>}
+          {delivery.address.street && <span>RUA: {delivery.address.street}</span>}
+          {delivery.address.number && <span>NÚMERO: {delivery.address.number}</span>}
+          {delivery.address.complement && <span>COMPLEMENTO: {delivery.address.complement}</span>}
+          {delivery.address.neighborhood && <span>BAIRRO: {delivery.address.neighborhood}</span>}
+          {(delivery.address.city || delivery.address.state) && (
+            <span>
+              {[delivery.address.city, delivery.address.state].filter(Boolean).join(" / ")}
+            </span>
+          )}
+          {delivery.address.postalCode && <span>CEP: {delivery.address.postalCode}</span>}
+          {delivery.address.reference && <span>REFERÊNCIA: {delivery.address.reference}</span>}
+          {delivery.courier?.name && <span>ENTREGADOR: {delivery.courier.name}</span>}
+          {delivery.courier?.phone && <span>CONTATO: {delivery.courier.phone}</span>}
+          {delivery.notes && <strong>OBS: {delivery.notes}</strong>}
+          {promisedAt && <span>PREVISÃO: {promisedAt}</span>}
+        </section>
+      )}
       <hr />
       {documentType !== "payment_statement" && (
         <section className="receipt-print-items" aria-label="Itens">
@@ -251,7 +403,7 @@ export function BrowserReceipt({
                   <span>
                     {item.quantity}× {item.productName}
                   </span>
-                  <strong>{formatMoney(item.netCents)}</strong>
+                  <strong>{formatMoney(item.grossCents)}</strong>
                 </div>
                 {item.seatNumber !== null && <small>Pessoa {item.seatNumber}</small>}
                 {item.modifiers.map((modifier) => (
@@ -268,12 +420,16 @@ export function BrowserReceipt({
                     )}
                   </div>
                 ))}
+                {documentType === "delivery_slip" && item.notes && <small>OBS: {item.notes}</small>}
               </div>
             ))}
           <hr />
           <AmountRow cents={receipt.totals.subtotalCents} label="Subtotal" />
           {receipt.totals.discountCents !== 0 && (
-            <AmountRow cents={receipt.totals.discountCents} label="Descontos" />
+            <AmountRow cents={-receipt.totals.discountCents} label="Descontos" />
+          )}
+          {!!receipt.totals.deliveryFeeCents && (
+            <AmountRow cents={receipt.totals.deliveryFeeCents} label="Taxa de entrega" />
           )}
           {receipt.totals.serviceChargeCents !== 0 && (
             <AmountRow
@@ -284,7 +440,9 @@ export function BrowserReceipt({
           {receipt.totals.tipCents !== 0 && (
             <AmountRow cents={receipt.totals.tipCents} label="Gorjeta" />
           )}
-          {receipt.totals.serviceChargeOptional && receipt.totals.serviceChargeCents > 0 ? (
+          {documentType === "partial_statement" &&
+          receipt.totals.serviceChargeOptional &&
+          receipt.totals.serviceChargeCents > 0 ? (
             <AmountRow cents={receipt.totals.suggestedTotalCents} label="TOTAL SUGERIDO" />
           ) : (
             <AmountRow cents={receipt.totals.totalCents} label="TOTAL" />
@@ -309,11 +467,22 @@ export function BrowserReceipt({
           <strong>PAGAMENTOS</strong>
           {receipt.payments.length ? (
             receipt.payments.map((payment) => (
-              <AmountRow
-                cents={payment.amountCents}
-                key={payment.id}
-                label={paymentLabels[payment.method] ?? payment.method}
-              />
+              <div key={payment.id}>
+                <AmountRow
+                  cents={payment.amountCents}
+                  label={`${paymentLabels[payment.method] ?? payment.method}${payment.reversedCents ? " (líquido)" : ""}`}
+                />
+                {!!payment.reversedCents && (
+                  <AmountRow cents={payment.reversedCents} label="Estornado" />
+                )}
+                {payment.receivedCents != null && payment.changeCents != null && (
+                  <>
+                    {!!payment.reversedCents && <small>Recebimento original</small>}
+                    <AmountRow cents={payment.receivedCents} label="Recebido em dinheiro" />
+                    <AmountRow cents={payment.changeCents} label="Troco" />
+                  </>
+                )}
+              </div>
             ))
           ) : (
             <span>Nenhum pagamento registrado</span>

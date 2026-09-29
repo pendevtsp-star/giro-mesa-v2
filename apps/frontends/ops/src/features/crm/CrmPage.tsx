@@ -1,4 +1,4 @@
-import { Button, Card } from "@giromesa/ui";
+import { Button } from "@giromesa/ui";
 import { useState } from "react";
 import type { GrowthScope } from "../../growth.shared";
 import { CrmBenefitsCampaigns } from "./CrmBenefitsCampaigns";
@@ -17,11 +17,8 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
 
   return (
     <div className="growth-stack crm-page">
-      <Card className="crm-page-navigation">
-        <div>
-          <p className="eyebrow">Relacionamento</p>
-          <h2>Clientes e campanhas</h2>
-        </div>
+      <header className="crm-page-navigation">
+        <h1>Clientes e campanhas</h1>
         <nav aria-label="Áreas de relacionamento">
           <Button
             aria-pressed={view === "service"}
@@ -48,7 +45,7 @@ export function RealCrmPage({ scope }: { scope: GrowthScope }) {
             Benefícios e campanhas
           </Button>
         </nav>
-      </Card>
+      </header>
       {view === "service" ? (
         <CrmWhatsappWorkspace onOpenCustomer={openCustomer} scope={scope} />
       ) : null}

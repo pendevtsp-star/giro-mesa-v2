@@ -1,5 +1,46 @@
 .cash-page {
-  max-width: 1160px;
+  min-width: 0;
+  gap: var(--gm-space-3);
+}
+
+.cash-page-header h1,
+.cash-page-header p {
+  margin: 0;
+}
+
+.cash-page-header p {
+  margin-top: var(--gm-space-1);
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+}
+
+.cash-page-header__actions {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--gm-space-2);
+}
+
+.cash-register-picker {
+  display: grid;
+  gap: var(--gm-space-1);
+  min-width: 0;
+  font-size: var(--gm-font-xs);
+  font-weight: 600;
+}
+
+.cash-register-picker select {
+  max-width: 320px;
+}
+
+.cash-modal {
+  --background: var(--gm-surface);
+}
+
+.cash-modal .action-form {
+  margin-top: var(--gm-space-3);
+  padding: 0;
+  border: 0;
 }
 
 .cash-page [hidden] {
@@ -31,7 +72,7 @@
 .cash-register-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   min-width: 0;
   background: var(--gm-surface);
@@ -64,7 +105,7 @@
   flex-direction: column;
   width: 100%;
   height: auto;
-  min-height: 112px;
+  min-height: 80px;
   padding: var(--gm-space-3) var(--gm-space-4);
   gap: var(--gm-space-2);
   text-align: left;
@@ -106,79 +147,25 @@
   font-size: var(--gm-font-2xs);
 }
 
-.cash-register-card__selected-pill {
-  display: inline-flex;
-  align-items: center;
-  align-self: flex-start;
-  padding: 2px var(--gm-space-2);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--gm-action);
-  background: var(--gm-action-soft);
-  border-radius: var(--gm-radius-sm);
-  margin-top: 2px;
-}
-
 .cash-register-card__select small,
 .cash-register-menu__content small {
   color: var(--gm-muted);
 }
 
-.cash-register-menu {
-  position: relative;
-  padding: var(--gm-space-1);
-}
-
-.cash-register-menu > summary {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  color: var(--gm-muted);
-  font-size: var(--gm-font-lg);
-  font-weight: 800;
-  cursor: pointer;
-  border-radius: var(--gm-radius-md);
-  list-style: none;
-  transition:
-    background var(--gm-duration-fast),
-    color var(--gm-duration-fast);
-}
-
-.cash-register-menu > summary::-webkit-details-marker {
-  display: none;
-}
-
-.cash-register-menu > summary:hover {
-  color: var(--gm-ink);
-  background: var(--gm-surface-soft);
-}
-
-.cash-register-menu > summary:focus-visible {
-  outline: 3px solid var(--gm-focus);
-  outline-offset: 2px;
-}
-
 .cash-register-menu__content {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% - var(--gm-space-1));
-  right: var(--gm-space-1);
-  display: grid;
-  min-width: 172px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 0;
   padding: var(--gm-space-2);
   gap: var(--gm-space-1);
-  background: var(--gm-surface);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-md);
-  box-shadow: var(--gm-shadow-md);
+  border: 0;
+  border-top: 1px solid var(--gm-border);
 }
 
 .cash-register-menu__content button {
   justify-content: flex-start;
-  width: 100%;
 }
 
 .cash-register-create,
@@ -211,10 +198,6 @@
   border-radius: 0 0 var(--gm-radius-lg) var(--gm-radius-lg);
 }
 
-.cash-consolidated-card {
-  border-left: 4px solid var(--gm-action);
-}
-
 /* ==========================================================================
    BARRA DE OPERAÇÃO DO TURNO ABERTO (Com Destaque no Fechamento)
    ========================================================================== */
@@ -225,11 +208,10 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--gm-space-4);
-  padding: var(--gm-space-4) var(--gm-space-5);
+  padding: var(--gm-space-3) var(--gm-space-4);
   background: var(--gm-surface);
   border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-xl);
-  box-shadow: var(--gm-shadow-sm);
+  border-radius: var(--gm-radius-lg);
 }
 
 .cash-operation-header__info {
@@ -275,33 +257,10 @@
   gap: var(--gm-space-2);
 }
 
-/* Botão de Fechamento com Destaque Máximo */
-.cash-btn-close-highlight {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gm-space-2);
-  font-weight: 800;
-  box-shadow: var(--gm-shadow-sm);
-  transition:
-    transform var(--gm-duration-fast) var(--gm-ease-out),
-    box-shadow var(--gm-duration-fast);
-}
-
-.cash-btn-close-highlight:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--gm-shadow-md);
-}
-
-.cash-btn-close-highlight--active {
-  box-shadow:
-    0 0 0 3px var(--gm-danger-soft),
-    var(--gm-shadow-md);
-}
-
 .cash-btn-quick--active {
   background: var(--gm-surface-soft);
-  border-color: var(--gm-action);
-  color: var(--gm-action);
+  border-color: var(--gm-brand);
+  color: var(--gm-brand-strong);
 }
 
 /* ==========================================================================
@@ -349,32 +308,8 @@
    PAINÉIS DE AÇÃO (Fechamento, Movimento, Transferência)
    ========================================================================== */
 
-.cash-action-card {
-  display: grid;
-  gap: var(--gm-space-4);
-  border-radius: var(--gm-radius-xl);
-  box-shadow: var(--gm-shadow-md);
-  animation: cash-slide-down var(--gm-duration-fast) var(--gm-ease-out);
-}
-
-@keyframes cash-slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.cash-closure-card {
-  border: 2px solid var(--gm-danger);
-  background: var(--gm-surface);
-}
-
 .cash-card-desc {
-  margin: var(--gm-space-1) 0 0 0;
+  margin: var(--gm-space-1) 0 var(--gm-space-3);
   font-size: var(--gm-font-xs);
   color: var(--gm-muted);
   max-width: 640px;
@@ -527,17 +462,13 @@
   gap: var(--gm-space-3);
 }
 
-/* Painel de Movimentação (Sangria/Suprimento) */
-.cash-movement-card,
-.cash-transfer-card {
-  border: 1px solid var(--gm-border);
-  background: var(--gm-surface);
-}
-
 .cash-movement-type-toggle {
   display: flex;
   align-items: center;
   gap: var(--gm-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
 }
 
 .cash-action-form-grid {
@@ -626,36 +557,6 @@
   gap: var(--gm-space-2);
 }
 
-.cash-quick-chip {
-  padding: var(--gm-space-2) var(--gm-space-3);
-  font-size: var(--gm-font-sm);
-  font-weight: 700;
-  color: var(--gm-ink);
-  background: var(--gm-surface-soft);
-  border: 1px solid var(--gm-border);
-  border-radius: var(--gm-radius-full);
-  cursor: pointer;
-  transition: all var(--gm-duration-fast) var(--gm-ease-out);
-}
-
-.cash-quick-chip:hover {
-  background: var(--gm-action-soft);
-  border-color: var(--gm-action);
-  color: var(--gm-action);
-}
-
-.cash-quick-chip--active {
-  background: var(--gm-action);
-  border-color: var(--gm-action);
-  color: var(--gm-surface);
-}
-
-.cash-quick-chip--clear {
-  color: var(--gm-muted);
-  background: transparent;
-  border-style: dashed;
-}
-
 .cash-opening-form {
   display: flex;
   align-items: flex-end;
@@ -690,13 +591,6 @@
   font-size: var(--gm-font-md);
 }
 
-.cash-opening-note small {
-  display: block;
-  font-size: var(--gm-font-xs);
-  color: var(--gm-muted);
-  line-height: 1.4;
-}
-
 .cash-hero-card__permission-msg {
   margin: 0;
   padding: var(--gm-space-3) var(--gm-space-4);
@@ -718,6 +612,8 @@
 }
 
 .cash-ledger__filter-tabs {
+  margin: 0;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   padding: 3px;
@@ -725,29 +621,6 @@
   border: 1px solid var(--gm-border);
   border-radius: var(--gm-radius-lg);
   gap: 2px;
-}
-
-.cash-tab-btn {
-  padding: var(--gm-space-1) var(--gm-space-3);
-  font-size: var(--gm-font-xs);
-  font-weight: 600;
-  color: var(--gm-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--gm-radius-md);
-  cursor: pointer;
-  transition: all var(--gm-duration-fast) var(--gm-ease-out);
-}
-
-.cash-tab-btn:hover {
-  color: var(--gm-ink);
-}
-
-.cash-tab-btn--active {
-  color: var(--gm-ink);
-  background: var(--gm-surface);
-  box-shadow: var(--gm-shadow-xs);
-  font-weight: 700;
 }
 
 .cash-entry-badge {
@@ -890,6 +763,7 @@
 .cash-approval__actions,
 .cash-history__exports,
 .cash-history__result {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: var(--gm-space-2);
@@ -926,9 +800,8 @@
 }
 
 .cash-history__detail {
-  margin-top: var(--gm-space-4);
-  padding-top: var(--gm-space-4);
-  border-top: 1px solid var(--gm-border);
+  margin: 0;
+  padding: 0;
 }
 
 /* ==========================================================================
@@ -1123,8 +996,8 @@
 }
 
 .cash-denom-type.coin {
-  color: var(--gm-action);
-  background: var(--gm-action-soft);
+  color: var(--gm-brand-strong);
+  background: var(--gm-brand-soft);
 }
 
 .cash-denomination-item input {
@@ -1309,6 +1182,19 @@
    ========================================================================== */
 
 @media (max-width: 640px) {
+  .cash-page-header__actions {
+    width: 100%;
+  }
+
+  .cash-register-picker {
+    flex: 1;
+  }
+
+  .cash-register-picker select {
+    width: 100%;
+    max-width: 100%;
+  }
+
   .cash-operation-header {
     flex-direction: column;
     align-items: stretch;
@@ -1317,7 +1203,7 @@
 
   .cash-operation-header__actions {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
@@ -1451,7 +1337,7 @@
 }
 
 .cash-workspace-tabs__item[data-active="true"] {
-  color: var(--gm-action);
+  color: var(--gm-brand-strong);
   background: var(--gm-surface);
   box-shadow: var(--gm-shadow-xs);
 }
@@ -1468,7 +1354,7 @@
 
 .cash-settings__form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(160px, 1fr)) auto;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
   align-items: end;
   gap: var(--gm-space-3);
 }
@@ -1518,11 +1404,6 @@
 .cash-hero-card__body {
   max-width: 760px;
   gap: var(--gm-space-3);
-}
-
-.cash-action-card {
-  gap: var(--gm-space-3);
-  box-shadow: var(--gm-shadow-sm);
 }
 
 .cash-closure-form {

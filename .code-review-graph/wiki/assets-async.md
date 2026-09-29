@@ -63,7 +63,7 @@ Directory-based community: apps/native
 | PairingPayload | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 551-551 |
 | HubCommandResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 552-552 |
 
-*... and 539 more members.*
+*... and 536 more members.*
 
 ## Execution Flows
 
@@ -93,10 +93,10 @@ Directory-based community: apps/native
 - `Error` (16 edge(s))
 - `slice` (14 edge(s))
 - `forEach` (13 edge(s))
-- `map` (13 edge(s))
 - `indexOf` (13 edge(s))
 - `Add` (12 edge(s))
 - `isArray` (12 edge(s))
+- `map` (12 edge(s))
 - `GetAsync` (11 edge(s))
 
 ### Incoming
@@ -109,10 +109,10 @@ Directory-based community: apps/native
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs` (15 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPayments.cs` (12 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosResultOutbox.cs` (9 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-C7rHALbT.js::e` (8 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-B5E4YIf6.js` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/AndroidStubs.cs` (8 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceSecurity.cs` (7 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPaymentContracts.cs` (7 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-C7rHALbT.js::Rn` (6 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/rolldown-runtime-hePW80VL.js` (5 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceDiagnostics.cs` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/MauiStorageStubs.cs` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/MauiStorageStubs.cs::InMemorySecureStorage` (3 edge(s))

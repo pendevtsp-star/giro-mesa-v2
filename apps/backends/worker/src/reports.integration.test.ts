@@ -8,11 +8,14 @@ import {
   managementReportSchedules,
   memberships,
   organizations,
+  parseReportCsv,
+  posPaymentReversals,
+  posTabPayments,
   posTabs,
   roleBindings,
   units,
 } from "@giromesa/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { EmailDeliveryError } from "./email.js";
 import { OutboxWorker } from "./outbox.js";
 import { processDueReportSchedules, reportContentSha256 } from "./reports.js";
@@ -32,6 +35,7 @@ test("claims each scheduled execution once and gates email by current permission
   const database = createDatabase(databaseUrl);
   let worker: OutboxWorker | undefined;
   let organizationId: string | undefined;
+  let otherOrganizationId: string | undefined;
   let ownerIdentityId: string | undefined;
   let cashierIdentityId: string | undefined;
   try {
@@ -133,6 +137,92 @@ test("claims each scheduled execution once and gates email by current permission
       closedAt: new Date("2026-08-12T15:00:00.000Z"),
     });
 
+    const [otherOrganization] = await database.db
+      .insert(organizations)
+      .values({
+        legalName: "Other reports tenant",
+        tradeName: "Other reports tenant",
+        document: randomUUID().replaceAll("-", "").slice(0, 14),
+      })
+      .returning();
+    assert.ok(otherOrganization);
+    otherOrganizationId = otherOrganization.id;
+    const [otherUnit, foreignUnit] = await database.db
+      .insert(units)
+      .values([
+        { organizationId: organization.id, name: "Other reports unit" },
+        { organizationId: otherOrganization.id, name: "Other tenant unit" },
+      ])
+      .returning();
+    assert.ok(otherUnit && foreignUnit);
+    const insidePeriod = new Date("2026-08-12T15:00:00.000Z");
+    const previousPeriod = new Date("2026-08-09T15:00:00.000Z");
+    const nextPeriod = new Date("2026-08-17T03:00:00.000Z");
+    const cases = [
+      { method: "cash", amount: 5000, reversal: 2000, status: "approved" },
+      { method: "cash", amount: 1000, reversal: 1000, status: "declined" },
+      { method: "pix", amount: 3000, reversal: 3000, status: "approved" },
+      { method: "debit_card", amount: 2000, reversal: 2000, status: "pending" },
+      {
+        method: "credit_card",
+        amount: 500,
+        reversal: 500,
+        status: "approved",
+        closedAt: previousPeriod,
+      },
+      { method: "cash", amount: 700, reversal: 700, status: "approved", resolvedAt: nextPeriod },
+      { method: "cash", amount: 900, reversal: 900, status: "approved", targetUnit: otherUnit },
+      { method: "cash", amount: 800, reversal: 800, status: "approved", targetUnit: foreignUnit },
+    ] as const;
+    for (const [index, scenario] of cases.entries()) {
+      const target = "targetUnit" in scenario ? scenario.targetUnit : unit;
+      const [tab] = await database.db
+        .insert(posTabs)
+        .values({
+          organizationId: target.organizationId,
+          unitId: target.id,
+          openedByIdentityId: owner.id,
+          displayNumber: index + 2,
+          status: "closed",
+          subtotalCents: scenario.amount,
+          totalCents: scenario.amount,
+          closedAt: "closedAt" in scenario ? scenario.closedAt : insidePeriod,
+        })
+        .returning();
+      assert.ok(tab);
+      const [payment] = await database.db
+        .insert(posTabPayments)
+        .values({
+          organizationId: target.organizationId,
+          unitId: target.id,
+          tabId: tab.id,
+          createdByIdentityId: owner.id,
+          method: scenario.method,
+          amountCents: scenario.amount,
+        })
+        .returning();
+      assert.ok(payment);
+      const reversal = {
+        organizationId: target.organizationId,
+        unitId: target.id,
+        paymentId: payment.id,
+        requestedByIdentityId: owner.id,
+        reason: "Scheduled report net receipt regression",
+        amountCents: scenario.reversal,
+        status: scenario.status,
+        resolvedAt:
+          scenario.status === "pending"
+            ? null
+            : "resolvedAt" in scenario
+              ? scenario.resolvedAt
+              : insidePeriod,
+      };
+      await database.db.insert(posPaymentReversals).values(reversal);
+      if (index === 0) {
+        await database.db.insert(posPaymentReversals).values({ ...reversal, status: "declined" });
+      }
+    }
+
     const claims = await Promise.all([
       processDueReportSchedules(database.db, { now, limit: 10 }),
       processDueReportSchedules(database.db, { now, limit: 10 }),
@@ -154,6 +244,19 @@ test("claims each scheduled execution once and gates email by current permission
     assert.match(inAppExport.content, /dre/);
     assert.match(inAppExport.content, /detalhamento_channels/);
     assert.equal(inAppExport.sha256, reportContentSha256(inAppExport.content));
+    const paymentRows = parseReportCsv(inAppExport.content)
+      .filter((row) => row.seção === "detalhamento_paymentMethods")
+      .map((row) => ({
+        method: row.chave,
+        quantity: Number(row.quantidade),
+        revenueCents: Number(row.receita_centavos?.replace(/^'/, "")),
+      }));
+    assert.deepEqual(paymentRows, [
+      { method: "cash", quantity: 3, revenueCents: 4700 },
+      { method: "credit_card", quantity: 0, revenueCents: -500 },
+      { method: "debit_card", quantity: 1, revenueCents: 2000 },
+      { method: "pix", quantity: 1, revenueCents: 0 },
+    ]);
 
     worker = new OutboxWorker();
     await assert.rejects(
@@ -255,9 +358,18 @@ test("claims each scheduled execution once and gates email by current permission
     );
   } finally {
     if (worker) await worker.close();
-    if (organizationId) {
-      await database.db.delete(posTabs).where(eq(posTabs.organizationId, organizationId));
-      await database.db.delete(organizations).where(eq(organizations.id, organizationId));
+    const organizationIds = [organizationId, otherOrganizationId].filter((id): id is string =>
+      Boolean(id),
+    );
+    if (organizationIds.length) {
+      await database.db
+        .delete(posPaymentReversals)
+        .where(inArray(posPaymentReversals.organizationId, organizationIds));
+      await database.db
+        .delete(posTabPayments)
+        .where(inArray(posTabPayments.organizationId, organizationIds));
+      await database.db.delete(posTabs).where(inArray(posTabs.organizationId, organizationIds));
+      await database.db.delete(organizations).where(inArray(organizations.id, organizationIds));
     }
     if (cashierIdentityId) {
       await database.db.delete(identities).where(eq(identities.id, cashierIdentityId));

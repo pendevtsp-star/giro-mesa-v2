@@ -189,9 +189,7 @@ export function ReportFamilyNavigation({
   return (
     <Card className="reports-family-navigation grid">
       <div className="reports-family-navigation__copy">
-        <p className="eyebrow">Biblioteca de relatórios</p>
-        <h2>Escolha a análise</h2>
-        <p>Selecione primeiro a família e depois o recorte que deseja consultar.</p>
+        <h2>Biblioteca de relatórios</h2>
       </div>
 
       <div className="reports-family-navigation__controls">

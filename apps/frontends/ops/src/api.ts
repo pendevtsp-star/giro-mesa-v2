@@ -106,7 +106,11 @@ export interface CommandResponse {
   command: { id: string; type: string; occurredAt: string };
 }
 
-export type PrintDocumentType = "partial_statement" | "payment_statement" | "final_receipt";
+export type PrintDocumentType =
+  | "partial_statement"
+  | "payment_statement"
+  | "final_receipt"
+  | "delivery_slip";
 export type PrintJobStatus = "queued" | "printing" | "confirmation_required" | "printed" | "failed";
 
 export interface EdgeHubPairing {
@@ -655,6 +659,8 @@ export function operationalApiErrorMessage(
   const code = typeof bodyCode === "string" ? bodyCode : "";
   const codedMessage = (
     {
+      DELIVERY_REQUIRES_ONLINE: "Conecte-se para abrir um delivery e validar endereço e taxa.",
+      DELIVERY_ITEMS_REQUIRED: "Adicione os itens do delivery antes de receber o pagamento.",
       KDS_PRODUCT_ROUTING_CHANGED_RETRY:
         "A rota de produção mudou durante o envio. Tente enviar novamente.",
       ORDER_HAS_INACTIVE_STATION:
@@ -4177,6 +4183,11 @@ export const api = {
     },
   },
   pilot: {
+    setManagerPin: (organizationId: string, unitId: string, pin: string) =>
+      request<{ configured: true }>(pilotPath(organizationId, unitId, "manager-pin"), {
+        method: "PUT",
+        body: JSON.stringify({ pin }),
+      }),
     shiftHandover: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "shift-handover")),
     acknowledgeShiftHandover: (
@@ -5347,6 +5358,8 @@ export const api = {
         readyNotificationConsent?: boolean;
         serviceNotes?: string;
         deliveryAddress?: string;
+        deliveryAddressDetails?: import("@giromesa/contracts").DeliveryAddressInput | null;
+        deliveryZoneId?: string | null;
         promisedAt?: string;
         responsibleIdentityId?: string;
         reservationId?: string;
@@ -5367,12 +5380,15 @@ export const api = {
       body: {
         expectedVersion: number;
         label?: string | null;
+        customerId?: string | null;
         fulfillmentType?: "dine_in" | "pickup" | "delivery";
         customerName?: string | null;
         customerPhone?: string | null;
         readyNotificationConsent?: boolean;
         serviceNotes?: string | null;
         deliveryAddress?: string | null;
+        deliveryAddressDetails?: import("@giromesa/contracts").DeliveryAddressInput | null;
+        deliveryZoneId?: string | null;
         promisedAt?: string | null;
         guestCount?: number;
         responsibleIdentityId?: string | null;
@@ -5441,6 +5457,7 @@ export const api = {
       body: {
         method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
         amountCents: number;
+        receivedCents?: number;
         reference?: string;
         cashRegisterId?: string;
         installationId?: string;
@@ -5583,16 +5600,38 @@ export const api = {
       organizationId: string,
       unitId: string,
       tabId: string,
-      body: {
-        itemId: string;
-        action: "discount" | "cancel";
-        discountCents?: number;
-        reason: string;
-      },
+      body:
+        | {
+            itemId: string;
+            action: "discount" | "cancel";
+            discountCents?: number;
+            reason: string;
+          }
+        | {
+            action: "tab_discount";
+            discountCents: number;
+            reason: string;
+          },
       idempotencyKey?: string,
     ) =>
       idempotentRequest<unknown>(
         pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}/approval-requests`),
+        "POST",
+        body,
+        idempotencyKey,
+      ),
+    discountTab: (
+      organizationId: string,
+      unitId: string,
+      tabId: string,
+      body: {
+        discountCents: number;
+        approval: { approverMembershipId: string; pin: string; reason: string };
+      },
+      idempotencyKey: string,
+    ) =>
+      idempotentRequest<unknown>(
+        pilotPath(organizationId, unitId, `tabs/${encodeURIComponent(tabId)}/discount`),
         "POST",
         body,
         idempotencyKey,
@@ -6280,6 +6319,43 @@ export const api = {
     },
   },
   growth: {
+    operationalCustomers: (
+      organizationId: string,
+      unitId: string,
+      filters?: { q?: string; limit?: number },
+    ) => {
+      const query = new URLSearchParams({ unitId });
+      if (filters?.q) query.set("q", filters.q);
+      if (filters?.limit) query.set("limit", String(filters.limit));
+      return request<unknown>(growthPath(organizationId, `operational-customers?${query}`));
+    },
+    createOperationalCustomer: (
+      organizationId: string,
+      unitId: string,
+      body: {
+        name: string;
+        phone?: string;
+        defaultDeliveryAddress?: import("@giromesa/contracts").DeliveryAddressInput;
+        idempotencyKey: string;
+      },
+    ) =>
+      request<unknown>(growthPath(organizationId, "operational-customers"), {
+        method: "POST",
+        body: JSON.stringify({ ...body, unitId }),
+      }),
+    updateOperationalCustomerAddress: (
+      organizationId: string,
+      unitId: string,
+      customerId: string,
+      defaultDeliveryAddress: import("@giromesa/contracts").DeliveryAddressInput | null,
+    ) =>
+      request<unknown>(
+        growthPath(organizationId, `operational-customers/${encodeURIComponent(customerId)}`),
+        {
+          method: "PATCH",
+          body: JSON.stringify({ unitId, defaultDeliveryAddress }),
+        },
+      ),
     customers: (organizationId: string) =>
       request<unknown>(growthPath(organizationId, "customers")),
     customerPage: (
@@ -6321,6 +6397,7 @@ export const api = {
         birthDate?: string;
         notes?: string | null;
         tags?: string[];
+        defaultDeliveryAddress?: import("@giromesa/contracts").DeliveryAddressInput | null;
       },
     ) =>
       request<unknown>(growthPath(organizationId, "customers"), {
@@ -6338,6 +6415,7 @@ export const api = {
         birthDate?: string | null;
         notes?: string | null;
         tags?: string[];
+        defaultDeliveryAddress?: import("@giromesa/contracts").DeliveryAddressInput | null;
       },
     ) =>
       request<unknown>(growthPath(organizationId, `customers/${encodeURIComponent(customerId)}`), {
@@ -6759,6 +6837,7 @@ export const api = {
         scheduled?: boolean;
         sla?: "overdue";
         updatedSince?: string;
+        orderRef?: string;
         limit?: number;
       },
     ) => {
@@ -6768,6 +6847,7 @@ export const api = {
       if (filters?.scheduled !== undefined) query.set("scheduled", String(filters.scheduled));
       if (filters?.sla) query.set("sla", filters.sla);
       if (filters?.updatedSince) query.set("updatedSince", filters.updatedSince);
+      if (filters?.orderRef) query.set("orderRef", filters.orderRef);
       if (filters?.limit !== undefined) query.set("limit", String(filters.limit));
       const suffix = query.size > 0 ? `?${query.toString()}` : "";
       return request<unknown>(
@@ -6789,6 +6869,7 @@ export const api = {
           city: string;
           state: string;
           postalCode: string;
+          reference?: string;
         };
         promisedAt?: string;
         idempotencyKey: string;

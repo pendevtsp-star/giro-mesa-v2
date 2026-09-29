@@ -8,14 +8,17 @@ import {
   resolveLocalReturnTo,
   resolveOpsUrl,
 } from "../../lib/auth-navigation";
+import { readPlanSelection } from "../../lib/pricing";
 
 export default function CreateAccountPage() {
   const [message, setMessage] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [returnTo, setReturnTo] = useState<string | null>(null);
+  const [planSelection, setPlanSelection] = useState<ReturnType<typeof readPlanSelection>>(null);
 
   useEffect(() => {
     const parameters = new URLSearchParams(window.location.search);
+    setPlanSelection(readPlanSelection(window.location.search));
     const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     setReturnTo(
       resolveLocalReturnTo(
@@ -89,6 +92,22 @@ export default function CreateAccountPage() {
       <section className="auth-box">
         <p className="eyebrow">Identidade GiroMesa</p>
         <h1>Criar sua conta</h1>
+        {planSelection ? (
+          <aside className="signup-plan-selection" aria-label="Plano de interesse">
+            <strong>
+              Plano de interesse:{" "}
+              {
+                { operacao: "Operação", crescimento: "Crescimento", rede: "Rede" }[
+                  planSelection.plan
+                ]
+              }
+              {" · "}
+              {planSelection.cycle === "annual" ? "Anual" : "Mensal"}
+            </strong>
+            <p>Você confirma o plano e o período na etapa de contratação.</p>
+            <Link href={`/?ciclo=${planSelection.cycle}#planos`}>Rever planos</Link>
+          </aside>
+        ) : null}
         <p>
           Crie sua conta e cadastre o estabelecimento no próximo passo. O teste grátis começa na
           hora.

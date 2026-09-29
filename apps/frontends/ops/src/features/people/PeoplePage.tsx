@@ -202,8 +202,12 @@ function AccessRolesPicker({
     <fieldset aria-describedby={`${id}-context`}>
       <legend>Funções autorizadas</legend>
       <p className="form-hint" id={`${id}-context`}>
-        Unidade: <strong>{unitLabel}</strong>. Marque todas as funções liberadas para este
-        funcionário.
+        {unitLabel && (
+          <>
+            Unidade: <strong>{unitLabel}</strong>.{" "}
+          </>
+        )}
+        Marque todas as funções liberadas para este funcionário.
       </p>
       {options.map((role) => (
         <label className="people-access-toggle" key={role.value}>
@@ -589,8 +593,8 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     );
   const currentUnitLabel =
     accessOverview.status === "ready"
-      ? (accessOverview.data.units.find((unit) => unit.id === scope.unitId)?.name ?? scope.unitId)
-      : scope.unitId;
+      ? (accessOverview.data.units.find((unit) => unit.id === scope.unitId)?.name ?? "")
+      : "";
   function failAction(error: unknown, fallback: string) {
     const message = error instanceof Error ? error.message : fallback;
     setActionError(message);
@@ -1601,11 +1605,44 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
     <RemoteGate remote={remote}>
       {(data) => (
         <div className="growth-stack people-page">
+          <div className="people-command-bar gm-toolbar">
+            <SegmentedTabs
+              active={section}
+              items={[
+                {
+                  id: "today",
+                  label: "Hoje",
+                  count: data.alerts.length + data.anomalies.length + data.corrections.length,
+                  tone: data.alerts.length + data.anomalies.length ? "warning" : undefined,
+                },
+                { id: "team", label: "Equipe", count: data.people.length },
+                {
+                  id: "access",
+                  label: "Acessos",
+                  count:
+                    accessCenter.state.status === "ready"
+                      ? accessCenter.state.data.terminals.length
+                      : undefined,
+                },
+                { id: "schedules", label: "Escalas", count: data.schedules.length },
+                {
+                  id: "time",
+                  label: "Ponto e relatórios",
+                  count: data.timeEntries.filter((entry) => !entry.clockedOutAt).length,
+                },
+                { id: "settings", label: "Configurações" },
+              ]}
+              label="Área do módulo Pessoas"
+              onChange={(nextSection) => {
+                setSection(nextSection);
+                setActionError("");
+              }}
+            />
+          </div>
           <Card className="people-overview">
             <div className="people-overview__header">
               <div>
-                <p className="eyebrow">Visão da equipe</p>
-                <h2>Operação de pessoas</h2>
+                <h2>Resumo da equipe</h2>
               </div>
               <div className="gm-observability-row">
                 <span
@@ -1686,7 +1723,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                       <strong>{data.alerts.length + data.corrections.length}</strong>
                     </div>
                   </div>
-                  <div className="people-form-actions">
+                  <div className="people-form-actions gm-toolbar">
                     <Button onClick={() => setSection("schedules")} size="sm" variant="secondary">
                       Ver escala de hoje
                     </Button>
@@ -1760,40 +1797,6 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
               </p>
             </Card>
           )}
-          <div className="people-command-bar gm-toolbar">
-            <SegmentedTabs
-              active={section}
-              items={[
-                {
-                  id: "today",
-                  label: "Hoje",
-                  count: data.alerts.length + data.anomalies.length + data.corrections.length,
-                  tone: data.alerts.length + data.anomalies.length ? "warning" : undefined,
-                },
-                { id: "team", label: "Equipe", count: data.people.length },
-                {
-                  id: "access",
-                  label: "Acessos",
-                  count:
-                    accessCenter.state.status === "ready"
-                      ? accessCenter.state.data.terminals.length
-                      : undefined,
-                },
-                { id: "schedules", label: "Escalas", count: data.schedules.length },
-                {
-                  id: "time",
-                  label: "Ponto e relatórios",
-                  count: data.timeEntries.filter((entry) => !entry.clockedOutAt).length,
-                },
-                { id: "settings", label: "Configurações" },
-              ]}
-              label="Área do módulo Pessoas"
-              onChange={(nextSection) => {
-                setSection(nextSection);
-                setActionError("");
-              }}
-            />
-          </div>
           {actionError && (
             <p className="people-page__error" role="alert">
               {actionError}
@@ -3568,7 +3571,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                           : grantableAccessRoles
                       }
                       selected={personAccessRoles}
-                      unitLabel={scope.unitId}
+                      unitLabel={currentUnitLabel}
                     />
                   </div>
                 )}
@@ -3778,7 +3781,7 @@ export function RealPeoplePage({ scope }: { scope: ManagementScope }) {
                     selected={unitAccessRoles}
                     unitLabel={
                       accessOverview.data.units.find((unit) => unit.id === unitAccessUnitId)
-                        ?.name ?? unitAccessUnitId
+                        ?.name ?? ""
                     }
                   />
                 </>

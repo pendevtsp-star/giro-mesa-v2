@@ -30,6 +30,16 @@ export function LegalDocument({ document }: { document: CommercialLegalDocument 
       <article className="container narrow">
         <p className="eyebrow">Documento publicado</p>
         <h1>{document.title}</h1>
+        <nav className="legal-index" aria-label="Nesta página">
+          <span>Nesta página</span>
+          <ul>
+            {document.sections.map((section) => (
+              <li key={section.heading}>
+                <a href={`#${sectionId(section.heading)}`}>{section.heading}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
         {document.sections.map((section) => (
           <section id={sectionId(section.heading)} key={section.heading}>
             <h2>{section.heading}</h2>

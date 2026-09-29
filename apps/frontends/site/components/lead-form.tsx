@@ -77,16 +77,29 @@ export function LeadForm({
       <div className="field-row">
         <Label>
           Nome completo
-          <Input name="name" autoComplete="name" required />
+          <Input name="name" autoComplete="name" placeholder="Seu nome completo" required />
         </Label>
         <Label>
           WhatsApp
-          <Input name="phone" inputMode="tel" autoComplete="tel" required />
+          <Input
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            placeholder="(00) 00000-0000"
+            required
+          />
         </Label>
       </div>
       <Label>
         E-mail profissional
-        <Input name="email" type="email" autoComplete="email" required />
+        <Input
+          name="email"
+          type="email"
+          autoComplete="email"
+          placeholder="voce@empresa.com.br"
+          required
+        />
       </Label>
       {kind === "trial" ? (
         <>
@@ -124,7 +137,13 @@ export function LeadForm({
       ) : (
         <Label>
           Como podemos ajudar?
-          <Textarea name="message" rows={5} required defaultValue={initialMessage} />
+          <Textarea
+            name="message"
+            rows={5}
+            placeholder="Conte um pouco sobre o seu negócio e como podemos ajudar."
+            required
+            defaultValue={initialMessage}
+          />
         </Label>
       )}
       <Label className="check-label">

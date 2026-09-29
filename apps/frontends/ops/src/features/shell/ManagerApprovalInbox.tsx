@@ -6,8 +6,9 @@ import { formatMoney } from "../../rules";
 type PendingApproval = {
   requestId: string;
   tabLabel: string | null;
-  productName: string;
-  action: "discount" | "cancel";
+  itemId: string | null;
+  productName: string | null;
+  action: "discount" | "cancel" | "tab_discount";
   discountCents: number | null;
   reason: string;
   requestedByName: string;
@@ -22,8 +23,9 @@ export function parsePendingApprovals(value: unknown): PendingApproval[] {
     const row = candidate as Record<string, unknown>;
     if (
       typeof row.requestId !== "string" ||
-      typeof row.productName !== "string" ||
-      (row.action !== "discount" && row.action !== "cancel") ||
+      (row.action !== "discount" && row.action !== "cancel" && row.action !== "tab_discount") ||
+      (row.action !== "tab_discount" && typeof row.itemId !== "string") ||
+      (row.action !== "tab_discount" && typeof row.productName !== "string") ||
       typeof row.reason !== "string" ||
       typeof row.requestedByName !== "string" ||
       typeof row.requestedAt !== "string"
@@ -34,7 +36,8 @@ export function parsePendingApprovals(value: unknown): PendingApproval[] {
       {
         requestId: row.requestId,
         tabLabel: typeof row.tabLabel === "string" ? row.tabLabel : null,
-        productName: row.productName,
+        itemId: typeof row.itemId === "string" ? row.itemId : null,
+        productName: typeof row.productName === "string" ? row.productName : null,
         action: row.action,
         discountCents: typeof row.discountCents === "number" ? row.discountCents : null,
         reason: row.reason,
@@ -106,7 +109,14 @@ export function ManagerApprovalInbox({
         crypto.randomUUID(),
       );
       setItems((current) => current.filter((item) => item.requestId !== requestId));
-      setNotice(decision === "approve" ? "Ajuste autorizado e aplicado." : "Solicitação recusada.");
+      const item = items.find((candidate) => candidate.requestId === requestId);
+      setNotice(
+        decision === "approve"
+          ? item?.action === "tab_discount"
+            ? "Desconto na conta autorizado e aplicado."
+            : "Ajuste autorizado e aplicado."
+          : "Solicitação recusada.",
+      );
       onChanged();
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Não foi possível concluir a decisão.");
@@ -166,9 +176,18 @@ export function ManagerApprovalInbox({
                 {items.map((item) => (
                   <article key={item.requestId}>
                     <div className="manager-inbox__request">
-                      <span>{item.action === "discount" ? "Desconto" : "Cancelamento"}</span>
+                      <span>
+                        {item.action === "tab_discount"
+                          ? "Desconto na conta"
+                          : item.action === "discount"
+                            ? "Desconto"
+                            : "Cancelamento"}
+                      </span>
                       <strong>
-                        {item.tabLabel ?? "Conta"} · {item.productName}
+                        {item.tabLabel ?? "Conta"}
+                        {item.action !== "tab_discount" && item.productName
+                          ? ` · ${item.productName}`
+                          : ""}
                       </strong>
                       <small>
                         Solicitado por {item.requestedByName} ·{" "}

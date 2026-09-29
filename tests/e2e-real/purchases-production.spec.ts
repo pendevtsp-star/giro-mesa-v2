@@ -612,7 +612,7 @@ test("estoque abre no turno e usa confirmação contextual para inativar item", 
     }
   }
 
-  await page.getByText("Mais áreas do estoque").click();
+  await page.getByText("Outras áreas", { exact: true }).click();
   await page.getByRole("button", { name: "Configurações" }).click();
   const itemCard = page.locator(".inventory-data-card").filter({ hasText: "Itens de estoque" });
   await itemCard.getByRole("button", { name: "Inativar" }).first().click();

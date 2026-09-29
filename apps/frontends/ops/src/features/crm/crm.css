@@ -15,17 +15,12 @@
   justify-content: space-between;
 }
 
-.crm-page-navigation > div {
-  display: grid;
-  gap: 0.15rem;
-}
-
 .crm-page-navigation {
   flex-direction: row;
   flex-wrap: wrap;
 }
 
-.crm-page-navigation :is(h2, p),
+.crm-page-navigation h1,
 .crm-thread-heading h3 {
   margin: 0;
 }
@@ -436,9 +431,10 @@
 }
 
 .crm-inline-fields {
+  align-items: end;
   display: grid;
   gap: var(--gm-space-2);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
 }
 
 .crm-inline-fields label,
@@ -446,6 +442,7 @@
 .crm-reply {
   display: grid;
   gap: var(--gm-space-1);
+  min-width: 0;
 }
 
 .crm-button-row {

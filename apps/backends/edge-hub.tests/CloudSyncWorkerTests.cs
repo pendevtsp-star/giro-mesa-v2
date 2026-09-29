@@ -124,8 +124,10 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         Assert.Equal("printed", state.Result?.GetProperty("status").GetString());
     }
 
-    [Fact]
-    public async Task NeverReprintsAConfirmationRequiredJobForAnotherCloudCommandReplay()
+    [Theory]
+    [InlineData("kds_ticket")]
+    [InlineData("delivery_slip")]
+    public async Task NeverReprintsAConfirmationRequiredJobForAnotherCloudCommandReplay(string documentType)
     {
         var options = PrinterOptions();
         var store = new HubStore(options, NullLogger<HubStore>.Instance);
@@ -141,10 +143,10 @@ public sealed class CloudSyncWorkerTests : IAsyncLifetime
         {
             cloudPrintJobId = Guid.NewGuid().ToString(),
             idempotencyKey = "cloud-print-stable-0001",
-            stationId = "33333333-3333-4333-8333-333333333333",
+            stationId = documentType == "kds_ticket" ? "33333333-3333-4333-8333-333333333333" : null,
             stationName = "Cozinha",
             printerId = "kitchen",
-            documentType = "kds_ticket",
+            documentType,
             copies = 1,
             payload = new { reference = "101", items = Array.Empty<object>() },
         }, new JsonSerializerOptions(JsonSerializerDefaults.Web));

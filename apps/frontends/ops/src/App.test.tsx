@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { Session } from "./app/types";
 import { OperationalApp, resolveInitialOperationalRoute } from "./features/shell/OperationalApp";
@@ -33,30 +33,24 @@ describe("experiência operacional", () => {
     expect(html).not.toContain("dados operacionais");
   });
 
-  it("organiza a navegação por operação, atendimento, gestão, financeiro e administração", () => {
+  it("agrupa os módulos sem esconder atendimento em um segundo nível e preserva permissões", () => {
     const ownerHtml = renderToStaticMarkup(
       <OperationalApp onLogout={() => {}} session={operationalSession("owner")} />,
     );
-    const atendimentoStart = ownerHtml.indexOf(">Atendimento<");
-    const atendimentoEnd = ownerHtml.indexOf("</details>", atendimentoStart);
-    const atendimentoHtml = ownerHtml.slice(atendimentoStart, atendimentoEnd);
-    expect(atendimentoStart).toBeGreaterThan(-1);
-    expect(atendimentoEnd).toBeGreaterThan(atendimentoStart);
     expect(ownerHtml).not.toContain("Central Operacional");
-    expect(atendimentoHtml).toContain('href="#/reservations"');
-    expect(atendimentoHtml).toContain("Recepção e espera");
-    expect(ownerHtml).toContain('href="#/salon"');
-    expect(atendimentoHtml).toContain("Mesas e comandas");
-    expect(atendimentoHtml).toContain('href="#/counter"');
-    expect(atendimentoHtml).toContain("Balcão e retirada");
-    expect(atendimentoHtml).toContain('href="#/delivery"');
-    expect(atendimentoHtml).toContain("Entregas");
-    expect(atendimentoHtml).not.toContain('href="#/cash"');
-
     const operacaoHtml = ownerHtml.slice(
       ownerHtml.indexOf(">Operação<"),
       ownerHtml.indexOf(">Gestão<"),
     );
+    expect(operacaoHtml).not.toContain('class="nav-section"');
+    expect(operacaoHtml).toContain('href="#/reservations"');
+    expect(operacaoHtml).toContain("Recepção e espera");
+    expect(operacaoHtml).toContain('href="#/salon"');
+    expect(operacaoHtml).toContain("Mesas e comandas");
+    expect(operacaoHtml).toContain('href="#/counter"');
+    expect(operacaoHtml).toContain("Balcão e retirada");
+    expect(operacaoHtml).toContain('href="#/delivery"');
+    expect(operacaoHtml).toContain("Entregas");
     expect(operacaoHtml).toContain('href="#/cash"');
     expect(operacaoHtml).toContain("Contas e caixa");
     expect(ownerHtml).toContain('href="#/table-qrs"');
@@ -84,6 +78,25 @@ describe("experiência operacional", () => {
     expect(cashierHtml).not.toContain('href="#/reservations"');
     expect(cashierHtml).toContain('href="#/cash"');
     expect(cashierHtml).not.toContain('href="#/table-qrs"');
+  });
+
+  it("mantém destinos de todos os grupos acessíveis no menu recolhido", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => (key === "giromesa_sidebar_collapsed" ? "true" : null),
+      setItem: vi.fn(),
+    });
+    try {
+      const html = renderToStaticMarkup(
+        <OperationalApp onLogout={() => {}} session={operationalSession("owner")} />,
+      );
+      const groups = [...html.matchAll(/<details class="nav-group"[^>]*>/g)];
+      expect(groups).toHaveLength(4);
+      expect(groups.every(([tag]) => tag.includes('open=""'))).toBe(true);
+      expect(html).toContain('title="Configurações"');
+      expect(html).toContain('title="Relatórios"');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("restaura somente a última rota permitida quando não há hash explícito", () => {

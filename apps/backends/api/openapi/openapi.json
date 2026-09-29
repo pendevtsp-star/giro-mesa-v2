@@ -17674,6 +17674,10 @@
                         "type": "string",
                         "maxLength": 120
                       },
+                      "reference": {
+                        "type": "string",
+                        "maxLength": 160
+                      },
                       "neighborhood": {
                         "type": "string",
                         "minLength": 2,
@@ -17871,6 +17875,10 @@
                       "complement": {
                         "type": "string",
                         "maxLength": 120
+                      },
+                      "reference": {
+                        "type": "string",
+                        "maxLength": 160
                       },
                       "neighborhood": {
                         "type": "string",
@@ -34249,6 +34257,18 @@
                     "minimum": 1,
                     "maximum": 9007199254740991
                   },
+                  "customerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "label": {
                     "anyOf": [
                       {
@@ -34309,6 +34329,86 @@
                       {
                         "type": "string",
                         "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryAddressDetails": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryZoneId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       {
                         "type": "null"
@@ -34440,6 +34540,18 @@
                     "minimum": 1,
                     "maximum": 9007199254740991
                   },
+                  "customerId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "label": {
                     "anyOf": [
                       {
@@ -34500,6 +34612,86 @@
                       {
                         "type": "string",
                         "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryAddressDetails": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryZoneId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                       },
                       {
                         "type": "null"
@@ -34850,6 +35042,86 @@
                     "type": "string",
                     "maxLength": 1000
                   },
+                  "deliveryAddressDetails": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryZoneId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "promisedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -34967,6 +35239,86 @@
                   "deliveryAddress": {
                     "type": "string",
                     "maxLength": 1000
+                  },
+                  "deliveryAddressDetails": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "deliveryZoneId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "promisedAt": {
                     "type": "string",
@@ -40282,9 +40634,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -40364,42 +40723,49 @@
                       ]
                     },
                     "action": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "reverse",
-                            "recover"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "reverse",
+                                "recover"
+                              ]
+                            },
+                            "reversalId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "paymentAttemptId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "rede",
+                                "paygo",
+                                "stone",
+                                "getnet",
+                                "cielo",
+                                "pagbank"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "reversalId",
+                            "paymentAttemptId",
+                            "provider"
                           ]
                         },
-                        "reversalId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "paymentAttemptId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "provider": {
-                          "type": "string",
-                          "enum": [
-                            "rede",
-                            "paygo",
-                            "stone",
-                            "getnet",
-                            "cielo",
-                            "pagbank"
-                          ]
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "type",
-                        "reversalId",
-                        "paymentAttemptId",
-                        "provider"
                       ]
                     },
                     "idempotentReplay": {
@@ -40500,9 +40866,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -40582,42 +40955,49 @@
                       ]
                     },
                     "action": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "reverse",
-                            "recover"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "reverse",
+                                "recover"
+                              ]
+                            },
+                            "reversalId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "paymentAttemptId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "rede",
+                                "paygo",
+                                "stone",
+                                "getnet",
+                                "cielo",
+                                "pagbank"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "reversalId",
+                            "paymentAttemptId",
+                            "provider"
                           ]
                         },
-                        "reversalId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "paymentAttemptId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "provider": {
-                          "type": "string",
-                          "enum": [
-                            "rede",
-                            "paygo",
-                            "stone",
-                            "getnet",
-                            "cielo",
-                            "pagbank"
-                          ]
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "type",
-                        "reversalId",
-                        "paymentAttemptId",
-                        "provider"
                       ]
                     },
                     "idempotentReplay": {
@@ -40719,6 +41099,12 @@
                     "maximum": 2147483647,
                     "minimum": 0
                   },
+                  "receivedCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
                   "reference": {
                     "type": "string",
                     "maxLength": 120
@@ -40807,6 +41193,12 @@
                     ]
                   },
                   "amountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "receivedCents": {
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 2147483647,
@@ -40917,7 +41309,8 @@
                     "enum": [
                       "partial_statement",
                       "payment_statement",
-                      "final_receipt"
+                      "final_receipt",
+                      "delivery_slip"
                     ]
                   },
                   "serviceCallId": {
@@ -41018,7 +41411,8 @@
                     "enum": [
                       "partial_statement",
                       "payment_statement",
-                      "final_receipt"
+                      "final_receipt",
+                      "delivery_slip"
                     ]
                   },
                   "serviceCallId": {
@@ -42242,7 +42636,8 @@
                     "type": "string",
                     "enum": [
                       "discount",
-                      "cancel"
+                      "cancel",
+                      "tab_discount"
                     ]
                   },
                   "discountCents": {
@@ -42257,7 +42652,6 @@
                   }
                 },
                 "required": [
-                  "itemId",
                   "action",
                   "reason"
                 ]
@@ -42328,7 +42722,8 @@
                     "type": "string",
                     "enum": [
                       "discount",
-                      "cancel"
+                      "cancel",
+                      "tab_discount"
                     ]
                   },
                   "discountCents": {
@@ -42343,7 +42738,6 @@
                   }
                 },
                 "required": [
-                  "itemId",
                   "action",
                   "reason"
                 ]
@@ -44839,6 +45233,194 @@
                 "required": [
                   "tipCents"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/discount": {
+      "post": {
+        "operationId": "PilotPosController_discountTab[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tabId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "approval": {
+                    "type": "object",
+                    "properties": {
+                      "approverMembershipId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{4,8}$"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "approverMembershipId",
+                      "pin",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "discountCents",
+                  "approval"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/discount": {
+      "post": {
+        "operationId": "PilotPosController_discountTab[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tabId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "idempotency-key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PilotPos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "discountCents": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 2147483647,
+                    "minimum": 0
+                  },
+                  "approval": {
+                    "type": "object",
+                    "properties": {
+                      "approverMembershipId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "pin": {
+                        "type": "string",
+                        "pattern": "^\\d{4,8}$"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 500
+                      }
+                    },
+                    "required": [
+                      "approverMembershipId",
+                      "pin",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "discountCents",
+                  "approval"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -70302,9 +70884,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -70384,42 +70973,49 @@
                       ]
                     },
                     "action": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "reverse",
-                            "recover"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "reverse",
+                                "recover"
+                              ]
+                            },
+                            "reversalId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "paymentAttemptId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "rede",
+                                "paygo",
+                                "stone",
+                                "getnet",
+                                "cielo",
+                                "pagbank"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "reversalId",
+                            "paymentAttemptId",
+                            "provider"
                           ]
                         },
-                        "reversalId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "paymentAttemptId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "provider": {
-                          "type": "string",
-                          "enum": [
-                            "rede",
-                            "paygo",
-                            "stone",
-                            "getnet",
-                            "cielo",
-                            "pagbank"
-                          ]
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "type",
-                        "reversalId",
-                        "paymentAttemptId",
-                        "provider"
                       ]
                     },
                     "idempotentReplay": {
@@ -70475,9 +71071,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -70557,42 +71160,49 @@
                       ]
                     },
                     "action": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "reverse",
-                            "recover"
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "reverse",
+                                "recover"
+                              ]
+                            },
+                            "reversalId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "paymentAttemptId": {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            "provider": {
+                              "type": "string",
+                              "enum": [
+                                "rede",
+                                "paygo",
+                                "stone",
+                                "getnet",
+                                "cielo",
+                                "pagbank"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "reversalId",
+                            "paymentAttemptId",
+                            "provider"
                           ]
                         },
-                        "reversalId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "paymentAttemptId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        },
-                        "provider": {
-                          "type": "string",
-                          "enum": [
-                            "rede",
-                            "paygo",
-                            "stone",
-                            "getnet",
-                            "cielo",
-                            "pagbank"
-                          ]
+                        {
+                          "type": "null"
                         }
-                      },
-                      "required": [
-                        "type",
-                        "reversalId",
-                        "paymentAttemptId",
-                        "provider"
                       ]
                     },
                     "idempotentReplay": {
@@ -70648,9 +71258,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -70839,9 +71456,16 @@
                           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                         },
                         "installationId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         "amountCents": {
                           "type": "integer",
@@ -72250,7 +72874,8 @@
                                 "partial_statement",
                                 "payment_statement",
                                 "final_receipt",
-                                "kds_ticket"
+                                "kds_ticket",
+                                "delivery_slip"
                               ]
                             }
                           },
@@ -72553,7 +73178,8 @@
                         "partial_statement",
                         "payment_statement",
                         "final_receipt",
-                        "kds_ticket"
+                        "kds_ticket",
+                        "delivery_slip"
                       ]
                     }
                   },
@@ -72669,7 +73295,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -72933,7 +73560,8 @@
                                 "partial_statement",
                                 "payment_statement",
                                 "final_receipt",
-                                "kds_ticket"
+                                "kds_ticket",
+                                "delivery_slip"
                               ]
                             }
                           },
@@ -73236,7 +73864,8 @@
                         "partial_statement",
                         "payment_statement",
                         "final_receipt",
-                        "kds_ticket"
+                        "kds_ticket",
+                        "delivery_slip"
                       ]
                     }
                   },
@@ -73352,7 +73981,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -73573,6 +74203,21 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 9007199254740991
+                        },
+                        "deliveryAutoPrint": {
+                          "type": "boolean"
+                        },
+                        "deliveryPrinterId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -73654,6 +74299,21 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "deliveryAutoPrint": {
+                    "type": "boolean"
+                  },
+                  "deliveryPrinterId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -73701,6 +74361,21 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 9007199254740991
+                        },
+                        "deliveryAutoPrint": {
+                          "type": "boolean"
+                        },
+                        "deliveryPrinterId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -73780,6 +74455,21 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 9007199254740991
+                        },
+                        "deliveryAutoPrint": {
+                          "type": "boolean"
+                        },
+                        "deliveryPrinterId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -73861,6 +74551,21 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "deliveryAutoPrint": {
+                    "type": "boolean"
+                  },
+                  "deliveryPrinterId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
                 "required": [
@@ -73908,6 +74613,21 @@
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 9007199254740991
+                        },
+                        "deliveryAutoPrint": {
+                          "type": "boolean"
+                        },
+                        "deliveryPrinterId": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uuid",
+                              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -74410,7 +75130,8 @@
                         "partial_statement",
                         "payment_statement",
                         "final_receipt",
-                        "kds_ticket"
+                        "kds_ticket",
+                        "delivery_slip"
                       ]
                     }
                   },
@@ -74533,7 +75254,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -74831,7 +75553,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -75105,7 +75828,8 @@
                         "partial_statement",
                         "payment_statement",
                         "final_receipt",
-                        "kds_ticket"
+                        "kds_ticket",
+                        "delivery_slip"
                       ]
                     }
                   },
@@ -75228,7 +75952,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -75526,7 +76251,8 @@
                               "partial_statement",
                               "payment_statement",
                               "final_receipt",
-                              "kds_ticket"
+                              "kds_ticket",
+                              "delivery_slip"
                             ]
                           }
                         },
@@ -76787,7 +77513,8 @@
                             "partial_statement",
                             "payment_statement",
                             "final_receipt",
-                            "kds_ticket"
+                            "kds_ticket",
+                            "delivery_slip"
                           ]
                         },
                         "status": {
@@ -77144,7 +77871,8 @@
                             "partial_statement",
                             "payment_statement",
                             "final_receipt",
-                            "kds_ticket"
+                            "kds_ticket",
+                            "delivery_slip"
                           ]
                         },
                         "status": {
@@ -77499,7 +78227,8 @@
                             "partial_statement",
                             "payment_statement",
                             "final_receipt",
-                            "kds_ticket"
+                            "kds_ticket",
+                            "delivery_slip"
                           ]
                         },
                         "status": {
@@ -77854,7 +78583,8 @@
                             "partial_statement",
                             "payment_statement",
                             "final_receipt",
-                            "kds_ticket"
+                            "kds_ticket",
+                            "delivery_slip"
                           ]
                         },
                         "status": {
@@ -113549,6 +114279,562 @@
         ]
       }
     },
+    "/api/v1/organizations/{organizationId}/growth/operational-customers": {
+      "get": {
+        "operationId": "GrowthController_listOperationalCustomers[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ]
+      },
+      "post": {
+        "operationId": "GrowthController_createOperationalCustomer[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "name",
+                  "idempotencyKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/operational-customers": {
+      "get": {
+        "operationId": "GrowthController_listOperationalCustomers[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ]
+      },
+      "post": {
+        "operationId": "GrowthController_createOperationalCustomer[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 160
+                  },
+                  "phone": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 180
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "name",
+                  "idempotencyKey"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{organizationId}/growth/operational-customers/{customerId}": {
+      "patch": {
+        "operationId": "GrowthController_updateOperationalCustomer[0]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "defaultDeliveryAddress"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organizationId}/growth/operational-customers/{customerId}": {
+      "patch": {
+        "operationId": "GrowthController_updateOperationalCustomer[1]",
+        "parameters": [
+          {
+            "name": "organizationId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Growth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "unitId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "unitId",
+                  "defaultDeliveryAddress"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/organizations/{organizationId}/growth/customers": {
       "get": {
         "operationId": "GrowthController_listCustomers[0]",
@@ -113634,6 +114920,74 @@
                         "type": "string",
                         "minLength": 8,
                         "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -113767,6 +115121,74 @@
                         "type": "string",
                         "minLength": 8,
                         "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -113968,6 +115390,74 @@
                       }
                     ]
                   },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "birthDate": {
                     "anyOf": [
                       {
@@ -114108,6 +115598,74 @@
                         "type": "string",
                         "minLength": 8,
                         "maxLength": 40
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "defaultDeliveryAddress": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "street": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 160
+                          },
+                          "number": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 30
+                          },
+                          "complement": {
+                            "type": "string",
+                            "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
+                          },
+                          "neighborhood": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "city": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 120
+                          },
+                          "state": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 2
+                          },
+                          "postalCode": {
+                            "type": "string",
+                            "pattern": "^\\d{5}-?\\d{3}$"
+                          },
+                          "latitude": {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          },
+                          "longitude": {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          }
+                        },
+                        "required": [
+                          "street",
+                          "number",
+                          "neighborhood",
+                          "city",
+                          "state",
+                          "postalCode"
+                        ],
+                        "additionalProperties": false
                       },
                       {
                         "type": "null"
@@ -118453,6 +120011,10 @@
                     "type": "string",
                     "maxLength": 120
                   },
+                  "reference": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
                   "neighborhood": {
                     "type": "string",
                     "minLength": 2,
@@ -118547,6 +120109,10 @@
                   "complement": {
                     "type": "string",
                     "maxLength": 120
+                  },
+                  "reference": {
+                    "type": "string",
+                    "maxLength": 160
                   },
                   "neighborhood": {
                     "type": "string",
@@ -119149,6 +120715,15 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "name": "orderRef",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -119249,6 +120824,15 @@
               ],
               "type": "string"
             }
+          },
+          {
+            "name": "orderRef",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -119348,6 +120932,10 @@
                           "complement": {
                             "type": "string",
                             "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
                           },
                           "neighborhood": {
                             "type": "string",
@@ -119523,6 +121111,10 @@
                           "complement": {
                             "type": "string",
                             "maxLength": 120
+                          },
+                          "reference": {
+                            "type": "string",
+                            "maxLength": 160
                           },
                           "neighborhood": {
                             "type": "string",

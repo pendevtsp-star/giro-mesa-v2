@@ -596,6 +596,34 @@
       "when": 1789660800000,
       "tag": "0084_inventory_resale_before_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1789750800000,
+      "tag": "0085_customer_delivery_address",
+      "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1789750800001,
+      "tag": "0086_pos_delivery_financial_print",
+      "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1789750800002,
+      "tag": "0087_manual_payment_reversal",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1789750800003,
+      "tag": "0088_cash_payment_exchange",
+      "breakpoints": true
     }
   ]
 }

@@ -295,12 +295,7 @@ export function CatalogPromotionsModal({
       : 0;
 
   return (
-    <Modal
-      isOpen={open}
-      onClose={onClose}
-      title="Gestão de Combos & Promoções de Horário"
-      size="lg"
-    >
+    <Modal isOpen={open} onClose={onClose} title="Combos e promoções" size="lg">
       <div className="catalog-stack catalog-stack--16">
         <div style={tabsStyle}>
           <Button
@@ -309,7 +304,7 @@ export function CatalogPromotionsModal({
             onClick={() => setTab("combos")}
             style={tabStyle(tab === "combos")}
           >
-            Combos Especiais ({catalog.combos.length})
+            Combos especiais ({catalog.combos.length})
           </Button>
           <Button
             type="button"
@@ -324,33 +319,39 @@ export function CatalogPromotionsModal({
         {tab === "combos" ? (
           <div className="catalog-stack catalog-stack--14" role="tabpanel">
             <div style={panelStyle}>
-              <strong style={fieldTitleStyle}>+ Criar Novo Combo Inteligente</strong>
+              <strong style={fieldTitleStyle}>Novo combo</strong>
               <div className="catalog-combo-form-grid">
-                <Input
-                  placeholder="Nome do Combo (Ex: Combo Casal, Burger + Refri...)"
-                  aria-label="Nome do combo"
-                  value={comboName}
-                  onChange={(event) => setComboName(event.target.value)}
-                  className="catalog-control-36"
-                />
-                <Input
-                  placeholder="Preço Promocional do Combo (R$)"
-                  aria-label="Preço promocional do combo"
-                  inputMode="decimal"
-                  data-currency="brl"
-                  value={comboPrice}
-                  onChange={(event) => setComboPrice(event.target.value)}
-                  className="catalog-control-36"
-                />
+                <Label className="gm-field catalog-field--compact">
+                  Nome
+                  <Input
+                    placeholder="Ex.: Combo casal"
+                    value={comboName}
+                    onChange={(event) => setComboName(event.target.value)}
+                    className="catalog-control-36"
+                  />
+                </Label>
+                <Label className="gm-field catalog-field--compact">
+                  Preço promocional (R$)
+                  <Input
+                    placeholder="0,00"
+                    inputMode="decimal"
+                    data-currency="brl"
+                    value={comboPrice}
+                    onChange={(event) => setComboPrice(event.target.value)}
+                    className="catalog-control-36"
+                  />
+                </Label>
               </div>
-              <Input
-                placeholder="Descrição do combo (Ex: 1 Hambúrguer + 1 Batata + 1 Bebida com 20% de economia)"
-                aria-label="Descrição do combo"
-                value={comboDescription}
-                onChange={(event) => setComboDescription(event.target.value)}
-                className="catalog-control-36"
-                style={{ width: "100%", marginBottom: 10 }}
-              />
+              <Label className="gm-field catalog-field--compact">
+                Descrição
+                <Input
+                  placeholder="Itens incluídos e informação útil para a venda"
+                  value={comboDescription}
+                  onChange={(event) => setComboDescription(event.target.value)}
+                  className="catalog-control-36"
+                  style={{ width: "100%", marginBottom: 10 }}
+                />
+              </Label>
 
               <div>
                 <span style={fieldTitleStyle}>Selecione os Produtos Inclusos no Combo:</span>
@@ -421,7 +422,7 @@ export function CatalogPromotionsModal({
                     onClick={() => void createCombo()}
                   >
                     <Icon name="check" size={13} />
-                    <span>{busy === "combo" ? "Salvando…" : "Salvar Combo"}</span>
+                    <span>{busy === "combo" ? "Salvando…" : "Salvar combo"}</span>
                   </Button>
                 </div>
               )}
@@ -491,7 +492,7 @@ export function CatalogPromotionsModal({
                 + Criar Nova Campanha de Happy Hour / Promoção Programada
               </strong>
               <div className="catalog-grid-main">
-                <Label className="catalog-field catalog-field--compact">
+                <Label className="gm-field items-stretch catalog-field--compact">
                   Nome da Campanha *
                   <Input
                     placeholder="Ex: Happy Hour Chopp & Petiscos..."
@@ -500,7 +501,7 @@ export function CatalogPromotionsModal({
                     className="catalog-control-36"
                   />
                 </Label>
-                <Label className="catalog-field catalog-field--compact">
+                <Label className="gm-field items-stretch catalog-field--compact">
                   Tipo de Desconto
                   <NativeSelect
                     value={promotionType}
@@ -513,7 +514,7 @@ export function CatalogPromotionsModal({
                     <option value="fixed_price">Preço Fixo Promocional (R$)</option>
                   </NativeSelect>
                 </Label>
-                <Label className="catalog-field catalog-field--compact">
+                <Label className="gm-field items-stretch catalog-field--compact">
                   {promotionType === "percentage"
                     ? "% de desconto *"
                     : "Preço promocional final (R$) *"}
@@ -553,7 +554,7 @@ export function CatalogPromotionsModal({
               </div>
 
               <div className="catalog-grid-main" style={{ alignItems: "flex-end" }}>
-                <Label className="catalog-field catalog-field--compact">
+                <Label className="gm-field items-stretch catalog-field--compact">
                   Horário de Início
                   <Input
                     type="time"
@@ -562,7 +563,7 @@ export function CatalogPromotionsModal({
                     className="catalog-control-36"
                   />
                 </Label>
-                <Label className="catalog-field catalog-field--compact">
+                <Label className="gm-field items-stretch catalog-field--compact">
                   Horário de Fim
                   <Input
                     type="time"
@@ -571,7 +572,7 @@ export function CatalogPromotionsModal({
                     className="catalog-control-36"
                   />
                 </Label>
-                <div className="catalog-inline-center-10" style={{ height: 36 }}>
+                <div className="gm-toolbar">
                   <Label className="catalog-clickable-row">
                     <input
                       className="accent-primary"
@@ -795,7 +796,7 @@ export function CatalogPromotionsModal({
         )}
 
         <div className="catalog-actions-end">
-          <Button variant="primary" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             Fechar
           </Button>
         </div>

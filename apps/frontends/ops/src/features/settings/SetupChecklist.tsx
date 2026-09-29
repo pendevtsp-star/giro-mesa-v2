@@ -285,7 +285,7 @@ export function SetupChecklist({
             Registre somente um teste realmente executado. A configuração automática continua
             aparecendo separadamente.
           </p>
-          <Label>
+          <Label className="gm-field items-stretch">
             Resultado
             <NativeSelect
               onChange={(event) => setCheckResult(event.target.value as "passed" | "failed")}
@@ -295,7 +295,7 @@ export function SetupChecklist({
               <option value="failed">Falhou no teste</option>
             </NativeSelect>
           </Label>
-          <Label>
+          <Label className="gm-field items-stretch">
             Protocolo ou referência da evidência
             <Input
               minLength={10}
@@ -304,7 +304,7 @@ export function SetupChecklist({
               value={evidenceReference}
             />
           </Label>
-          <Label>
+          <Label className="gm-field items-stretch">
             O que foi testado e próximo passo
             <Textarea
               minLength={10}

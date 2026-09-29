@@ -1,0 +1,35 @@
+.delivery-address-fields {
+  container: delivery-address / inline-size;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.delivery-address-fields__row {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+
+.delivery-address-fields .gm-form-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+@container delivery-address (min-width: 440px) {
+  .delivery-address-fields__row {
+    grid-template-columns: 120px minmax(0, 1fr);
+  }
+}
+
+@container delivery-address (min-width: 720px) {
+  .delivery-address-fields__row--1 {
+    grid-template-columns: 120px minmax(0, 2fr) 96px minmax(0, 1fr);
+  }
+
+  .delivery-address-fields__row--2 {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 76px minmax(0, 1.5fr);
+  }
+}

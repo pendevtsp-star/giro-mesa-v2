@@ -203,7 +203,9 @@ async function mockCatalogInventory(page: Page) {
 async function openCatalog(page: Page) {
   await page.goto("/#/catalog");
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { name: "Cardápio operacional" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Cardápio", level: 1, exact: true }),
+  ).toBeVisible();
 }
 
 test("ficha opcional salva, recupera e desativa com confirmação e retry em 375 px", async ({
@@ -217,7 +219,7 @@ test("ficha opcional salva, recupera e desativa com confirmação e retry em 375
   await expect(dish).toContainText("Ficha técnica opcional");
   await expect(dish.getByRole("button", { name: "Pausar", exact: true })).toBeVisible();
   await dish.getByRole("button", { name: "Editar Produto & Histórico" }).click();
-  const dialog = page.getByRole("dialog", { name: "Editar Item: Prato do dia" });
+  const dialog = page.getByRole("dialog", { name: "Editar produto: Prato do dia" });
   await dialog.locator("summary").filter({ hasText: "Estoque e ficha técnica · opcional" }).click();
   await expect(
     dialog.getByText(
@@ -258,7 +260,9 @@ test("ficha opcional salva, recupera e desativa com confirmação e retry em 375
   await recipe.screenshot({ path: testInfo.outputPath("optional-recipe-375-dark.png") });
   await page.keyboard.press("Escape");
   await page.reload();
-  await expect(page.getByRole("heading", { name: "Cardápio operacional" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Cardápio", level: 1, exact: true }),
+  ).toBeVisible();
   await page
     .locator(".catalog-product-card")
     .filter({ hasText: "Prato do dia" })
@@ -304,7 +308,7 @@ test("revenda separa saldo físico, saldo disponível e limite diário em 385 px
   await expect(beer).not.toContainText("48 un em estoque");
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(385);
   await beer.getByRole("button", { name: "Editar Produto & Histórico" }).click();
-  const dialog = page.getByRole("dialog", { name: "Editar Item: Cerveja" });
+  const dialog = page.getByRole("dialog", { name: "Editar produto: Cerveja" });
   await dialog.locator("summary").filter({ hasText: "Estoque e ficha técnica · opcional" }).click();
   await expect(dialog.getByText(/Vinculado a/)).toContainText("Cerveja 600 ml");
   await expect(dialog.getByText(/Custo médio do estoque/)).toContainText(/6,00/);

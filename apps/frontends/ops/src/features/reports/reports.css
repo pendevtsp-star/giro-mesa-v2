@@ -251,15 +251,16 @@
     background: var(--gm-surface-soft);
     border: 1px solid var(--gm-border);
     border-radius: var(--gm-radius-sm);
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--gm-space-3);
-    grid-template-columns: minmax(15rem, 1fr) auto;
     padding: var(--gm-space-3);
   }
 
   .reports-result-toolbar__context {
     align-items: center;
     display: grid;
+    flex: 1 1 24rem;
     gap: var(--gm-space-2);
     grid-template-columns: minmax(0, 1fr) auto;
     min-width: 0;
@@ -280,7 +281,7 @@
   .reports-result-toolbar__actions {
     align-items: center;
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: var(--gm-space-2);
     justify-content: flex-end;
     min-width: 0;
@@ -297,6 +298,7 @@
   .reports-secondary-actions {
     align-items: center;
     display: flex;
+    flex-wrap: wrap;
     gap: var(--gm-space-2);
   }
 
@@ -639,6 +641,7 @@
   @media (max-width: 1180px) {
     .reports-result-toolbar {
       align-items: stretch;
+      display: grid;
       grid-template-columns: minmax(0, 1fr);
     }
 

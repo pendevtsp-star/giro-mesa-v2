@@ -1,5 +1,5 @@
 import { Button, Icon, type IconName } from "@giromesa/ui";
-import type { ChangeEvent } from "react";
+import { type ChangeEvent, useEffect, useRef } from "react";
 
 export type CatalogLanguage = "pt" | "en" | "es";
 
@@ -17,6 +17,7 @@ type CatalogManagementHeaderProps = {
   brandingHref: string;
   onOpenBulkAdjustment: () => void;
   onOpenNewProduct: () => void;
+  onOpenSetup: () => void;
   onOpenCustomerPreview: () => void;
   onOpenLabels: () => void;
   onOpenMatrix: () => void;
@@ -73,6 +74,7 @@ export function CatalogManagementHeader({
   onLanguageChange,
   onOpenBulkAdjustment,
   onOpenNewProduct,
+  onOpenSetup,
   onOpenCustomerPreview,
   onOpenLabels,
   onOpenMatrix,
@@ -84,6 +86,29 @@ export function CatalogManagementHeader({
   production,
   tableQrHref,
 }: CatalogManagementHeaderProps) {
+  const moreMenuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      const menu = moreMenuRef.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      const menu = moreMenuRef.current;
+      if (event.key !== "Escape" || !menu?.open || !menu.contains(document.activeElement)) return;
+      menu.open = false;
+      menu.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, []);
+
   const headerActions: HeaderAction[] = [
     {
       icon: "salon",
@@ -91,6 +116,11 @@ export function CatalogManagementHeader({
       onClick: onOpenCustomerPreview,
       title: "Abrir a versão do cardápio que o cliente verá",
     },
+  ];
+
+  const actions = headerActions;
+
+  const secondaryActions: Array<HeaderAction | HeaderLink> = [
     {
       icon: "list",
       label: `Adicionais e opções (${groupCount})`,
@@ -103,11 +133,6 @@ export function CatalogManagementHeader({
       onClick: onOpenPromotions,
       title: "Gerenciar combos especiais e promoções de Happy Hour",
     },
-  ];
-
-  const actions = headerActions;
-
-  const secondaryActions: Array<HeaderAction | HeaderLink> = [
     {
       icon: "finance",
       label: "Desempenho dos produtos",
@@ -161,14 +186,14 @@ export function CatalogManagementHeader({
   return (
     <header className="catalog-management-header">
       <div className="catalog-management-header__summary">
-        <h2>Cardápio da operação</h2>
+        <h1>Cardápio</h1>
         <p>
           <strong>{availableProductCount} disponíveis</strong> ·{" "}
           {productCount - availableProductCount} pausados · {categoryCount} categorias
         </p>
       </div>
 
-      <fieldset className="gm-toolbar gm-toolbar--scroll catalog-management-header__actions">
+      <fieldset className="gm-toolbar catalog-management-header__actions">
         <legend className="gm-sr-only">Ações do cardápio</legend>
         <Button
           className="catalog-management-header__action"
@@ -184,15 +209,24 @@ export function CatalogManagementHeader({
           <Icon name="plus" size={14} />
           <span>Novo produto</span>
         </Button>
+        <Button
+          aria-haspopup="dialog"
+          className="catalog-management-header__action"
+          onClick={onOpenSetup}
+          size="sm"
+          variant="secondary"
+        >
+          <Icon name="list" size={14} />
+          <span>Estrutura e cadastros</span>
+        </Button>
         {actions.map((action) => (
           <HeaderActionButton key={action.label} {...action} />
         ))}
 
-        <details className="catalog-management-header__more">
+        <details className="catalog-management-header__more" ref={moreMenuRef}>
           <summary>
             <Icon name="settings" size={14} />
             <span>Mais ações</span>
-            <small>{secondaryActions.length + 2}</small>
           </summary>
           <div className="gm-toolbar catalog-management-header__more-actions">
             <label

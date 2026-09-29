@@ -1,0 +1,56 @@
+.attendance-action-form,
+.attendance-action-form__fields {
+  display: grid;
+  gap: var(--gm-space-3);
+  min-width: 0;
+}
+
+.attendance-action-form__fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.attendance-action-form__intro,
+.attendance-action-form__summary p {
+  margin: 0;
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+}
+
+.attendance-action-form label {
+  display: grid;
+  gap: var(--gm-space-1);
+  min-width: 0;
+}
+
+.attendance-action-form__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--gm-space-3);
+  padding: var(--gm-space-3);
+  background: var(--gm-surface-soft);
+  border: 1px solid var(--gm-border);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+.attendance-action-form__summary > div {
+  display: grid;
+  gap: var(--gm-space-1);
+}
+
+.attendance-action-form__summary span {
+  color: var(--gm-muted);
+  font-size: var(--gm-font-sm);
+}
+
+.attendance-action-form__summary p {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 480px) {
+  .attendance-action-form__summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

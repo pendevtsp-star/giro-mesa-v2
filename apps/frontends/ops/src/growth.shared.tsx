@@ -149,6 +149,7 @@ export interface DeliveryCourier {
 }
 
 export interface DeliveryAddress {
+  reference?: string;
   street?: string;
   number?: string;
   complement?: string;
@@ -183,10 +184,11 @@ function optionalNumber(value: unknown): number | undefined {
   return value === null || value === undefined ? undefined : number(value);
 }
 
-function address(value: unknown): DeliveryAddress | null {
+export function parseDeliveryAddress(value: unknown): DeliveryAddress | null {
   if (value === null || value === undefined) return null;
   const row = record(value);
   return {
+    reference: optionalText(row.reference) ?? undefined,
     street: optionalText(row.street) ?? undefined,
     number: optionalText(row.number) ?? undefined,
     complement: optionalText(row.complement) ?? undefined,
@@ -259,7 +261,7 @@ export function parseDeliveryOrders(value: unknown): DeliveryOrder[] {
       totalCents: number(row.totalCents),
       paymentMethod: text(row.paymentMethod),
       paymentStatus: text(row.paymentStatus),
-      address: address(row.address),
+      address: parseDeliveryAddress(row.address),
       addressValidationStatus: addressValidationStatus as DeliveryAddressValidationStatus,
       scheduledFor: optionalText(row.scheduledFor),
       promisedAt: optionalText(row.promisedAt),

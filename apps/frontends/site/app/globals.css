@@ -4,6 +4,9 @@
 @import "../styles/footer.css" layer(legacy);
 @import "../styles/inner-pages.css" layer(legacy);
 @import "../styles/responsive.css" layer(legacy);
+@import "../styles/landing-sections.css" layer(legacy);
+@import "../styles/hero.css" layer(legacy);
+@import "../styles/contact.css" layer(legacy);
 
 /* The site's container owns its gutters; Tailwind's utility otherwise
    overrides the legacy layer and stretches mobile content to the edges. */
@@ -16,23 +19,55 @@
   max-width: 800px;
 }
 
-/* The shared Label primitive is inline-flex by default. Public auth forms
+.container.security-page {
+  max-width: 900px;
+}
+
+/* The shared Label primitive is inline-flex by default. Public site forms
    need stacked labels so the control keeps its full width. */
-.auth-form > label[data-slot="label"]:not(.check-label) {
+.auth-form > label[data-slot="label"]:not(.check-label),
+.lead-form label[data-slot="label"]:not(.check-label) {
   display: grid;
   align-items: stretch;
   gap: 7px;
   width: 100%;
+  min-width: 0;
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
   line-height: 1.2;
 }
 
-.auth-form > label.check-label[data-slot="label"] {
+.auth-form label.check-label[data-slot="label"],
+.auth-box > label.check-label[data-slot="label"],
+.lead-form > label.check-label[data-slot="label"],
+.auth-box label.check-label[data-slot="label"] {
   align-items: flex-start;
   display: flex;
   gap: 9px;
   font-size: 13px;
   line-height: 1.3;
+}
+
+.lead-form > label.check-label[data-slot="label"] {
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--gm-muted);
+}
+
+.lead-form input:not([type="checkbox"]),
+.lead-form select,
+.lead-form textarea,
+.auth-form input:not([type="checkbox"]) {
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.auth-box label.check-label[data-slot="label"] input {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-top: 3px;
 }

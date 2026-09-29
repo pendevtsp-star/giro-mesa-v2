@@ -11,6 +11,7 @@ using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Integrations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Loyalty;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Multiunit;
+using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.OperationalCustomers;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Segments;
 using GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units;
@@ -85,6 +86,11 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Multiunit.MultiunitRequestBuilder Multiunit
         {
             get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Multiunit.MultiunitRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The operationalCustomers property</summary>
+        public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.OperationalCustomers.OperationalCustomersRequestBuilder OperationalCustomers
+        {
+            get => new global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.OperationalCustomers.OperationalCustomersRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The reservations property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Reservations.ReservationsRequestBuilder Reservations

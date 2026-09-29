@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 import {
+  growthCustomers,
   identities,
   managementInventoryItems,
   managementPeople,
@@ -28,6 +29,7 @@ import {
   posProductPrices,
   posProductStations,
   posProducts,
+  posShiftSectionStaff,
   posTabs,
   roleBindings,
   units,
@@ -2500,6 +2502,21 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       (section) => section.name === "Praça varanda atualizada",
     );
     assert.ok(shiftSection && targetShiftSection);
+    const primaryWaiterFloor = await pos.listFloor(supportIdentity.id, organizationA.id, unitA.id);
+    assert.equal(
+      primaryWaiterFloor.tables.find((candidate) => candidate.id === varandaTable.id)?.accessLevel,
+      "operate",
+    );
+    const unassignedWaiterFloor = await pos.listFloor(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+    );
+    assert.equal(
+      unassignedWaiterFloor.tables.find((candidate) => candidate.id === varandaTable.id)
+        ?.accessLevel,
+      "overview",
+    );
     await assert.rejects(
       () =>
         pos.openTab(
@@ -2537,6 +2554,24 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       targetShiftSection.id,
       { active: true },
     );
+    const coveringWaiterFloor = await pos.listFloor(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+    );
+    assert.equal(
+      coveringWaiterFloor.shiftSectionStaff.some(
+        (row) =>
+          row.shiftSectionId === targetShiftSection.id &&
+          row.identityId === unassignedWaiterIdentity.id &&
+          row.role === "support",
+      ),
+      true,
+    );
+    assert.equal(
+      coveringWaiterFloor.tables.find((candidate) => candidate.id === varandaTable.id)?.accessLevel,
+      "operate",
+    );
     const supportedOpen = await pos.openTab(
       unassignedWaiterIdentity.id,
       organizationA.id,
@@ -2548,6 +2583,33 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       (supportedOpen.tab as { responsibleIdentityId: string }).responsibleIdentityId,
       supportIdentity.id,
     );
+    await database.db
+      .update(posTabs)
+      .set({ responsibleIdentityId: identity.id, shiftSectionId: null })
+      .where(eq(posTabs.id, (supportedOpen.tab as { id: string }).id));
+    const assignedWaiterRestrictedFloor = await pos.listFloor(
+      unassignedWaiterIdentity.id,
+      organizationA.id,
+      unitA.id,
+    );
+    assert.equal(
+      assignedWaiterRestrictedFloor.openTabs.some(
+        (candidate) => candidate.id === (supportedOpen.tab as { id: string }).id,
+      ),
+      false,
+    );
+    assert.equal(
+      assignedWaiterRestrictedFloor.tables.find((candidate) => candidate.id === varandaTable.id)
+        ?.accessLevel,
+      "overview",
+    );
+    await database.db
+      .update(posTabs)
+      .set({
+        responsibleIdentityId: supportIdentity.id,
+        shiftSectionId: targetShiftSection.id,
+      })
+      .where(eq(posTabs.id, (supportedOpen.tab as { id: string }).id));
     await pos.closeTab(
       unassignedWaiterIdentity.id,
       organizationA.id,
@@ -2564,6 +2626,12 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       targetShiftSection.id,
       { active: false },
     );
+    assert.equal(
+      (await pos.listFloor(unassignedWaiterIdentity.id, organizationA.id, unitA.id)).tables.find(
+        (candidate) => candidate.id === varandaTable.id,
+      )?.accessLevel,
+      "overview",
+    );
     await pos.updateShiftSectionAssignment(
       identity.id,
       organizationA.id,
@@ -2577,13 +2645,19 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
         supportIdentityIds: [],
       },
     );
-    await pos.updateShiftSectionCoverage(
-      supportIdentity.id,
-      organizationA.id,
-      unitA.id,
-      shift.id,
-      shiftSection.id,
-      { active: true },
+    await database.db.insert(posShiftSectionStaff).values({
+      organizationId: organizationA.id,
+      unitId: unitA.id,
+      shiftId: shift.id,
+      shiftSectionId: shiftSection.id,
+      identityId: busserIdentity.id,
+      role: "support",
+    });
+    assert.equal(
+      (await pos.listFloor(busserIdentity.id, organizationA.id, unitA.id)).tables.find(
+        (candidate) => candidate.id === freeTable.id,
+      )?.accessLevel,
+      "overview",
     );
     await pos.updateShiftSectionCoverage(
       supportIdentity.id,
@@ -2729,6 +2803,34 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
     );
     const counterTab = counterOpened.tab as { id: string; displayNumber: number; version: number };
     assert.ok(counterTab.displayNumber > 0);
+    const [counterCustomer, foreignCustomer] = await database.db
+      .insert(growthCustomers)
+      .values([
+        {
+          organizationId: organizationA.id,
+          name: "Cliente vinculado",
+          idempotencyKey: `customer-a-${runId}`,
+          requestFingerprint: "integration",
+        },
+        {
+          organizationId: organizationB.id,
+          name: "Cliente outro tenant",
+          idempotencyKey: `customer-b-${runId}`,
+          requestFingerprint: "integration",
+        },
+      ])
+      .returning();
+    assert.ok(counterCustomer && foreignCustomer);
+    await assert.rejects(
+      () =>
+        pos.updateTab(identity.id, organizationA.id, unitA.id, counterTab.id, {
+          expectedVersion: counterTab.version,
+          customerId: foreignCustomer.id,
+        }),
+      (error: unknown) =>
+        (error as { getResponse?: () => { code?: string } }).getResponse?.().code ===
+        "CUSTOMER_NOT_FOUND",
+    );
     const updatedCounter = await pos.updateTab(
       identity.id,
       organizationA.id,
@@ -2736,10 +2838,16 @@ it("runs a tenant-isolated, idempotent POS and KDS flow against PostgreSQL", asy
       counterTab.id,
       {
         expectedVersion: counterTab.version,
+        customerId: counterCustomer.id,
         promisedAt: new Date(Date.now() + 3_600_000).toISOString(),
       },
     );
     const currentCounterVersion = (updatedCounter.tab as { version: number }).version;
+    assert.equal(updatedCounter.tab.customerId, counterCustomer.id);
+    assert.equal(
+      (await pos.getTab(identity.id, organizationA.id, unitA.id, counterTab.id)).tab.customerId,
+      counterCustomer.id,
+    );
     await assert.rejects(
       () =>
         pos.updateTab(identity.id, organizationA.id, unitA.id, counterTab.id, {

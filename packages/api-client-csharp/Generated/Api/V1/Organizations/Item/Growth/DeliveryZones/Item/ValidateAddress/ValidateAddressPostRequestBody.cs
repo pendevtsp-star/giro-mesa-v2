@@ -56,6 +56,14 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.Item
 #else
         public string PostalCode { get; set; }
 #endif
+        /// <summary>The reference property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public string? Reference { get; set; }
+#nullable restore
+#else
+        public string Reference { get; set; }
+#endif
         /// <summary>The state property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -97,6 +105,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.Item
                 { "neighborhood", n => { Neighborhood = n.GetStringValue(); } },
                 { "number", n => { Number = n.GetStringValue(); } },
                 { "postalCode", n => { PostalCode = n.GetStringValue(); } },
+                { "reference", n => { Reference = n.GetStringValue(); } },
                 { "state", n => { State = n.GetStringValue(); } },
                 { "street", n => { Street = n.GetStringValue(); } },
             };
@@ -115,6 +124,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.DeliveryZones.Item
             writer.WriteStringValue("neighborhood", Neighborhood);
             writer.WriteStringValue("number", Number);
             writer.WriteStringValue("postalCode", PostalCode);
+            writer.WriteStringValue("reference", Reference);
             writer.WriteStringValue("state", State);
             writer.WriteStringValue("street", Street);
         }

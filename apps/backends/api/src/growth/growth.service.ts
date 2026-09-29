@@ -98,6 +98,7 @@ import {
 } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { applyDeliveryFee } from "../pilot-operations/delivery-financial.js";
 import { EvolutionGoClient, EvolutionGoError } from "./evolution-go.js";
 import {
   canRetryCrmAutomationFailure,
@@ -151,6 +152,9 @@ import type {
   LoyaltyProgramInput,
   LoyaltyRedeemInput,
   LoyaltyReverseInput,
+  OperationalCustomerInput,
+  OperationalCustomerListQueryInput,
+  OperationalCustomerUpdateInput,
   PriceOverrideInput,
   PublicCouponValidationInput,
   PublicReservationInput,
@@ -463,6 +467,177 @@ export class GrowthService {
       this.database.db.select({ value: count() }).from(growthCustomers).where(where),
     ]);
     return { items, total: Number(total?.value ?? 0), limit: query.limit, offset: query.offset };
+  }
+
+  async listOperationalCustomers(
+    identityId: string,
+    organizationId: string,
+    query: OperationalCustomerListQueryInput,
+  ) {
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      query.unitId,
+      "operations:tabs:open",
+    );
+    await this.requireEntitlement(organizationId, "basic_crm");
+    const searchDigits = query.q?.replace(/\D/g, "");
+    const where = and(
+      eq(growthCustomers.organizationId, organizationId),
+      eq(growthCustomers.defaultUnitId, query.unitId),
+      isNull(growthCustomers.archivedAt),
+      query.q
+        ? or(
+            ilike(growthCustomers.name, `%${query.q}%`),
+            searchDigits
+              ? sql`regexp_replace(coalesce(${growthCustomers.phone}, ''), '[^0-9]', '', 'g') like ${`%${searchDigits}%`}`
+              : undefined,
+          )
+        : undefined,
+    );
+    const [items, [total]] = await Promise.all([
+      this.database.db
+        .select({
+          id: growthCustomers.id,
+          name: growthCustomers.name,
+          phone: growthCustomers.phone,
+          defaultDeliveryAddress: growthCustomers.defaultDeliveryAddress,
+        })
+        .from(growthCustomers)
+        .where(where)
+        .orderBy(asc(growthCustomers.name), asc(growthCustomers.id))
+        .limit(query.limit)
+        .offset(query.offset),
+      this.database.db.select({ value: count() }).from(growthCustomers).where(where),
+    ]);
+    return { items, total: Number(total?.value ?? 0), limit: query.limit, offset: query.offset };
+  }
+
+  async createOperationalCustomer(
+    identityId: string,
+    organizationId: string,
+    input: OperationalCustomerInput,
+  ) {
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      input.unitId,
+      "operations:tabs:open",
+    );
+    await this.requireEntitlement(organizationId, "basic_crm");
+    const requestFingerprint = payloadFingerprint(input);
+    return this.database.db.transaction(async (tx) => {
+      // ponytail: lock por organização; trocar por chave de contato se o cadastro virar gargalo.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`growth-customer-contact:${organizationId}`}))`,
+      );
+      const [replay] = await tx
+        .select({
+          id: growthCustomers.id,
+          name: growthCustomers.name,
+          phone: growthCustomers.phone,
+          defaultDeliveryAddress: growthCustomers.defaultDeliveryAddress,
+          requestFingerprint: growthCustomers.requestFingerprint,
+        })
+        .from(growthCustomers)
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.idempotencyKey, input.idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (replay) {
+        if (replay.requestFingerprint !== requestFingerprint) this.idempotencyConflict();
+        const { requestFingerprint: _requestFingerprint, ...customer } = replay;
+        return { customer, idempotentReplay: true };
+      }
+      await this.assertUniqueCustomerContact(organizationId, { phone: input.phone });
+      const [created] = await tx
+        .insert(growthCustomers)
+        .values({
+          organizationId,
+          defaultUnitId: input.unitId,
+          name: input.name,
+          phone: normalizeCustomerPhone(input.phone),
+          defaultDeliveryAddress: input.defaultDeliveryAddress ?? null,
+          tags: [],
+          marketingOptIn: false,
+          emailMarketingOptIn: false,
+          whatsappMarketingOptIn: false,
+          idempotencyKey: input.idempotencyKey,
+          requestFingerprint,
+        })
+        .returning({
+          id: growthCustomers.id,
+          name: growthCustomers.name,
+          phone: growthCustomers.phone,
+          defaultDeliveryAddress: growthCustomers.defaultDeliveryAddress,
+        });
+      if (!created) throw new Error("OPERATIONAL_CUSTOMER_INSERT_FAILED");
+      await this.audit(tx, {
+        organizationId,
+        unitId: input.unitId,
+        identityId,
+        action: "growth.operational_customer.created",
+        entityType: "growth_customer",
+        entityId: created.id,
+      });
+      await this.outbox(tx, "growth.customer_created", "growth_customer", created.id, {
+        organizationId,
+        unitId: input.unitId,
+        customerId: created.id,
+      });
+      return { customer: created, idempotentReplay: false };
+    });
+  }
+
+  async updateOperationalCustomer(
+    identityId: string,
+    organizationId: string,
+    customerId: string,
+    input: OperationalCustomerUpdateInput,
+  ) {
+    await this.requireUnitCapability(
+      identityId,
+      organizationId,
+      input.unitId,
+      "operations:tabs:open",
+    );
+    await this.requireEntitlement(organizationId, "basic_crm");
+    return this.database.db.transaction(async (tx) => {
+      const [customer] = await tx
+        .update(growthCustomers)
+        .set({ defaultDeliveryAddress: input.defaultDeliveryAddress, updatedAt: new Date() })
+        .where(
+          and(
+            eq(growthCustomers.organizationId, organizationId),
+            eq(growthCustomers.id, customerId),
+            eq(growthCustomers.defaultUnitId, input.unitId),
+            isNull(growthCustomers.archivedAt),
+          ),
+        )
+        .returning({
+          id: growthCustomers.id,
+          name: growthCustomers.name,
+          phone: growthCustomers.phone,
+          defaultDeliveryAddress: growthCustomers.defaultDeliveryAddress,
+        });
+      if (!customer)
+        throw new NotFoundException({
+          code: "OPERATIONAL_CUSTOMER_NOT_FOUND",
+          message: "Cliente operacional não encontrado nesta unidade.",
+        });
+      await this.audit(tx, {
+        organizationId,
+        unitId: input.unitId,
+        identityId,
+        action: "growth.operational_customer.address_updated",
+        entityType: "growth_customer",
+        entityId: customer.id,
+      });
+      return { customer };
+    });
   }
 
   async customerHistory(
@@ -897,6 +1072,7 @@ export class GrowthService {
           name: input.name,
           email: normalizeCustomerEmail(input.email),
           phone: normalizeCustomerPhone(input.phone),
+          defaultDeliveryAddress: input.defaultDeliveryAddress ?? null,
           birthDate: input.birthDate ?? null,
           notes: input.notes ?? null,
           tags: input.tags,
@@ -958,6 +1134,9 @@ export class GrowthService {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.email !== undefined ? { email: normalizeCustomerEmail(input.email) } : {}),
           ...(input.phone !== undefined ? { phone: normalizeCustomerPhone(input.phone) } : {}),
+          ...(input.defaultDeliveryAddress !== undefined
+            ? { defaultDeliveryAddress: input.defaultDeliveryAddress }
+            : {}),
           ...(input.birthDate !== undefined ? { birthDate: input.birthDate } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.tags !== undefined ? { tags: input.tags } : {}),
@@ -3683,6 +3862,7 @@ export class GrowthService {
         and(
           eq(deliveryOrders.organizationId, organizationId),
           eq(deliveryOrders.unitId, unitId),
+          input.orderRef ? eq(deliveryOrders.orderRef, input.orderRef) : undefined,
           input.status ? eq(deliveryOrders.status, input.status) : undefined,
           input.updatedSince ? gt(deliveryOrders.updatedAt, input.updatedSince) : undefined,
           input.scheduled === undefined
@@ -3800,6 +3980,7 @@ export class GrowthService {
       .select({
         id: posTabs.id,
         totalCents: posTabs.totalCents,
+        deliveryFeeCents: posTabs.deliveryFeeCents,
         fulfillmentType: posTabs.fulfillmentType,
         customerName: posTabs.customerName,
         customerPhone: posTabs.customerPhone,
@@ -3869,7 +4050,7 @@ export class GrowthService {
         .limit(1);
       if (!zone)
         throw new BadRequestException({ code: "DELIVERY_ZONE_INVALID", message: "Zona inválida." });
-      if (tab.totalCents < zone.minimumOrderCents)
+      if (tab.totalCents - tab.deliveryFeeCents < zone.minimumOrderCents)
         throw new BadRequestException({
           code: "DELIVERY_MINIMUM_NOT_MET",
           message: "Pedido abaixo do mínimo.",
@@ -3892,17 +4073,29 @@ export class GrowthService {
         message: "Retirada não aceita zona ou endereço de entrega.",
       });
     }
-    const totalCents = tab.totalCents + deliveryFeeCents;
+    const operationalSubtotalCents = tab.totalCents - tab.deliveryFeeCents;
     const requestFingerprint = payloadFingerprint({
       input: { ...input, customerId },
       customerName,
       customerPhone,
       zoneId,
-      operationalSubtotalCents: tab.totalCents,
+      operationalSubtotalCents,
       deliveryFeeCents,
-      totalCents,
+      totalCents: operationalSubtotalCents + deliveryFeeCents,
     });
-    const [created] = await this.database.db.transaction(async (tx) => {
+    return this.database.db.transaction(async (tx) => {
+      const persistedTab =
+        input.fulfillment === "delivery"
+          ? await applyDeliveryFee(
+              tx,
+              organizationId,
+              input.unitId,
+              input.orderRef,
+              deliveryFeeCents,
+            )
+          : tab;
+      const subtotalCents = persistedTab.totalCents - persistedTab.deliveryFeeCents;
+      const totalCents = persistedTab.totalCents;
       const rows = await tx
         .insert(deliveryOrders)
         .values({
@@ -3914,8 +4107,8 @@ export class GrowthService {
           zoneId,
           orderRef: input.orderRef,
           fulfillment: input.fulfillment,
-          subtotalCents: tab.totalCents,
-          deliveryFeeCents,
+          subtotalCents,
+          deliveryFeeCents: persistedTab.deliveryFeeCents,
           totalCents,
           address: input.address ? { ...input.address } : null,
           addressValidationStatus,
@@ -3952,25 +4145,24 @@ export class GrowthService {
           fulfillment: row.fulfillment,
         });
       }
-      return rows;
-    });
-    if (created) return { duplicate: false, order: created };
-    const [existing] = await this.database.db
-      .select()
-      .from(deliveryOrders)
-      .where(
-        and(
-          eq(deliveryOrders.organizationId, organizationId),
-          or(
-            eq(deliveryOrders.idempotencyKey, input.idempotencyKey),
-            eq(deliveryOrders.orderRef, input.orderRef),
+      if (row) return { duplicate: false, order: row };
+      const [existing] = await tx
+        .select()
+        .from(deliveryOrders)
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            or(
+              eq(deliveryOrders.idempotencyKey, input.idempotencyKey),
+              eq(deliveryOrders.orderRef, input.orderRef),
+            ),
           ),
-        ),
-      )
-      .limit(1);
-    if (!existing || existing.requestFingerprint !== requestFingerprint)
-      return this.idempotencyConflict();
-    return { duplicate: true, order: existing };
+        )
+        .limit(1);
+      if (!existing || existing.requestFingerprint !== requestFingerprint)
+        return this.idempotencyConflict();
+      return { duplicate: true, order: existing };
+    });
   }
 
   async assignDeliveryCourier(

@@ -56,6 +56,71 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RejectsOpeningDeliveryOfflineWithoutMutatingOrQueuingTheCommand()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        await store.SaveOperationalSnapshotAsync(Snapshot());
+        var command = Command(Guid.NewGuid().ToString(), "pos.tab.open_requested", "open-tab",
+            new
+            {
+                body = new
+                {
+                    tableId = TableId,
+                    guestCount = 1,
+                    fulfillmentType = "delivery",
+                    deliveryZoneId = Guid.NewGuid().ToString(),
+                    deliveryAddressDetails = new { street = "Rua Central", number = "42" },
+                },
+            });
+
+        var rejected = await Assert.ThrowsAsync<OperationalConflictException>(() => store.AcceptCommandAsync(command));
+
+        Assert.Equal("DELIVERY_REQUIRES_ONLINE", rejected.Code);
+        var snapshot = await store.GetOperationalSnapshotAsync(OrganizationId, UnitId);
+        Assert.Empty(snapshot!.Tabs.EnumerateArray());
+        Assert.Empty(snapshot.Floor.GetProperty("openTabs").EnumerateArray());
+        Assert.Equal("available", snapshot.Floor.GetProperty("tables")[0].GetProperty("status").GetString());
+        Assert.Empty(await store.GetPendingAsync(20));
+    }
+
+    [Fact]
+    public async Task PreservesDeliveryFeeWhenRecalculatingAnOfflineTab()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var tabId = Guid.NewGuid().ToString();
+        await store.SaveOperationalSnapshotAsync(SnapshotWithModifier(
+            tabId, Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), Guid.NewGuid().ToString(), 700));
+        var tip = Command(Guid.NewGuid().ToString(), "pos.tab.tip_requested", "tip",
+            new { tabId, tipCents = 200 });
+        var result = await store.AcceptCommandAsync(tip);
+        Assert.Equal(3900, result.Result!.Value.GetProperty("totals").GetProperty("totalCents").GetInt64());
+        Assert.Equal(700, result.Result.Value.GetProperty("totals").GetProperty("deliveryFeeCents").GetInt64());
+        var persisted = await store.GetOperationalSnapshotAsync(OrganizationId, UnitId);
+        Assert.Equal(3900, persisted!.TabDetails.GetProperty(tabId).GetProperty("tab").GetProperty("totalCents").GetInt64());
+    }
+
+    [Theory]
+    [InlineData("merge-tabs", "pos.tabs.merge_requested", "DELIVERY_TAB_MERGE_UNSUPPORTED")]
+    [InlineData("split-tab", "pos.tab.split_requested", "DELIVERY_TAB_SPLIT_UNSUPPORTED")]
+    public async Task RejectsOfflineDeliveryMergeAndSplitLikeTheApi(string action, string type, string error)
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+        var tabId = Guid.NewGuid().ToString();
+        var itemId = Guid.NewGuid().ToString();
+        await store.SaveOperationalSnapshotAsync(SnapshotWithModifier(tabId,
+            Guid.NewGuid().ToString(), itemId, Guid.NewGuid().ToString(), 700));
+        var command = Command(Guid.NewGuid().ToString(), type, action,
+            new { tabId, body = new { targetTabId = tabId, sourceTabIds = new[] { Guid.NewGuid().ToString() }, items = new[] { new { orderItemId = itemId, quantity = 1 } } } });
+        var rejected = await Assert.ThrowsAsync<OperationalConflictException>(() => store.AcceptCommandAsync(command));
+        Assert.Contains(error, rejected.Message);
+        var snapshot = await store.GetOperationalSnapshotAsync(OrganizationId, UnitId);
+        Assert.Equal(3700, snapshot!.TabDetails.GetProperty(tabId).GetProperty("tab").GetProperty("totalCents").GetInt64());
+    }
+
+    [Fact]
     public async Task ProjectsPilotFlowAtomicallyAndSurvivesReplayConflictRejectionAndRestart()
     {
         var store = CreateStore();
@@ -69,6 +134,7 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
             new { body = new { tableId = TableId, guestCount = 2 } });
         var opened = await store.AcceptCommandAsync(open);
         Assert.Equal(open.Id, opened.Result!.Value.GetProperty("tab").GetProperty("id").GetString());
+        Assert.Equal(0, opened.Result.Value.GetProperty("tab").GetProperty("deliveryFeeCents").GetInt64());
 
         var occupied = Command(
             "99999999-9999-4999-8999-999999999999",
@@ -1162,7 +1228,8 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
         string tabId,
         string orderId,
         string itemId,
-        string modifierId)
+        string modifierId,
+        int deliveryFeeCents = 0)
     {
         var now = DateTimeOffset.UtcNow;
         var tab = new
@@ -1173,6 +1240,7 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
             tableId = TableId,
             openedByIdentityId = ActorId,
             label = "Mesa com modificador",
+            fulfillmentType = deliveryFeeCents > 0 ? "delivery" : "dine_in",
             guestCount = 2,
             status = "open",
             mergedIntoTabId = (string?)null,
@@ -1181,7 +1249,8 @@ public sealed class OfflineProjectionTests : IAsyncLifetime
             subtotalCents = 3_000,
             discountCents = 0,
             serviceChargeCents = 0,
-            totalCents = 3_000,
+            deliveryFeeCents,
+            totalCents = 3_000 + deliveryFeeCents,
             closedAt = (DateTimeOffset?)null,
             createdAt = now,
             updatedAt = now,

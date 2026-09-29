@@ -63,7 +63,7 @@ Directory-based community: apps/frontends
 | terminalSessionForView | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/app/access.ts | 81-100 |
 | platformSession | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/app/access.ts | 102-127 |
 
-*... and 924 more members.*
+*... and 731 more members.*
 
 ## Execution Flows
 
@@ -76,36 +76,36 @@ Directory-based community: apps/frontends
 
 ### Outgoing
 
-- `expect` (506 edge(s))
-- `map` (217 edge(s))
-- `toBe` (194 edge(s))
-- `useState` (180 edge(s))
-- `Button` (161 edge(s))
-- `stringify` (101 edge(s))
-- `filter` (98 edge(s))
-- `Input` (96 edge(s))
-- `toEqual` (92 edge(s))
-- `equal` (85 edge(s))
-- `trim` (83 edge(s))
-- `setMessage` (82 edge(s))
-- `fn` (72 edge(s))
-- `get` (69 edge(s))
-- `objectContaining` (67 edge(s))
+- `expect` (406 edge(s))
+- `toBe` (180 edge(s))
+- `map` (153 edge(s))
+- `useState` (134 edge(s))
+- `Button` (112 edge(s))
+- `filter` (68 edge(s))
+- `equal` (66 edge(s))
+- `toEqual` (66 edge(s))
+- `setMessage` (66 edge(s))
+- `Input` (64 edge(s))
+- `trim` (59 edge(s))
+- `stringify` (54 edge(s))
+- `find` (49 edge(s))
+- `get` (48 edge(s))
+- `String` (48 edge(s))
 
 ### Incoming
 
-- `expect` (506 edge(s))
-- `toBe` (194 edge(s))
-- `toEqual` (92 edge(s))
-- `equal` (85 edge(s))
-- `stringify` (71 edge(s))
-- `fn` (69 edge(s))
-- `objectContaining` (67 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/shell/OperationalApp.tsx::OperationalApp` (56 edge(s))
+- `expect` (406 edge(s))
+- `toBe` (180 edge(s))
+- `equal` (66 edge(s))
+- `toEqual` (66 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/salon/FloorPlan.tsx` (56 edge(s))
-- `stringContaining` (55 edge(s))
-- `toMatchObject` (50 edge(s))
-- `toContain` (47 edge(s))
-- `stubGlobal` (43 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/site/lib/commercial.ts` (42 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/counter/CounterWorkspace.tsx::TabWorkspaceSession` (39 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/shell/OperationalApp.tsx::OperationalApp` (55 edge(s))
+- `fn` (45 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/counter/CounterWorkspace.tsx::TabWorkspaceSession` (40 edge(s))
+- `toMatchObject` (39 edge(s))
+- `toContain` (33 edge(s))
+- `stringify` (28 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/cash/CashPage.tsx::RealCashPage` (23 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/bridge.ts` (22 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/frontends/ops/src/features/kds/KdsPage.tsx::RealKdsPage` (20 edge(s))
+- `stubGlobal` (19 edge(s))

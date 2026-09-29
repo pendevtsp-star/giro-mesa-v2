@@ -68,3 +68,34 @@ Com caixa, gerente e garçom reais, validar em 1440 px e 375 px:
 ## Decisão
 
 Registrar commit, artefatos, ambiente, responsáveis e exceções. Qualquer duplicidade, perda financeira, vazamento entre tenants, impressão sem estado persistido ou integração SmartPOS fail-open é **NO-GO**.
+
+## Revisão local de UX — 19/09/2026
+
+Alterações mantidas no checkout, sem commit, push ou deploy. O Salão reutiliza o PDV do Balcão: Pedido, Conta e Pré-conta têm conteúdos separados; ações ocasionais continuam no menu Mais e nas respectivas janelas. O panorama usa fundo gelo no tema claro, estados com contraste, contadores legíveis e cartões de mesa destacados. Configuração e organização do turno permanecem separadas do atendimento.
+
+Correções encontradas durante a inspeção:
+
+- Os indicadores incluíam comandas de balcão. Agora consideram somente comandas abertas em mesas ativas, sem duplicar pessoas nas contas vinculadas do mesmo atendimento.
+- A janela de Salão bloqueava os atalhos do PDV. Agora Alt+1/2/3 alternam Pedido/Conta/Pré-conta dentro dela, preservando o bloqueio quando uma janela secundária está aberta.
+- Escape propagava o fechamento de uma janela secundária para a comanda. O cancelamento fica restrito à janela ativa; regras de tamanho também se aplicam apenas à janela proprietária.
+- Editar Observação removia o item do rascunho antes de salvar. Agora cancelar preserva o item e salvar atualiza a mesma linha, sem duplicação.
+- Repor rodada usava o último pedido do operador, mesmo em outra mesa. O histórico local desse atalho agora pertence à própria comanda; favoritos e produtos recentes continuam disponíveis entre atendimentos.
+- O perfil de garçom podia ver o formulário manual de recebimento num terminal de caixa. A UI agora respeita perfil e modo do terminal, mantendo consulta por pessoa e pedido de conta ao caixa. Cobrança integrada continua dependendo de terminal e integração autorizados.
+- A projeção do salão marcava mesas livres como somente panorama, mesmo quando o garçom estava escalado para atendê-las. Agora a abertura considera a praça efetiva do turno e remanejamentos válidos. Mesas ocupadas continuam exigindo acesso à comanda existente; escalas antigas não concedem capacidade de abertura a um perfil sem permissão.
+
+Validação executada no navegador do Codex, com API/PostgreSQL locais e cadastros sintéticos:
+
+| Área | Evidência observada |
+| --- | --- |
+| Panorama | Painel/lista, ordenação, busca/filtros, prioridades, configuração de praça/equipe, ajuda e abertura de mesas. |
+| Comanda | Pedido, Conta, Pré-conta, Mais, histórico, edição do atendimento, cadastro de cliente, separar consumo, transferir item e unificar; janelas de ações estruturais foram inspecionadas e canceladas, sem executar transferências reais nesta rodada. |
+| Rascunho | Adicionar item, cancelar edição com Escape, salvar observação sem perder ou duplicar a linha e enviar à produção. Repor rodada aparece na própria comanda após o envio e não aparece ao mudar para outra mesa. |
+| Caixa | Conta de R$ 16,80: recebimento parcial de R$ 10,00, saldo R$ 6,80, segundo recebimento em dinheiro de R$ 10,00 com troco automático de R$ 3,20. Abertura e cancelamento do seletor de correção de pagamento. |
+| Ciclo da mesa | Abertura, envio à produção, pagamentos, encerramento sem imprimir, assumir limpeza e liberar mesa. |
+| Garçom | Abertura de mesa livre da própria praça pela interface, envio à produção, consulta por pessoa (R$ 16,80 / 2 = R$ 8,40), solicitação da conta ao caixa e ausência do formulário manual de pagamento. |
+| Responsividade | Inspeção em 1440 px, 768 px e 375 px; temas claro/escuro, foco, atalhos e janelas secundárias. Nenhum overflow horizontal observado nos cenários inspecionados. |
+| Impressão | Solicitação real de pré-conta com pagamento parcial; job exigiu conferência e foi marcado como não impresso. Não houve confirmação de saída física. |
+
+Checks: suite Ops de 89 arquivos/437 testes durante a implementação; após os ajustes finais, testes direcionados de Salão, workspace, pagamentos e atalhos (40 testes), typecheck de Ops/UI e Biome dos arquivos alterados. Na API, build, typecheck e integração PostgreSQL de permissões passaram: praça atribuída, fora da praça, cobertura ativa/inativa, comanda invisível e perfil sem capacidade de abertura. A API local em 3218 foi atualizada e a aba original em 3118 voltou a carregar normalmente. O cenário automatizado adicionado em `tests/e2e-real/salon-production.spec.ts` cobre isolamento das abas, edição do rascunho e Escape; ele não foi executado pelo runner Playwright nesta rodada, que utilizou QA visual pelo navegador.
+
+Limites: o turno usado no QA estava em `quick_service`; a abertura em `full_service` não foi executada visualmente nesta rodada. O contrato materializa praças novas somente na abertura de turno, por isso a configuração do turno existente foi preservada. Esta validação também não homologa impressora física, SmartPOS, carga, operação offline ou o ciclo completo de transferências/unificações concorrentes. Permanecem aplicáveis os gates acima. Os arquivos anteriores desta rodada foram preservados fora do Git em `C:\Users\maxue\.codex\backups\giromesa-salon-unification-20260919\before`; eventual retorno deve usar o diff desta rodada, sem descartar alterações anteriores do checkout.

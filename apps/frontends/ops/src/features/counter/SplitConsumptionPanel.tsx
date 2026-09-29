@@ -80,7 +80,6 @@ export function SplitConsumptionPanel({
     >
       <header>
         <div>
-          <strong>Separar consumo</strong>
           <small>Escolha quanto vai para a outra comanda.</small>
         </div>
         <Button disabled={busy} onClick={onClose} size="sm" type="button" variant="ghost">

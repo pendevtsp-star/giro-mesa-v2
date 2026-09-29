@@ -656,7 +656,7 @@ test("Pessoas prioriza o resumo e permanece utilizável no mobile", async ({ pag
   await mockPeopleApi(page);
   await openPeople(page);
 
-  await expect(page.getByRole("heading", { name: "Operação de pessoas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Resumo da equipe" })).toBeVisible();
   await expect(page.locator(".people-overview__metrics > div")).toHaveCount(4);
   await expect(page.getByText("Ponto ativo", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Turnos em andamento" })).toBeVisible();

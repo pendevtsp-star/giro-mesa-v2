@@ -57,7 +57,7 @@ export function CrmFormPanel({
 }) {
   return (
     <details className="action-panel">
-      <summary id={id} tabIndex={id ? -1 : undefined}>
+      <summary id={id}>
         <span>
           <strong>{title}</strong>
           <small>{description}</small>

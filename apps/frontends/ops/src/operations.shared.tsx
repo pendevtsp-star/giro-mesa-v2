@@ -1,3 +1,4 @@
+import { type DeliveryAddressInput, deliveryAddressSchema } from "@giromesa/contracts";
 import { Button, Card } from "@giromesa/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ProfileId } from "./domain";
@@ -281,11 +282,15 @@ export interface PosTab {
   label: string | null;
   displayNumber: number | null;
   fulfillmentType: "dine_in" | "pickup" | "delivery";
+  customerId?: string | null;
   customerName: string | null;
   customerPhone: string | null;
   readyNotificationConsent: boolean;
   serviceNotes: string | null;
   deliveryAddress: string | null;
+  deliveryAddressDetails?: DeliveryAddressInput | null;
+  deliveryZoneId?: string | null;
+  deliveryFeeCents?: number;
   promisedAt: string | null;
   readyNotifiedAt: string | null;
   responsibleIdentityId: string | null;
@@ -295,6 +300,7 @@ export interface PosTab {
   version: number;
   status: string;
   serviceChargeBasisPoints: number;
+  suggestedServiceChargeBasisPoints?: number;
   tipCents: number;
   subtotalCents: number;
   discountCents: number;
@@ -415,6 +421,12 @@ export interface PilotFloor {
 }
 
 export function summarizeOperationalLoad(floor: PilotFloor) {
+  const activeTableIds = new Set(
+    floor.tables.filter((table) => table.active).map((table) => table.id),
+  );
+  const salonTabs = floor.openTabs.filter(
+    (tab) => tab.status === "open" && tab.tableId && activeTableIds.has(tab.tableId),
+  );
   const effectiveSectionId = (tableId: string) =>
     floor.shiftTableTransfers.find((row) => row.tableId === tableId)?.targetShiftSectionId ??
     floor.shiftSectionTables.find((row) => row.tableId === tableId)?.shiftSectionId;
@@ -422,7 +434,7 @@ export function summarizeOperationalLoad(floor: PilotFloor) {
     const tableIds = floor.tables
       .filter((table) => table.active && effectiveSectionId(table.id) === section.id)
       .map((table) => table.id);
-    const tabs = floor.openTabs.filter((tab) => tab.tableId && tableIds.includes(tab.tableId));
+    const tabs = salonTabs.filter((tab) => tab.tableId && tableIds.includes(tab.tableId));
     return {
       id: section.id,
       name: section.name,
@@ -441,7 +453,7 @@ export function summarizeOperationalLoad(floor: PilotFloor) {
   });
   const staff = floor.staff
     .map((person) => {
-      const tabs = floor.openTabs.filter((tab) => tab.responsibleIdentityId === person.identityId);
+      const tabs = salonTabs.filter((tab) => tab.responsibleIdentityId === person.identityId);
       return {
         ...person,
         sections: sections.filter((section) => section.staffIds.includes(person.identityId)).length,
@@ -482,6 +494,8 @@ export type PaymentFinancialStatus = "posted" | "reversed";
 
 export interface TabPayment {
   id: string;
+  source?: string | null;
+  paymentAttemptId?: string | null;
   method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
   amountCents: number;
   reversedCents: number;
@@ -944,11 +958,18 @@ export function parseTab(row: Row): PosTab {
     label: optionalText(row.label),
     displayNumber: optionalNumber(row.displayNumber),
     fulfillmentType: fulfillmentType as PosTab["fulfillmentType"],
+    customerId: optionalText(row.customerId),
     customerName: optionalText(row.customerName),
     customerPhone: optionalText(row.customerPhone),
     readyNotificationConsent: row.readyNotificationConsent === true,
     serviceNotes: optionalText(row.serviceNotes),
     deliveryAddress: optionalText(row.deliveryAddress),
+    deliveryAddressDetails:
+      row.deliveryAddressDetails == null
+        ? null
+        : deliveryAddressSchema.parse(row.deliveryAddressDetails),
+    deliveryZoneId: optionalText(row.deliveryZoneId),
+    deliveryFeeCents: number(row.deliveryFeeCents ?? 0),
     promisedAt: optionalText(row.promisedAt),
     readyNotifiedAt: optionalText(row.readyNotifiedAt),
     responsibleIdentityId: optionalText(row.responsibleIdentityId),
@@ -963,6 +984,10 @@ export function parseTab(row: Row): PosTab {
     version: number(row.version ?? 1),
     status: text(row.status),
     serviceChargeBasisPoints: number(row.serviceChargeBasisPoints),
+    suggestedServiceChargeBasisPoints:
+      row.suggestedServiceChargeBasisPoints == null
+        ? undefined
+        : number(row.suggestedServiceChargeBasisPoints),
     tipCents: number(row.tipCents),
     subtotalCents: number(row.subtotalCents),
     discountCents: number(row.discountCents),
@@ -1550,6 +1575,8 @@ function parseTabPayment(row: Row): TabPayment {
   return {
     id: text(row.id),
     method: method as TabPayment["method"],
+    source: optionalText(row.source),
+    paymentAttemptId: optionalText(row.paymentAttemptId),
     amountCents,
     reversedCents,
     netAmountCents,

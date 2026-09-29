@@ -5,6 +5,7 @@ import {
   commercialAttributionForCatalog,
   commercialAttributionFromSearchParams,
   commercialHeroForCatalog,
+  getCommercialCatalog,
   isPersistedLeadReceipt,
   normalizeCommercialCatalog,
   withCommercialAttribution,
@@ -113,6 +114,38 @@ function publishedCatalog() {
     experiments: [],
   };
 }
+
+test("consulta o catálogo pela API do servidor com fallback público e sem cache", async (t) => {
+  const previousApiUrl = process.env.API_URL;
+  const previousPublicApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const requests: Array<{ url: string; options?: RequestInit }> = [];
+  t.mock.method(globalThis, "fetch", async (url: string, options?: RequestInit) => {
+    requests.push({ url, options });
+    return Response.json(publishedCatalog());
+  });
+  try {
+    process.env.API_URL = "https://catalog.example.test/";
+    process.env.NEXT_PUBLIC_API_URL = "http://127.0.0.1:3218/";
+    assert.equal((await getCommercialCatalog()).source, "api");
+    delete process.env.API_URL;
+    assert.equal((await getCommercialCatalog()).source, "api");
+    assert.deepEqual(requests, [
+      {
+        url: "https://catalog.example.test/public/v1/commercial-catalog",
+        options: { cache: "no-store", headers: undefined },
+      },
+      {
+        url: "http://127.0.0.1:3218/public/v1/commercial-catalog",
+        options: { cache: "no-store", headers: undefined },
+      },
+    ]);
+  } finally {
+    if (previousApiUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = previousApiUrl;
+    if (previousPublicApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL;
+    else process.env.NEXT_PUBLIC_API_URL = previousPublicApiUrl;
+  }
+});
 
 test("o anual equivale a dez mensalidades", () => {
   assert.equal(annualPriceCents(14900), 149000);

@@ -64,8 +64,8 @@
   }
   .auth-story {
     min-height: auto;
-    padding: 70px 40px;
-    gap: 80px;
+    padding: 44px 40px;
+    gap: 28px;
   }
   .security-card {
     padding: 25px;
@@ -150,13 +150,39 @@
     padding: 22px 18px;
   }
   .auth-story {
-    padding: 55px 25px;
+    padding: 36px 24px;
   }
   .auth-story h1 {
-    font-size: 46px;
+    font-size: 36px;
   }
   .auth-panel {
-    padding: 55px 22px;
+    padding: 32px 20px;
+  }
+  .auth-panel .auth-box,
+  .single-auth-page .auth-box {
+    padding: 24px 20px;
+  }
+  .security-card-heading {
+    flex-direction: column;
+    gap: 14px;
+  }
+  .security-actions {
+    flex-direction: column;
+  }
+  .security-actions .button {
+    white-space: normal;
+    height: auto;
+    min-height: 44px;
+    text-align: center;
+  }
+  .support-grid {
+    padding-block: 0;
+  }
+  .support-grid article {
+    padding: 24px;
+  }
+  .legal-index ul {
+    grid-template-columns: minmax(0, 1fr);
   }
   .auth-options {
     align-items: flex-start;

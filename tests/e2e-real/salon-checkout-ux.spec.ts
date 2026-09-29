@@ -303,24 +303,31 @@ test("checkout registra payloads curtos de dinheiro e Pix", async ({ page }) => 
   const form = dialog.locator("form.cashier-payment-form");
   await expect(form).toBeVisible();
 
-  const paymentMode = form.getByLabel("Como receber");
-  await expect(paymentMode).toHaveValue("full");
-  await expect(form.getByLabel("Valor a receber")).toHaveValue("287.4");
-  await paymentMode.selectOption("per_person");
-  await expect(form.getByLabel("Dividir o saldo por")).toHaveValue("2");
-  await expect(form.getByLabel("Valor a receber")).toHaveValue("143.7");
-  await paymentMode.selectOption("full");
-  await form.getByLabel("Valor a receber").fill("10.01");
-  await expect(paymentMode).toHaveValue("custom");
-  await form.getByLabel("Valor a receber").fill("");
-  await expect(form.getByLabel("Valor a receber")).toHaveValue("");
+  const amount = form.getByLabel("Valor recebido", { exact: true });
+  await expect(amount).toHaveAttribute("data-currency", "brl");
+  await expect(amount).toHaveValue("287,40");
+  await expect(form.locator('input[data-currency="brl"]')).toHaveCount(1);
+  await expect(form.getByText("Troco", { exact: true })).toBeVisible();
+  await form.getByRole("button", { name: "Quanto por pessoa?", exact: true }).click();
+  const split = page.getByRole("dialog", { name: "Quanto por pessoa?", exact: true });
+  await expect(split.getByLabel("Quantas pessoas?")).toHaveValue("2");
+  await expect(split).toContainText(/R\$\s*143,70/);
+  await split.getByRole("button", { name: "Fechar consulta" }).click();
+  await expect(amount).toHaveValue("287,40");
+  await amount.fill("10,01");
+  await form.getByRole("button", { name: "Quanto por pessoa?", exact: true }).click();
+  await split.getByLabel("Quantas pessoas?").fill("3");
+  await expect(split).toContainText(/R\$\s*95,80/);
+  await split.getByRole("button", { name: "Fechar consulta" }).click();
+  await expect(amount).toHaveValue("10,01");
+  expect(state.paymentBodies).toHaveLength(0);
+  await amount.fill("");
+  await expect(amount).toHaveValue("");
   await expect(
     dialog.locator(".service-action-dock").getByRole("button", { name: /Confirmar/ }),
   ).toBeDisabled();
-  await form.getByLabel("Valor a receber").fill("10.01");
   await form.getByLabel("Forma de pagamento").selectOption("cash");
-  await form.getByLabel("Valor a receber").fill("10.01");
-  await form.getByLabel("Valor recebido").fill("20.00");
+  await amount.fill("10,01");
   await dialog
     .locator(".service-action-dock")
     .getByRole("button", { name: /Confirmar/ })
@@ -329,11 +336,12 @@ test("checkout registra payloads curtos de dinheiro e Pix", async ({ page }) => 
   expect(state.paymentBodies[0]).toMatchObject({
     method: "cash",
     amountCents: 1001,
-    reference: "Recebido R$\u00a020,00; troco R$\u00a09,99",
+    receivedCents: 1001,
+    reference: "Recebido R$\u00a010,01; troco R$\u00a00,00",
   });
 
   await form.getByLabel("Forma de pagamento").selectOption("pix");
-  await form.getByLabel("Valor a receber").fill("3.33");
+  await form.getByLabel("Valor deste pagamento", { exact: true }).fill("3,33");
   await form.getByText("Referência e confirmação externa", { exact: true }).click();
   await form.getByLabel("Referência opcional").fill("pix-qr-1");
   await dialog
@@ -348,6 +356,37 @@ test("checkout registra payloads curtos de dinheiro e Pix", async ({ page }) => 
   });
 });
 
+test("dinheiro acima do saldo calcula troco e Pix bloqueia o excedente", async ({ page }) => {
+  const state = await mockCheckoutApi(page);
+  const dialog = await openCheckout(page);
+  const form = dialog.locator("form.cashier-payment-form");
+  const confirm = dialog.locator(".service-action-dock button[form]");
+  await expect(form.locator('input[data-currency="brl"]')).toHaveCount(1);
+  await form.getByLabel("Valor recebido", { exact: true }).fill("300,00");
+  await expect(confirm).toHaveText(/Confirmar R\$\s*287,40/);
+  await expect(confirm).toBeEnabled();
+  await expect(form.getByText("Troco", { exact: true })).toBeVisible();
+  await expect(form).toContainText(/R\$\s*12,60/);
+
+  await form.getByLabel("Forma de pagamento").selectOption("pix");
+  await form.getByLabel("Valor deste pagamento", { exact: true }).fill("300,00");
+  await expect(confirm).toBeDisabled();
+  expect(state.paymentBodies).toHaveLength(0);
+
+  await form.getByLabel("Forma de pagamento").selectOption("cash");
+  await form.getByLabel("Valor recebido", { exact: true }).fill("300,00");
+  await expect(form.locator('input[data-currency="brl"]')).toHaveCount(1);
+  await expect(confirm).toHaveText(/Confirmar R\$\s*287,40/);
+  await confirm.click();
+  await expect.poll(() => state.paymentBodies).toHaveLength(1);
+  expect(state.paymentBodies[0]).toMatchObject({
+    method: "cash",
+    amountCents: 28740,
+    receivedCents: 30000,
+    reference: "Recebido R$\u00a0300,00; troco R$\u00a012,60",
+  });
+});
+
 test("aguarda o saldo atualizado antes de permitir outro recebimento", async ({ page }) => {
   const state = await mockCheckoutApi(page);
   const dialog = await openCheckout(page);
@@ -359,18 +398,28 @@ test("aguarda o saldo atualizado antes de permitir outro recebimento", async ({ 
     if (route.request().method() === "GET" && state.payments.length) await balanceReady;
     await route.fallback();
   });
-  const amount = dialog.getByLabel("Valor a receber", { exact: true });
+  const amount = dialog.getByLabel("Valor recebido", { exact: true });
   const confirm = dialog.locator(".service-action-dock button[form]");
   try {
-    await amount.fill("10.01");
+    await amount.fill("10,01");
     await confirm.click();
     await expect.poll(() => state.payments.length).toBe(1);
     await expect(confirm).toBeDisabled();
     release();
-    await expect(dialog.getByLabel("Como receber")).toHaveValue("full");
-    await expect(amount).toHaveValue("277.39");
+    await expect(amount).toHaveValue("277,39");
     await expect(confirm).toBeEnabled();
     expect(state.paymentBodies).toHaveLength(1);
+    expect(state.paymentBodies[0]).toMatchObject({
+      method: "cash",
+      amountCents: 1001,
+      reference: "Recebido R$\u00a010,01; troco R$\u00a00,00",
+    });
+    const history = dialog.locator("details.account-disclosure").filter({
+      has: page.locator("summary", { hasText: "Pagamentos registrados" }),
+    });
+    await expect(history).not.toHaveAttribute("open", "");
+    await history.locator("summary").click();
+    await expect(history.getByLabel("Pagamentos registrados")).toContainText("10,01");
   } finally {
     release();
   }
@@ -422,7 +471,7 @@ test("poll anterior ao pagamento não libera saldo quando a atualização falha"
   try {
     await page.waitForTimeout(8_100);
     expect(staleReads).toBeGreaterThan(0);
-    await dialog.getByLabel("Valor a receber", { exact: true }).fill("10.01");
+    await dialog.getByLabel("Valor recebido", { exact: true }).fill("10,01");
     await confirm.click();
     await expect.poll(() => failedReads).toBeGreaterThan(0);
     releaseStale();
@@ -435,7 +484,7 @@ test("poll anterior ao pagamento não libera saldo quando a atualização falha"
     ).toBeVisible();
     await expect(confirm).toBeDisabled();
     recover = true;
-    await expect(dialog.getByLabel("Valor a receber", { exact: true })).toHaveValue("289.99", {
+    await expect(dialog.getByLabel("Valor recebido", { exact: true })).toHaveValue("289,99", {
       timeout: 12_000,
     });
     await expect(confirm).toBeEnabled();
@@ -450,10 +499,8 @@ test("erro CASH_SHIFT_REQUIRED permanece inline após três segundos", async ({ 
   const state = await mockCheckoutApi(page, 28_740, 0, true);
   const dialog = await openCheckout(page);
   const form = dialog.locator("form.cashier-payment-form");
-  await form.getByLabel("Como receber").selectOption("custom");
   await form.getByLabel("Forma de pagamento").selectOption("cash");
-  await form.getByLabel("Valor a receber").fill("10.01");
-  await form.getByLabel("Valor recebido").fill("20.00");
+  await form.getByLabel("Valor recebido", { exact: true }).fill("10,01");
   await dialog
     .locator(".service-action-dock")
     .getByRole("button", { name: /Confirmar/ })

@@ -199,7 +199,7 @@ export function LocationModal({
           />
         </Label>
         <div className="inventory-modal-actions">
-          <Button onClick={onClose} variant="ghost">
+          <Button onClick={onClose} variant="secondary">
             Cancelar
           </Button>
           <Button
@@ -342,14 +342,6 @@ export function ItemModal({
             </NativeSelect>
           </Label>
           <Label className="gm-form-field">
-            <span>Código interno</span>
-            <Input maxLength={80} onChange={(e) => setSku(e.target.value)} value={sku} />
-          </Label>
-          <Label className="gm-form-field">
-            <span>Código de barras</span>
-            <Input maxLength={80} onChange={(e) => setBarcode(e.target.value)} value={barcode} />
-          </Label>
-          <Label className="gm-form-field">
             <span>Unidade de estoque</span>
             <NativeSelect onChange={(e) => setUnit(e.target.value)} value={unit}>
               {["un", "kg", "g", "l", "ml"].map((value) => (
@@ -360,26 +352,6 @@ export function ItemModal({
             </NativeSelect>
           </Label>
           <Label className="gm-form-field">
-            <span>Unidade de compra</span>
-            <Input
-              onChange={(e) => setPurchaseUnit(e.target.value)}
-              placeholder="Ex.: caixa"
-              value={purchaseUnit}
-            />
-          </Label>
-          <Label className="gm-form-field">
-            <span>Conversão para estoque</span>
-            <Input
-              inputMode="decimal"
-              onChange={(e) => setFactor(e.target.value)}
-              required
-              value={factor}
-            />
-            <small>
-              Quantidade em {unit || "un"} contida em cada {purchaseUnit || "unidade comprada"}.
-            </small>
-          </Label>
-          <Label className="gm-form-field">
             <span>Estoque mínimo</span>
             <Input
               inputMode="decimal"
@@ -388,39 +360,81 @@ export function ItemModal({
               value={minimum}
             />
           </Label>
-          <Label className="gm-form-field">
-            <span>Quantidade sugerida de compra</span>
-            <Input
-              inputMode="decimal"
-              onChange={(e) => setReorder(e.target.value)}
-              required
-              value={reorder}
-            />
-          </Label>
-          <Label className="gm-form-field">
-            <span>Prazo do fornecedor (dias)</span>
-            <Input
-              inputMode="numeric"
-              min={0}
-              onChange={(e) => setLeadTime(e.target.value)}
-              type="number"
-              value={leadTime}
-            />
-          </Label>
-          <Label className="gm-form-field">
-            <span>Fornecedor preferencial</span>
-            <NativeSelect onChange={(e) => setSupplierId(e.target.value)} value={supplierId}>
-              <option value="">Não definido</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </NativeSelect>
-          </Label>
+        </div>
+        <details className="gm-disclosure inventory-form-disclosure">
+          <summary>
+            <span className="inventory-disclosure-label">
+              <strong>Compra e identificação</strong>
+              <small className="inventory-disclosure-hint">
+                Códigos, conversão, reposição e fornecedor
+              </small>
+            </span>
+          </summary>
+          <div className="gm-form-grid inventory-form-grid [&>label]:flex-col [&>label]:items-stretch">
+            <Label className="gm-form-field">
+              <span>Código interno</span>
+              <Input maxLength={80} onChange={(e) => setSku(e.target.value)} value={sku} />
+            </Label>
+            <Label className="gm-form-field">
+              <span>Código de barras</span>
+              <Input maxLength={80} onChange={(e) => setBarcode(e.target.value)} value={barcode} />
+            </Label>
+            <Label className="gm-form-field">
+              <span>Unidade de compra</span>
+              <Input
+                onChange={(e) => setPurchaseUnit(e.target.value)}
+                placeholder="Ex.: caixa"
+                value={purchaseUnit}
+              />
+            </Label>
+            <Label className="gm-form-field">
+              <span>Conversão para estoque</span>
+              <Input
+                inputMode="decimal"
+                onChange={(e) => setFactor(e.target.value)}
+                required
+                value={factor}
+              />
+              <small>
+                Quantidade em {unit || "un"} contida em cada {purchaseUnit || "unidade comprada"}.
+              </small>
+            </Label>
+            <Label className="gm-form-field">
+              <span>Quantidade sugerida de compra</span>
+              <Input
+                inputMode="decimal"
+                onChange={(e) => setReorder(e.target.value)}
+                required
+                value={reorder}
+              />
+            </Label>
+            <Label className="gm-form-field">
+              <span>Prazo do fornecedor (dias)</span>
+              <Input
+                inputMode="numeric"
+                min={0}
+                onChange={(e) => setLeadTime(e.target.value)}
+                type="number"
+                value={leadTime}
+              />
+            </Label>
+            <Label className="gm-form-field inventory-form-grid__wide">
+              <span>Fornecedor preferencial</span>
+              <NativeSelect onChange={(e) => setSupplierId(e.target.value)} value={supplierId}>
+                <option value="">Não definido</option>
+                {suppliers.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Label>
+          </div>
+        </details>
+        <div className="gm-form-grid inventory-form-grid [&>label]:flex-col [&>label]:items-stretch">
           {kind === "resale" && (
             <Label className="gm-form-field inventory-form-grid__wide">
-              <span>Produto do Cardápio para baixa direta</span>
+              <span>Produto no cardápio</span>
               <NativeSelect
                 onChange={(e) => {
                   setProductId(e.target.value);
@@ -435,16 +449,13 @@ export function ItemModal({
                   </option>
                 ))}
               </NativeSelect>
-              <small>
-                Você pode receber a mercadoria antes de criar o produto. No Cardápio, escolha
-                Produto de revenda e busque este item para ativar a baixa por venda.
-              </small>
+              <small>Vincule agora ou depois para baixar o estoque nas vendas.</small>
             </Label>
           )}
           {kind === "resale" && !productId && (
             <p className="inventory-context-note inventory-form-grid__wide">
-              Vincule um produto do Cardápio para configurar vasilhames retornáveis. Até lá, o saldo
-              da bebida é controlado normalmente; os vasilhames cheios ainda não são calculados.
+              Para controlar vasilhames, vincule um produto no cardápio. Sem o vínculo, a bebida
+              mantém o saldo normal, mas os vasilhames cheios não entram na reconciliação.
             </p>
           )}
           {kind === "resale" && productId && (
@@ -503,7 +514,7 @@ export function ItemModal({
           )}
         </div>
         <div className="inventory-modal-actions">
-          <Button onClick={onClose} variant="ghost">
+          <Button onClick={onClose} variant="secondary">
             Cancelar
           </Button>
           <Button disabled={busy || !valid} type="submit">
@@ -760,7 +771,7 @@ export function InventoryEventModal({
           />
         </Label>
         <div className="inventory-modal-actions">
-          <Button onClick={onClose} variant="ghost">
+          <Button onClick={onClose} variant="secondary">
             Continuar depois
           </Button>
           <Button disabled={busy || lines.length === 0 || reason.trim().length < 3} type="submit">
@@ -1519,7 +1530,7 @@ export function ReturnableIncidentModal({
             />
           </Label>
         </div>
-        <Label className="gm-form-field">
+        <Label className="gm-form-field inventory-modal-field">
           <span>Justificativa e referência</span>
           <Textarea
             minLength={5}
@@ -1528,7 +1539,7 @@ export function ReturnableIncidentModal({
             value={reason}
           />
         </Label>
-        <Label className="gm-form-field">
+        <Label className="gm-form-field inventory-modal-field">
           <span>Evidências (uma URL por linha, até 10)</span>
           <Textarea
             aria-invalid={!evidenceValid}

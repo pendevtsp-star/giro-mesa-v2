@@ -11,8 +11,10 @@ namespace GiroMesa.EdgeHub.Tests;
 
 public sealed class EscPosPrinterGatewayTests
 {
-    [Fact]
-    public async Task SendsEscPosBytesToAConfiguredNetworkPrinter()
+    [Theory]
+    [InlineData("partial_statement", "PRE-CONTA")]
+    [InlineData("delivery_slip", "VIA DE ENTREGA")]
+    public async Task SendsEscPosBytesToAConfiguredNetworkPrinter(string documentType, string title)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -43,7 +45,7 @@ public sealed class EscPosPrinterGatewayTests
             .RootElement.Clone();
 
         var result = await gateway.PrintAsync(
-            new PrintRequest("job-1:1", null, "counter", "partial_statement", payload));
+            new PrintRequest("job-1:1", null, "counter", documentType, payload));
         var bytes = await received;
         listener.Stop();
 
@@ -52,6 +54,7 @@ public sealed class EscPosPrinterGatewayTests
         Assert.Equal("caixa", result.PrinterId);
         Assert.Equal(bytes.Length, result.BytesWritten);
         Assert.True(bytes.Length > 20);
+        Assert.Contains(title, Encoding.Latin1.GetString(bytes));
     }
 
     [Fact]
@@ -200,6 +203,8 @@ public sealed class EscPosPrinterGatewayTests
                 "logoRaster":{"encoding":"escpos-raster","widthDots":16,"heightDots":2,"dataBase64":"/wAA/w=="}
               },
               "context":{
+                "label":"Mesa 12","fulfillmentType":"dine_in","guestCount":4,"status":"open",
+                "displayNumber":12,"tableLabel":"Mesa 12",
                 "areaName":"Salao principal",
                 "squareName":"Praca A",
                 "waiterDisplayName":"Equipe A",
@@ -207,7 +212,6 @@ public sealed class EscPosPrinterGatewayTests
                 "closedAt":"2026-08-22T20:45:00-03:00",
                 "durationMinutes":95
               },
-              "tab":{"label":"Mesa 12","fulfillmentType":"dine_in","guestCount":4,"customerPhone":"81999999999"},
               "totals":{
                 "subtotalCents":4100,
                 "discountCents":100,
@@ -239,6 +243,10 @@ public sealed class EscPosPrinterGatewayTests
         var document = ThermalReceiptFormatter.FormatDocument("partial_statement", payload, width);
 
         Assert.Contains("CASA GIRO CENTRO", document.Text);
+        Assert.Contains("Mesa 12", document.Text);
+        Assert.Contains("PEDIDO 12", document.Text);
+        Assert.Contains("No salao | 4 pessoa(s)", document.Text);
+        Assert.Contains("STATUS: ABERTO", document.Text);
         Assert.Contains("CNPJ: 12.345.678/0001-90", document.Text);
         Assert.Contains("Rua Central", document.Text);
         Assert.Contains("TEL: (81) 3333-4444", document.Text);
@@ -295,7 +303,7 @@ public sealed class EscPosPrinterGatewayTests
         Assert.False(ContainsSequence(textFallback, [0x1d, 0x28, 0x4c]));
         Assert.True(ContainsSequence(
             graphic,
-            [0x1d, 0x28, 0x4c, 0x0e, 0x00, 0x30, 0x70, 0x30, 0x01, 0x01, 0x31]));
+            [0x1d, 0x28, 0x4c, 0x0e, 0x00, 0x30, 0x70, 0x30, 0x01, 0x01, 0x31, 0x10, 0x00, 0x02, 0x00]));
         Assert.True(ContainsSequence(graphic, [0x1d, 0x28, 0x4c, 0x02, 0x00, 0x30, 0x32]));
         Assert.Contains("CASA GIRO", Encoding.Latin1.GetString(textFallback));
         Assert.Contains("CASA GIRO", Encoding.Latin1.GetString(graphic));

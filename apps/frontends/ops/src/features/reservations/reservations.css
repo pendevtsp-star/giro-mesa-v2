@@ -3,6 +3,53 @@
     gap: var(--gm-space-3);
   }
 
+  .reception-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gm-space-3);
+    flex-wrap: wrap;
+  }
+
+  .reception-header h1 {
+    margin: 0;
+  }
+
+  .reception-actions {
+    border: 0;
+    padding: 0;
+    margin: 0;
+  }
+
+  .reception-header p {
+    color: var(--gm-muted);
+    font-size: var(--gm-font-sm);
+    margin: var(--gm-space-1) 0 0;
+  }
+
+  .reception-sync-label {
+    color: var(--gm-muted);
+    font-size: var(--gm-font-xs);
+  }
+
+  .reception-sync-warning {
+    color: var(--gm-warning);
+    font-size: var(--gm-font-xs);
+    font-weight: 700;
+  }
+
+  .reception-modal .action-form {
+    padding: 0;
+  }
+
+  .reception-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--gm-space-2);
+    padding-top: var(--gm-space-3);
+    border-top: 1px solid var(--gm-border);
+  }
+
   .reception-sync-status {
     align-items: center;
     display: flex;
@@ -70,7 +117,7 @@
     align-items: end;
     display: grid;
     gap: var(--gm-space-3);
-    grid-template-columns: minmax(280px, 1fr) 12rem auto;
+    grid-template-columns: minmax(0, 1fr) 12rem;
     padding: var(--gm-space-3);
   }
 
@@ -145,13 +192,6 @@
     outline-offset: -2px;
   }
 
-  .arrival-bar__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--gm-space-2);
-    justify-content: flex-end;
-  }
-
   .reservations-card .data-row > div:first-child {
     align-items: start;
     display: grid;
@@ -220,18 +260,7 @@
     z-index: 4;
   }
 
-  .reception-history {
-    border-top: 1px solid var(--gm-border);
-    padding-top: var(--gm-space-3);
-  }
-
-  .reception-history > summary {
-    cursor: pointer;
-    font-weight: 700;
-    margin-bottom: var(--gm-space-3);
-  }
-
-  .reception-history > .gm-button {
+  .reception-history .gm-modal__body > .gm-button {
     margin-top: var(--gm-space-3);
   }
 
@@ -248,16 +277,6 @@
     margin: 0;
   }
 
-  @media (max-width: 900px) {
-    .arrival-bar {
-      grid-template-columns: minmax(0, 1fr) auto;
-    }
-
-    .arrival-bar > .gm-form-field:first-child {
-      grid-column: 1 / -1;
-    }
-  }
-
   @media (max-width: 640px) {
     .arrival-bar {
       align-items: stretch;
@@ -268,25 +287,10 @@
       grid-column: auto;
     }
 
-    .arrival-bar__actions {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      justify-content: stretch;
-    }
-
-    .arrival-bar__actions .gm-button {
-      min-width: 0;
-      white-space: normal;
-    }
-
     .customer-lookup__status,
     .customer-selection {
       align-items: stretch;
       flex-direction: column;
-    }
-
-    .reservations-actions {
-      grid-template-columns: 1fr;
     }
 
     .reservations-card {

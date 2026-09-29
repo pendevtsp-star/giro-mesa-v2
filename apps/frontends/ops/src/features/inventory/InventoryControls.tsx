@@ -334,7 +334,7 @@ export function InventoryControls({
                 }}
               >
                 <p>{reasonAction.description}</p>
-                <Label>
+                <Label className="gm-field items-stretch">
                   <span>Justificativa</span>
                   <Textarea
                     autoFocus
@@ -471,7 +471,7 @@ function BlindCountCard({
         </Badge>
       </div>
       <form className="gm-form-stack" onSubmit={submit}>
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Setor da contagem</span>
           <NativeSelect
             required
@@ -512,7 +512,7 @@ function BlindCountCard({
         )}
         {!open && !submitted && (
           <>
-            <Label>
+            <Label className="gm-field items-stretch">
               <span>Escopo</span>
               <NativeSelect
                 value={scheduleId}
@@ -530,7 +530,7 @@ function BlindCountCard({
                   ))}
               </NativeSelect>
             </Label>
-            <Label>
+            <Label className="gm-field items-stretch">
               <span>Motivo</span>
               <Input
                 minLength={3}
@@ -554,7 +554,7 @@ function BlindCountCard({
               saldo esperado.
             </p>
             {open.lines.map((line) => (
-              <Label key={line.id}>
+              <Label className="gm-field items-stretch" key={line.id}>
                 <span>
                   {itemBy(inventory, line.inventoryItemId)}
                   {line.lotId ? ` · ${lotBy(inventory, line.lotId)}` : ""}
@@ -691,7 +691,7 @@ function SectorPolicyCard({ busy, data, inventory, onRun, scope }: ControlCardPr
           );
         }}
       >
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Setor</span>
           <NativeSelect
             value={locationId}
@@ -709,7 +709,7 @@ function SectorPolicyCard({ busy, data, inventory, onRun, scope }: ControlCardPr
           </NativeSelect>
         </Label>
         <div className="gm-form-grid">
-          <Label>
+          <Label className="gm-field items-stretch">
             <span>Mínima °C</span>
             <Input
               inputMode="decimal"
@@ -722,7 +722,7 @@ function SectorPolicyCard({ busy, data, inventory, onRun, scope }: ControlCardPr
               onChange={(event) => setMinimum(event.target.value)}
             />
           </Label>
-          <Label>
+          <Label className="gm-field items-stretch">
             <span>Máxima °C</span>
             <Input
               inputMode="decimal"
@@ -798,7 +798,7 @@ function TemperatureCard({
           );
         }}
       >
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Setor</span>
           <NativeSelect value={locationId} onChange={(event) => setLocationId(event.target.value)}>
             {inventory.locations.map((item) => (
@@ -808,7 +808,7 @@ function TemperatureCard({
             ))}
           </NativeSelect>
         </Label>
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Temperatura °C</span>
           <Input
             inputMode="decimal"
@@ -882,7 +882,7 @@ function LotHoldCard({
           );
         }}
       >
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Lote</span>
           <NativeSelect value={lotId} onChange={(event) => setLotId(event.target.value)}>
             {inventory.lots
@@ -894,7 +894,7 @@ function LotHoldCard({
               ))}
           </NativeSelect>
         </Label>
-        <Label>
+        <Label className="gm-field items-stretch">
           <span>Motivo</span>
           <Input
             minLength={5}

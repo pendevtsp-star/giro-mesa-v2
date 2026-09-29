@@ -1,5 +1,6 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: shadcn-compatible controls render native form elements nested by these labels
 import { Badge, Button, Card, Input, NativeSelect } from "@giromesa/ui";
+import { useState } from "react";
 import { type KdsAllDayItem, type KdsData, serviceModeLabel } from "../../operations.shared";
 import type { RealtimeStatus } from "../../realtime";
 import { type KdsAvailabilityChange, KdsAvailabilityPanel } from "./KdsAvailabilityPanel";
@@ -119,232 +120,166 @@ export function KdsSettingsPage({
   viewMode: "station" | "pass";
   cloudUnavailable: boolean;
 }) {
+  const [section, setSection] = useState("terminal");
   const selectedStation = data.stations.find((station) => station.id === stationId);
   const stationName = selectedStation?.name ?? "Todas as estações";
   const stationIsSpecific = stationId !== "all" && selectedStation !== undefined;
   const serviceMode = data.operationServiceMode
     ? serviceModeLabel(data.operationServiceMode)
     : "Não informado pelo servidor";
+  const sections: Array<[string, string]> = [
+    ["terminal", "Terminal"],
+    ["products", "Produtos e estações"],
+    ["hardware", "Impressão e teclas"],
+    ...(canManageUnitSettings && data.capabilities.analytics
+      ? [["history", "Histórico"] as [string, string]]
+      : []),
+  ];
 
   return (
     <div className="kds-settings" data-kds-settings>
-      <div className="kds-settings__intro gm-observability-row">
-        <div>
-          <strong>Configuração com escopo explícito</strong>
-          <p>
-            Preferências do terminal ficam neste navegador. Regras da unidade permanecem na fonte
-            operacional e não são simuladas localmente.
-          </p>
-        </div>
-        <Badge tone="info">Terminal ≠ unidade</Badge>
-      </div>
+      <fieldset className="gm-toolbar kds-settings-sections">
+        <legend className="gm-sr-only">Áreas de configuração do KDS</legend>
+        {sections.map(([value, label]) => (
+          <Button
+            aria-pressed={section === value}
+            key={value}
+            onClick={() => setSection(value)}
+            size="sm"
+            variant={section === value ? "primary" : "secondary"}
+          >
+            {label}
+          </Button>
+        ))}
+      </fieldset>
 
-      <div className="kds-settings__grid">
-        <Card className="kds-settings-card">
-          <header className="kds-settings-card__header">
-            <div>
-              <Badge tone="info">Somente este terminal</Badge>
-              <h2>Terminal</h2>
-              <p>Defina a estação, confira conexão e prepare este equipamento para o turno.</p>
-            </div>
-            <Badge tone={connectionReady ? "success" : "warning"}>
-              {connectionReady ? "Conectado" : "Requer atenção"}
-            </Badge>
-          </header>
-
-          <div className="gm-form-grid kds-settings-terminal-controls">
-            <label className="gm-form-field" htmlFor="kds-terminal-label">
-              <span>Nome deste terminal</span>
-              <Input
-                className="gm-form-control"
-                id="kds-terminal-label"
-                maxLength={80}
-                onChange={(event) => onTerminalLabelChange(event.target.value)}
-                value={terminalLabel}
-              />
-              <small>Instalação {installationId.slice(0, 8)} · identificação local estável.</small>
-            </label>
-            <fieldset>
-              <legend>Área ao abrir</legend>
-              <div className="segmented">
-                <Button
-                  aria-pressed={viewMode === "station"}
-                  onClick={() => onViewModeChange("station")}
-                  type="button"
-                >
-                  Estação
-                </Button>
-                <Button
-                  aria-pressed={viewMode === "pass"}
-                  onClick={() => onViewModeChange("pass")}
-                  type="button"
-                >
-                  Passe / expedição
-                </Button>
+      <div className="kds-settings__grid" data-section={section}>
+        {section === "terminal" && (
+          <Card className="kds-settings-card">
+            <header className="kds-settings-card__header">
+              <div>
+                <Badge tone="info">Somente este terminal</Badge>
+                <h2>Terminal</h2>
+                <p>Estação e preferências deste equipamento.</p>
               </div>
-            </fieldset>
-            <label className="gm-form-field" htmlFor="kds-settings-station">
-              <span>Estação deste terminal</span>
-              <NativeSelect
-                className="gm-form-control"
-                data-kds-station
-                disabled={stationLocked || viewMode === "pass"}
-                id="kds-settings-station"
-                onChange={(event) => onSelectStation(event.target.value)}
-                value={stationId}
-              >
-                <option value="all">Todas as estações</option>
-                {data.stations.map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.name}
-                  </option>
-                ))}
-              </NativeSelect>
-              <small>Seleção local deste navegador; não altera o roteamento dos produtos.</small>
-            </label>
-            <div className="kds-settings-lock">
-              <Button
-                aria-pressed={stationLocked}
-                disabled={!stationLocked && !stationIsSpecific}
-                onClick={onToggleStationLock}
-                size="sm"
-                variant={stationLocked ? "secondary" : "primary"}
-              >
-                {stationLocked ? "Liberar estação" : "Fixar estação neste terminal"}
-              </Button>
-              {!stationLocked && !stationIsSpecific && (
-                <small>Escolha uma estação específica para fixar o terminal.</small>
-              )}
-            </div>
-            <div className="kds-terminal-profile-state" role="status">
-              <Badge
-                tone={
-                  terminalProfileStatus === "synced"
-                    ? "success"
-                    : terminalProfileStatus === "error"
-                      ? "warning"
-                      : "neutral"
-                }
-              >
-                {terminalProfileStatus === "synced"
-                  ? "Sincronizado"
-                  : terminalProfileStatus === "loading"
-                    ? "Consultando perfil"
-                    : "Fallback local"}
+              <Badge tone={connectionReady ? "success" : "warning"}>
+                {connectionReady ? "Conectado" : "Requer atenção"}
               </Badge>
-              <small>{terminalProfileMessage}</small>
-              {terminalProfileCanManage && (
-                <Button
-                  disabled={
-                    terminalProfileBusy || cloudUnavailable || terminalLabel.trim().length < 1
-                  }
-                  onClick={onTerminalProfileSync}
-                  size="sm"
-                  variant="secondary"
+            </header>
+
+            <div className="gm-form-grid kds-settings-terminal-controls">
+              <label className="gm-form-field" htmlFor="kds-terminal-label">
+                <span>Nome deste terminal</span>
+                <Input
+                  className="gm-form-control"
+                  id="kds-terminal-label"
+                  maxLength={80}
+                  onChange={(event) => onTerminalLabelChange(event.target.value)}
+                  value={terminalLabel}
+                />
+                <small>Terminal {installationId.slice(0, 8)}</small>
+              </label>
+              <fieldset>
+                <legend>Área ao abrir</legend>
+                <div className="segmented">
+                  <Button
+                    aria-pressed={viewMode === "station"}
+                    onClick={() => onViewModeChange("station")}
+                    type="button"
+                  >
+                    Estação
+                  </Button>
+                  <Button
+                    aria-pressed={viewMode === "pass"}
+                    onClick={() => onViewModeChange("pass")}
+                    type="button"
+                  >
+                    Passe / expedição
+                  </Button>
+                </div>
+              </fieldset>
+              <label className="gm-form-field" htmlFor="kds-settings-station">
+                <span>Estação deste terminal</span>
+                <NativeSelect
+                  className="gm-form-control"
+                  data-kds-station
+                  disabled={stationLocked || viewMode === "pass"}
+                  id="kds-settings-station"
+                  onChange={(event) => onSelectStation(event.target.value)}
+                  value={stationId}
                 >
-                  {terminalProfileBusy ? "Sincronizando…" : "Sincronizar perfil do terminal"}
+                  <option value="all">Todas as estações</option>
+                  {data.stations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+                <small>Seleção deste navegador.</small>
+              </label>
+              <div className="kds-settings-lock">
+                <Button
+                  aria-pressed={stationLocked}
+                  disabled={!stationLocked && !stationIsSpecific}
+                  onClick={onToggleStationLock}
+                  size="sm"
+                  variant={stationLocked ? "secondary" : "primary"}
+                >
+                  {stationLocked ? "Liberar estação" : "Fixar estação neste terminal"}
                 </Button>
-              )}
+                {!stationLocked && !stationIsSpecific && (
+                  <small>Escolha uma estação específica para fixar o terminal.</small>
+                )}
+              </div>
+              <div className="kds-terminal-profile-state" role="status">
+                <Badge
+                  tone={
+                    terminalProfileStatus === "synced"
+                      ? "success"
+                      : terminalProfileStatus === "error"
+                        ? "warning"
+                        : "neutral"
+                  }
+                >
+                  {terminalProfileStatus === "synced"
+                    ? "Sincronizado"
+                    : terminalProfileStatus === "loading"
+                      ? "Consultando perfil"
+                      : "Salvo neste navegador"}
+                </Badge>
+                <small>{terminalProfileMessage}</small>
+                {terminalProfileCanManage && (
+                  <Button
+                    disabled={
+                      terminalProfileBusy || cloudUnavailable || terminalLabel.trim().length < 1
+                    }
+                    onClick={onTerminalProfileSync}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {terminalProfileBusy ? "Sincronizando…" : "Sincronizar perfil do terminal"}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
 
-          <KdsOpeningChecklist
-            checklistKey={checklistKey}
-            connectionReady={connectionReady}
-            fullscreen={fullscreen}
-            onPrint={onPrint}
-            onTestSound={onTestSound}
-            onToggleFullscreen={onToggleFullscreen}
-            operatingDay={operatingDay}
-            realtimeStatus={realtimeStatus}
-            soundEnabled={soundEnabled}
-            stationLocked={stationLocked && stationIsSpecific}
-            stationName={stationName}
-          />
-        </Card>
+            <KdsOpeningChecklist
+              checklistKey={checklistKey}
+              connectionReady={connectionReady}
+              fullscreen={fullscreen}
+              onPrint={onPrint}
+              onTestSound={onTestSound}
+              onToggleFullscreen={onToggleFullscreen}
+              operatingDay={operatingDay}
+              realtimeStatus={realtimeStatus}
+              soundEnabled={soundEnabled}
+              stationLocked={stationLocked && stationIsSpecific}
+              stationName={stationName}
+            />
+          </Card>
+        )}
 
-        <Card className="kds-settings-card">
-          <header className="kds-settings-card__header">
-            <div>
-              <Badge tone="neutral">Configuração da unidade</Badge>
-              <h2>Estações e roteamento</h2>
-              <p>Leitura das estações publicadas para esta unidade e da capacidade informada.</p>
-            </div>
-          </header>
-
-          {data.stations.length === 0 ? (
-            <p className="kds-settings-empty">Nenhuma estação foi publicada pelo servidor.</p>
-          ) : (
-            <ul className="kds-settings-stations">
-              {data.stations.map((station) => {
-                const capacity = station.capacity;
-                const details = capacity
-                  ? [
-                      numberLabel(capacity.activeAssignments, "atribuições ativas"),
-                      numberLabel(capacity.blockedAssignments, "bloqueadas"),
-                      numberLabel(capacity.queuedQuantity, "na fila"),
-                      numberLabel(capacity.preparingQuantity, "preparando"),
-                    ].filter((value): value is string => value !== null)
-                  : [];
-                return (
-                  <li key={station.id}>
-                    <span>
-                      <strong>{station.name}</strong>
-                      {station.code && <small>{station.code}</small>}
-                    </span>
-                    <small>
-                      {details.length > 0
-                        ? details.join(" · ")
-                        : "Sem capacidade quantitativa nos dados atuais"}
-                    </small>
-                    {capacity?.recommendation && capacity.recommendation.state !== "normal" && (
-                      <Badge
-                        tone={capacity.recommendation.state === "overloaded" ? "danger" : "warning"}
-                      >
-                        {capacity.recommendation.suggestedDelayMinutes
-                          ? `Sugerir +${capacity.recommendation.suggestedDelayMinutes} min`
-                          : "Revisar capacidade"}
-                      </Badge>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          <div className="kds-settings-unit-action">
-            {canManageUnitSettings ? (
-              <>
-                <a className="gm-button gm-button--secondary gm-button--sm" href="#/catalog">
-                  Configurar produtos no Cardápio
-                </a>
-                <small>
-                  Em “Estações de produção”, cada estação selecionada recebe o item e precisa
-                  concluí-lo.
-                </small>
-              </>
-            ) : (
-              <small>
-                Você pode consultar estas estações. Alterações de roteamento exigem permissão de
-                gestão do Cardápio.
-              </small>
-            )}
-          </div>
-        </Card>
-
-        <KdsHardwareSettings
-          bumpMap={bumpMap}
-          hardwarePrinting={data.capabilities.hardwarePrinting}
-          onBumpMapChange={onBumpMapChange}
-          onPrinterPreferencesChange={onPrinterPreferencesChange}
-          onReprint={onReprint}
-          onTestPrint={onPrint}
-          printBusy={printBusy}
-          printerLabel={printerLabel}
-          printerPreferences={printerPreferences}
-        />
-
-        {data.capabilities.availability && (
+        {section === "products" && data.capabilities.availability && (
           <KdsAvailabilityPanel
             busyKeys={busyKeys}
             canManage={canManageUnitSettings}
@@ -356,123 +291,206 @@ export function KdsSettingsPage({
           />
         )}
 
-        <Card className="kds-settings-card">
-          <header className="kds-settings-card__header">
-            <div>
-              <Badge tone="neutral">Configuração da unidade</Badge>
-              <h2>Fluxo</h2>
-              <p>Comportamentos habilitados pelo contrato operacional atual.</p>
-            </div>
-          </header>
-          <dl className="kds-settings-flow">
-            <div>
-              <dt>Modelo de atendimento</dt>
-              <dd>{serviceMode}</dd>
-            </div>
-            <div>
-              <dt>Sequência de cursos</dt>
-              <dd>{data.capabilities.courseFire ? "Disponível" : "Não habilitada"}</dd>
-            </div>
-            <div>
-              <dt>Pronto parcial</dt>
-              <dd>{data.capabilities.partialReady ? "Disponível" : "Não habilitado"}</dd>
-            </div>
-            <div>
-              <dt>Entrega no passe</dt>
-              <dd>{data.capabilities.handoff ? "Disponível" : "Não habilitado"}</dd>
-            </div>
-            <div>
-              <dt>Lotes de produção</dt>
-              <dd>{data.capabilities.batches ? "Disponíveis" : "Não habilitados"}</dd>
-            </div>
-          </dl>
-          <small className="kds-settings-scope-note">
-            Esta tela só grava regras quando o serviço está disponível; ela reflete a configuração
-            recebida.
-          </small>
-        </Card>
+        {section === "products" && (
+          <Card className="kds-settings-card">
+            <header className="kds-settings-card__header">
+              <div>
+                <Badge tone="neutral">Configuração da unidade</Badge>
+                <h2>Estações e roteamento</h2>
+                <p>Estações e capacidade da unidade.</p>
+              </div>
+            </header>
 
-        <Card className="kds-settings-card">
-          <header className="kds-settings-card__header">
-            <div>
-              <Badge tone="info">Somente este terminal</Badge>
-              <h2>Aparência</h2>
-              <p>Preferências visuais e de atenção deste navegador.</p>
-            </div>
-          </header>
+            {data.stations.length === 0 ? (
+              <p className="kds-settings-empty">Nenhuma estação foi publicada pelo servidor.</p>
+            ) : (
+              <ul className="kds-settings-stations">
+                {data.stations.map((station) => {
+                  const capacity = station.capacity;
+                  const details = capacity
+                    ? [
+                        numberLabel(capacity.activeAssignments, "atribuições ativas"),
+                        numberLabel(capacity.blockedAssignments, "bloqueadas"),
+                        numberLabel(capacity.queuedQuantity, "na fila"),
+                        numberLabel(capacity.preparingQuantity, "preparando"),
+                      ].filter((value): value is string => value !== null)
+                    : [];
+                  return (
+                    <li key={station.id}>
+                      <span>
+                        <strong>{station.name}</strong>
+                        {station.code && <small>{station.code}</small>}
+                      </span>
+                      <small>
+                        {details.length > 0 ? details.join(" · ") : "Capacidade não informada"}
+                      </small>
+                      {capacity?.recommendation && capacity.recommendation.state !== "normal" && (
+                        <Badge
+                          tone={
+                            capacity.recommendation.state === "overloaded" ? "danger" : "warning"
+                          }
+                        >
+                          {capacity.recommendation.suggestedDelayMinutes
+                            ? `Sugerir +${capacity.recommendation.suggestedDelayMinutes} min`
+                            : "Revisar capacidade"}
+                        </Badge>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
-          <div className="kds-settings-options">
-            <div>
-              <span>
-                <strong>Alertas sonoros</strong>
-                <small>Válido nesta sessão do navegador.</small>
-              </span>
-              <Button
-                aria-pressed={soundEnabled}
-                onClick={onToggleSound}
-                size="sm"
-                variant="secondary"
-              >
-                {soundEnabled ? "Desativar som" : "Ativar som"}
-              </Button>
+            <div className="kds-settings-unit-action">
+              {canManageUnitSettings ? (
+                <>
+                  <a className="gm-button gm-button--secondary gm-button--sm" href="#/catalog">
+                    Configurar produtos no Cardápio
+                  </a>
+                  <small>
+                    Em “Estações de produção”, cada estação selecionada recebe o item e precisa
+                    concluí-lo.
+                  </small>
+                </>
+              ) : (
+                <small>
+                  Você pode consultar estas estações. Alterações de roteamento exigem permissão de
+                  gestão do Cardápio.
+                </small>
+              )}
             </div>
+          </Card>
+        )}
 
-            <fieldset>
-              <legend>Densidade dos tickets</legend>
-              <div className="segmented">
+        {section === "hardware" && (
+          <KdsHardwareSettings
+            bumpMap={bumpMap}
+            hardwarePrinting={data.capabilities.hardwarePrinting}
+            onBumpMapChange={onBumpMapChange}
+            onPrinterPreferencesChange={onPrinterPreferencesChange}
+            onReprint={onReprint}
+            onTestPrint={onPrint}
+            printBusy={printBusy}
+            printerLabel={printerLabel}
+            printerPreferences={printerPreferences}
+          />
+        )}
+
+        {section === "products" && (
+          <Card className="kds-settings-card kds-settings-flow-card">
+            <header className="kds-settings-card__header">
+              <div>
+                <Badge tone="neutral">Configuração da unidade</Badge>
+                <h2>Fluxo</h2>
+              </div>
+            </header>
+            <dl className="kds-settings-flow">
+              <div>
+                <dt>Modelo de atendimento</dt>
+                <dd>{serviceMode}</dd>
+              </div>
+              <div>
+                <dt>Sequência de preparo</dt>
+                <dd>{data.capabilities.courseFire ? "Disponível" : "Não habilitada"}</dd>
+              </div>
+              <div>
+                <dt>Pronto parcial</dt>
+                <dd>{data.capabilities.partialReady ? "Disponível" : "Não habilitado"}</dd>
+              </div>
+              <div>
+                <dt>Entrega no passe</dt>
+                <dd>{data.capabilities.handoff ? "Disponível" : "Não habilitado"}</dd>
+              </div>
+              <div>
+                <dt>Lotes de produção</dt>
+                <dd>{data.capabilities.batches ? "Disponíveis" : "Não habilitados"}</dd>
+              </div>
+            </dl>
+          </Card>
+        )}
+
+        {section === "terminal" && (
+          <Card className="kds-settings-card">
+            <header className="kds-settings-card__header">
+              <div>
+                <Badge tone="info">Somente este terminal</Badge>
+                <h2>Aparência</h2>
+              </div>
+            </header>
+
+            <div className="kds-settings-options">
+              <div>
+                <span>
+                  <strong>Alertas sonoros</strong>
+                  <small>Válido nesta sessão do navegador.</small>
+                </span>
                 <Button
-                  aria-pressed={density === "compact"}
-                  onClick={() => onDensityChange("compact")}
-                  type="button"
+                  aria-pressed={soundEnabled}
+                  onClick={onToggleSound}
+                  size="sm"
+                  variant="secondary"
                 >
-                  Compacta
-                </Button>
-                <Button
-                  aria-pressed={density === "comfortable"}
-                  onClick={() => onDensityChange("comfortable")}
-                  type="button"
-                >
-                  Confortável
+                  {soundEnabled ? "Desativar som" : "Ativar som"}
                 </Button>
               </div>
-            </fieldset>
 
-            <label>
-              <input
-                checked={allDayExpanded}
-                onChange={(event) => onAllDayExpandedChange(event.target.checked)}
-                type="checkbox"
-              />
-              <span>
-                <strong>Abrir All-day por padrão</strong>
-                <small>O resumo continua secundário à fila de tickets.</small>
-              </span>
-            </label>
+              <fieldset>
+                <legend>Densidade dos tickets</legend>
+                <div className="segmented">
+                  <Button
+                    aria-pressed={density === "compact"}
+                    onClick={() => onDensityChange("compact")}
+                    type="button"
+                  >
+                    Compacta
+                  </Button>
+                  <Button
+                    aria-pressed={density === "comfortable"}
+                    onClick={() => onDensityChange("comfortable")}
+                    type="button"
+                  >
+                    Confortável
+                  </Button>
+                </div>
+              </fieldset>
 
-            <div>
-              <span>
-                <strong>Tela cheia</strong>
-                <small>A preferência é sincronizável; entrar exige gesto neste navegador.</small>
-              </span>
-              <span className="kds-settings-inline-actions">
-                <label>
-                  <input
-                    checked={fullscreenPreferred}
-                    onChange={(event) => onFullscreenPreferredChange(event.target.checked)}
-                    type="checkbox"
-                  />
-                  Preferir ao abrir
-                </label>
-                <Button onClick={onToggleFullscreen} size="sm" variant="ghost">
-                  {fullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
-                </Button>
-              </span>
+              <label>
+                <input
+                  checked={allDayExpanded}
+                  onChange={(event) => onAllDayExpandedChange(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Abrir resumo da produção</strong>
+                  <small>Exibe as quantidades por produto.</small>
+                </span>
+              </label>
+
+              <div>
+                <span>
+                  <strong>Tela cheia</strong>
+                  <small>Ative neste equipamento ao iniciar o turno.</small>
+                </span>
+                <span className="kds-settings-inline-actions">
+                  <label>
+                    <input
+                      checked={fullscreenPreferred}
+                      onChange={(event) => onFullscreenPreferredChange(event.target.checked)}
+                      type="checkbox"
+                    />
+                    Preferir ao abrir
+                  </label>
+                  <Button onClick={onToggleFullscreen} size="sm" variant="ghost">
+                    {fullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"}
+                  </Button>
+                </span>
+              </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
 
-      {canManageUnitSettings && data.capabilities.analytics && (
+      {section === "history" && canManageUnitSettings && data.capabilities.analytics && (
         <section aria-label="Métricas gerenciais da produção" className="kds-settings-analytics">
           <KdsAnalyticsPanel
             analytics={analytics}

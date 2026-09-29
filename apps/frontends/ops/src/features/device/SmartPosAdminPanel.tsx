@@ -198,7 +198,7 @@ function PairingCard({ organizationId, unitId }: { organizationId: string; unitI
             void createPairing();
           }}
         >
-          <Label htmlFor="smartpos-pairing-label">
+          <Label className="gm-field items-stretch" htmlFor="smartpos-pairing-label">
             Nome operacional do terminal
             <Input
               autoComplete="off"
@@ -458,7 +458,7 @@ function ReconciliationPanel({
             antes de considerar o recebimento confirmado.
           </p>
         </div>
-        <Label htmlFor="smartpos-reconciliation-filter">
+        <Label className="gm-field items-stretch" htmlFor="smartpos-reconciliation-filter">
           Status
           <NativeSelect
             id="smartpos-reconciliation-filter"
@@ -597,7 +597,7 @@ function HomologationPanel({
           }}
         >
           <div className="smartpos-form-grid">
-            <Label htmlFor="smartpos-homologation-device">
+            <Label className="gm-field items-stretch" htmlFor="smartpos-homologation-device">
               Terminal
               <NativeSelect
                 id="smartpos-homologation-device"
@@ -612,7 +612,7 @@ function HomologationPanel({
                 ))}
               </NativeSelect>
             </Label>
-            <Label htmlFor="smartpos-homologation-environment">
+            <Label className="gm-field items-stretch" htmlFor="smartpos-homologation-environment">
               Ambiente
               <NativeSelect
                 id="smartpos-homologation-environment"
@@ -626,7 +626,7 @@ function HomologationPanel({
                 <option value="production">Produção</option>
               </NativeSelect>
             </Label>
-            <Label htmlFor="smartpos-terminal-hash">
+            <Label className="gm-field items-stretch" htmlFor="smartpos-terminal-hash">
               Hash do serial do terminal
               <Input
                 autoComplete="off"
@@ -638,7 +638,7 @@ function HomologationPanel({
               />
               <small>SHA-256 hexadecimal com 64 caracteres; não informe o serial bruto.</small>
             </Label>
-            <Label htmlFor="smartpos-evidence-reference">
+            <Label className="gm-field items-stretch" htmlFor="smartpos-evidence-reference">
               Referência da evidência
               <Input
                 id="smartpos-evidence-reference"
@@ -667,7 +667,7 @@ function HomologationPanel({
               )}
             </div>
           </fieldset>
-          <Label htmlFor="smartpos-homologation-notes">
+          <Label className="gm-field items-stretch" htmlFor="smartpos-homologation-notes">
             Observações
             <Textarea
               id="smartpos-homologation-notes"

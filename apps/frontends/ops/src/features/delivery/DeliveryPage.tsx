@@ -44,7 +44,7 @@ import {
 } from "../../realtime";
 import { formatMoney } from "../../rules";
 
-type Tab = "orders" | "zones";
+type Tab = "orders" | "couriers" | "zones";
 type Filter = "all" | "late" | "scheduled";
 type Column = "received" | "preparing" | "ready" | "dispatched";
 type TransitionStatus = Exclude<DeliveryOrderStatus, "draft" | "dispatched">;
@@ -110,9 +110,24 @@ function columnFor(status: DeliveryOrderStatus): Column | null {
   return status === "dispatched" || status === "delivery_failed" ? "dispatched" : null;
 }
 
-export function deliveryStatusLabel(status: DeliveryOrderStatus) {
-  return {
+export function deliveryColumnSummary(
+  orders: Array<Pick<DeliveryOrder, "status" | "promisedAt" | "totalCents">>,
+) {
+  return columns.map((column) => {
+    const matching = orders.filter((order) => columnFor(order.status) === column.id);
+    return {
+      ...column,
+      count: matching.length,
+      totalCents: matching.reduce((sum, order) => sum + order.totalCents, 0),
+      lateCount: matching.filter(isLate).length,
+    };
+  });
+}
+
+export function deliveryStatusLabel(status: string) {
+  const labels = {
     draft: "Rascunho",
+    sent: "Enviado",
     placed: "Recebido",
     confirmed: "Confirmado",
     preparing: "Em preparo",
@@ -122,7 +137,10 @@ export function deliveryStatusLabel(status: DeliveryOrderStatus) {
     returned: "Devolvido à loja",
     completed: "Concluído",
     canceled: "Cancelado",
-  }[status];
+    served: "Entregue",
+    empty: "Sem pedidos",
+  };
+  return Object.hasOwn(labels, status) ? labels[status as keyof typeof labels] : "Em revisão";
 }
 
 export function deliveryPaymentMethodLabel(method: string) {
@@ -226,7 +244,7 @@ function isScheduled(order: DeliveryOrder) {
   return Boolean(order.scheduledFor);
 }
 
-function isLate(order: DeliveryOrder) {
+function isLate(order: Pick<DeliveryOrder, "status" | "promisedAt">) {
   return isDeliverySlaOverdue(order);
 }
 
@@ -511,27 +529,17 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
 
   const [mobileColumn, setMobileColumn] = useState<Column | "all">("all");
 
-  const summary = useMemo(
-    () =>
-      columns.map((column) => {
-        const columnOrders =
-          orders.state.status === "ready"
-            ? orders.state.data.filter((order) => columnFor(order.status) === column.id)
-            : [];
-        return {
-          ...column,
-          count: columnOrders.length,
-          totalCents: columnOrders.reduce((sum, order) => sum + order.totalCents, 0),
-          lateCount: columnOrders.filter(isLate).length,
-        };
-      }),
-    [orders.state],
-  );
+  const summary = useMemo(() => deliveryColumnSummary(visibleOrders), [visibleOrders]);
 
   const totalVolumeCents = useMemo(
     () => summary.reduce((sum, col) => sum + col.totalCents, 0),
     [summary],
   );
+
+  function openOrder(order: DeliveryOrder) {
+    setNotice(null);
+    setSelected(order);
+  }
 
   async function transition(
     order: DeliveryOrder,
@@ -774,7 +782,13 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
         active: values.active,
         ...(values.radiusKm === undefined
           ? {}
-          : { geometry: { type: "unit-radius", radiusKm: values.radiusKm } }),
+          : {
+              geometry: {
+                ...currentZone?.geometry,
+                type: "unit-radius",
+                radiusKm: values.radiusKm,
+              },
+            }),
       };
       const response = currentZone
         ? await api.growth.updateDeliveryZone(scope.organizationId, currentZone.id, zoneValues)
@@ -798,11 +812,15 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
 
   return (
     <div className="delivery-page">
+      <header className="delivery-page__header">
+        <h1>Entregas</h1>
+      </header>
       <div className="delivery-page__toolbar gm-toolbar">
         <SegmentedTabs
           active={tab}
           items={[
             { id: "orders", label: "Pedidos" },
+            ...(canManage ? [{ id: "couriers" as const, label: "Entregadores" }] : []),
             { id: "zones", label: "Zonas" },
           ]}
           label="Área do delivery"
@@ -822,6 +840,94 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
           {notice.text}
         </p>
       )}
+      {tab === "couriers" && canManage && (
+        <RemoteGate remote={couriers}>
+          {(courierList) => (
+            <Card className="delivery-couriers" aria-label="Disponibilidade dos entregadores">
+              <div className="delivery-couriers__header">
+                <div>
+                  <strong>Entregadores</strong>
+                  <span className="delivery-couriers__stats">
+                    {courierList.filter((c) => c.status === "available").length} disponíveis ·{" "}
+                    {courierList.filter((c) => c.status === "delivering").length} em entrega ·{" "}
+                    {courierList.length} total
+                  </span>
+                </div>
+                <Button onClick={() => setCreatingCourier(true)} size="sm" variant="secondary">
+                  Cadastrar entregador
+                </Button>
+              </div>
+              {courierList.length === 0 ? (
+                <p className="delivery-couriers__empty">
+                  Nenhum entregador cadastrado nesta unidade.
+                </p>
+              ) : (
+                <div className="delivery-couriers__grid">
+                  {courierList.map((courier) => {
+                    const whatsAppLink = courier.phone
+                      ? buildCourierWhatsAppLink(courier.phone, courier.name)
+                      : null;
+                    return (
+                      <div className="delivery-courier-card" key={courier.id}>
+                        <div className="delivery-courier-card__info">
+                          <div className="delivery-courier-card__name-line">
+                            <strong>{courier.name}</strong>
+                            <Badge
+                              tone={
+                                courier.status === "available"
+                                  ? "success"
+                                  : courier.status === "delivering"
+                                    ? "warning"
+                                    : "neutral"
+                              }
+                            >
+                              {deliveryCourierStatusLabel(courier.status)}
+                            </Badge>
+                          </div>
+                          <small className="delivery-courier-card__ref">{courier.reference}</small>
+                          {courier.phone && (
+                            <span className="delivery-courier-card__phone">{courier.phone}</span>
+                          )}
+                        </div>
+                        <div className="delivery-courier-card__actions">
+                          {whatsAppLink && (
+                            <a
+                              className="gm-button gm-button--secondary gm-button--sm"
+                              href={whatsAppLink}
+                              rel="noopener noreferrer"
+                              target="_blank"
+                              title="Chamar entregador no WhatsApp"
+                            >
+                              WhatsApp
+                            </a>
+                          )}
+                          <Button
+                            disabled={
+                              busy === courier.id ||
+                              (courier.status !== "available" && courier.status !== "offline")
+                            }
+                            onClick={() => void setCourierStatus(courier)}
+                            size="sm"
+                            variant="secondary"
+                          >
+                            {courier.status === "available"
+                              ? "Ficar offline"
+                              : courier.status === "offline"
+                                ? "Ficar disponível"
+                                : courier.status === "assigned"
+                                  ? "Atribuído"
+                                  : "Em entrega"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          )}
+        </RemoteGate>
+      )}
       {tab === "orders" ? (
         <section className="delivery-operations" aria-label="Pedidos de delivery">
           {!online && (
@@ -830,7 +936,7 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
             </p>
           )}
           {displayedOrders.state.status === "loading" ? (
-            <Loading label="Carregando pedidos persistidos…" />
+            <Loading label="Carregando pedidos…" />
           ) : displayedOrders.state.status === "error" ? (
             <Failure
               message={displayedOrders.state.message}
@@ -856,170 +962,32 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
               {projectionStatus.state.status === "ready" &&
                 projectionStatus.state.data.totalMissing > 0 && (
                   <Callout tone="warning">
-                    <strong>
-                      {projectionStatus.state.data.totalMissing} comanda(s) de delivery precisam de
-                      revisão de projeção.
-                    </strong>
-                    <p>
-                      A comanda existe no atendimento, mas ainda não aparece como pedido nesta fila.
-                      Revise o status e a origem sem recriar o pedido.
-                    </p>
+                    <strong>Fora da fila: {projectionStatus.state.data.totalMissing}</strong>
+                    <p>Complete zona e endereço no atendimento, sem recriar o pedido.</p>
                     <ul>
                       {groupDeliveryProjectionGaps(projectionStatus.state.data).map((gap) => (
                         <li key={gap.tabId}>
                           <a href={`#/counter?tab=${encodeURIComponent(gap.tabId)}`}>
                             Abrir {gap.reference}
                           </a>{" "}
-                          · {gap.status}
+                          · {deliveryStatusLabel(gap.status)}
                         </li>
                       ))}
                     </ul>
                   </Callout>
                 )}
-              <Card
-                className="delivery-realtime-notices"
-                aria-label="Atualizações auditáveis do delivery"
+
+              <section
+                className="delivery-operations__summary"
+                aria-label="Resumo dos pedidos em operação"
               >
-                <div>
-                  <strong>Atualizações recentes</strong>
-                  <span>Eventos recebidos nesta sessão</span>
-                </div>
-                {realtimeEvents.length === 0 ? (
-                  <p>Nenhum evento de delivery recebido.</p>
-                ) : (
-                  <ol>
-                    {realtimeEvents.map((event, index) => (
-                      <li
-                        key={`${event.aggregateId ?? event.topic ?? "delivery"}-${event.createdAt ?? index}`}
-                      >
-                        <span>{eventLabel(event.topic)}</span>
-                        <time dateTime={event.createdAt}>
-                          {event.createdAt ? dateTime(event.createdAt) : "Agora"}
-                        </time>
-                      </li>
-                    ))}
-                  </ol>
+                <strong>{visibleOrders.length} em operação</strong>
+                <span>{formatMoney(totalVolumeCents)}</span>
+                {summary.some((item) => item.lateCount > 0) && (
+                  <Badge tone="danger">
+                    {summary.reduce((count, item) => count + item.lateCount, 0)} atrasado(s)
+                  </Badge>
                 )}
-              </Card>
-              {canManage && couriers.state.status === "ready" && (
-                <Card className="delivery-couriers" aria-label="Disponibilidade dos entregadores">
-                  <div className="delivery-couriers__header">
-                    <div>
-                      <strong>🛵 Central de Entregadores</strong>
-                      <span className="delivery-couriers__stats">
-                        {couriers.state.data.filter((c) => c.status === "available").length}{" "}
-                        disponíveis ·{" "}
-                        {couriers.state.data.filter((c) => c.status === "delivering").length} em
-                        entrega · {couriers.state.data.length} total
-                      </span>
-                    </div>
-                    <Button onClick={() => setCreatingCourier(true)} size="sm" variant="secondary">
-                      + Cadastrar entregador
-                    </Button>
-                  </div>
-                  {couriers.state.data.length === 0 ? (
-                    <p className="delivery-couriers__empty">
-                      Nenhum entregador cadastrado nesta unidade.
-                    </p>
-                  ) : (
-                    <div className="delivery-couriers__grid">
-                      {couriers.state.data.map((courier) => {
-                        const whatsAppLink = courier.phone
-                          ? buildCourierWhatsAppLink(courier.phone, courier.name)
-                          : null;
-                        return (
-                          <div className="delivery-courier-card" key={courier.id}>
-                            <div className="delivery-courier-card__info">
-                              <div className="delivery-courier-card__name-line">
-                                <strong>{courier.name}</strong>
-                                <Badge
-                                  tone={
-                                    courier.status === "available"
-                                      ? "success"
-                                      : courier.status === "delivering"
-                                        ? "warning"
-                                        : "neutral"
-                                  }
-                                >
-                                  {courier.status === "available"
-                                    ? "Disponível"
-                                    : courier.status === "delivering"
-                                      ? "Em entrega"
-                                      : "Offline"}
-                                </Badge>
-                              </div>
-                              <small className="delivery-courier-card__ref">
-                                {courier.reference}
-                              </small>
-                              {courier.phone && (
-                                <span className="delivery-courier-card__phone">
-                                  {courier.phone}
-                                </span>
-                              )}
-                            </div>
-                            <div className="delivery-courier-card__actions">
-                              {whatsAppLink && (
-                                <a
-                                  className="delivery-courier-wa-btn"
-                                  href={whatsAppLink}
-                                  rel="noopener noreferrer"
-                                  target="_blank"
-                                  title="Chamar entregador no WhatsApp"
-                                >
-                                  💬 WhatsApp
-                                </a>
-                              )}
-                              <Button
-                                disabled={
-                                  busy === courier.id ||
-                                  (courier.status !== "available" && courier.status !== "offline")
-                                }
-                                onClick={() => void setCourierStatus(courier)}
-                                size="sm"
-                                variant="secondary"
-                              >
-                                {courier.status === "available"
-                                  ? "Ficar offline"
-                                  : courier.status === "offline"
-                                    ? "Ficar disponível"
-                                    : courier.status === "assigned"
-                                      ? "Atribuído"
-                                      : "Em entrega"}
-                              </Button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </Card>
-              )}
-              <section className="delivery-summary" aria-label="Resumo dos pedidos em operação">
-                {summary.map((item) => (
-                  <span className="delivery-summary-pill" key={item.id}>
-                    <div className="delivery-summary-pill__top">
-                      <strong>{item.count}</strong>
-                      <span className="delivery-summary-pill__amount">
-                        {formatMoney(item.totalCents)}
-                      </span>
-                    </div>
-                    <div className="delivery-summary-pill__label-line">
-                      <small>{item.label}</small>
-                      {item.lateCount > 0 && <Badge tone="danger">⚠️ {item.lateCount}</Badge>}
-                    </div>
-                  </span>
-                ))}
-                <span className="delivery-summary-pill delivery-summary-pill--total">
-                  <div className="delivery-summary-pill__top">
-                    <strong>{visibleOrders.length}</strong>
-                    <span className="delivery-summary-pill__amount">
-                      {formatMoney(totalVolumeCents)}
-                    </span>
-                  </div>
-                  <div className="delivery-summary-pill__label-line">
-                    <small>Total em operação</small>
-                  </div>
-                </span>
               </section>
               <div className="delivery-operations__filters">
                 <SegmentedTabs
@@ -1077,10 +1045,10 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                                 key={order.id}
                                 onAdvance={() =>
                                   nextAction(order)?.dispatch || !nextAction(order)?.status
-                                    ? setSelected(order)
+                                    ? openOrder(order)
                                     : void transition(order)
                                 }
-                                onOpen={() => setSelected(order)}
+                                onOpen={() => openOrder(order)}
                                 order={order}
                               />
                             ))}
@@ -1089,28 +1057,22 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                     })}
                   </div>
                   <div className="delivery-list-real">
-                    <div className="delivery-mobile-column-tabs">
-                      <button
-                        className={`delivery-col-tab ${mobileColumn === "all" ? "delivery-col-tab--active" : ""}`}
-                        onClick={() => setMobileColumn("all")}
-                        type="button"
-                      >
-                        Todos ({visibleOrders.length})
-                      </button>
-                      {columns.map((col) => {
-                        const colCount = summary.find((item) => item.id === col.id)?.count ?? 0;
-                        return (
-                          <button
-                            className={`delivery-col-tab ${mobileColumn === col.id ? "delivery-col-tab--active" : ""}`}
-                            key={col.id}
-                            onClick={() => setMobileColumn(col.id)}
-                            type="button"
-                          >
-                            {col.label} ({colCount})
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <SegmentedTabs
+                      active={mobileColumn}
+                      items={[
+                        { id: "all" as const, label: `Todos (${visibleOrders.length})` },
+                        ...summary.map((column) => ({
+                          id: column.id,
+                          label: `${column.label} (${column.count})`,
+                        })),
+                      ]}
+                      label="Etapa do pedido"
+                      onChange={setMobileColumn}
+                    />
+                    {mobileColumn !== "all" &&
+                      !visibleOrders.some((order) => columnFor(order.status) === mobileColumn) && (
+                        <p className="delivery-column-empty">Nenhum pedido nesta etapa.</p>
+                      )}
                     {visibleOrders
                       .filter(
                         (order) =>
@@ -1122,20 +1084,40 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
                           key={order.id}
                           onAdvance={() =>
                             nextAction(order)?.dispatch || !nextAction(order)?.status
-                              ? setSelected(order)
+                              ? openOrder(order)
                               : void transition(order)
                           }
-                          onOpen={() => setSelected(order)}
+                          onOpen={() => openOrder(order)}
                           order={order}
                         />
                       ))}
                   </div>
                 </>
               )}
+              <details className="gm-disclosure delivery-realtime-notices">
+                <summary>Atualizações recentes</summary>
+                <small>Recebidas nesta sessão</small>
+                {realtimeEvents.length === 0 ? (
+                  <p>Nenhum evento de delivery recebido.</p>
+                ) : (
+                  <ol>
+                    {realtimeEvents.map((event, index) => (
+                      <li
+                        key={`${event.aggregateId ?? event.topic ?? "delivery"}-${event.createdAt ?? index}`}
+                      >
+                        <span>{eventLabel(event.topic)}</span>
+                        <time dateTime={event.createdAt}>
+                          {event.createdAt ? dateTime(event.createdAt) : "Agora"}
+                        </time>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </details>
             </>
           )}
         </section>
-      ) : (
+      ) : tab === "zones" ? (
         <Zones
           canManage={canManage}
           busy={busy}
@@ -1144,9 +1126,10 @@ export function RealDeliveryPage({ scope, canManage }: { scope: GrowthScope; can
           remote={zones}
           scope={scope}
         />
-      )}
+      ) : null}
       <OrderModal
         busy={busy === selected?.id}
+        notice={notice}
         couriers={couriers.state.status === "ready" ? couriers.state.data : []}
         couriersLoading={couriers.state.status === "loading"}
         courierId={courierId}
@@ -1233,7 +1216,7 @@ function OrderCard({
         <div className="delivery-order-card__id-group">
           <span className="delivery-order-card__protocol">#{orderId(order)}</span>
           <Badge tone={order.fulfillment === "delivery" ? "info" : "neutral"}>
-            {order.fulfillment === "delivery" ? "🛵 Entrega" : "🛍️ Retirada"}
+            {order.fulfillment === "delivery" ? "Entrega" : "Retirada"}
           </Badge>
         </div>
         <div className="delivery-order-card__badges">
@@ -1259,9 +1242,6 @@ function OrderCard({
       >
         <div className="delivery-order-card__customer">
           <strong>{order.customerName ?? "Cliente não informado"}</strong>
-          {order.customerPhone && (
-            <span className="delivery-order-card__phone">{order.customerPhone}</span>
-          )}
         </div>
 
         {neighborhood && (
@@ -1291,13 +1271,13 @@ function OrderCard({
         <div className="delivery-order-card__actions">
           {whatsApp && (
             <a
-              className="delivery-whatsapp-btn"
+              className="gm-button gm-button--secondary gm-button--sm"
               href={whatsApp}
               rel="noopener noreferrer"
               target="_blank"
               title="Abrir WhatsApp com o cliente"
             >
-              💬 WhatsApp
+              WhatsApp
             </a>
           )}
           {action && (
@@ -1329,14 +1309,14 @@ function DeliveryCoverageSimulator({
   scope: GrowthScope;
 }) {
   const [selectedZoneId, setSelectedZoneId] = useState<string>("auto");
-  const [street, setStreet] = useState("Av. Paulista");
-  const [number, setNumber] = useState("1000");
-  const [neighborhood, setNeighborhood] = useState("Bela Vista");
-  const [city, setCity] = useState("São Paulo");
-  const [state, setState] = useState("SP");
-  const [postalCode, setPostalCode] = useState("01310-100");
-  const [latitude, setLatitude] = useState("-23.561414");
-  const [longitude, setLongitude] = useState("-46.655881");
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const [simulating, setSimulating] = useState(false);
   const [simResult, setSimResult] = useState<{
     covered: boolean;
@@ -1345,6 +1325,7 @@ function DeliveryCoverageSimulator({
     estimatedMinutes?: number;
     minimumOrderCents?: number;
     message?: string;
+    unavailable?: boolean;
   } | null>(null);
 
   async function handleSimulate(event: FormEvent) {
@@ -1352,19 +1333,31 @@ function DeliveryCoverageSimulator({
     const lat = Number(latitude);
     const lng = Number(longitude);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      setSimResult({ covered: false, message: "Coordenadas (latitude e longitude) inválidas." });
+      setSimResult({
+        covered: false,
+        unavailable: true,
+        message: "Coordenadas (latitude e longitude) inválidas.",
+      });
       return;
     }
     const activeZones = zones.filter((z) => z.active);
     if (activeZones.length === 0) {
-      setSimResult({ covered: false, message: "Não há zonas de entrega ativas para simulação." });
+      setSimResult({
+        covered: false,
+        unavailable: true,
+        message: "Não há zonas de entrega ativas para consulta.",
+      });
       return;
     }
     const targetZones =
       selectedZoneId === "auto" ? activeZones : activeZones.filter((z) => z.id === selectedZoneId);
 
     if (targetZones.length === 0) {
-      setSimResult({ covered: false, message: "Zona selecionada não encontrada ou inativa." });
+      setSimResult({
+        covered: false,
+        unavailable: true,
+        message: "Zona selecionada não encontrada ou inativa.",
+      });
       return;
     }
 
@@ -1384,12 +1377,15 @@ function DeliveryCoverageSimulator({
 
     try {
       let foundCoveredZone: DeliveryZone | null = null;
+      let unavailable = false;
       for (const zone of targetZones) {
         const response = (await api.growth.validateDeliveryZoneAddress(
           scope.organizationId,
           zone.id,
           addressPayload,
         )) as { covered: boolean; validationStatus: string };
+        unavailable ||=
+          response.validationStatus === "unavailable" || response.validationStatus === "unchecked";
         if (response?.covered) {
           foundCoveredZone = zone;
           break;
@@ -1407,12 +1403,16 @@ function DeliveryCoverageSimulator({
       } else {
         setSimResult({
           covered: false,
-          message: "Endereço fora do raio de cobertura das zonas testadas.",
+          unavailable,
+          message: unavailable
+            ? "Há zonas sem limites geográficos completos. Confirme a cobertura manualmente antes do despacho."
+            : "Endereço fora do raio de cobertura das zonas testadas.",
         });
       }
     } catch (err) {
       setSimResult({
         covered: false,
+        unavailable: true,
         message: err instanceof Error ? err.message : "Não foi possível validar o endereço.",
       });
     } finally {
@@ -1427,8 +1427,7 @@ function DeliveryCoverageSimulator({
     >
       <div className="delivery-coverage-simulator__header">
         <div>
-          <h3>📍 Simulador de Cobertura e Taxa</h3>
-          <p>Validação em tempo real com as zonas operacionais configuradas.</p>
+          <p>Confira o endereço e as coordenadas antes da consulta.</p>
         </div>
       </div>
       <form onSubmit={handleSimulate} className="delivery-coverage-simulator__form">
@@ -1439,7 +1438,7 @@ function DeliveryCoverageSimulator({
               value={selectedZoneId}
               onChange={(e) => setSelectedZoneId(e.target.value)}
             >
-              <option value="auto">Todas as zonas ativas (busca automática)</option>
+              <option value="auto">Todas as zonas ativas</option>
               {zones
                 .filter((z) => z.active)
                 .map((z) => (
@@ -1508,6 +1507,10 @@ function DeliveryCoverageSimulator({
             <span>Latitude</span>
             <Input
               value={latitude}
+              type="number"
+              min={-90}
+              max={90}
+              step="any"
               onChange={(e) => setLatitude(e.target.value)}
               placeholder="-23.56..."
               required
@@ -1517,6 +1520,10 @@ function DeliveryCoverageSimulator({
             <span>Longitude</span>
             <Input
               value={longitude}
+              type="number"
+              min={-180}
+              max={180}
+              step="any"
               onChange={(e) => setLongitude(e.target.value)}
               placeholder="-46.65..."
               required
@@ -1525,7 +1532,7 @@ function DeliveryCoverageSimulator({
         </div>
         <div className="delivery-coverage-simulator__actions">
           <Button type="submit" disabled={simulating}>
-            {simulating ? "Consultando backend…" : "🔍 Testar Cobertura e Taxa"}
+            {simulating ? "Consultando…" : "Consultar cobertura"}
           </Button>
         </div>
       </form>
@@ -1537,7 +1544,7 @@ function DeliveryCoverageSimulator({
         >
           {simResult.covered ? (
             <div className="delivery-coverage-result__content">
-              <strong>✅ Endereço Atendido pela Zona {simResult.zoneName}</strong>
+              <strong>Endereço atendido · {simResult.zoneName}</strong>
               <div className="delivery-coverage-result__metrics">
                 <span>
                   Taxa de Entrega: <strong>{formatMoney(simResult.feeCents ?? 0)}</strong>
@@ -1552,7 +1559,11 @@ function DeliveryCoverageSimulator({
             </div>
           ) : (
             <div className="delivery-coverage-result__content">
-              <strong>⚠️ Não Atendido</strong>
+              <strong>
+                {simResult.unavailable
+                  ? "Não foi possível confirmar a cobertura"
+                  : "Endereço não atendido"}
+              </strong>
               <p>
                 {simResult.message ??
                   "O endereço informado não está coberto por nenhuma zona ativa no momento."}
@@ -1582,17 +1593,13 @@ function Zones({
 }) {
   return (
     <section className="delivery-zones" aria-label="Zonas de entrega">
-      <Card className="delivery-zones__notice" role="note">
-        <Badge tone="info">Cobertura declarada</Badge>
-        <p>
-          Configure regiões e raios que a operação consegue atender. Utilize o simulador abaixo para
-          testar endereços reais diretamente com o backend.
-        </p>
-      </Card>
       <RemoteGate remote={remote}>
         {(zones) => (
           <>
-            <DeliveryCoverageSimulator zones={zones} scope={scope} />
+            <details className="gm-disclosure delivery-coverage-disclosure">
+              <summary>Consultar cobertura e taxa</summary>
+              <DeliveryCoverageSimulator zones={zones} scope={scope} />
+            </details>
             {zones.length === 0 ? (
               <EmptyState
                 action={
@@ -1604,7 +1611,7 @@ function Zones({
                 }
                 icon={<Icon name="delivery" size={28} />}
                 title="Nenhuma zona configurada"
-                description="A entrega própria exige uma zona, taxa e pedido mínimo persistidos."
+                description="Cadastre a região atendida, a taxa e o pedido mínimo."
               />
             ) : (
               <div className="delivery-zones__grid">
@@ -1613,7 +1620,6 @@ function Zones({
                     <div className="delivery-zone-real__heading">
                       <div>
                         <h2>{zone.name}</h2>
-                        <small>Região declarada</small>
                       </div>
                       <Badge tone={zone.active ? "success" : "neutral"}>
                         {zone.active ? "Ativa" : "Inativa"}
@@ -1636,7 +1642,7 @@ function Zones({
                         <dt>Alcance</dt>
                         <dd>
                           {typeof zone.geometry.radiusKm === "number"
-                            ? `Raio declarado: ${zone.geometry.radiusKm} km`
+                            ? `${zone.geometry.radiusKm} km`
                             : "Cobertura declarada"}
                         </dd>
                       </div>
@@ -1670,6 +1676,7 @@ function Zones({
 function OrderModal({
   order,
   busy,
+  notice,
   couriers,
   couriersLoading,
   courierId,
@@ -1681,6 +1688,7 @@ function OrderModal({
 }: {
   order: DeliveryOrder | null;
   busy: boolean;
+  notice: { text: string; error?: boolean } | null;
   couriers: DeliveryCourier[];
   couriersLoading: boolean;
   courierId: string;
@@ -1702,6 +1710,7 @@ function OrderModal({
   const [exceptionReason, setExceptionReason] = useState("");
   return (
     <Modal
+      closeDisabled={busy}
       isOpen={order !== null}
       onClose={onClose}
       size="md"
@@ -1723,6 +1732,14 @@ function OrderModal({
             </Badge>
             <strong>{formatMoney(order.totalCents)}</strong>
           </div>
+          {notice && (
+            <p
+              className={`delivery-notice${notice.error ? " delivery-notice--error" : ""}`}
+              role={notice.error ? "alert" : "status"}
+            >
+              {notice.text}
+            </p>
+          )}
           <dl>
             <div>
               <dt>Cliente</dt>
@@ -1736,55 +1753,10 @@ function OrderModal({
               <dt>Endereço</dt>
               <dd>{address(order)}</dd>
             </div>
-            <div>
-              <dt>Zona</dt>
-              <dd>{order.zoneName ?? "Não informada"}</dd>
-            </div>
-            <div>
-              <dt>Cobertura</dt>
-              <dd>
-                {order.addressValidationStatus === "covered"
-                  ? "Validada pela zona"
-                  : "Aguardando confirmação manual"}
-              </dd>
-            </div>
-            <div>
-              <dt>Entregador</dt>
-              <dd>{order.courierReference ?? "A atribuir"}</dd>
-            </div>
-            {order.courierStatus && (
-              <div>
-                <dt>Status do entregador</dt>
-                <dd>{deliveryCourierStatusLabel(order.courierStatus)}</dd>
-              </div>
-            )}
-            <div>
-              <dt>Pagamento</dt>
-              <dd>
-                {deliveryPaymentMethodLabel(order.paymentMethod)} ·{" "}
-                {deliveryPaymentStatusLabel(order.paymentStatus)} · {formatMoney(order.totalCents)}
-              </dd>
-            </div>
-            <div>
-              <dt>Agendamento</dt>
-              <dd>{order.scheduledFor ? dateTime(order.scheduledFor) : "Não agendado"}</dd>
-            </div>
             {order.promisedAt && (
               <div>
                 <dt>Prometido para</dt>
                 <dd>{dateTime(order.promisedAt)}</dd>
-              </div>
-            )}
-            {order.address?.latitude !== undefined && order.address.longitude !== undefined && (
-              <div>
-                <dt>Coordenadas</dt>
-                <dd>{`${order.address.latitude.toFixed(6)}, ${order.address.longitude.toFixed(6)}`}</dd>
-              </div>
-            )}
-            {order.lastPosition && (
-              <div>
-                <dt>Última posição</dt>
-                <dd>{`${order.lastPosition.latitude.toFixed(6)}, ${order.lastPosition.longitude.toFixed(6)} · ${dateTime(order.lastPosition.at)}`}</dd>
               </div>
             )}
           </dl>
@@ -1799,75 +1771,7 @@ function OrderModal({
               Total <strong>{formatMoney(order.totalCents)}</strong>
             </span>
           </div>
-          <section className="delivery-history" aria-labelledby="delivery-history-title">
-            <h3 id="delivery-history-title">Histórico</h3>
-            {order.history.length === 0 ? (
-              <p>Sem transições registradas para este pedido.</p>
-            ) : (
-              <ol>
-                {order.history.map((entry) => (
-                  <li key={entry.id}>
-                    <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
-                    <span>{`${entry.fromStatus ? `${deliveryStatusLabel(entry.fromStatus)} → ` : ""}${deliveryStatusLabel(entry.toStatus)}`}</span>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-          <section
-            className="delivery-notifications"
-            aria-labelledby="delivery-notifications-title"
-          >
-            <h3 id="delivery-notifications-title">Notificações</h3>
-            {order.notifications.length === 0 ? (
-              <p>Nenhuma notificação registrada.</p>
-            ) : (
-              <ol>
-                {order.notifications.map((notification) => (
-                  <li key={notification.id}>
-                    <span>{`${notification.audience === "operations" ? "Operação" : "Cliente"} · ${deliveryNotificationTypeLabel(notification.type)}`}</span>
-                    <small>Pendente do provedor — não enviada</small>
-                    <time dateTime={notification.createdAt}>
-                      {dateTime(notification.createdAt)}
-                    </time>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
-          <div className="delivery-notification-trigger">
-            <div className="delivery-notification-trigger__fields">
-              <label className="gm-form-field">
-                <span>Destinatário da notificação</span>
-                <NativeSelect
-                  onChange={(e) => setNotifAudience(e.target.value as typeof notifAudience)}
-                  value={notifAudience}
-                >
-                  <option value="operations">Equipe Operacional</option>
-                  <option value="customer">Cliente (SMS/Push)</option>
-                </NativeSelect>
-              </label>
-              <label className="gm-form-field">
-                <span>Tipo do aviso</span>
-                <NativeSelect
-                  onChange={(e) => setNotifType(e.target.value as typeof notifType)}
-                  value={notifType}
-                >
-                  <option value="status_update">Atualização de status</option>
-                  <option value="courier_assigned">Entregador atribuído</option>
-                  <option value="courier_arriving">Entregador chegando</option>
-                </NativeSelect>
-              </label>
-            </div>
-            <Button
-              disabled={busy}
-              onClick={() => onRequestNotification(notifAudience, notifType)}
-              size="sm"
-              variant="secondary"
-            >
-              Solicitar notificação
-            </Button>
-          </div>
+
           {order.paymentStatus !== "paid" && (
             <Callout tone={order.status === "completed" ? "danger" : "warning"}>
               <strong>
@@ -1945,9 +1849,7 @@ function OrderModal({
           ) : order.status === "dispatched" || order.status === "delivery_failed" ? (
             <div className="gm-form-stack">
               {order.status === "delivery_failed" && (
-                <Callout tone="danger">
-                  A tentativa precisa de um destino auditável: nova saída ou devolução à loja.
-                </Callout>
+                <Callout tone="danger">Confirme uma nova tentativa ou a devolução à loja.</Callout>
               )}
               <label className="gm-form-field">
                 <span>
@@ -1984,7 +1886,7 @@ function OrderModal({
                       disabled={busy || exceptionReason.trim().length < 10}
                       onClick={() => onTransition("ready", exceptionReason)}
                     >
-                      Retornar à fila para nova tentativa
+                      Tentar novamente
                     </Button>
                     <Button
                       disabled={busy || exceptionReason.trim().length < 10}
@@ -2004,6 +1906,124 @@ function OrderModal({
               </Button>
             )
           )}
+          <details className="gm-disclosure delivery-metadata">
+            <summary>Dados da entrega</summary>
+            <dl>
+              <div>
+                <dt>Zona</dt>
+                <dd>{order.zoneName ?? "Não informada"}</dd>
+              </div>
+              <div>
+                <dt>Cobertura</dt>
+                <dd>
+                  {order.addressValidationStatus === "covered"
+                    ? "Validada pela zona"
+                    : "Aguardando confirmação manual"}
+                </dd>
+              </div>
+              <div>
+                <dt>Entregador</dt>
+                <dd>{order.courierReference ?? "A atribuir"}</dd>
+              </div>
+              {order.courierStatus && (
+                <div>
+                  <dt>Status do entregador</dt>
+                  <dd>{deliveryCourierStatusLabel(order.courierStatus)}</dd>
+                </div>
+              )}
+              <div>
+                <dt>Pagamento</dt>
+                <dd>
+                  {deliveryPaymentMethodLabel(order.paymentMethod)} ·{" "}
+                  {deliveryPaymentStatusLabel(order.paymentStatus)} ·{" "}
+                  {formatMoney(order.totalCents)}
+                </dd>
+              </div>
+              <div>
+                <dt>Agendamento</dt>
+                <dd>{order.scheduledFor ? dateTime(order.scheduledFor) : "Não agendado"}</dd>
+              </div>
+
+              {order.address?.latitude !== undefined && order.address.longitude !== undefined && (
+                <div>
+                  <dt>Coordenadas</dt>
+                  <dd>{`${order.address.latitude.toFixed(6)}, ${order.address.longitude.toFixed(6)}`}</dd>
+                </div>
+              )}
+              {order.lastPosition && (
+                <div>
+                  <dt>Última posição</dt>
+                  <dd>{`${order.lastPosition.latitude.toFixed(6)}, ${order.lastPosition.longitude.toFixed(6)} · ${dateTime(order.lastPosition.at)}`}</dd>
+                </div>
+              )}
+            </dl>
+          </details>
+          <details className="gm-disclosure delivery-history">
+            <summary>Histórico ({order.history.length})</summary>
+            {order.history.length === 0 ? (
+              <p>Sem transições registradas para este pedido.</p>
+            ) : (
+              <ol>
+                {order.history.map((entry) => (
+                  <li key={entry.id}>
+                    <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
+                    <span>{`${entry.fromStatus ? `${deliveryStatusLabel(entry.fromStatus)} → ` : ""}${deliveryStatusLabel(entry.toStatus)}`}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </details>
+          <details className="gm-disclosure delivery-notifications">
+            <summary>Notificações ({order.notifications.length})</summary>
+            {order.notifications.length === 0 ? (
+              <p>Nenhuma notificação registrada.</p>
+            ) : (
+              <ol>
+                {order.notifications.map((notification) => (
+                  <li key={notification.id}>
+                    <span>{`${notification.audience === "operations" ? "Operação" : "Cliente"} · ${deliveryNotificationTypeLabel(notification.type)}`}</span>
+                    <small>Pendente do provedor — não enviada</small>
+                    <time dateTime={notification.createdAt}>
+                      {dateTime(notification.createdAt)}
+                    </time>
+                  </li>
+                ))}
+              </ol>
+            )}
+            <div className="delivery-notification-trigger">
+              <div className="delivery-notification-trigger__fields">
+                <label className="gm-form-field">
+                  <span>Destinatário da notificação</span>
+                  <NativeSelect
+                    onChange={(e) => setNotifAudience(e.target.value as typeof notifAudience)}
+                    value={notifAudience}
+                  >
+                    <option value="operations">Equipe Operacional</option>
+                    <option value="customer">Cliente</option>
+                  </NativeSelect>
+                </label>
+                <label className="gm-form-field">
+                  <span>Tipo do aviso</span>
+                  <NativeSelect
+                    onChange={(e) => setNotifType(e.target.value as typeof notifType)}
+                    value={notifType}
+                  >
+                    <option value="status_update">Atualização de status</option>
+                    <option value="courier_assigned">Entregador atribuído</option>
+                    <option value="courier_arriving">Entregador chegando</option>
+                  </NativeSelect>
+                </label>
+              </div>
+              <Button
+                disabled={busy}
+                onClick={() => onRequestNotification(notifAudience, notifType)}
+                size="sm"
+                variant="secondary"
+              >
+                Solicitar notificação
+              </Button>
+            </div>
+          </details>
         </div>
       )}
     </Modal>
@@ -2045,7 +2065,7 @@ function CourierModal({
   }
 
   return (
-    <Modal isOpen onClose={onClose} size="sm" title="Cadastrar entregador">
+    <Modal closeDisabled={busy} isOpen onClose={onClose} size="sm" title="Cadastrar entregador">
       <form className="gm-form-stack" onSubmit={(event) => void submit(event)}>
         <label className="gm-form-field">
           <span>Nome</span>
@@ -2082,7 +2102,7 @@ function CourierModal({
           </p>
         )}
         <div className="delivery-zone-real__actions">
-          <Button onClick={onClose} variant="ghost">
+          <Button disabled={busy} onClick={onClose} variant="secondary">
             Cancelar
           </Button>
           <Button
@@ -2167,6 +2187,7 @@ function ZoneModal({
   }
   return (
     <Modal
+      closeDisabled={busy}
       isOpen
       onClose={onClose}
       size="sm"
@@ -2241,7 +2262,7 @@ function ZoneModal({
           </p>
         )}
         <div className="delivery-zone-real__actions">
-          <Button onClick={onClose} variant="ghost">
+          <Button disabled={busy} onClick={onClose} variant="secondary">
             Cancelar
           </Button>
           <Button disabled={busy || name.trim().length < 2} type="submit">

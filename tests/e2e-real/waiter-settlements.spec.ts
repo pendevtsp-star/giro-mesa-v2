@@ -236,3 +236,66 @@ test("resposta atrasada não restaura prévia de filtros abandonados", async ({ 
   await expect(page.getByText("Prévia — ainda não registrada")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Gerar fechamento" })).toHaveCount(0);
 });
+
+for (const target of ["fechamento", "perda operacional"] as const) {
+  test(`preserva observação de ${target} após falha e limpa somente no sucesso`, async ({
+    page,
+  }) => {
+    await mockApi(page);
+    await page.route("**/v1/**/management/waiter-settlements", async (route) => {
+      await route.fulfill({
+        json: {
+          configuration,
+          partnershipPlan: null,
+          settlements: [settlement("closed")],
+          operationalLosses: [
+            {
+              id: "loss-1",
+              tabId: "tab-1",
+              tabLabel: "Comanda 1",
+              type: "unpaid_tab",
+              reason: "Cliente saiu sem pagar",
+              amountCents: 8_000,
+              status: "pending",
+              createdAt: "2026-08-20T15:00:00.000Z",
+            },
+          ],
+          capabilities,
+        },
+      });
+    });
+    const submitted: unknown[] = [];
+    const endpoint =
+      target === "fechamento"
+        ? "**/waiter-settlements/settlements/*/transition"
+        : "**/waiter-settlements/losses/*/decision";
+    await page.route(endpoint, async (route) => {
+      submitted.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: submitted.length === 1 ? 503 : 200,
+        json: submitted.length === 1 ? { message: "Falha temporária" } : {},
+      });
+    });
+    await page.goto("/#/waiter-settlements");
+    await page.getByRole("button", { name: "Abrir operação" }).click();
+    if (target === "perda operacional") {
+      await page.getByRole("button", { name: "Perdas", exact: true }).click();
+    }
+    await page.getByRole("button", { name: "Aprovar", exact: true }).click();
+    const modal = page.getByRole("dialog", { name: `Aprovar ${target}`, exact: true });
+    const note = modal.getByLabel("Observação");
+    const approve = modal.getByRole("button", { name: "Aprovar", exact: true });
+    await note.fill("Conferido com o responsável pelo turno");
+    await approve.click();
+    await expect(approve).toBeEnabled();
+    await expect(note).toHaveValue("Conferido com o responsável pelo turno");
+    await approve.click();
+    await expect(modal).toBeHidden();
+    expect(submitted).toEqual([
+      { action: "approve", note: "Conferido com o responsável pelo turno" },
+      { action: "approve", note: "Conferido com o responsável pelo turno" },
+    ]);
+    await page.getByRole("button", { name: "Aprovar", exact: true }).click();
+    await expect(note).toHaveValue("");
+  });
+}

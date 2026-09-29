@@ -10,7 +10,24 @@
 @import "./features/shell/navigation.css" layer(legacy);
 @import "./styles/convergence.css" layer(legacy);
 
-/* Operational drawers must outrank the unlayered modal defaults from @giromesa/ui. */
+/* Operational surfaces must outrank the unlayered defaults from @giromesa/ui. */
+.salon-metric-card.gm-card {
+  border-inline-start: 4px solid var(--gm-brand);
+  padding: 0.75rem 0.85rem;
+}
+
+.salon-metric-card--occupancy.gm-card {
+  border-inline-start-color: var(--gm-info);
+}
+
+.salon-metric-card--ticket.gm-card {
+  border-inline-start-color: var(--gm-success);
+}
+
+.salon-metric-card--alert.gm-card {
+  border-inline-start-color: var(--gm-warning);
+}
+
 @media (min-width: 761px) {
   .counter-modal.gm-modal-backdrop[open] {
     align-items: stretch;
@@ -18,7 +35,7 @@
     padding: 0;
   }
 
-  .counter-modal .gm-modal {
+  .counter-modal > .gm-modal {
     border-radius: var(--gm-radius-lg) 0 0 var(--gm-radius-lg);
     height: 100dvh;
     max-height: none;
@@ -33,7 +50,7 @@
     justify-content: center;
     padding: 12px;
   }
-  .salon-service-modal--attendance .gm-modal {
+  .salon-service-modal--attendance > .gm-modal {
     width: min(1600px, calc(100vw - 24px));
     max-width: none;
     height: calc(100dvh - 24px);
@@ -48,8 +65,8 @@
     padding: 0;
   }
 
-  .salon-service-modal .gm-modal,
-  .counter-modal .gm-modal {
+  .salon-service-modal > .gm-modal,
+  .counter-modal > .gm-modal {
     border-radius: 0;
     height: 100dvh;
     max-height: none;

@@ -1,4 +1,6 @@
 // biome-ignore-all lint/a11y/noLabelWithoutControl: controls render native form elements nested by labels
+
+import type { DeliveryAddressInput } from "@giromesa/contracts";
 import {
   Badge,
   Button,
@@ -13,7 +15,18 @@ import {
 } from "@giromesa/ui";
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api";
-import { dateTime, type GrowthScope, RemoteGate, useRemote } from "../../growth.shared";
+import {
+  type DeliveryAddress,
+  dateTime,
+  type GrowthScope,
+  RemoteGate,
+  useRemote,
+} from "../../growth.shared";
+import {
+  DeliveryAddressFields,
+  emptyDeliveryAddress,
+  formatDeliveryAddress,
+} from "../delivery/DeliveryAddressFields";
 import {
   type CrmCustomerDetail,
   type CrmCustomerHistoryCursor,
@@ -79,6 +92,60 @@ const fulfillmentLabels: Record<string, string> = {
   pickup: "Retirada",
   delivery: "Entrega",
 };
+
+function customerAddressDraft(address: DeliveryAddress | null): DeliveryAddressInput {
+  return {
+    reference: address?.reference ?? "",
+    street: address?.street ?? "",
+    number: address?.number ?? "",
+    complement: address?.complement ?? "",
+    neighborhood: address?.neighborhood ?? "",
+    city: address?.city ?? "",
+    state: address?.state ?? "",
+    postalCode: address?.postalCode ?? "",
+    ...(address?.latitude !== undefined ? { latitude: address.latitude } : {}),
+    ...(address?.longitude !== undefined ? { longitude: address.longitude } : {}),
+  };
+}
+
+function customerAddressPayload(address: DeliveryAddressInput) {
+  const values = Object.values(address).map((value) => `${value ?? ""}`.trim());
+  if (values.every((value) => !value)) return undefined;
+  return {
+    ...(address.reference?.trim() ? { reference: address.reference.trim() } : {}),
+    street: address.street.trim(),
+    number: address.number.trim(),
+    ...(address.complement?.trim() ? { complement: address.complement.trim() } : {}),
+    neighborhood: address.neighborhood.trim(),
+    city: address.city.trim(),
+    state: address.state.trim(),
+    postalCode: address.postalCode.trim(),
+    ...(address.latitude !== undefined ? { latitude: address.latitude } : {}),
+    ...(address.longitude !== undefined ? { longitude: address.longitude } : {}),
+  };
+}
+
+function customerAddressText(address: DeliveryAddress | null) {
+  if (!address) return "Não informado";
+  return formatDeliveryAddress(customerAddressDraft(address));
+}
+
+function CustomerAddressFields({
+  address,
+  onChange,
+}: {
+  address: DeliveryAddressInput;
+  onChange: (address: DeliveryAddressInput) => void;
+}) {
+  const entered = Object.values(address).some((value) => `${value ?? ""}`.trim());
+  return (
+    <fieldset className="action-form__wide">
+      <legend>Endereço principal de delivery (opcional)</legend>
+      <DeliveryAddressFields onChange={onChange} required={entered} value={address} />
+    </fieldset>
+  );
+}
+
 function openNewCustomerPanel() {
   const summary = document.getElementById("crm-new-customer");
   const panel = summary?.closest("details");
@@ -205,7 +272,6 @@ function CustomerProfile({ detail, scope }: { detail: CrmCustomerDetail; scope: 
     <Card aria-labelledby="crm-profile-title" className="crm-profile">
       <header className="crm-profile__header">
         <div>
-          <p className="eyebrow">Perfil do cliente</p>
           <h2 id="crm-profile-title">{customer.name}</h2>
         </div>
         <div className="crm-profile__badges">
@@ -246,12 +312,15 @@ function CustomerProfile({ detail, scope }: { detail: CrmCustomerDetail; scope: 
           <span>Cliente desde</span>
           <strong>{customer.createdAt ? dateTime(customer.createdAt) : "Não informado"}</strong>
         </div>
+        <div>
+          <span>Endereço principal</span>
+          <strong>{customerAddressText(customer.defaultDeliveryAddress)}</strong>
+        </div>
       </section>
       <div className="crm-profile__section">
         <div className="crm-section-heading">
           <div>
             <strong>Fidelidade</strong>
-            <small>Saldo de pontos do cliente</small>
           </div>
           <strong className="crm-balance">{detail.loyalty.balance} ponto(s)</strong>
         </div>
@@ -260,7 +329,6 @@ function CustomerProfile({ detail, scope }: { detail: CrmCustomerDetail; scope: 
         <div className="crm-section-heading">
           <div>
             <strong>Relacionamento</strong>
-            <small>Indicadores calculados automaticamente</small>
           </div>
         </div>
         <dl className="crm-metrics">
@@ -557,10 +625,14 @@ export function CrmCustomerWorkspace({
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [defaultDeliveryAddress, setDefaultDeliveryAddress] =
+    useState<DeliveryAddressInput>(emptyDeliveryAddress);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBirthDate, setEditBirthDate] = useState("");
+  const [editDefaultDeliveryAddress, setEditDefaultDeliveryAddress] =
+    useState<DeliveryAddressInput>(emptyDeliveryAddress);
   const [editNotes, setEditNotes] = useState("");
   const [editTags, setEditTags] = useState("");
   const [archiveReason, setArchiveReason] = useState("");
@@ -595,6 +667,9 @@ export function CrmCustomerWorkspace({
     setEditEmail(selectedDetail.customer.email ?? "");
     setEditPhone(selectedDetail.customer.phone ?? "");
     setEditBirthDate(selectedDetail.customer.birthDate ?? "");
+    setEditDefaultDeliveryAddress(
+      customerAddressDraft(selectedDetail.customer.defaultDeliveryAddress),
+    );
     setEditNotes(selectedDetail.customer.notes ?? "");
     setEditTags(selectedDetail.customer.tags.join(", "));
   }, [selectedDetail]);
@@ -619,11 +694,13 @@ export function CrmCustomerWorkspace({
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         birthDate: birthDate || undefined,
+        defaultDeliveryAddress: customerAddressPayload(defaultDeliveryAddress),
       });
       setName("");
       setEmail("");
       setPhone("");
       setBirthDate("");
+      setDefaultDeliveryAddress(emptyDeliveryAddress);
       setFeedback({
         tone: "success",
         message:
@@ -650,6 +727,7 @@ export function CrmCustomerWorkspace({
         email: editEmail.trim() || null,
         phone: editPhone.trim() || null,
         birthDate: editBirthDate || null,
+        defaultDeliveryAddress: customerAddressPayload(editDefaultDeliveryAddress) ?? null,
         notes: editNotes.trim() || null,
         tags: editTags
           .split(",")
@@ -745,7 +823,6 @@ export function CrmCustomerWorkspace({
                 ? "Sincronizando clientes"
                 : "Clientes atualizados"}
           </Badge>
-          <small>Consulte os clientes e suas autorizações para campanhas.</small>
         </div>
         <Button
           disabled={customers.refreshing || detail.refreshing}
@@ -768,7 +845,6 @@ export function CrmCustomerWorkspace({
         <Card aria-labelledby="crm-customers-heading" className="crm-directory">
           <header className="crm-directory__header">
             <div>
-              <p className="eyebrow">Relacionamento</p>
               <h2 id="crm-customers-heading">Clientes</h2>
             </div>
             {customers.state.status === "ready" && (
@@ -943,6 +1019,10 @@ export function CrmCustomerWorkspace({
                   value={editBirthDate}
                 />
               </label>
+              <CustomerAddressFields
+                address={editDefaultDeliveryAddress}
+                onChange={setEditDefaultDeliveryAddress}
+              />
               <label className="action-form__wide">
                 Marcadores
                 <Input
@@ -1044,6 +1124,10 @@ export function CrmCustomerWorkspace({
                 value={birthDate}
               />
             </label>
+            <CustomerAddressFields
+              address={defaultDeliveryAddress}
+              onChange={setDefaultDeliveryAddress}
+            />
             <Button disabled={busy === "create" || name.trim().length < 2} type="submit">
               {busy === "create" ? "Salvando…" : "Cadastrar cliente"}
             </Button>

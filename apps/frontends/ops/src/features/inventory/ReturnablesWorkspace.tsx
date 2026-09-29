@@ -295,27 +295,54 @@ function ReturnablesReady({
           value={selectedReconciliation.openCustodyQuantity}
           footer="Saídas aguardando devolução"
         />
-        <StatCard title="Com fornecedor" value={selectedReconciliation.supplierInTransitQuantity} />
-        <StatCard title="Perdas aprovadas" value={selectedReconciliation.approvedLossQuantity} />
-        <StatCard
-          title="Movimentos explicados"
-          value={selectedReconciliation.explainableBalanceQuantity ?? "—"}
-          footer={
-            selectedReconciliation.explainableBalanceQuantity === null
-              ? "Aguardando reconciliação do servidor"
-              : "Sem comparar físico com custódia"
-          }
-        />
-        <StatCard
-          title="Última divergência de contagem"
-          value={selectedReconciliation.lastCountDifferenceQuantity ?? "—"}
-          footer={
-            selectedReconciliation.lastCountedAt
-              ? `Contagem de ${dateLabel(selectedReconciliation.lastCountedAt)}`
-              : "Sem contagem aprovada para este setor"
-          }
-        />
       </section>
+      <details
+        className="gm-disclosure returnables-reconciliation"
+        open={
+          selectedReconciliation.lastCountDifferenceQuantity !== null &&
+          selectedReconciliation.lastCountDifferenceQuantity !== 0
+            ? true
+            : undefined
+        }
+      >
+        <summary>
+          <span className="returnables-reconciliation__label">
+            <strong>Reconciliação do setor</strong>
+            <small>Fornecedor, perdas e divergência da última contagem</small>
+          </span>
+          {selectedReconciliation.lastCountDifferenceQuantity !== null &&
+            selectedReconciliation.lastCountDifferenceQuantity !== 0 && (
+              <Badge tone="danger">
+                Divergência {selectedReconciliation.lastCountDifferenceQuantity}
+              </Badge>
+            )}
+        </summary>
+        <section className="returnables-buckets returnables-buckets--secondary">
+          <StatCard
+            title="Com fornecedor"
+            value={selectedReconciliation.supplierInTransitQuantity}
+          />
+          <StatCard title="Perdas aprovadas" value={selectedReconciliation.approvedLossQuantity} />
+          <StatCard
+            title="Movimentos explicados"
+            value={selectedReconciliation.explainableBalanceQuantity ?? "—"}
+            footer={
+              selectedReconciliation.explainableBalanceQuantity === null
+                ? "Aguardando reconciliação do servidor"
+                : "Sem comparar físico com custódia"
+            }
+          />
+          <StatCard
+            title="Última divergência de contagem"
+            value={selectedReconciliation.lastCountDifferenceQuantity ?? "—"}
+            footer={
+              selectedReconciliation.lastCountedAt
+                ? `Contagem de ${dateLabel(selectedReconciliation.lastCountedAt)}`
+                : "Sem contagem aprovada para este setor"
+            }
+          />
+        </section>
+      </details>
 
       {(stale || refreshError) && (
         <Card className="returnables-alert" role="alert">

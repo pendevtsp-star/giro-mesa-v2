@@ -1,4 +1,20 @@
 /* Reusable operational patterns extracted from the Cardapio experience. */
+:root:not([data-theme="dark"]) .gm-workspace-cool {
+  --gm-paper: var(--gm-paper-cool);
+  --gm-surface-soft: var(--gm-surface-soft-cool);
+  --gm-surface-sunken: var(--gm-surface-soft-cool);
+  --gm-border: var(--gm-border-cool);
+  --background: var(--gm-paper);
+  --muted: var(--gm-surface-soft);
+  --border: var(--gm-border);
+  --input: var(--gm-border);
+  background: var(--gm-paper);
+}
+
+.gm-workspace-cool .gm-modal {
+  --background: var(--gm-surface);
+}
+
 .gm-toolbar {
   display: flex;
   min-width: 0;

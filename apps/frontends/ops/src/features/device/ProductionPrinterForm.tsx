@@ -15,6 +15,7 @@ const documentTypes = [
   { value: "partial_statement", label: "Conta parcial" },
   { value: "payment_statement", label: "Comprovante de pagamento" },
   { value: "final_receipt", label: "Recibo final" },
+  { value: "delivery_slip", label: "Via de entrega" },
 ] as const;
 
 export function createProductionPrinterDraft(

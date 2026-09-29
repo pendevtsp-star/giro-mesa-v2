@@ -21,7 +21,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Deliver
         /// </summary>
         /// <param name="pathParameters">Path parameters for the request</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public DeliveryOrdersRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders{?limit*,query*,scheduled*,sla*,status*,updatedSince*}", pathParameters)
+        public DeliveryOrdersRequestBuilder(Dictionary<string, object> pathParameters, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders{?limit*,orderRef*,query*,scheduled*,sla*,status*,updatedSince*}", pathParameters)
         {
         }
         /// <summary>
@@ -29,7 +29,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Deliver
         /// </summary>
         /// <param name="rawUrl">The raw URL to use for the request builder.</param>
         /// <param name="requestAdapter">The request adapter to use to execute the requests.</param>
-        public DeliveryOrdersRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders{?limit*,query*,scheduled*,sla*,status*,updatedSince*}", rawUrl)
+        public DeliveryOrdersRequestBuilder(string rawUrl, IRequestAdapter requestAdapter) : base(requestAdapter, "{+baseurl}/api/v1/organizations/{organizationId}/growth/units/{unitId}/delivery-orders{?limit*,orderRef*,query*,scheduled*,sla*,status*,updatedSince*}", rawUrl)
         {
         }
         /// <returns>A <see cref="Stream"/></returns>
@@ -78,6 +78,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Growth.Units.Item.Deliver
         {
             [QueryParameter("limit")]
             public int? Limit { get; set; }
+            [QueryParameter("orderRef")]
+            public Guid? OrderRef { get; set; }
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
             [QueryParameter("query")]

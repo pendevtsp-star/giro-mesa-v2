@@ -95,7 +95,13 @@ import {
   loyaltyProgramSchema,
   loyaltyRedeemSchema,
   loyaltyReverseSchema,
+  type OperationalCustomerInput,
+  type OperationalCustomerListQueryInput,
+  type OperationalCustomerUpdateInput,
   type OptOutInput,
+  operationalCustomerListQuerySchema,
+  operationalCustomerSchema,
+  operationalCustomerUpdateSchema,
   optOutSchema,
   type PriceOverrideInput,
   type PublicCouponValidationInput,
@@ -145,6 +151,40 @@ import { GrowthService } from "./growth.service.js";
 ])
 export class GrowthController {
   constructor(private readonly growth: GrowthService) {}
+
+  @Get("operational-customers")
+  listOperationalCustomers(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Query(new ZodPipe(operationalCustomerListQuerySchema))
+    query: OperationalCustomerListQueryInput,
+  ) {
+    return this.growth.listOperationalCustomers(request.auth.identityId, organizationId, query);
+  }
+
+  @Post("operational-customers")
+  createOperationalCustomer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Body(new ZodPipe(operationalCustomerSchema)) body: OperationalCustomerInput,
+  ) {
+    return this.growth.createOperationalCustomer(request.auth.identityId, organizationId, body);
+  }
+
+  @Patch("operational-customers/:customerId")
+  updateOperationalCustomer(
+    @Req() request: AuthenticatedRequest,
+    @Param("organizationId", ParseUUIDPipe) organizationId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Body(new ZodPipe(operationalCustomerUpdateSchema)) body: OperationalCustomerUpdateInput,
+  ) {
+    return this.growth.updateOperationalCustomer(
+      request.auth.identityId,
+      organizationId,
+      customerId,
+      body,
+    );
+  }
 
   @Get("customers")
   listCustomers(
@@ -617,6 +657,11 @@ export class GrowthController {
   }
 
   @Get("units/:unitId/delivery-orders")
+  @ApiQuery({
+    name: "orderRef",
+    required: false,
+    schema: { type: "string", format: "uuid" },
+  })
   @ApiQuery({
     name: "status",
     required: false,

@@ -22,6 +22,8 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         public Guid? InstallationId { get; set; }
         /// <summary>The method property</summary>
         public global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method? Method { get; set; }
+        /// <summary>The receivedCents property</summary>
+        public int? ReceivedCents { get; set; }
         /// <summary>The reference property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -59,6 +61,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
                 { "cashRegisterId", n => { CashRegisterId = n.GetGuidValue(); } },
                 { "installationId", n => { InstallationId = n.GetGuidValue(); } },
                 { "method", n => { Method = n.GetEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method>(); } },
+                { "receivedCents", n => { ReceivedCents = n.GetIntValue(); } },
                 { "reference", n => { Reference = n.GetStringValue(); } },
             };
         }
@@ -73,6 +76,7 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
             writer.WriteGuidValue("cashRegisterId", CashRegisterId);
             writer.WriteGuidValue("installationId", InstallationId);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Payments.PaymentsPostRequestBody_method>("method", Method);
+            writer.WriteIntValue("receivedCents", ReceivedCents);
             writer.WriteStringValue("reference", Reference);
             writer.WriteAdditionalData(AdditionalData);
         }

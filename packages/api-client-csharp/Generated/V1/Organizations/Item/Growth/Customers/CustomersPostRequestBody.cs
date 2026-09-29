@@ -22,6 +22,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_birthDate BirthDate { get; set; }
 #endif
+        /// <summary>The defaultDeliveryAddress property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress? DefaultDeliveryAddress { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress DefaultDeliveryAddress { get; set; }
+#endif
         /// <summary>The defaultUnitId property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -96,6 +104,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers
             return new Dictionary<string, Action<IParseNode>>
             {
                 { "birthDate", n => { BirthDate = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_birthDate>(global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_birthDate.CreateFromDiscriminatorValue); } },
+                { "defaultDeliveryAddress", n => { DefaultDeliveryAddress = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress>(global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress.CreateFromDiscriminatorValue); } },
                 { "defaultUnitId", n => { DefaultUnitId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultUnitId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultUnitId.CreateFromDiscriminatorValue); } },
                 { "email", n => { Email = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_email>(global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_email.CreateFromDiscriminatorValue); } },
                 { "name", n => { Name = n.GetStringValue(); } },
@@ -112,6 +121,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_birthDate>("birthDate", BirthDate);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress>("defaultDeliveryAddress", DefaultDeliveryAddress);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultUnitId>("defaultUnitId", DefaultUnitId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_email>("email", Email);
             writer.WriteStringValue("name", Name);
@@ -186,6 +196,63 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers
                 else {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_birthDateMember1>(null, CustomersPostRequestBodyBirthDateMember1);
                 }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class CustomersPostRequestBody_defaultDeliveryAddress : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1? CustomersPostRequestBodyDefaultDeliveryAddressMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1 CustomersPostRequestBodyDefaultDeliveryAddressMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember2? CustomersPostRequestBodyDefaultDeliveryAddressMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember2 CustomersPostRequestBodyDefaultDeliveryAddressMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody.CustomersPostRequestBody_defaultDeliveryAddress();
+                result.CustomersPostRequestBodyDefaultDeliveryAddressMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1();
+                result.CustomersPostRequestBodyDefaultDeliveryAddressMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(CustomersPostRequestBodyDefaultDeliveryAddressMember1 != null || CustomersPostRequestBodyDefaultDeliveryAddressMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(CustomersPostRequestBodyDefaultDeliveryAddressMember1, CustomersPostRequestBodyDefaultDeliveryAddressMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Growth.Customers.CustomersPostRequestBody_defaultDeliveryAddressMember1>(null, CustomersPostRequestBodyDefaultDeliveryAddressMember1, CustomersPostRequestBodyDefaultDeliveryAddressMember2);
             }
         }
         /// <summary>

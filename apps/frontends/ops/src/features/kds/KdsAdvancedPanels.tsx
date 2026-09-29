@@ -22,7 +22,7 @@ import {
 import { useState } from "react";
 import { api } from "../../api";
 import type { KdsData, PilotScope } from "../../operations.shared";
-import { kdsChannelLabel } from "./kds.model";
+import { KDS_ITEM_STATE_LABEL, kdsChannelLabel } from "./kds.model";
 
 const key = () => globalThis.crypto.randomUUID();
 
@@ -31,6 +31,7 @@ export function KdsAdvancedPanels({
   scope,
   installationId,
   mode,
+  stationId,
   refresh,
   fullscreen,
 }: {
@@ -38,11 +39,15 @@ export function KdsAdvancedPanels({
   scope: PilotScope;
   installationId: string;
   mode: "station" | "pass";
+  stationId: string;
   refresh: () => Promise<boolean>;
   fullscreen: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const productionGrid = data.productionGrid.filter(
+    (group) => stationId === "all" || group.stationId === stationId,
+  );
   const run = async (actionKey: string, action: () => Promise<unknown>) => {
     setBusy(actionKey);
     setError(null);
@@ -140,14 +145,12 @@ export function KdsAdvancedPanels({
       {!fullscreen &&
         mode === "station" &&
         data.capabilities.productionGrid &&
-        data.productionGrid.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Produção por item</CardTitle>
-            </CardHeader>
-            <CardContent>
+        productionGrid.length > 0 && (
+          <details className="kds-support-panel kds-production-grid">
+            <summary>Produção por item</summary>
+            <div className="kds-support-panel__body">
               <Accordion>
-                {data.productionGrid.map((group) => {
+                {productionGrid.map((group) => {
                   const recipe = data.items.find(
                     ({ item }) => item.productId === group.productId && item.recipe.length > 0,
                   )?.item.recipe;
@@ -184,7 +187,7 @@ export function KdsAdvancedPanels({
                                   <TableCell>
                                     {assignment.readyQuantity}/{assignment.quantity}
                                   </TableCell>
-                                  <TableCell>{assignment.status}</TableCell>
+                                  <TableCell>{KDS_ITEM_STATE_LABEL[assignment.status]}</TableCell>
                                   <TableCell>
                                     {data.capabilities.ticketClaim && ticket && (
                                       <Button
@@ -242,8 +245,8 @@ export function KdsAdvancedPanels({
                   );
                 })}
               </Accordion>
-            </CardContent>
-          </Card>
+            </div>
+          </details>
         )}
 
       {mode === "pass" && data.capabilities.runnerHandoff && runnerOrders.length > 0 && (

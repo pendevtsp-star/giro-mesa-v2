@@ -102,7 +102,7 @@
 
 .smartpos-admin :is(input, select, textarea, .gm-button) {
   max-width: 100%;
-  min-height: 48px;
+  min-height: 40px;
 }
 
 .smartpos-admin-error,

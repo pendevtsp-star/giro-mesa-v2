@@ -16,5 +16,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         #pragma warning disable CS1591
         Cancel,
         #pragma warning restore CS1591
+        [EnumMember(Value = "tab_discount")]
+        #pragma warning disable CS1591
+        Tab_discount,
+        #pragma warning restore CS1591
     }
 }

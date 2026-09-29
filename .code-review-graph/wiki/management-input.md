@@ -63,7 +63,7 @@ Directory-based community: apps/backends
 | consumeComparablePasswordWork | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 777-780 |
 | beginIdentitySession | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/auth/auth.service.ts | 782-834 |
 
-*... and 1977 more members.*
+*... and 1703 more members.*
 
 ## Execution Flows
 
@@ -83,36 +83,36 @@ Directory-based community: apps/backends
 
 ### Outgoing
 
-- `eq` (1174 edge(s))
-- `equal` (694 edge(s))
-- `where` (670 edge(s))
-- `from` (524 edge(s))
-- `values` (467 edge(s))
-- `insert` (431 edge(s))
-- `select` (422 edge(s))
-- `and` (345 edge(s))
+- `eq` (1118 edge(s))
+- `where` (641 edge(s))
+- `equal` (621 edge(s))
+- `from` (499 edge(s))
+- `values` (434 edge(s))
+- `select` (402 edge(s))
+- `insert` (399 edge(s))
+- `and` (328 edge(s))
 - `Param` (277 edge(s))
-- `returning` (271 edge(s))
 - `ParseUUIDPipe` (271 edge(s))
-- `limit` (251 edge(s))
-- `ok` (226 edge(s))
-- `map` (218 edge(s))
-- `Equal` (198 edge(s))
+- `returning` (257 edge(s))
+- `limit` (245 edge(s))
+- `ok` (210 edge(s))
+- `map` (200 edge(s))
+- `update` (174 edge(s))
 
 ### Incoming
 
-- `equal` (690 edge(s))
-- `values` (229 edge(s))
-- `insert` (229 edge(s))
-- `ok` (221 edge(s))
-- `eq` (197 edge(s))
-- `where` (177 edge(s))
-- `returning` (166 edge(s))
-- `deepEqual` (163 edge(s))
-- `randomUUID` (123 edge(s))
-- `from` (121 edge(s))
-- `select` (100 edge(s))
+- `equal` (617 edge(s))
+- `values` (210 edge(s))
+- `insert` (210 edge(s))
+- `ok` (205 edge(s))
+- `where` (155 edge(s))
+- `eq` (155 edge(s))
+- `returning` (155 edge(s))
+- `deepEqual` (149 edge(s))
+- `randomUUID` (119 edge(s))
+- `from` (102 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/backends/api/src/pilot-operations/pilot-pos.controller.ts` (94 edge(s))
-- `rejects` (74 edge(s))
-- `safeParse` (73 edge(s))
+- `select` (81 edge(s))
+- `rejects` (67 edge(s))
 - `delete` (67 edge(s))
+- `safeParse` (57 edge(s))

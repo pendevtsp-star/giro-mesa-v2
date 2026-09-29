@@ -80,6 +80,31 @@ const locationKindLabels: Record<StockLocation["kind"], string> = {
   other: "Outro",
 };
 
+const secondaryViewGroups: ReadonlyArray<{
+  label: string;
+  items: ReadonlyArray<readonly [InventoryView, string]>;
+}> = [
+  {
+    label: "Operação",
+    items: [
+      ["overview", "Visão completa"],
+      ["planning", "Planejamento"],
+      ["lots", "Lotes e validades"],
+      ["transfers", "Transferências"],
+      ["returnables", "Vasilhames"],
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      ["assets", "Ativos"],
+      ["controls", "Controles"],
+      ["recipes", "Fichas técnicas"],
+      ["settings", "Configurações"],
+    ],
+  },
+];
+
 function itemKind(item: InventoryItem): InventoryItemKind {
   return item.kind ?? "ingredient";
 }
@@ -338,10 +363,52 @@ export function InventoryWorkspace({
     );
   });
   const latestCount = data.recentMovements.find((movement) => movement.type === "count");
+  const secondaryViewLabel = secondaryViewGroups
+    .flatMap((group) => group.items)
+    .find(([id]) => id === view)?.[1];
+  const hasBalanceFilters =
+    query.trim().length > 0 ||
+    locationFilter !== "all" ||
+    statusFilter !== "all" ||
+    kindFilter !== "all";
+  const showCountAction = ["shift", "balances", "counts", "movements"].includes(view);
+  const showTransferAction = ["shift", "balances", "transfers"].includes(view);
+  const showItemAction = ["shift", "balances", "settings"].includes(view);
 
   return (
     <div className="inventory-workspace">
-      {view !== "shift" && (
+      <header className="inventory-page-heading">
+        <h1>Estoque</h1>
+        <div className="inventory-page-heading__actions">
+          {showCountAction && (
+            <Button
+              disabled={!canCount}
+              onClick={() => onOpen("event")}
+              size="sm"
+              variant="secondary"
+            >
+              <Icon name="check" size={15} /> Contar / ajustar
+            </Button>
+          )}
+          {showTransferAction && (
+            <Button
+              disabled={!canTransfer}
+              onClick={() => onOpen("transfer")}
+              size="sm"
+              variant="secondary"
+            >
+              <Icon name="refresh" size={15} /> Transferir
+            </Button>
+          )}
+          {showItemAction && (
+            <Button onClick={() => onOpen("item")} size="sm" variant="secondary">
+              <Icon name="plus" size={15} /> Novo item
+            </Button>
+          )}
+        </div>
+      </header>
+
+      {["overview", "balances", "planning"].includes(view) && (
         <section className="inventory-observability" aria-label="Resumo do estoque">
           <StatCard
             title="Valor em estoque"
@@ -384,77 +451,73 @@ export function InventoryWorkspace({
         </section>
       )}
 
-      <div className="inventory-command-bar gm-toolbar">
-        <Badge tone={realtimeStatus === "live" ? "success" : "warning"}>
-          {realtimeStatus === "live"
-            ? "Atualizações conectadas"
-            : realtimeStatus === "polling"
-              ? "Atualização periódica"
-              : "Conectando"}
-        </Badge>
-        <SegmentedTabs
-          active={view}
-          items={[
-            {
-              id: "shift",
-              label: "Turno",
-              count: summaries.filter((summary) => summary.zero || summary.low || summary.negative)
-                .length,
-            },
-            { id: "pending", label: "Pendências", count: data.pendingActions.length },
-            { id: "balances", label: "Saldos", count: summaries.length },
-            { id: "counts", label: "Contagem" },
-            { id: "movements", label: "Movimentações", count: data.recentMovements.length },
-          ]}
-          label="Seções do estoque"
-          onChange={onViewChange}
-        />
+      <div className="inventory-command-bar">
+        <div className="inventory-command-bar__navigation">
+          <SegmentedTabs
+            active={view}
+            items={[
+              {
+                id: "shift",
+                label: "Turno",
+                count: summaries.filter(
+                  (summary) => summary.zero || summary.low || summary.negative,
+                ).length,
+              },
+              { id: "balances", label: "Saldos", count: summaries.length },
+              { id: "movements", label: "Movimentos", count: data.recentMovements.length },
+              { id: "counts", label: "Contagem" },
+              { id: "pending", label: "Pendências", count: data.pendingActions.length },
+            ]}
+            label="Áreas principais do estoque"
+            onChange={onViewChange}
+          />
+        </div>
         <details className="inventory-more-views">
-          <summary>Mais áreas do estoque</summary>
-          <div>
-            {(
-              [
-                ["overview", "Análise completa"],
-                ["planning", "Planejamento"],
-                ["lots", "Lotes e validades"],
-                ["transfers", "Transferências"],
-                ["returnables", "Vasilhames"],
-                ["assets", "Ativos"],
-                ["controls", "Controles"],
-                ["recipes", "Fichas técnicas"],
-                ["settings", "Configurações"],
-              ] as const
-            ).map(([id, label]) => (
-              <Button
-                aria-pressed={view === id}
-                key={id}
-                onClick={() => onViewChange(id)}
-                size="sm"
-                variant={view === id ? "secondary" : "ghost"}
-              >
-                {label}
-              </Button>
+          <summary>{secondaryViewLabel ?? "Outras áreas"}</summary>
+          <div className="inventory-more-views__menu">
+            {secondaryViewGroups.map((group) => (
+              <section aria-label={group.label} key={group.label}>
+                <small>{group.label}</small>
+                {group.items.map(([id, label]) => (
+                  <Button
+                    aria-label={label}
+                    aria-pressed={view === id}
+                    key={id}
+                    onClick={(event) => {
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                      onViewChange(id);
+                    }}
+                    size="sm"
+                    variant={view === id ? "secondary" : "ghost"}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </section>
             ))}
           </div>
         </details>
+        {realtimeStatus !== "live" && (
+          <Badge tone="warning">
+            {realtimeStatus === "polling" ? "Atualização periódica" : "Conectando"}
+          </Badge>
+        )}
         <div className="inventory-command-bar__actions">
-          <Button disabled={!canCount} onClick={() => onOpen("event")} size="sm">
-            <Icon name="check" size={15} /> Contar / ajustar
-          </Button>
-          <Button
-            disabled={!canTransfer}
-            onClick={() => onOpen("transfer")}
-            size="sm"
-            variant="secondary"
-          >
-            <Icon name="refresh" size={15} /> Transferir
-          </Button>
-          <Button onClick={() => onOpen("item")} size="sm" variant="secondary">
-            <Icon name="plus" size={15} /> Novo item
-          </Button>
-          <Button onClick={() => onOpen("scan")} size="sm" variant="ghost">
-            Ler código
-          </Button>
+          <details className="inventory-action-menu">
+            <summary>Mais ações</summary>
+            <div>
+              <Button
+                onClick={(event) => {
+                  event.currentTarget.closest("details")?.removeAttribute("open");
+                  onOpen("scan");
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Ler código
+              </Button>
+            </div>
+          </details>
         </div>
       </div>
 
@@ -495,7 +558,7 @@ export function InventoryWorkspace({
             <small>{data.automation.failed} evento(s) aguardando correção do processamento.</small>
           </span>
         </div>
-      ) : view !== "shift" ? (
+      ) : ["overview", "controls"].includes(view) ? (
         <div
           className={`inventory-system-status${data.automation.lastProcessedAt ? "" : " inventory-system-status--neutral"}`}
           role="status"
@@ -521,7 +584,7 @@ export function InventoryWorkspace({
         </div>
       ) : null}
 
-      {!hasPosition && (
+      {!hasPosition && ["shift", "balances", "settings"].includes(view) && (
         <Card className="inventory-onboarding">
           <div>
             <p className="eyebrow">Configuração inicial</p>
@@ -536,7 +599,11 @@ export function InventoryWorkspace({
               <span>1</span>
               <strong>Criar setores</strong>
               <small>Depósito, cozinha e bar.</small>
-              <Button onClick={() => onOpen("location")} size="sm" variant="secondary">
+              <Button
+                onClick={() => onOpen("location")}
+                size="sm"
+                variant={data.locations.length ? "secondary" : "primary"}
+              >
                 {data.locations.length ? "Adicionar outro" : "Criar setor"}
               </Button>
             </li>
@@ -1282,49 +1349,69 @@ export function InventoryWorkspace({
               <p className="eyebrow">Posição atual</p>
               <h2>Saldos por item e local</h2>
             </div>
-            <div className="inventory-filters">
-              <SearchField
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar item, código interno ou código de barras"
-                value={query}
-              />
-              <NativeSelect
-                aria-label="Filtrar por tipo de item"
-                onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
-                value={kindFilter}
-              >
-                <option value="all">Todos os tipos</option>
-                {Object.entries(kindLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </NativeSelect>
-              <NativeSelect
-                aria-label="Filtrar por local"
-                onChange={(event) => setLocationFilter(event.target.value)}
-                value={locationFilter}
-              >
-                <option value="all">Todos os locais</option>
-                {data.locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </NativeSelect>
-              <NativeSelect
-                aria-label="Filtrar por situação"
-                onChange={(event) => setStatusFilter(event.target.value)}
-                value={statusFilter}
-              >
-                <option value="all">Todas as situações</option>
-                <option value="zero">Sem disponível</option>
-                <option value="negative">Saldo negativo por local</option>
-                <option value="low">Abaixo do mínimo</option>
-                <option value="normal">Normais</option>
-                <option value="inactive">Inativos</option>
-              </NativeSelect>
+            <div className="inventory-balance-summary" aria-live="polite">
+              <Badge tone={hasBalanceFilters ? "info" : "neutral"}>
+                {visibleSummaries.length} de {summaries.length} itens
+              </Badge>
+              {hasBalanceFilters && (
+                <Button
+                  onClick={() => {
+                    setQuery("");
+                    setKindFilter("all");
+                    setLocationFilter("all");
+                    setStatusFilter("all");
+                  }}
+                  size="sm"
+                  variant="ghost"
+                >
+                  Limpar filtros
+                </Button>
+              )}
             </div>
+          </div>
+          <div className="inventory-filters gm-toolbar">
+            <SearchField
+              aria-label="Buscar no estoque"
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar item, código interno ou código de barras"
+              value={query}
+            />
+            <NativeSelect
+              aria-label="Filtrar por tipo de item"
+              onChange={(event) => setKindFilter(event.target.value as typeof kindFilter)}
+              value={kindFilter}
+            >
+              <option value="all">Todos os tipos</option>
+              {Object.entries(kindLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Filtrar por local"
+              onChange={(event) => setLocationFilter(event.target.value)}
+              value={locationFilter}
+            >
+              <option value="all">Todos os locais</option>
+              {data.locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </NativeSelect>
+            <NativeSelect
+              aria-label="Filtrar por situação"
+              onChange={(event) => setStatusFilter(event.target.value)}
+              value={statusFilter}
+            >
+              <option value="all">Todas as situações</option>
+              <option value="zero">Sem disponível</option>
+              <option value="negative">Saldo negativo por local</option>
+              <option value="low">Abaixo do mínimo</option>
+              <option value="normal">Normais</option>
+              <option value="inactive">Inativos</option>
+            </NativeSelect>
           </div>
           {visibleSummaries.length ? (
             <div className="inventory-balance-list">
@@ -1340,20 +1427,22 @@ export function InventoryWorkspace({
                         : `Estoque em ${summary.item.unit}`}
                     </small>
                   </div>
-                  <div>
-                    <small>Físico</small>
+                  <div className="inventory-balance-row__available">
+                    <small>Disponível</small>
                     <strong>
-                      {summary.quantity.toLocaleString("pt-BR")} {summary.item.unit}
-                    </strong>
-                  </div>
-                  <div>
-                    <small>Reservado / quarentena / em trânsito / disponível</small>
-                    <strong>
-                      {summary.reservedQuantity.toLocaleString("pt-BR")} /{" "}
-                      {summary.blockedQuantity.toLocaleString("pt-BR")} /{" "}
-                      {summary.inTransitQuantity.toLocaleString("pt-BR")} /{" "}
                       {summary.availableQuantity.toLocaleString("pt-BR")} {summary.item.unit}
                     </strong>
+                    <small>Físico {summary.quantity.toLocaleString("pt-BR")}</small>
+                  </div>
+                  <div className="inventory-balance-row__commitments">
+                    <small>Compromissos</small>
+                    <strong>
+                      {summary.reservedQuantity.toLocaleString("pt-BR")} reserv. ·{" "}
+                      {summary.blockedQuantity.toLocaleString("pt-BR")} quarent.
+                    </strong>
+                    {summary.inTransitQuantity > 0 && (
+                      <small>{summary.inTransitQuantity.toLocaleString("pt-BR")} em trânsito</small>
+                    )}
                   </div>
                   <div>
                     <small>Custo médio</small>
@@ -1384,36 +1473,37 @@ export function InventoryWorkspace({
                         ))}
                     </span>
                   </div>
-                  <Badge
-                    tone={
-                      !summary.item.active
-                        ? "neutral"
-                        : summary.zero || summary.negative
-                          ? "danger"
-                          : summary.low
-                            ? "warning"
-                            : "success"
-                    }
-                  >
-                    {!summary.item.active
-                      ? "Inativo"
-                      : summary.negative
-                        ? "Conferir saldo"
-                        : summary.zero
-                          ? "Sem disponível"
-                          : summary.low
-                            ? "Repor"
-                            : "Normal"}
-                  </Badge>
-                  <Badge tone="info">{kindLabels[itemKind(summary.item)]}</Badge>
-                  <Button
-                    aria-label={`Editar ${summary.item.name}`}
-                    onClick={() => onEditItem(summary.item)}
-                    size="sm"
-                    variant="ghost"
-                  >
-                    Editar
-                  </Button>
+                  <div className="inventory-balance-row__actions">
+                    <Badge
+                      tone={
+                        !summary.item.active
+                          ? "neutral"
+                          : summary.zero || summary.negative
+                            ? "danger"
+                            : summary.low
+                              ? "warning"
+                              : "success"
+                      }
+                    >
+                      {!summary.item.active
+                        ? "Inativo"
+                        : summary.negative
+                          ? "Conferir saldo"
+                          : summary.zero
+                            ? "Sem disponível"
+                            : summary.low
+                              ? "Repor"
+                              : "Normal"}
+                    </Badge>
+                    <Button
+                      aria-label={`Editar ${summary.item.name}`}
+                      onClick={() => onEditItem(summary.item)}
+                      size="sm"
+                      variant="ghost"
+                    >
+                      Editar
+                    </Button>
+                  </div>
                 </article>
               ))}
             </div>

@@ -255,6 +255,11 @@ internal static class OperationalProjection
         string now)
     {
         var body = RequireObject(data, "body");
+        // Delivery address, coverage and fees must be validated by the online API.
+        if (ReadOptionalString(body, "fulfillmentType") == "delivery")
+        {
+            throw Conflict("DELIVERY_REQUIRES_ONLINE");
+        }
         var tableId = ReadOptionalString(body, "tableId");
         var label = ReadOptionalString(body, "label");
         var guestCount = ReadInt(body, "guestCount", 1, 500);
@@ -288,6 +293,7 @@ internal static class OperationalProjection
             ["mergedIntoTabId"] = null,
             ["serviceChargeBasisPoints"] = 0,
             ["tipCents"] = 0,
+            ["deliveryFeeCents"] = 0,
             ["subtotalCents"] = 0,
             ["discountCents"] = 0,
             ["serviceChargeCents"] = 0,
@@ -650,6 +656,8 @@ internal static class OperationalProjection
         }
         var target = GetTabDetail(root, targetTabId);
         if (ReadString(RequireObject(target, "tab"), "status") != "open") throw Conflict("TAB_NOT_OPEN");
+        if (ReadOptionalString(RequireObject(target, "tab"), "fulfillmentType") == "delivery")
+            throw Conflict("DELIVERY_TAB_MERGE_UNSUPPORTED");
         var targetOrders = RequireArray(target, "orders");
         var targetItems = RequireArray(target, "items");
         var targetModifiers = RequireArray(target, "modifiers");
@@ -662,6 +670,8 @@ internal static class OperationalProjection
                 ?? throw Conflict("SOURCE_TAB_NOT_FOUND");
             var sourceTab = RequireObject(source, "tab");
             if (ReadString(sourceTab, "status") != "open") throw Conflict("SOURCE_TAB_NOT_FOUND");
+            if (ReadOptionalString(sourceTab, "fulfillmentType") == "delivery")
+                throw Conflict("DELIVERY_TAB_MERGE_UNSUPPORTED");
             foreach (var order in RequireArray(source, "orders").OfType<JsonObject>())
             {
                 order["tabId"] = targetTabId;
@@ -714,6 +724,8 @@ internal static class OperationalProjection
         var source = GetTabDetail(root, sourceTabId);
         var sourceTab = RequireObject(source, "tab");
         if (ReadString(sourceTab, "status") != "open") throw Conflict("TAB_NOT_OPEN");
+        if (ReadOptionalString(sourceTab, "fulfillmentType") == "delivery")
+            throw Conflict("DELIVERY_TAB_SPLIT_UNSUPPORTED");
         if (GetTabDetailOrNull(root, command.Id) is not null) throw Conflict("ENTITY_ID_CONFLICT");
         var tableId = ReadOptionalString(body, "tableId");
         var tables = RequireArray(RequireObject(root, "floor"), "tables");
@@ -755,6 +767,7 @@ internal static class OperationalProjection
             ["mergedIntoTabId"] = null,
             ["serviceChargeBasisPoints"] = ReadLong(sourceTab, "serviceChargeBasisPoints", 0),
             ["tipCents"] = 0,
+            ["deliveryFeeCents"] = 0,
             ["subtotalCents"] = 0,
             ["discountCents"] = 0,
             ["serviceChargeCents"] = 0,
@@ -2001,12 +2014,13 @@ internal static class OperationalProjection
         var discount = activeItems.Sum(item => ReadLong(item, "discountCents", 0));
         var basisPoints = ReadLong(tab, "serviceChargeBasisPoints", 0);
         var tip = ReadLong(tab, "tipCents", 0);
+        var deliveryFee = ReadLong(tab, "deliveryFeeCents", 0);
         long serviceCharge;
         long total;
         try
         {
             serviceCharge = checked(checked((subtotal - discount) * basisPoints) / 10_000);
-            total = checked(subtotal - discount + serviceCharge + tip);
+            total = checked(subtotal - discount + serviceCharge + tip + deliveryFee);
         }
         catch (OverflowException)
         {
@@ -2025,6 +2039,7 @@ internal static class OperationalProjection
             ["discountCents"] = discount,
             ["serviceChargeCents"] = serviceCharge,
             ["tipCents"] = tip,
+            ["deliveryFeeCents"] = deliveryFee,
             ["totalCents"] = total,
         };
     }

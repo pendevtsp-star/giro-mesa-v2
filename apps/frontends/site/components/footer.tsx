@@ -46,9 +46,7 @@ export function Footer() {
         <div className="footer-brand">
           <Logo />
           <p>Operação conectada, decisões mais claras.</p>
-          <p className="footer-note">
-            Produto em desenvolvimento. Integrações dependem de contratação e homologação.
-          </p>
+          <p className="footer-note">Produto em desenvolvimento.</p>
         </div>
         {groups.map((group) => (
           <div key={group.title}>

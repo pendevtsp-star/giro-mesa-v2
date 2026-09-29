@@ -1,3 +1,4 @@
+import { Icon } from "@giromesa/ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -25,25 +26,33 @@ export default function SupportPage() {
       </section>
       <section className="section container support-grid">
         <article id="senha">
-          <span>↗</span>
+          <span className="support-icon">
+            <Icon name="user" size={24} />
+          </span>
           <h2>Acesso e senha</h2>
           <p>Recuperação de senha, verificação em duas etapas, convites e dispositivos.</p>
           <Link href="/login">Ir para o login</Link>
         </article>
         <article>
-          <span>◎</span>
+          <span className="support-icon">
+            <Icon name="settings" size={24} />
+          </span>
           <h2>Implantação</h2>
           <p>Checklist, cardápio, equipe, mesas e simulação.</p>
           <Link href="/criar-conta">Criar conta grátis</Link>
         </article>
         <article id="status">
-          <span>◌</span>
+          <span className="support-icon">
+            <Icon name="dashboard" size={24} />
+          </span>
           <h2>Status dos serviços</h2>
           <p>Nenhuma página pública de disponibilidade foi configurada ainda.</p>
           <span className="status-chip">Status não publicado</span>
         </article>
         <article>
-          <span>◇</span>
+          <span className="support-icon">
+            <Icon name="people" size={24} />
+          </span>
           <h2>Atendimento</h2>
           <p>Horários e canais críticos serão publicados por plano antes do lançamento.</p>
           <Link href="/contato">Falar conosco</Link>

@@ -333,16 +333,17 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     await page.evaluate((value) => localStorage.setItem("giromesa-theme", value), theme);
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Estoque" })).toBeVisible();
-    const inventoryTabs = page.getByRole("group", { name: "Seções do estoque" });
+    const inventoryTabs = page.getByRole("group", { name: "Áreas principais do estoque" });
     await expect(inventoryTabs.getByRole("button").nth(0)).toContainText("Turno");
-    await expect(inventoryTabs.getByRole("button").nth(1)).toContainText("Pendências");
-    await expect(inventoryTabs.getByRole("button").nth(2)).toContainText("Saldos");
+    await expect(inventoryTabs.getByRole("button").nth(1)).toContainText("Saldos");
+    await expect(inventoryTabs.getByRole("button").nth(2)).toContainText("Movimentos");
     const moreAreas = page.locator(".inventory-more-views");
-    await moreAreas.getByText("Mais áreas do estoque").click();
+    await moreAreas.locator("summary").click();
     await expect(moreAreas.getByRole("button", { name: "Vasilhames" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
+    await moreAreas.locator("summary").click();
     await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
     await page.getByRole("button", { name: "Novo item de revenda" }).click();
     const resaleItemDialog = page.getByRole("dialog", { name: "Novo item de revenda" });
@@ -351,13 +352,16 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
       "resale",
     );
     await page.keyboard.press("Escape");
+    await moreAreas.locator("summary").click();
     await moreAreas.getByRole("button", { name: "Controles" }).click();
     await expect(page.getByRole("heading", { name: "Contagem cega" })).toBeVisible();
     await expect(page.getByText("Temperatura crítica: 11 °C.")).toBeVisible();
     await expect(page.getByText("82%")).toBeVisible();
+    await moreAreas.locator("summary").click();
     await moreAreas.getByRole("button", { name: "Vasilhames" }).click();
     await expect(page.getByRole("heading", { name: "Retornos pendentes" })).toBeVisible();
     await expect(page.getByText("Mesa 12").first()).toBeVisible();
+    await page.getByText("Reconciliação do setor", { exact: true }).click();
     await expect(page.getByText("Última divergência de contagem")).toBeVisible();
     await expect(page.getByText("Caução é opcional.")).toBeVisible();
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
@@ -365,7 +369,6 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
       true,
     );
     await inventoryTabs.getByRole("button", { name: /^Saldos/ }).click();
-    await moreAreas.locator("summary").click();
     const cards = page.locator(".inventory-observability .gm-stat-card");
     await expect(cards).toHaveCount(4);
     const positions = await cards.evaluateAll((elements) =>
@@ -377,9 +380,7 @@ test("controles do estoque permanecem operacionais em desktop e 375 px", async (
     expect(Math.abs(positions[0].y - positions[1].y)).toBeLessThan(2);
     if (width === 375) expect(positions[2].y).toBeGreaterThan(positions[0].y);
     else expect(Math.abs(positions[0].y - positions[3].y)).toBeLessThan(2);
-    await expect(page.locator(".inventory-system-status--neutral")).toContainText(
-      "sem execução registrada",
-    );
+    await expect(page.locator(".inventory-system-status--neutral")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );

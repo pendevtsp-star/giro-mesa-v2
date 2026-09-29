@@ -621,7 +621,6 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
                 ? "Sincronizando relacionamento"
                 : "Benefícios e campanhas atualizados"}
           </Badge>
-          <small>Fidelidade, benefícios, grupos de clientes e campanhas.</small>
         </div>
         <Button
           disabled={refreshing}
@@ -915,7 +914,6 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
         <Card>
           <div className="section-title">
             <div>
-              <p className="eyebrow">Benefícios</p>
               <h2 id="crm-benefits-heading">Cupons</h2>
             </div>
             {coupons.state.status === "ready" && (
@@ -966,7 +964,6 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
         <Card>
           <div className="section-title">
             <div>
-              <p className="eyebrow">Público</p>
               <h2>Grupos de clientes</h2>
             </div>
             {segments.state.status === "ready" && (
@@ -1002,7 +999,6 @@ export function CrmBenefitsCampaigns({ scope }: { scope: GrowthScope }) {
         <Card>
           <div className="section-title">
             <div>
-              <p className="eyebrow">Comunicação</p>
               <h2>Campanhas</h2>
             </div>
             {campaigns.state.status === "ready" && (

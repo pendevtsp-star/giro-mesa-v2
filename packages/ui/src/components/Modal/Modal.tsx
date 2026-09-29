@@ -12,6 +12,7 @@ export function Modal({
   description,
   children,
   size = "md",
+  closeDisabled = false,
   className = "",
   contentClassName = "",
 }: {
@@ -21,6 +22,7 @@ export function Modal({
   description?: ReactNode;
   children: ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  closeDisabled?: boolean;
   className?: string;
   contentClassName?: string;
 }) {
@@ -28,6 +30,7 @@ export function Modal({
   const titleId = useId();
 
   function requestClose() {
+    if (closeDisabled) return;
     const dialog = dialogRef.current;
     if (dialog?.open) dialog.close();
     onClose();
@@ -54,6 +57,7 @@ export function Modal({
       data-slot="dialog"
       onCancel={(event) => {
         event.preventDefault();
+        event.stopPropagation();
         requestClose();
       }}
       onClick={(event) => event.target === event.currentTarget && requestClose()}
@@ -72,7 +76,13 @@ export function Modal({
               {description}
             </div>
           )}
-          <Button aria-label="Fechar" onClick={requestClose} size="sm" variant="ghost">
+          <Button
+            aria-label="Fechar"
+            disabled={closeDisabled}
+            onClick={requestClose}
+            size="sm"
+            variant="ghost"
+          >
             <Icon name="x" size={16} />
           </Button>
         </div>

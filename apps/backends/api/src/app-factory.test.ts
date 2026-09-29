@@ -37,6 +37,13 @@ test("isolates operational limits by valid session while strict buckets remain I
     return;
   }
 
+  const previousSecret = process.env.QR_TABLE_TOKEN_SECRET;
+  process.env.QR_TABLE_TOKEN_SECRET = randomUUID();
+  context.after(() => {
+    if (previousSecret === undefined) delete process.env.QR_TABLE_TOKEN_SECRET;
+    else process.env.QR_TABLE_TOKEN_SECRET = previousSecret;
+  });
+
   const { app } = await createApplication();
   await app.init();
   const auth = app.get(AuthService);

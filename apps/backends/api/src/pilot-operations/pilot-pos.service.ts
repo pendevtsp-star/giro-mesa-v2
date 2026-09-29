@@ -7,11 +7,14 @@ import type {
   PaymentAttemptStatus,
   PrintDocumentPayloadV2,
 } from "@giromesa/contracts";
+import { deliveryAddressSchema } from "@giromesa/contracts";
 import {
   auditEvents,
   type Database,
+  deliveryCouriers,
   deliveryOrderStatusHistory,
   deliveryOrders,
+  deliveryZones,
   deviceEnrollments,
   doseClubRedemptions,
   fiscalDocuments,
@@ -137,6 +140,7 @@ import { DatabaseService } from "../database/database.module.js";
 import { DoseClubIntegrationService } from "../doseclub-integration/doseclub-integration.service.js";
 import { loyaltyEarn } from "../growth/growth.rules.js";
 import { normalizeStoredBranding } from "../organizations/establishment-settings.service.js";
+import { receiptLogoRaster } from "../organizations/receipt-logo.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { bestPromotion, localCalendar } from "../public-menu/public-order-rules.js";
 import { requireConfirmedPublicTotal } from "../public-menu/public-order-total.js";
@@ -158,12 +162,14 @@ import {
   kdsAttentionRevision,
   kdsCapacityRecommendation,
   kdsPartialState,
+  MAX_STORED_CENTS,
   normalizeKdsAttentionText,
   paymentAttemptExpiresAt,
   projectKdsAvailability,
   replayResult,
   requestHash,
   shouldAlertKdsCancellation,
+  stableJson,
   suggestedServiceChargeBasisPoints,
   summarizeKdsDurations,
   tabTotals,
@@ -703,7 +709,7 @@ export class PilotPosService {
       unitId: string;
       reversalId: string;
       paymentId: string;
-      installationId: string;
+      installationId: string | null;
       actorIdentityId: string;
       paymentMethod: typeof posTabPayments.$inferSelect.method;
       amountCents: number;
@@ -791,7 +797,7 @@ export class PilotPosService {
     }
 
     let cashRegisterId = originalShift?.cashRegisterId ?? null;
-    if (!cashRegisterId) {
+    if (!cashRegisterId && input.installationId) {
       const [binding] = await tx
         .select({ cashRegisterId: managementCashRegisterTerminals.cashRegisterId })
         .from(managementCashRegisterTerminals)
@@ -1693,6 +1699,20 @@ export class PilotPosService {
         .filter((member) => coordinatedGroupIds.has(member.groupId))
         .map((member) => member.tableId),
     );
+    const operationalSectionByTableId = new Map(
+      shiftSectionTables.map((assignment) => [assignment.tableId, assignment.shiftSectionId]),
+    );
+    const floorReadAt = new Date();
+    for (const transfer of shiftTableTransfers) {
+      if (transfer.expiresAt > floorReadAt) {
+        operationalSectionByTableId.set(transfer.tableId, transfer.targetShiftSectionId);
+      }
+    }
+    const assignedTableIds = new Set(
+      [...operationalSectionByTableId]
+        .filter(([, shiftSectionId]) => assignedShiftSectionIds.has(shiftSectionId))
+        .map(([tableId]) => tableId),
+    );
     const fullTabIds = new Set(
       tabs
         .filter(
@@ -1806,6 +1826,16 @@ export class PilotPosService {
         )
         .flatMap((tab) => (tab.tableId ? [[tab.tableId, tab] as const] : [])),
     );
+    const canOpenTabs = [...scopedRoles].some((role) =>
+      hasPermission(role, "operations:tabs:open"),
+    );
+    const operationalTableAccess = (tableId: string) => {
+      const openTab = openTabByTableId.get(tableId);
+      if (openTab) return fullTabIds.has(openTab.id) ? ("operate" as const) : ("overview" as const);
+      return canOpenTabs && (assignedTableIds.has(tableId) || coordinatedTableIds.has(tableId))
+        ? ("operate" as const)
+        : ("overview" as const);
+    };
     const staffNameByIdentityId = new Map(
       staff.map(({ identityId: staffIdentityId, displayName }) => [staffIdentityId, displayName]),
     );
@@ -1839,10 +1869,7 @@ export class PilotPosService {
           ? ("manage" as const)
           : cashierFloorAccess
             ? ("financial" as const)
-            : openTabByTableId.get(table.id) &&
-                fullTabIds.has(openTabByTableId.get(table.id)?.id as string)
-              ? ("operate" as const)
-              : ("overview" as const),
+            : operationalTableAccess(table.id),
       })),
       openTabs: visibleTabsWithMergePolicy,
       tableGroups: tableGroups.map((group) => ({
@@ -5337,6 +5364,16 @@ export class PilotPosService {
       ), queue as (
         select tabs.*,
                case
+                 when tabs.fulfillment_type = 'delivery' then case
+                   when delivery.status = 'completed' then 'delivered'
+                   when delivery.status in ('dispatched', 'delivery_failed') then 'waiting'
+                   when delivery.status in ('ready', 'returned')
+                     then case when tabs.ready_notified_at is not null then 'waiting' else 'ready' end
+                   when tabs.promised_at is not null and tabs.promised_at < now() then 'late'
+                   when delivery.status in ('placed', 'confirmed', 'preparing')
+                     or coalesce(orders.production_order_count, 0) > 0 then 'production'
+                   else 'new'
+                 end
                  when tabs.status = 'closed' then 'delivered'
                  when coalesce(orders.active_order_count, 0) > 0
                    and coalesce(orders.ready_order_count, 0) = coalesce(orders.active_order_count, 0)
@@ -5345,17 +5382,29 @@ export class PilotPosService {
                  when coalesce(orders.production_order_count, 0) > 0 then 'production'
                  else 'new'
                end as queue_stage
-          from pos_tabs tabs
-          left join order_rollup orders on orders.tab_id = tabs.id
+           from pos_tabs tabs
+           left join order_rollup orders on orders.tab_id = tabs.id
+           left join growth_delivery_orders delivery
+             on delivery.organization_id = tabs.organization_id
+            and delivery.unit_id = tabs.unit_id
+            and delivery.order_ref = tabs.id
          where tabs.organization_id = ${organizationId}::uuid
            and tabs.unit_id = ${unitId}::uuid
            and tabs.table_id is null
            and tabs.status in ('open', 'closed')
-           and (tabs.status = 'open' or tabs.closed_at >= now() - interval '24 hours')
+           and not (tabs.fulfillment_type = 'delivery' and tabs.status = 'closed'
+             and tabs.total_cents = 0 and delivery.id is null)
+            and (tabs.fulfillment_type <> 'delivery' or delivery.status is distinct from 'canceled')
+            and (tabs.status = 'open' or tabs.closed_at >= now() - interval '24 hours'
+              or (tabs.fulfillment_type = 'delivery' and coalesce(delivery.status::text, 'draft') not in ('completed', 'canceled')))
       )
     `;
     const channelFilter =
       query.channel === "all" ? sql`true` : sql`queue.fulfillment_type = ${query.channel}`;
+    const activeQueueFilter = sql`(
+      (queue.fulfillment_type <> 'delivery' and queue.status = 'open')
+      or (queue.fulfillment_type = 'delivery' and queue.queue_stage <> 'delivered')
+    )`;
     const baseFilter = sql`
       ${channelFilter}
       and (
@@ -5391,6 +5440,8 @@ export class PilotPosService {
                queue.ready_notification_consent as "readyNotificationConsent",
                queue.service_notes as "serviceNotes",
                queue.delivery_address as "deliveryAddress",
+               queue.delivery_address_details as "deliveryAddressDetails",
+               queue.delivery_zone_id as "deliveryZoneId",
                queue.promised_at as "promisedAt",
                queue.ready_notified_at as "readyNotifiedAt",
                queue.guest_count as "guestCount",
@@ -5402,6 +5453,7 @@ export class PilotPosService {
                queue.subtotal_cents as "subtotalCents",
                queue.discount_cents as "discountCents",
                queue.service_charge_cents as "serviceChargeCents",
+               queue.delivery_fee_cents as "deliveryFeeCents",
                queue.total_cents as "totalCents",
                queue.closed_at as "closedAt",
                queue.created_at as "createdAt",
@@ -5410,7 +5462,7 @@ export class PilotPosService {
          from queue
          where ${baseFilter}
            and (
-             (${query.stage} = 'all' and queue.status = 'open')
+             (${query.stage} = 'all' and ${activeQueueFilter})
              or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
            )
          order by case queue.queue_stage
@@ -5438,7 +5490,7 @@ export class PilotPosService {
         selectedTotal: number;
       }>(sql`
         ${queueCte}
-        select count(*) filter (where queue.status = 'open')::int as all,
+        select count(*) filter (where ${activeQueueFilter})::int as all,
                count(*) filter (where queue.queue_stage = 'new')::int as new,
                count(*) filter (where queue.queue_stage = 'production')::int as production,
                count(*) filter (where queue.queue_stage = 'ready')::int as ready,
@@ -5446,7 +5498,7 @@ export class PilotPosService {
                count(*) filter (where queue.queue_stage = 'delivered')::int as delivered,
                count(*) filter (where queue.queue_stage = 'late')::int as late,
                count(*) filter (
-                 where (${query.stage} = 'all' and queue.status = 'open')
+                 where (${query.stage} = 'all' and ${activeQueueFilter})
                     or (${query.stage} <> 'all' and queue.queue_stage = ${query.stage})
                )::int as "selectedTotal"
           from queue
@@ -5701,8 +5753,37 @@ export class PilotPosService {
       )
       .orderBy(desc(posPrintJobs.createdAt))
       .limit(100);
+    const [customerLink] = await this.database.db
+      .select({ customerId: posTabCustomerLinks.customerId })
+      .from(posTabCustomerLinks)
+      .where(
+        and(
+          eq(posTabCustomerLinks.organizationId, organizationId),
+          eq(posTabCustomerLinks.unitId, unitId),
+          eq(posTabCustomerLinks.tabId, tabId),
+        ),
+      )
+      .limit(1);
     return {
-      tab,
+      tab: {
+        ...tab,
+        customerId: customerLink?.customerId ?? null,
+        suggestedServiceChargeBasisPoints: suggestedServiceChargeBasisPoints(
+          tab.fulfillmentType,
+          (
+            await this.database.db
+              .select({ configuration: managementSettlementSettings.configuration })
+              .from(managementSettlementSettings)
+              .where(
+                and(
+                  eq(managementSettlementSettings.organizationId, organizationId),
+                  eq(managementSettlementSettings.unitId, unitId),
+                ),
+              )
+              .limit(1)
+          )[0]?.configuration,
+        ),
+      },
       relatedTabs,
       service,
       printJobs: printJobs.map((job) => ({
@@ -6089,6 +6170,13 @@ export class PilotPosService {
           .limit(1);
         const serviceConfiguration = settlementSettings?.configuration;
         const fulfillmentType = input.fulfillmentType ?? "dine_in";
+        const deliveryZone = await this.validateDeliveryDraft(
+          tx,
+          organizationId,
+          unitId,
+          fulfillmentType,
+          input.deliveryZoneId,
+        );
         const serviceChargeBasisPoints = suggestedServiceChargeBasisPoints(
           fulfillmentType,
           serviceConfiguration,
@@ -6114,6 +6202,10 @@ export class PilotPosService {
             readyNotificationConsent: input.readyNotificationConsent ?? false,
             serviceNotes: reservationServiceNotes ?? (input.serviceNotes?.trim() || undefined),
             deliveryAddress: input.deliveryAddress?.trim() || undefined,
+            deliveryAddressDetails: input.deliveryAddressDetails,
+            deliveryZoneId: input.deliveryZoneId,
+            deliveryFeeCents: deliveryZone?.feeCents ?? 0,
+            totalCents: deliveryZone?.feeCents ?? 0,
             promisedAt: input.promisedAt ? new Date(input.promisedAt) : undefined,
             guestCount: input.guestCount,
             serviceChargeBasisPoints,
@@ -6254,7 +6346,7 @@ export class PilotPosService {
           reservationId: input.reservationId,
           waitlistEntryId: input.waitlistEntryId,
         });
-        return { tab };
+        return { tab: { ...tab, customerId } };
       },
     );
   }
@@ -6277,6 +6369,7 @@ export class PilotPosService {
       await this.requireOperationalIdentity(organizationId, unitId, input.responsibleIdentityId);
     }
     return this.database.db.transaction(async (tx) => {
+      const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
       const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
       if (tab.version !== input.expectedVersion) {
         throw new ConflictException({
@@ -6289,6 +6382,42 @@ export class PilotPosService {
         this.assertPromisedAtNotPast(input.promisedAt);
       }
       const nextFulfillmentType = input.fulfillmentType ?? tab.fulfillmentType;
+      const deliveryZoneChanged =
+        (input.deliveryZoneId !== undefined && input.deliveryZoneId !== tab.deliveryZoneId) ||
+        nextFulfillmentType !== tab.fulfillmentType;
+      const deliveryZone = deliveryZoneChanged
+        ? await this.validateDeliveryDraft(
+            tx,
+            organizationId,
+            unitId,
+            nextFulfillmentType,
+            input.deliveryZoneId === undefined ? tab.deliveryZoneId : input.deliveryZoneId,
+          )
+        : null;
+      const [registeredDelivery] = await tx
+        .select({ id: deliveryOrders.id, customerId: deliveryOrders.customerId })
+        .from(deliveryOrders)
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            eq(deliveryOrders.unitId, unitId),
+            eq(deliveryOrders.orderRef, tab.id),
+          ),
+        )
+        .limit(1);
+      if (
+        registeredDelivery &&
+        (nextFulfillmentType !== tab.fulfillmentType ||
+          (input.deliveryZoneId !== undefined && input.deliveryZoneId !== tab.deliveryZoneId) ||
+          (input.deliveryAddressDetails !== undefined &&
+            stableJson(input.deliveryAddressDetails) !== stableJson(tab.deliveryAddressDetails)) ||
+          (input.deliveryAddress !== undefined && input.deliveryAddress !== tab.deliveryAddress))
+      ) {
+        throw new ConflictException({
+          code: "DELIVERY_DETAILS_ALREADY_REGISTERED",
+          message: "A entrega já foi registrada; preserve o endereço e a zona vinculados.",
+        });
+      }
       const nextDeliveryAddress =
         input.deliveryAddress === undefined ? tab.deliveryAddress : input.deliveryAddress;
       if (nextFulfillmentType === "delivery" && !nextDeliveryAddress?.trim()) {
@@ -6297,10 +6426,19 @@ export class PilotPosService {
           message: "Informe o endereço do delivery.",
         });
       }
+      const deliveryFeeCents = deliveryZoneChanged
+        ? (deliveryZone?.feeCents ?? 0)
+        : tab.deliveryFeeCents;
+      const totalCents = tab.totalCents - tab.deliveryFeeCents + deliveryFeeCents;
+      if (totalCents > MAX_STORED_CENTS)
+        throw new ConflictException({ code: "DELIVERY_TOTAL_INVALID" });
+      this.assertTabPaymentFloor(totalCents, paymentState);
       const [updated] = await tx
         .update(posTabs)
         .set({
           label: input.label === undefined ? tab.label : input.label,
+          deliveryFeeCents,
+          totalCents,
           fulfillmentType: input.fulfillmentType ?? tab.fulfillmentType,
           customerName: input.customerName === undefined ? tab.customerName : input.customerName,
           customerPhone:
@@ -6312,6 +6450,12 @@ export class PilotPosService {
           serviceNotes: input.serviceNotes === undefined ? tab.serviceNotes : input.serviceNotes,
           deliveryAddress:
             input.deliveryAddress === undefined ? tab.deliveryAddress : input.deliveryAddress,
+          deliveryAddressDetails:
+            input.deliveryAddressDetails === undefined
+              ? tab.deliveryAddressDetails
+              : input.deliveryAddressDetails,
+          deliveryZoneId:
+            input.deliveryZoneId === undefined ? tab.deliveryZoneId : input.deliveryZoneId,
           promisedAt:
             input.promisedAt === undefined
               ? tab.promisedAt
@@ -6336,12 +6480,95 @@ export class PilotPosService {
         )
         .returning();
       if (!updated) throw new ConflictException({ code: "TAB_VERSION_CONFLICT" });
+      const [customerLink] = await tx
+        .select()
+        .from(posTabCustomerLinks)
+        .where(
+          and(
+            eq(posTabCustomerLinks.organizationId, organizationId),
+            eq(posTabCustomerLinks.unitId, unitId),
+            eq(posTabCustomerLinks.tabId, tabId),
+          ),
+        )
+        .limit(1);
+      let customerId = customerLink?.customerId ?? null;
+      if (input.customerId !== undefined && input.customerId !== customerId) {
+        if (
+          paymentState.paidCents ||
+          paymentState.reservedCents ||
+          paymentState.coveredLossCents ||
+          (registeredDelivery &&
+            (customerId !== null || registeredDelivery.customerId !== null || !input.customerId))
+        ) {
+          throw new ConflictException({
+            code: "TAB_CUSTOMER_ALREADY_COMMITTED",
+            message: "O cliente vinculado não pode mudar após pagamento ou registro da entrega.",
+          });
+        }
+        if (input.customerId) {
+          const [customer] = await tx
+            .select({ id: growthCustomers.id })
+            .from(growthCustomers)
+            .where(
+              and(
+                eq(growthCustomers.organizationId, organizationId),
+                eq(growthCustomers.id, input.customerId),
+                isNull(growthCustomers.archivedAt),
+              ),
+            )
+            .limit(1);
+          if (!customer) throw new NotFoundException({ code: "CUSTOMER_NOT_FOUND" });
+        }
+        if (registeredDelivery && input.customerId) {
+          const [linkedDelivery] = await tx
+            .update(deliveryOrders)
+            .set({ customerId: input.customerId, updatedAt: new Date() })
+            .where(
+              and(
+                eq(deliveryOrders.organizationId, organizationId),
+                eq(deliveryOrders.unitId, unitId),
+                eq(deliveryOrders.id, registeredDelivery.id),
+                isNull(deliveryOrders.customerId),
+              ),
+            )
+            .returning({ id: deliveryOrders.id });
+          if (!linkedDelivery)
+            throw new ConflictException({ code: "TAB_CUSTOMER_ALREADY_COMMITTED" });
+        }
+        await tx
+          .delete(posTabCustomerLinks)
+          .where(
+            and(
+              eq(posTabCustomerLinks.organizationId, organizationId),
+              eq(posTabCustomerLinks.unitId, unitId),
+              eq(posTabCustomerLinks.tabId, tabId),
+            ),
+          );
+        if (input.customerId)
+          await tx.insert(posTabCustomerLinks).values({
+            organizationId,
+            unitId,
+            tabId,
+            customerId: input.customerId,
+            linkedByIdentityId: identityId,
+          });
+        await this.recordEvent(
+          tx,
+          identityId,
+          organizationId,
+          unitId,
+          tabId,
+          "tab.customer_linked",
+          { previousCustomerId: customerId, customerId: input.customerId },
+        );
+        customerId = input.customerId;
+      }
       await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.updated", {
         version: updated.version,
         fulfillmentType: updated.fulfillmentType,
         responsibleIdentityId: updated.responsibleIdentityId,
       });
-      return { tab: updated };
+      return { tab: { ...updated, customerId } };
     });
   }
 
@@ -7086,6 +7313,7 @@ export class PilotPosService {
         );
         const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        await this.assertDeliveryFinancialReady(tx, organizationId, unitId, tab, true);
         const capability = await this.paymentCapability(
           tx,
           organizationId,
@@ -7432,6 +7660,7 @@ export class PilotPosService {
             id: posTabPayments.id,
             tabId: posTabPayments.tabId,
             amountCents: posTabPayments.amountCents,
+            method: posTabPayments.method,
             paymentAttemptId: posTabPayments.paymentAttemptId,
             source: posTabPayments.source,
             verified: posTabPayments.verified,
@@ -7449,14 +7678,21 @@ export class PilotPosService {
             ),
           )
           .limit(1);
+        if (!payment) throw new NotFoundException({ code: "PAYMENT_NOT_FOUND" });
+        const manual = payment.source === "manual" && !payment.paymentAttemptId;
         if (
-          payment?.source !== "terminal" ||
-          !payment.verified ||
-          !payment.paymentAttemptId ||
-          !payment.installationId ||
-          !payment.provider
+          !manual &&
+          (payment.source !== "terminal" ||
+            !payment.verified ||
+            !payment.paymentAttemptId ||
+            !payment.installationId ||
+            !payment.provider)
         ) {
           throw new ConflictException({ code: "PAYMENT_REVERSAL_REQUIRES_VERIFIED_TERMINAL" });
+        }
+        if (manual) {
+          await this.lockTabPaymentState(tx, organizationId, unitId, payment.tabId);
+          await this.requireOpenTab(tx, organizationId, unitId, payment.tabId);
         }
         const [fiscalDocument] = await tx
           .select({ status: fiscalDocuments.status })
@@ -7499,6 +7735,73 @@ export class PilotPosService {
             code: "PAYMENT_REVERSAL_REQUIRES_FISCAL_CANCELLATION",
             message: "Aguarde a NFC-e e cancele-a antes de estornar o pagamento.",
           });
+        }
+        if (manual) {
+          const [existing] = await tx
+            .select({ id: posPaymentReversals.id })
+            .from(posPaymentReversals)
+            .where(
+              and(
+                eq(posPaymentReversals.organizationId, organizationId),
+                eq(posPaymentReversals.unitId, unitId),
+                eq(posPaymentReversals.paymentId, paymentId),
+                inArray(posPaymentReversals.status, [
+                  "pending",
+                  "processing",
+                  "approved",
+                  "unknown",
+                ]),
+              ),
+            )
+            .limit(1);
+          if (existing) throw new ConflictException({ code: "PAYMENT_ALREADY_REVERSED" });
+          const now = new Date();
+          const [reversal] = await tx
+            .insert(posPaymentReversals)
+            .values({
+              organizationId,
+              unitId,
+              paymentId,
+              requestedByIdentityId: identityId,
+              amountCents: payment.amountCents,
+              reason: input.reason,
+              status: "approved",
+              resolvedAt: now,
+            })
+            .returning();
+          if (!reversal) throw new Error("Payment reversal insert did not return a row");
+          const accounting = await this.recordApprovedPaymentReversalAccounting(tx, {
+            organizationId,
+            unitId,
+            reversalId: reversal.id,
+            paymentId,
+            installationId: null,
+            actorIdentityId: identityId,
+            paymentMethod: payment.method,
+            amountCents: payment.amountCents,
+            occurredAt: now,
+          });
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            payment.tabId,
+            "payment.reversal_approved",
+            {
+              reversalId: reversal.id,
+              paymentId,
+              amountCents: payment.amountCents,
+              reason: input.reason,
+              source: "manual",
+              ...accounting,
+            },
+            { entityType: "payment_reversal", entityId: reversal.id },
+          );
+          return { reversal: this.paymentReversalView(reversal), action: null };
+        }
+        if (!payment.paymentAttemptId || !payment.installationId || !payment.provider) {
+          throw new ConflictException({ code: "PAYMENT_REVERSAL_REQUIRES_VERIFIED_TERMINAL" });
         }
         await this.smartPos.lockPaymentInstallation(
           tx,
@@ -8006,7 +8309,9 @@ export class PilotPosService {
           ),
         )
         .limit(1);
-      if (!reversal) throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      if (!reversal?.paymentAttemptId || !reversal.installationId) {
+        throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      }
       const [attempt] = await tx
         .select({ provider: posPaymentAttempts.provider })
         .from(posPaymentAttempts)
@@ -8081,7 +8386,9 @@ export class PilotPosService {
           ),
         )
         .limit(1);
-      if (!reversal) throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      if (!reversal?.paymentAttemptId || !reversal.installationId) {
+        throw new NotFoundException({ code: "PAYMENT_REVERSAL_NOT_FOUND" });
+      }
       const [existingResult] = await tx
         .select({
           reversalId: posPaymentReversalResults.reversalId,
@@ -8337,6 +8644,7 @@ export class PilotPosService {
       async (tx) => {
         const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        await this.assertDeliveryFinancialReady(tx, organizationId, unitId, tab, true);
         const availableCents =
           tab.totalCents -
           paymentState.paidCents -
@@ -8357,6 +8665,8 @@ export class PilotPosService {
             unitId,
             tabId,
             ...paymentInput,
+            changeCents:
+              input.receivedCents === undefined ? null : input.receivedCents - input.amountCents,
             source: "manual",
             verified: input.method === "cash",
             createdByIdentityId: identityId,
@@ -8367,6 +8677,8 @@ export class PilotPosService {
           paymentId: payment.id,
           method: payment.method,
           amountCents: payment.amountCents,
+          receivedCents: payment.receivedCents,
+          changeCents: payment.changeCents,
           source: payment.source,
           verified: payment.verified,
         });
@@ -8932,7 +9244,7 @@ export class PilotPosService {
             copies: input.copies ?? source.copies,
             terminalId: target.terminalId,
             printerId: target.printerId,
-            payload: source.payload,
+            payload: { ...source.payload, print: { isReprint: true } },
             requestedByIdentityId: identityId,
             reprintOfJobId: source.id,
             reason: input.reason,
@@ -9189,7 +9501,45 @@ export class PilotPosService {
       async (tx) => {
         await this.lockServiceTable(tx, organizationId, unitId, tabId);
         const paymentState = await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
-        const tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        let tab = await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        let deliveryFeeWaivedCents = 0;
+        if (
+          tab.fulfillmentType === "delivery" &&
+          tab.totalCents === tab.deliveryFeeCents &&
+          paymentState.paidCents === 0 &&
+          paymentState.reservedCents === 0 &&
+          paymentState.coveredLossCents === 0 &&
+          !(await this.hasActiveTabItems(tx, organizationId, unitId, tabId))
+        ) {
+          const [activity] = await tx.execute<{ hasActivity: boolean }>(sql`
+            select (
+              exists(select 1 from ${posTabPayments} where organization_id = ${organizationId}::uuid
+                and unit_id = ${unitId}::uuid and tab_id = ${tabId}::uuid)
+              or exists(select 1 from growth_delivery_orders where organization_id = ${organizationId}::uuid
+                and unit_id = ${unitId}::uuid and order_ref = ${tabId}::uuid)
+            ) as "hasActivity"
+          `);
+          if (!activity?.hasActivity) {
+            deliveryFeeWaivedCents = tab.deliveryFeeCents;
+            const [cleared] = await tx
+              .update(posTabs)
+              .set({ deliveryFeeCents: 0, totalCents: 0 })
+              .where(
+                and(
+                  eq(posTabs.id, tabId),
+                  eq(posTabs.organizationId, organizationId),
+                  eq(posTabs.unitId, unitId),
+                ),
+              )
+              .returning();
+            if (!cleared) throw new ConflictException({ code: "TAB_NOT_OPEN" });
+            tab = cleared;
+          } else {
+            await this.assertDeliveryFinancialReady(tx, organizationId, unitId, tab);
+          }
+        } else {
+          await this.assertDeliveryFinancialReady(tx, organizationId, unitId, tab);
+        }
         let singleTabGroup = tab.tableId
           ? await this.findSingleTabGroup(tx, organizationId, unitId, tab.tableId)
           : null;
@@ -9338,6 +9688,7 @@ export class PilotPosService {
         await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.closed", {
           paidCents,
           operationalLossCents,
+          deliveryFeeWaivedCents,
           printRequested: input.printRequested,
           releasedTableIds,
           turnoverStatus: releasedTableIds.length > 0 ? "needs_cleaning" : null,
@@ -9606,14 +9957,22 @@ export class PilotPosService {
       "approval.request",
       { tabId, ...input },
       async (tx) => {
-        const row = await this.getScopedItem(tx, organizationId, unitId, input.itemId);
-        if (row.tabId !== tabId) {
+        const accountDiscount = input.action === "tab_discount";
+        if (!accountDiscount && !input.itemId)
+          throw new BadRequestException({ code: "APPROVAL_ITEM_REQUIRED" });
+        if (accountDiscount) {
+          await this.requireOpenTab(tx, organizationId, unitId, tabId);
+        }
+        const row = input.itemId
+          ? await this.getScopedItem(tx, organizationId, unitId, input.itemId)
+          : null;
+        if (row && row.tabId !== tabId) {
           throw new ConflictException({ code: "APPROVAL_ITEM_TAB_MISMATCH" });
         }
-        if (row.item.status === "canceled") {
+        if (row?.item.status === "canceled") {
           throw new ConflictException({ code: "ITEM_CANCELED" });
         }
-        if (input.discountCents && input.discountCents > row.item.grossCents) {
+        if (row && input.discountCents && input.discountCents > row.item.grossCents) {
           throw new BadRequestException({ code: "DISCOUNT_EXCEEDS_ITEM" });
         }
         const requestId = randomUUID();
@@ -9653,7 +10012,7 @@ export class PilotPosService {
             action: input.action,
             discountCents: input.discountCents,
             reason: input.reason,
-            productName: row.item.productName,
+            productName: row?.item.productName ?? "Conta inteira",
             tabLabel:
               tab?.tableLabel ??
               tab?.label ??
@@ -9713,7 +10072,7 @@ export class PilotPosService {
         requestId: String(event.payload.requestId),
         tabId: event.tabId,
         tabLabel: typeof event.payload.tabLabel === "string" ? event.payload.tabLabel : null,
-        itemId: String(event.payload.itemId),
+        itemId: typeof event.payload.itemId === "string" ? event.payload.itemId : null,
         productName: String(event.payload.productName ?? "Item"),
         action: event.payload.action,
         discountCents:
@@ -9736,9 +10095,79 @@ export class PilotPosService {
     input: ApprovalDecisionInput,
   ) {
     const membership = await this.verifyManagerPin(identityId, organizationId, unitId, input.pin);
+    const [accountRequest] = await this.database.db
+      .select()
+      .from(posTabEvents)
+      .where(
+        and(
+          eq(posTabEvents.organizationId, organizationId),
+          eq(posTabEvents.unitId, unitId),
+          eq(posTabEvents.type, "approval.requested"),
+          sql`${posTabEvents.payload}->>'requestId' = ${requestId}`,
+          sql`${posTabEvents.payload}->>'action' = 'tab_discount'`,
+        ),
+      )
+      .limit(1);
+    if (accountRequest) {
+      return this.idempotent(
+        identityId,
+        organizationId,
+        unitId,
+        idempotencyKey,
+        "approval.tab_discount.decide",
+        { requestId, decision },
+        async (tx) => {
+          await tx.execute(
+            sql`select pg_advisory_xact_lock(hashtext(${`pos-approval:${organizationId}:${unitId}:${requestId}`}))`,
+          );
+          const [decided] = await tx
+            .select({ id: posTabEvents.id })
+            .from(posTabEvents)
+            .where(
+              and(
+                eq(posTabEvents.organizationId, organizationId),
+                eq(posTabEvents.unitId, unitId),
+                inArray(posTabEvents.type, ["approval.approved", "approval.rejected"]),
+                sql`${posTabEvents.payload}->>'requestId' = ${requestId}`,
+              ),
+            )
+            .limit(1);
+          if (decided || !isApprovalActive(accountRequest.createdAt))
+            throw new ConflictException({ code: "APPROVAL_REQUEST_NOT_FOUND" });
+          if (decision === "approved") {
+            await this.applyTabDiscount(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              accountRequest.tabId,
+              {
+                discountCents: Number(accountRequest.payload.discountCents),
+                approval: {
+                  approverMembershipId: membership.id,
+                  pin: input.pin,
+                  reason: String(accountRequest.payload.reason),
+                },
+              },
+            );
+          }
+          await this.recordEvent(
+            tx,
+            identityId,
+            organizationId,
+            unitId,
+            accountRequest.tabId,
+            `approval.${decision}`,
+            { requestId, action: "tab_discount" },
+          );
+          return { requestId, status: decision };
+        },
+      );
+    }
     const requests = await this.listApprovalRequests(identityId, organizationId, unitId);
     const request = requests.find((candidate) => candidate.requestId === requestId);
     if (!request) throw new NotFoundException({ code: "APPROVAL_REQUEST_NOT_FOUND" });
+    if (!request.itemId) throw new BadRequestException({ code: "APPROVAL_ITEM_REQUIRED" });
     if (decision === "approved") {
       const approval = {
         approverMembershipId: membership.id,
@@ -10579,8 +11008,8 @@ export class PilotPosService {
       });
       fromStatus = toStatus;
     }
-    const subtotalCents = tab.totalCents;
-    const totalCents = subtotalCents + current.deliveryFeeCents;
+    const subtotalCents = tab.totalCents - tab.deliveryFeeCents;
+    const totalCents = tab.totalCents;
     const financialChanged =
       current.subtotalCents !== subtotalCents || current.totalCents !== totalCents;
     if (financialChanged) {
@@ -11031,6 +11460,30 @@ export class PilotPosService {
             now,
             true,
           );
+          const policy =
+            tab.fulfillmentType === "delivery"
+              ? await this.productionPrinting?.getBillPolicy(tx, organizationId, unitId)
+              : null;
+          if (policy?.deliveryAutoPrint && policy.deliveryPrinterId) {
+            const deliveryPrint = await this.queuePrintJob(
+              tx,
+              identityId,
+              organizationId,
+              unitId,
+              tab.id,
+              {
+                documentType: "delivery_slip",
+                copies: 1,
+              },
+            );
+            printJobIds.push(deliveryPrint.id);
+            if (deliveryPrint.lastError)
+              printWarnings.push({
+                printJobId: deliveryPrint.id,
+                stationId: "delivery",
+                code: deliveryPrint.lastError,
+              });
+          }
           return { orderId, status: "sent", ticketIds, printJobIds, printWarnings };
         },
       );
@@ -11216,6 +11669,12 @@ export class PilotPosService {
       );
     if (sources.length !== sourceIds.length) {
       throw new NotFoundException({ code: "SOURCE_TAB_NOT_FOUND" });
+    }
+    if ([target, ...sources].some((account) => account.fulfillmentType === "delivery")) {
+      throw new ConflictException({
+        code: "DELIVERY_TAB_MERGE_UNSUPPORTED",
+        message: "Entregas possuem endereço e taxa próprios e não podem ser unificadas.",
+      });
     }
     if (
       sources.some(
@@ -12083,6 +12542,8 @@ export class PilotPosService {
           );
         }
         const source = await this.requireOpenTab(tx, organizationId, unitId, sourceTabId);
+        if (source.fulfillmentType === "delivery")
+          throw new ConflictException({ code: "DELIVERY_TAB_SPLIT_UNSUPPORTED" });
         const existingTarget = input.targetTabId
           ? await this.requireOpenTab(tx, organizationId, unitId, input.targetTabId)
           : null;
@@ -12926,6 +13387,8 @@ export class PilotPosService {
       "tab.service_charge",
       { tabId, ...input },
       async (tx) => {
+        await this.lockServiceTable(tx, organizationId, unitId, tabId);
+        await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         await this.requireOpenTab(tx, organizationId, unitId, tabId);
         await tx
           .update(posTabs)
@@ -12980,6 +13443,8 @@ export class PilotPosService {
       "tab.tip",
       { tabId, ...input },
       async (tx) => {
+        await this.lockServiceTable(tx, organizationId, unitId, tabId);
+        await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
         await this.requireOpenTab(tx, organizationId, unitId, tabId);
         await tx
           .update(posTabs)
@@ -13004,6 +13469,148 @@ export class PilotPosService {
         return { tabId, totals };
       },
     );
+  }
+
+  async discountTab(
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    idempotencyKey: string,
+    input: DiscountInput,
+  ) {
+    await this.requireScopedCapability(
+      identityId,
+      organizationId,
+      unitId,
+      "operations:exceptions:approve",
+    );
+    const membership = await this.verifyManagerPin(
+      identityId,
+      organizationId,
+      unitId,
+      input.approval.pin,
+    );
+    if (membership.id !== input.approval.approverMembershipId)
+      throw new ForbiddenException({ code: "INVALID_MANAGER_APPROVAL" });
+    return this.idempotent(
+      identityId,
+      organizationId,
+      unitId,
+      idempotencyKey,
+      "tab.discount",
+      { tabId, ...input, approval: { ...input.approval, pin: "[redacted]" } },
+      (tx) => this.applyTabDiscount(tx, identityId, organizationId, unitId, tabId, input),
+    );
+  }
+
+  private async applyTabDiscount(
+    tx: Transaction,
+    identityId: string,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+    input: DiscountInput,
+  ) {
+    await this.requireOperationalBilling(organizationId);
+    if (!Number.isSafeInteger(input.discountCents) || input.discountCents <= 0)
+      throw new BadRequestException({ code: "INVALID_DISCOUNT" });
+    await this.lockServiceTable(tx, organizationId, unitId, tabId);
+    await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
+    await this.requireOpenTab(tx, organizationId, unitId, tabId);
+    const [fiscal] = await tx
+      .select({ id: fiscalDocuments.id })
+      .from(fiscalDocuments)
+      .where(
+        and(
+          eq(fiscalDocuments.organizationId, organizationId),
+          eq(fiscalDocuments.unitId, unitId),
+          eq(fiscalDocuments.tabId, tabId),
+          inArray(fiscalDocuments.status, ["pending", "processing", "authorized", "contingency"]),
+        ),
+      )
+      .limit(1);
+    if (fiscal) throw new ConflictException({ code: "DISCOUNT_REQUIRES_FISCAL_CANCELLATION" });
+    const rows = await tx
+      .select({ item: posOrderItems })
+      .from(posOrderItems)
+      .innerJoin(
+        posOrders,
+        and(
+          eq(posOrders.organizationId, posOrderItems.organizationId),
+          eq(posOrders.unitId, posOrderItems.unitId),
+          eq(posOrders.id, posOrderItems.orderId),
+        ),
+      )
+      .where(
+        and(
+          eq(posOrderItems.organizationId, organizationId),
+          eq(posOrderItems.unitId, unitId),
+          eq(posOrders.tabId, tabId),
+          ne(posOrderItems.status, "canceled"),
+          or(ne(posOrders.source, "qr_table"), ne(posOrders.status, "draft")),
+        ),
+      )
+      .orderBy(posOrderItems.id);
+    const netCents = rows.reduce((sum, { item }) => sum + item.netCents, 0);
+    if (input.discountCents > netCents)
+      throw new BadRequestException({ code: "DISCOUNT_EXCEEDS_CONSUMPTION" });
+    const approval = await this.approve(
+      tx,
+      identityId,
+      organizationId,
+      unitId,
+      "discount",
+      "tab",
+      tabId,
+      input.approval,
+    );
+    let accumulated = 0;
+    let allocated = 0;
+    const allocations: { itemId: string; discountCents: number }[] = [];
+    const now = new Date();
+    for (const { item } of rows) {
+      accumulated += item.netCents;
+      const cumulative = Number(
+        (BigInt(accumulated) * BigInt(input.discountCents)) / BigInt(netCents),
+      );
+      const additional = cumulative - allocated;
+      allocated = cumulative;
+      if (!additional) continue;
+      await tx
+        .update(posOrderItems)
+        .set({
+          discountCents: item.discountCents + additional,
+          netCents: item.netCents - additional,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(posOrderItems.organizationId, organizationId),
+            eq(posOrderItems.unitId, unitId),
+            eq(posOrderItems.id, item.id),
+          ),
+        );
+      allocations.push({ itemId: item.id, discountCents: additional });
+    }
+    const totals = await this.recalculateTab(tx, organizationId, unitId, tabId);
+    for (const orderId of new Set(rows.map(({ item }) => item.orderId))) {
+      await this.syncDeliveryProjection(
+        tx,
+        identityId,
+        organizationId,
+        unitId,
+        orderId,
+        now,
+        false,
+      );
+    }
+    await this.recordEvent(tx, identityId, organizationId, unitId, tabId, "tab.discounted", {
+      discountCents: input.discountCents,
+      approvalId: approval.id,
+      allocations,
+    });
+    return { tabId, discountCents: input.discountCents, approvalId: approval.id, totals };
   }
 
   async discountItem(
@@ -18342,6 +18949,8 @@ export class PilotPosService {
         .limit(1);
     const [initial] = await findItem();
     if (!initial) throw new NotFoundException({ code: "ORDER_ITEM_NOT_FOUND" });
+    await this.lockServiceTable(tx, organizationId, unitId, initial.tabId);
+    await this.lockTabPaymentState(tx, organizationId, unitId, initial.tabId);
     await this.requireOpenTab(tx, organizationId, unitId, initial.tabId);
     const [row] = await findItem();
     if (!row) throw new NotFoundException({ code: "ORDER_ITEM_NOT_FOUND" });
@@ -18492,6 +19101,13 @@ export class PilotPosService {
     },
   ) {
     const policy = await this.productionPrinting?.getBillPolicy(tx, organizationId, unitId);
+    if (input.documentType === "delivery_slip" && policy?.deliveryPrinterId) {
+      return {
+        deliveryRoute: "cloud" as const,
+        terminalId: null,
+        printerId: policy.deliveryPrinterId,
+      };
+    }
     if (
       (input.documentType === undefined || input.documentType === "partial_statement") &&
       policy?.mode === "cashier_printer" &&
@@ -18567,6 +19183,7 @@ export class PilotPosService {
       method: string;
     },
   ) {
+    await this.lockTabPaymentState(tx, organizationId, unitId, tabId);
     const tab = await this.requireTab(tx, organizationId, unitId, tabId);
     const target = await this.resolvePrintTarget(tx, identityId, organizationId, unitId, input);
     if (input.documentType === "final_receipt" && tab.status !== "closed") {
@@ -18605,6 +19222,47 @@ export class PilotPosService {
       }
     }
     const basePayload = await this.buildPrintDocumentPayload(tx, organizationId, unitId, tab);
+    if (input.documentType === "delivery_slip") {
+      if (tab.fulfillmentType !== "delivery")
+        throw new ConflictException({ code: "DELIVERY_SLIP_REQUIRES_DELIVERY" });
+      const [delivery] = await tx
+        .select({ order: deliveryOrders, courier: deliveryCouriers })
+        .from(deliveryOrders)
+        .leftJoin(
+          deliveryCouriers,
+          and(
+            eq(deliveryCouriers.organizationId, organizationId),
+            eq(deliveryCouriers.unitId, unitId),
+            eq(deliveryCouriers.id, deliveryOrders.courierId),
+          ),
+        )
+        .where(
+          and(
+            eq(deliveryOrders.organizationId, organizationId),
+            eq(deliveryOrders.unitId, unitId),
+            eq(deliveryOrders.orderRef, tabId),
+          ),
+        )
+        .limit(1);
+      if (!delivery?.order.address)
+        throw new ConflictException({ code: "DELIVERY_ORDER_REGISTRATION_REQUIRED" });
+      basePayload.delivery = {
+        orderId: delivery.order.id,
+        status: delivery.order.status,
+        customerName: delivery.order.customerName,
+        customerPhone: delivery.order.customerPhone,
+        address: deliveryAddressSchema.parse(delivery.order.address),
+        notes: tab.serviceNotes,
+        promisedAt: delivery.order.promisedAt?.toISOString() ?? null,
+        courier: delivery.courier
+          ? {
+              name: delivery.courier.name,
+              reference: delivery.courier.reference,
+              phone: delivery.courier.phone,
+            }
+          : null,
+      };
+    }
     const payload = splitPart
       ? {
           ...basePayload,
@@ -18713,6 +19371,7 @@ export class PilotPosService {
           status: posOrderItems.status,
           seatNumber: posOrderItems.seatNumber,
           course: posOrderItems.course,
+          notes: posOrderItems.notes,
         })
         .from(posOrderItems)
         .innerJoin(
@@ -18736,6 +19395,8 @@ export class PilotPosService {
           method: posTabPayments.method,
           amountCents: posTabPayments.amountCents,
           createdAt: posTabPayments.createdAt,
+          receivedCents: posTabPayments.receivedCents,
+          changeCents: posTabPayments.changeCents,
           reversedCents: sql<number>`coalesce(sum(${posPaymentReversals.amountCents}), 0)`.mapWith(
             Number,
           ),
@@ -18762,6 +19423,8 @@ export class PilotPosService {
           posTabPayments.method,
           posTabPayments.amountCents,
           posTabPayments.createdAt,
+          posTabPayments.receivedCents,
+          posTabPayments.changeCents,
         ),
       tx
         .select({
@@ -18852,6 +19515,9 @@ export class PilotPosService {
         openingHours: presentation.openingHours,
         timezone: establishment?.timezone ?? "America/Sao_Paulo",
         logoUrl: presentation.logoUrl,
+        logoRaster:
+          (await receiptLogoRaster(this.database, organizationId, unitId, presentation.logoUrl)) ??
+          undefined,
       },
       context: {
         tabId: tab.id,
@@ -18883,6 +19549,7 @@ export class PilotPosService {
         suggestedTotalCents: tab.totalCents,
         serviceTaxNotice: presentation.serviceTaxNotice,
         tipCents: tab.tipCents,
+        deliveryFeeCents: tab.deliveryFeeCents,
         totalCents: tab.totalCents,
         grossPaidCents,
         reversedCents,
@@ -18895,15 +19562,17 @@ export class PilotPosService {
           .filter((modifier) => modifier.orderItemId === item.id)
           .map(({ orderItemId: _orderItemId, ...modifier }) => modifier),
       })),
-      payments: payments
-        .map((payment) => ({
-          id: payment.id,
-          method: payment.method,
-          amountCents: payment.amountCents - payment.reversedCents,
-          financialStatus: "posted" as const,
-          createdAt: payment.createdAt.toISOString(),
-        }))
-        .filter((payment) => payment.amountCents > 0),
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        method: payment.method,
+        amountCents: payment.amountCents - payment.reversedCents,
+        netAmountCents: payment.amountCents - payment.reversedCents,
+        reversedCents: payment.reversedCents,
+        receivedCents: payment.receivedCents,
+        changeCents: payment.changeCents,
+        financialStatus: "posted" as const,
+        createdAt: payment.createdAt.toISOString(),
+      })),
     };
   }
 
@@ -18919,6 +19588,7 @@ export class PilotPosService {
         .select({
           serviceChargeBasisPoints: posTabs.serviceChargeBasisPoints,
           serviceChargeAdjustmentCents: posTabs.serviceChargeAdjustmentCents,
+          deliveryFeeCents: posTabs.deliveryFeeCents,
           tipCents: posTabs.tipCents,
         })
         .from(posTabs)
@@ -18981,6 +19651,9 @@ export class PilotPosService {
         : 0;
     totals.totalCents += adjustedServiceChargeCents - totals.serviceChargeCents;
     totals.serviceChargeCents = adjustedServiceChargeCents;
+    totals.totalCents += tab.deliveryFeeCents;
+    if (totals.totalCents > MAX_STORED_CENTS)
+      throw new ConflictException({ code: "DELIVERY_TOTAL_INVALID" });
     this.assertTabPaymentFloor(totals.totalCents, paymentState);
     await tx
       .update(posTabs)
@@ -18993,6 +19666,84 @@ export class PilotPosService {
         ),
       );
     return totals;
+  }
+
+  private async validateDeliveryDraft(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    fulfillment: string,
+    zoneId?: string | null,
+  ) {
+    if (!zoneId) return null;
+    if (fulfillment !== "delivery")
+      throw new BadRequestException({ code: "PICKUP_DELIVERY_FIELDS_FORBIDDEN" });
+    const [zone] = await tx
+      .select({ id: deliveryZones.id, feeCents: deliveryZones.feeCents })
+      .from(deliveryZones)
+      .where(
+        and(
+          eq(deliveryZones.organizationId, organizationId),
+          eq(deliveryZones.unitId, unitId),
+          eq(deliveryZones.id, zoneId),
+          eq(deliveryZones.active, true),
+        ),
+      )
+      .limit(1);
+    if (!zone) throw new BadRequestException({ code: "DELIVERY_ZONE_INVALID" });
+    return zone;
+  }
+
+  private async assertDeliveryFinancialReady(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tab: typeof posTabs.$inferSelect,
+    requireItems = false,
+  ) {
+    if (tab.fulfillmentType !== "delivery") return;
+    if (requireItems && !(await this.hasActiveTabItems(tx, organizationId, unitId, tab.id))) {
+      throw new ConflictException({
+        code: "DELIVERY_ITEMS_REQUIRED",
+        message:
+          "Adicione itens ao delivery antes de receber. Uma comanda vazia pode ser encerrada sem consumo.",
+      });
+    }
+    if (tab.deliveryZoneId) return;
+    const [delivery] = await tx
+      .select({ deliveryFeeCents: deliveryOrders.deliveryFeeCents })
+      .from(deliveryOrders)
+      .where(
+        and(
+          eq(deliveryOrders.organizationId, organizationId),
+          eq(deliveryOrders.unitId, unitId),
+          eq(deliveryOrders.orderRef, tab.id),
+        ),
+      )
+      .limit(1);
+    if (!delivery || delivery.deliveryFeeCents !== tab.deliveryFeeCents)
+      throw new ConflictException({
+        code: "DELIVERY_FINANCIAL_SETUP_REQUIRED",
+        message: "Confirme a zona e a taxa da entrega antes de receber ou encerrar a comanda.",
+      });
+  }
+
+  private async hasActiveTabItems(
+    tx: Transaction,
+    organizationId: string,
+    unitId: string,
+    tabId: string,
+  ) {
+    const [result] = await tx.execute<{ hasItems: boolean }>(sql`
+      select exists (
+        select 1 from pos_order_items items
+        inner join pos_orders orders on orders.id = items.order_id
+          and orders.organization_id = items.organization_id and orders.unit_id = items.unit_id
+        where orders.organization_id = ${organizationId}::uuid and orders.unit_id = ${unitId}::uuid
+          and orders.tab_id = ${tabId}::uuid and orders.status <> 'canceled' and items.status <> 'canceled'
+      ) as "hasItems"
+    `);
+    return result?.hasItems === true;
   }
 
   private async idempotent<T extends JsonResponse>(

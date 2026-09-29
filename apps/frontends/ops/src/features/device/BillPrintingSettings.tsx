@@ -12,7 +12,7 @@ export function BillPrintingSettingsPanel({
 }) {
   const [policy, setPolicy] = useState<BillPrintingPolicy | null>(null);
   const [printers, setPrinters] = useState<ProductionPrinter[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -106,15 +106,22 @@ export function BillPrintingSettings({
   const eligible = printers.filter(
     (printer) => printer.active && printer.documentTypes.includes("partial_statement"),
   );
+  const deliveryPrinters = printers.filter(
+    (printer) => printer.active && printer.documentTypes.includes("delivery_slip"),
+  );
   return (
     <section aria-labelledby="bill-printing-title" className="gm-form-stack">
       <div>
-        <h3 id="bill-printing-title">Pedido de pré-conta</h3>
-        <p>Escolha o destino ao solicitar a conta no atendimento.</p>
+        <h3 id="bill-printing-title">Impressão do atendimento</h3>
+        <p>Pré-conta e via de entrega.</p>
       </div>
       {error && <Callout tone="danger">{error}</Callout>}
       {!draft ? (
-        <p role="status">Carregando configuração de pré-conta…</p>
+        <p role="status">
+          {busy && !error
+            ? "Carregando configuração de pré-conta…"
+            : "Configuração de impressão indisponível."}
+        </p>
       ) : (
         <>
           <FormField htmlFor="bill-printing-mode" label="Ao pedir a conta">
@@ -170,16 +177,53 @@ export function BillPrintingSettings({
           {draft.mode === "notify_cashier" && (
             <p>O caixa recebe o chamado e escolhe quando imprimir.</p>
           )}
+          <FormField htmlFor="delivery-auto-print" label="Via de entrega automática">
+            <NativeSelect
+              id="delivery-auto-print"
+              disabled={busy}
+              value={draft.deliveryAutoPrint ? "yes" : "no"}
+              onChange={(event) =>
+                setDraft({ ...draft, deliveryAutoPrint: event.target.value === "yes" })
+              }
+            >
+              <option value="no">Desativada · impressão manual no pedido</option>
+              <option value="yes">Imprimir ao enviar pedido de delivery</option>
+            </NativeSelect>
+          </FormField>
+          {draft.deliveryAutoPrint && (
+            <FormField htmlFor="delivery-printer" label="Impressora da expedição">
+              <NativeSelect
+                id="delivery-printer"
+                disabled={busy}
+                value={draft.deliveryPrinterId ?? ""}
+                onChange={(event) =>
+                  setDraft({ ...draft, deliveryPrinterId: event.target.value || null })
+                }
+              >
+                <option value="">Selecione a impressora</option>
+                {deliveryPrinters.map((printer) => (
+                  <option key={printer.id} value={printer.id}>
+                    {printer.label}
+                  </option>
+                ))}
+              </NativeSelect>
+              {!deliveryPrinters.length && (
+                <small>Habilite o documento “Via de entrega” em uma impressora ativa.</small>
+              )}
+            </FormField>
+          )}
           <div>
             <Button
               disabled={
                 busy ||
                 (draft.mode === "cashier_printer" &&
-                  !eligible.some((printer) => printer.id === draft.printerId))
+                  !eligible.some((printer) => printer.id === draft.printerId)) ||
+                (draft.deliveryAutoPrint === true &&
+                  !deliveryPrinters.some((printer) => printer.id === draft.deliveryPrinterId))
               }
               onClick={() => onSave(draft)}
             >
-              {busy ? "Salvando…" : "Salvar destino da pré-conta"}
+              {busy ? "Salvando…" : "Salvar impressão"}
             </Button>
           </div>
         </>

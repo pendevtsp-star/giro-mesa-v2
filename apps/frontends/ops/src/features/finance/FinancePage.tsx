@@ -345,7 +345,6 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
           <div className="finance-page">
             <div className="finance-toolbar">
               <div>
-                <p className="eyebrow">Controle financeiro operacional</p>
                 <h2>Agenda e conciliação</h2>
               </div>
               <div className="finance-toolbar__actions">
@@ -524,6 +523,7 @@ export function RealFinancePage({ scope }: { scope: ManagementScope }) {
                           const key = `${entry.direction}:${entry.id}`;
                           return (
                             <button
+                              aria-pressed={selectedKey === key}
                               className={`finance-entry ${selectedKey === key ? "finance-entry--selected" : ""}`}
                               key={key}
                               onClick={() => {

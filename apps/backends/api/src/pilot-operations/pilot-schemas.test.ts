@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
+import { billPrintingPolicySchema } from "@giromesa/contracts";
 import {
   counterQueueQuerySchema,
   openTabSchema,
   orderSchema,
   paymentSchema,
+  printJobSchema,
   terminalProfileSchema,
   updateTabSchema,
 } from "./pilot-schemas.js";
@@ -17,6 +19,82 @@ const installationId = "00000000-0000-4000-8000-000000000005";
 const customerId = "00000000-0000-4000-8000-000000000006";
 const productId = "00000000-0000-4000-8000-000000000007";
 const externalClubId = "00000000-0000-4000-8000-000000000008";
+
+it("accepts optional cash received cents and rejects invalid cash exchanges", () => {
+  for (const receivedCents of [5000, 7000]) {
+    assert.equal(
+      paymentSchema.safeParse({ method: "cash", amountCents: 5000, receivedCents }).success,
+      true,
+    );
+  }
+  assert.equal(paymentSchema.safeParse({ method: "cash", amountCents: 5000 }).success, true);
+  for (const receivedCents of [4999, -1, 0, 7000.5, 2147483648, "7000", null]) {
+    assert.equal(
+      paymentSchema.safeParse({ method: "cash", amountCents: 5000, receivedCents }).success,
+      false,
+    );
+  }
+  for (const method of ["pix", "credit_card", "debit_card", "other"]) {
+    assert.equal(
+      paymentSchema.safeParse({ method, amountCents: 5000, receivedCents: 7000 }).success,
+      false,
+    );
+  }
+});
+
+it("validates persisted delivery addresses, customer links and independent delivery printing", () => {
+  const address = {
+    street: "Rua A",
+    number: "10",
+    neighborhood: "Centro",
+    city: "Recife",
+    state: "PE",
+    postalCode: "50000-000",
+    reference: "Portão azul",
+  };
+  assert.equal(
+    openTabSchema.safeParse({
+      fulfillmentType: "delivery",
+      deliveryAddress: "Rua A 10",
+      deliveryAddressDetails: address,
+      deliveryZoneId: productId,
+      guestCount: 1,
+    }).success,
+    true,
+  );
+  assert.equal(
+    updateTabSchema.safeParse({
+      expectedVersion: 1,
+      customerId,
+      deliveryAddressDetails: { ...address, postalCode: "bad" },
+    }).success,
+    false,
+  );
+  assert.equal(updateTabSchema.safeParse({ expectedVersion: 1, customerId: "bad" }).success, false);
+  assert.equal(
+    printJobSchema.safeParse({ documentType: "delivery_slip", copies: 1 }).success,
+    true,
+  );
+  assert.equal(
+    billPrintingPolicySchema.safeParse({
+      mode: "notify_cashier",
+      printerId: null,
+      revision: 0,
+      deliveryAutoPrint: true,
+      deliveryPrinterId: productId,
+    }).success,
+    true,
+  );
+  assert.equal(
+    billPrintingPolicySchema.safeParse({
+      mode: "notify_cashier",
+      printerId: null,
+      revision: 0,
+      deliveryAutoPrint: true,
+    }).success,
+    false,
+  );
+});
 
 it("requires one table and only one reception source when seating a guest", () => {
   assert.equal(

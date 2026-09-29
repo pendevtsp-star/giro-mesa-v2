@@ -14,6 +14,7 @@ import {
   recipeQuantityToMilli,
   useRemote,
 } from "../../management.shared";
+import "./inventory.css";
 
 function recipeQuantityLabel(quantityMilli: number): string {
   return (quantityMilli / 1_000).toLocaleString("pt-BR", { maximumFractionDigits: 3 });
@@ -206,14 +207,13 @@ export function RecipeManager({
                 <div className="card-header">
                   <div>
                     <p className="eyebrow">Produção e custo</p>
-                    <h2>Fichas técnicas versionadas</h2>
+                    <h2>Fichas técnicas</h2>
                   </div>
                   <Badge tone="info">{recipes.length} ativa(s)</Badge>
                 </div>
                 <p className="recipe-card__intro">
-                  Opcional: o produto pode ser vendido sem ficha técnica. Configure os insumos para
-                  acompanhar o consumo real de cada venda. Toda alteração cria uma nova versão, sem
-                  reescrever o histórico operacional.
+                  A ficha é opcional para vender. Cada alteração salva uma nova versão dos insumos
+                  utilizados.
                 </p>
                 {!prerequisitesReady && (
                   <p className="auth-message auth-message--error" role="alert">
@@ -225,133 +225,149 @@ export function RecipeManager({
                   </p>
                 )}
                 <div className="recipe-layout">
-                  <form className="recipe-form" onSubmit={saveRecipe}>
-                    <label className="compact-field">
-                      Produto vendido
-                      <NativeSelect
-                        disabled={Boolean(initialProductId) || !activeProducts.length || submitting}
-                        onChange={(event) => {
-                          setProductId(event.target.value);
-                          setSuccess("");
-                        }}
-                        value={productId}
+                  <details
+                    className="gm-disclosure recipe-editor"
+                    open={initialProductId ? true : undefined}
+                  >
+                    <summary>
+                      <span className="inventory-disclosure-label">
+                        <strong>Criar nova versão</strong>
+                        <small className="inventory-disclosure-hint">
+                          Selecione o produto e informe os insumos consumidos
+                        </small>
+                      </span>
+                    </summary>
+                    <form className="recipe-form" onSubmit={saveRecipe}>
+                      <label className="compact-field">
+                        Produto vendido
+                        <NativeSelect
+                          disabled={
+                            Boolean(initialProductId) || !activeProducts.length || submitting
+                          }
+                          onChange={(event) => {
+                            setProductId(event.target.value);
+                            setSuccess("");
+                          }}
+                          value={productId}
+                        >
+                          <option value="">Selecione o produto</option>
+                          {activeProducts.map((product) => (
+                            <option key={product.id} value={product.id}>
+                              {product.name}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      </label>
+                      <fieldset
+                        className="recipe-component-builder"
+                        disabled={!prerequisitesReady || submitting}
                       >
-                        <option value="">Selecione o produto</option>
-                        {activeProducts.map((product) => (
-                          <option key={product.id} value={product.id}>
-                            {product.name}
-                          </option>
-                        ))}
-                      </NativeSelect>
-                    </label>
-                    <fieldset
-                      className="recipe-component-builder"
-                      disabled={!prerequisitesReady || submitting}
-                    >
-                      <legend>Adicionar componente</legend>
-                      <label className="compact-field">
-                        Insumo
-                        <NativeSelect
-                          onChange={(event) => setInventoryItemId(event.target.value)}
-                          value={inventoryItemId}
-                        >
-                          <option value="">Selecione o insumo</option>
-                          {activeItems.map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} ({item.unit})
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      </label>
-                      <label className="compact-field">
-                        Local de baixa
-                        <NativeSelect
-                          onChange={(event) => setLocationId(event.target.value)}
-                          value={locationId}
-                        >
-                          <option value="">Selecione o local</option>
-                          {activeLocations.map((location) => (
-                            <option key={location.id} value={location.id}>
-                              {location.name} ({location.code})
-                            </option>
-                          ))}
-                        </NativeSelect>
-                      </label>
-                      <label className="compact-field">
-                        Quantidade por venda
-                        <Input
-                          inputMode="decimal"
-                          onChange={(event) => setQuantity(event.target.value)}
-                          placeholder="Ex.: 0,250"
-                          value={quantity}
-                        />
-                      </label>
-                      <label className="compact-field">
-                        Perda prevista (%)
-                        <Input
-                          inputMode="decimal"
-                          onChange={(event) => setLossPercent(event.target.value)}
-                          placeholder="Ex.: 2,50"
-                          value={lossPercent}
-                        />
-                      </label>
-                      <Button onClick={addComponent} size="sm" variant="secondary">
-                        Adicionar componente
-                      </Button>
-                    </fieldset>
-                    {components.length > 0 && (
-                      <ul className="recipe-draft" aria-label="Componentes da nova versão">
-                        {components.map((component) => {
-                          const item = itemById.get(component.inventoryItemId);
-                          const location = locationById.get(component.locationId);
-                          return (
-                            <li
-                              className="recipe-component-row"
-                              key={`${component.inventoryItemId}:${component.locationId}`}
-                            >
-                              <span>
-                                <strong>{item?.name ?? "Insumo indisponível"}</strong>
-                                <small>{location?.name ?? "Local indisponível"}</small>
-                              </span>
-                              <span>
-                                {recipeQuantityLabel(component.quantityMilli)} {item?.unit ?? "un."}
-                                {component.lossBasisPoints > 0
-                                  ? ` + ${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(component.lossBasisPoints / 100)}% de perda`
-                                  : ""}
-                              </span>
-                              <Button
-                                aria-label={`Remover ${item?.name ?? "componente"}`}
-                                disabled={submitting}
-                                onClick={() => {
-                                  dirty.current = true;
-                                  setComponents((current) =>
-                                    current.filter((candidate) => candidate !== component),
-                                  );
-                                }}
-                                size="sm"
-                                variant="ghost"
+                        <legend>Adicionar componente</legend>
+                        <label className="compact-field">
+                          Insumo
+                          <NativeSelect
+                            onChange={(event) => setInventoryItemId(event.target.value)}
+                            value={inventoryItemId}
+                          >
+                            <option value="">Selecione o insumo</option>
+                            {activeItems.map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.name} ({item.unit})
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </label>
+                        <label className="compact-field">
+                          Local de baixa
+                          <NativeSelect
+                            onChange={(event) => setLocationId(event.target.value)}
+                            value={locationId}
+                          >
+                            <option value="">Selecione o local</option>
+                            {activeLocations.map((location) => (
+                              <option key={location.id} value={location.id}>
+                                {location.name} ({location.code})
+                              </option>
+                            ))}
+                          </NativeSelect>
+                        </label>
+                        <label className="compact-field">
+                          Quantidade por venda
+                          <Input
+                            inputMode="decimal"
+                            onChange={(event) => setQuantity(event.target.value)}
+                            placeholder="Ex.: 0,250"
+                            value={quantity}
+                          />
+                        </label>
+                        <label className="compact-field">
+                          Perda prevista (%)
+                          <Input
+                            inputMode="decimal"
+                            onChange={(event) => setLossPercent(event.target.value)}
+                            placeholder="Ex.: 2,50"
+                            value={lossPercent}
+                          />
+                        </label>
+                        <Button onClick={addComponent} size="sm" variant="secondary">
+                          Adicionar componente
+                        </Button>
+                      </fieldset>
+                      {components.length > 0 && (
+                        <ul className="recipe-draft" aria-label="Componentes da nova versão">
+                          {components.map((component) => {
+                            const item = itemById.get(component.inventoryItemId);
+                            const location = locationById.get(component.locationId);
+                            return (
+                              <li
+                                className="recipe-component-row"
+                                key={`${component.inventoryItemId}:${component.locationId}`}
                               >
-                                Remover
-                              </Button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    {feedback && (
-                      <p className="auth-message auth-message--error" role="alert">
-                        {feedback}
-                      </p>
-                    )}
-                    {success && (
-                      <p className="auth-message" role="status">
-                        {success}
-                      </p>
-                    )}
-                    <Button disabled={!prerequisitesReady || submitting} type="submit">
-                      {submitting ? "Aguarde…" : "Salvar nova versão"}
-                    </Button>
-                  </form>
+                                <span>
+                                  <strong>{item?.name ?? "Insumo indisponível"}</strong>
+                                  <small>{location?.name ?? "Local indisponível"}</small>
+                                </span>
+                                <span>
+                                  {recipeQuantityLabel(component.quantityMilli)}{" "}
+                                  {item?.unit ?? "un."}
+                                  {component.lossBasisPoints > 0
+                                    ? ` + ${new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(component.lossBasisPoints / 100)}% de perda`
+                                    : ""}
+                                </span>
+                                <Button
+                                  aria-label={`Remover ${item?.name ?? "componente"}`}
+                                  disabled={submitting}
+                                  onClick={() => {
+                                    dirty.current = true;
+                                    setComponents((current) =>
+                                      current.filter((candidate) => candidate !== component),
+                                    );
+                                  }}
+                                  size="sm"
+                                  variant="ghost"
+                                >
+                                  Remover
+                                </Button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      {feedback && (
+                        <p className="auth-message auth-message--error" role="alert">
+                          {feedback}
+                        </p>
+                      )}
+                      {success && (
+                        <p className="auth-message" role="status">
+                          {success}
+                        </p>
+                      )}
+                      <Button disabled={!prerequisitesReady || submitting} type="submit">
+                        {submitting ? "Aguarde…" : "Salvar nova versão"}
+                      </Button>
+                    </form>
+                  </details>
                   <section className="recipe-versions" aria-labelledby="active-recipes-title">
                     <div className="recipe-versions__header">
                       <h3 id="active-recipes-title">Versões ativas</h3>

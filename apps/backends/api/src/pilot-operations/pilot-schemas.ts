@@ -1,4 +1,5 @@
 import {
+  deliveryAddressSchema,
   integratedPaymentMethodSchema,
   paymentAttemptCreateSchema,
   paymentAttemptStatusSchema,
@@ -666,6 +667,8 @@ export const openTabSchema = z
     readyNotificationConsent: z.boolean().optional(),
     serviceNotes: z.string().trim().max(500).optional(),
     deliveryAddress: z.string().trim().max(1_000).optional(),
+    deliveryAddressDetails: deliveryAddressSchema.nullable().optional(),
+    deliveryZoneId: id.nullable().optional(),
     promisedAt: futureDateTime.optional(),
     responsibleIdentityId: id.optional(),
     reservationId: id.optional(),
@@ -699,6 +702,7 @@ export const openTabSchema = z
 export const updateTabSchema = z
   .object({
     expectedVersion: z.number().int().min(1),
+    customerId: id.nullable().optional(),
     label: z.string().trim().max(120).nullable().optional(),
     fulfillmentType: fulfillmentType.optional(),
     customerName: z.string().trim().max(120).nullable().optional(),
@@ -706,6 +710,8 @@ export const updateTabSchema = z
     readyNotificationConsent: z.boolean().optional(),
     serviceNotes: z.string().trim().max(500).nullable().optional(),
     deliveryAddress: z.string().trim().max(1_000).nullable().optional(),
+    deliveryAddressDetails: deliveryAddressSchema.nullable().optional(),
+    deliveryZoneId: id.nullable().optional(),
     promisedAt: optionalDateTime.nullable().optional(),
     guestCount: z.number().int().min(1).max(500).optional(),
     responsibleIdentityId: id.nullable().optional(),
@@ -925,13 +931,24 @@ export const serviceCallSchema = z
     }
   });
 
-export const paymentSchema = z.object({
-  method: z.enum(["cash", "credit_card", "debit_card", "pix", "other"]),
-  amountCents: cents.positive(),
-  reference: z.string().trim().max(120).optional(),
-  cashRegisterId: id.optional(),
-  installationId: id.optional(),
-});
+export const paymentSchema = z
+  .object({
+    method: z.enum(["cash", "credit_card", "debit_card", "pix", "other"]),
+    amountCents: cents.positive(),
+    receivedCents: cents.positive().optional(),
+    reference: z.string().trim().max(120).optional(),
+    cashRegisterId: id.optional(),
+    installationId: id.optional(),
+  })
+  .refine(
+    (input) =>
+      input.receivedCents === undefined ||
+      (input.method === "cash" && input.receivedCents >= input.amountCents),
+    {
+      path: ["receivedCents"],
+      message: "O valor recebido deve cobrir o pagamento e só pode ser informado em dinheiro.",
+    },
+  );
 
 const printTargetSchema = z.object({
   installationId: id.optional(),
@@ -940,7 +957,12 @@ const printTargetSchema = z.object({
 });
 
 export const printJobSchema = printTargetSchema.extend({
-  documentType: z.enum(["partial_statement", "payment_statement", "final_receipt"]),
+  documentType: z.enum([
+    "partial_statement",
+    "payment_statement",
+    "final_receipt",
+    "delivery_slip",
+  ]),
   serviceCallId: id.optional(),
   copies: z.number().int().min(1).max(5).default(1),
   reason: z.string().trim().min(3).max(500).optional(),
@@ -974,7 +996,13 @@ export const printJobQuerySchema = z.object({
   stationId: id.optional(),
   kdsTicketId: id.optional(),
   documentType: z
-    .enum(["partial_statement", "payment_statement", "final_receipt", "kds_ticket"])
+    .enum([
+      "partial_statement",
+      "payment_statement",
+      "final_receipt",
+      "kds_ticket",
+      "delivery_slip",
+    ])
     .optional(),
   status: z.enum(["queued", "printing", "confirmation_required", "printed", "failed"]).optional(),
   terminalId: z.string().trim().min(1).max(120).optional(),
@@ -1036,13 +1064,20 @@ export const reopenTabSchema = z.object({
 
 export const approvalRequestSchema = z
   .object({
-    itemId: id,
-    action: z.enum(["discount", "cancel"]),
+    itemId: id.optional(),
+    action: z.enum(["discount", "cancel", "tab_discount"]),
     discountCents: cents.optional(),
     reason: z.string().trim().min(3).max(500),
   })
   .superRefine((input, context) => {
-    if (input.action === "discount" && !input.discountCents) {
+    if ((input.action === "tab_discount") === (input.itemId !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["itemId"],
+        message: "Informe o item apenas para ajustes de item.",
+      });
+    }
+    if (input.action !== "cancel" && !input.discountCents) {
       context.addIssue({
         code: "custom",
         path: ["discountCents"],
@@ -1158,6 +1193,9 @@ export const approvalSchema = z.object({
 });
 
 export const discountSchema = z.object({ discountCents: cents, approval: approvalSchema });
+export const tabDiscountSchema = z
+  .object({ discountCents: cents.positive(), approval: approvalSchema })
+  .strict();
 export const cancelItemSchema = z.object({ approval: approvalSchema });
 export const managerPinSchema = z.object({ pin: z.string().regex(/^\d{4,8}$/) });
 export const kdsStateSchema = z
@@ -2038,7 +2076,7 @@ export const paymentReversalResponseSchema = z.object({
   reversal: z.object({
     id,
     paymentId: id,
-    installationId: id,
+    installationId: id.nullable(),
     amountCents: z.number().int().positive(),
     reason: z.string(),
     status: z.enum(["pending", "processing", "approved", "declined", "canceled", "unknown"]),
@@ -2048,12 +2086,14 @@ export const paymentReversalResponseSchema = z.object({
     createdAt: responseDateTime,
     updatedAt: responseDateTime,
   }),
-  action: z.object({
-    type: z.enum(["reverse", "recover"]),
-    reversalId: id,
-    paymentAttemptId: id,
-    provider: paymentTerminalProviderSchema,
-  }),
+  action: z
+    .object({
+      type: z.enum(["reverse", "recover"]),
+      reversalId: id,
+      paymentAttemptId: id,
+      provider: paymentTerminalProviderSchema,
+    })
+    .nullable(),
   idempotentReplay: z.boolean().optional(),
 });
 export const paymentDeviceReversalResultResponseSchema = z.object({

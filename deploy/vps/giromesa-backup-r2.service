@@ -1,0 +1,14 @@
+[Unit]
+Description=GiroMesa complete backup to Cloudflare R2
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=true
+TimeoutStartSec=90s
+ExecStart=/usr/bin/python3 /srv/apps/giromesa-v2/current/deploy/vps/backup-to-r2.py

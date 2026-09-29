@@ -6,7 +6,9 @@ import {
   deliveryOrderStatusHistory,
   deliveryOrders,
   deviceEnrollments,
+  growthCustomers,
   hubCommands,
+  hubHeartbeats,
   identities,
   memberships,
   organizations,
@@ -26,10 +28,11 @@ import {
   roleBindings,
   units,
 } from "@giromesa/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { GrowthService } from "../growth/growth.service.js";
 import { ScopeService } from "../organizations/scope.service.js";
+import { applyDeliveryFee } from "./delivery-financial.js";
 import { PilotPosService } from "./pilot-pos.service.js";
 import { kdsReadModelSchema } from "./pilot-schemas.js";
 import { PilotSmartPosService } from "./pilot-smartpos.service.js";
@@ -140,6 +143,14 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       })
       .returning();
     assert.ok(hub);
+    await database.db.insert(hubHeartbeats).values({
+      organizationId: organization.id,
+      unitId: unit.id,
+      hubId: hub.id,
+      version: "integration",
+      metadata: { capabilities: ["financial_print_jobs_v1"] },
+      lastSeenAt: new Date(),
+    });
     const createdPrinter = await productionPrinting.createPrinter(
       owner.id,
       organization.id,
@@ -156,7 +167,7 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
         cut: true,
         supportsRasterGraphics: false,
         isDefault: false,
-        documentTypes: ["kds_ticket"],
+        documentTypes: ["kds_ticket", "delivery_slip"],
         fallbackPrinterId: null,
         active: true,
       },
@@ -257,6 +268,123 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       geometry: { type: "circle", center: [-46.65, -23.56], radiusKm: 5 },
       active: true,
     });
+    const quoted = await pos.openTab(
+      owner.id,
+      organization.id,
+      unit.id,
+      `delivery-quote-${runId}`,
+      {
+        fulfillmentType: "delivery",
+        deliveryZoneId: zone.id,
+        deliveryAddress: "Rua da Entrega, 10",
+        guestCount: 1,
+        deliveryAddressDetails: {
+          street: "Rua da Entrega",
+          number: "10",
+          neighborhood: "Centro",
+          city: "São Paulo",
+          state: "SP",
+          postalCode: "01001-000",
+        },
+      },
+    );
+    const quotedTab = quoted.tab as {
+      id: string;
+      totalCents: number;
+      deliveryFeeCents: number;
+      version: number;
+    };
+    assert.equal(quotedTab.totalCents, 900);
+    assert.equal(quotedTab.deliveryFeeCents, 900);
+    const quotedOrder = await pos.setTip(
+      owner.id,
+      organization.id,
+      unit.id,
+      quotedTab.id,
+      `delivery-quote-items-${runId}`,
+      {
+        tipCents: 100,
+      },
+    );
+    assert.equal(quotedOrder.totals.totalCents, 1000);
+    const quoteDetails = await pos.getTab(owner.id, organization.id, unit.id, quotedTab.id);
+    assert.equal(quoteDetails.tab.deliveryAddressDetails?.street, "Rua da Entrega");
+    await assert.rejects(
+      () =>
+        pos.recordPayment(
+          owner.id,
+          organization.id,
+          unit.id,
+          quotedTab.id,
+          `delivery-empty-payment-${runId}`,
+          { method: "pix", amountCents: 900 },
+        ),
+      (error) => errorCode(error) === "DELIVERY_ITEMS_REQUIRED",
+    );
+    // A tip is not silently waived alongside the delivery quote.
+    await assert.rejects(() =>
+      pos.closeTab(
+        owner.id,
+        organization.id,
+        unit.id,
+        quotedTab.id,
+        `delivery-empty-tip-close-${runId}`,
+        { printRequested: false },
+      ),
+    );
+    await pos.setTip(
+      owner.id,
+      organization.id,
+      unit.id,
+      quotedTab.id,
+      `delivery-empty-tip-reset-${runId}`,
+      { tipCents: 0 },
+    );
+    const emptyClose = await pos.closeTab(
+      owner.id,
+      organization.id,
+      unit.id,
+      quotedTab.id,
+      `delivery-empty-close-${runId}`,
+      { printRequested: false },
+    );
+    assert.equal(emptyClose.tab.status, "closed");
+    assert.equal(emptyClose.tab.totalCents, 0);
+    assert.equal(emptyClose.tab.deliveryFeeCents, 0);
+    assert.equal(emptyClose.paidCents, 0);
+    const retriedEmptyClose = await pos.closeTab(
+      owner.id,
+      organization.id,
+      unit.id,
+      quotedTab.id,
+      `delivery-empty-close-${runId}`,
+      { printRequested: false },
+    );
+    assert.equal(retriedEmptyClose.tab.id, quotedTab.id);
+    const emptyQueue = await pos.listCounterQueue(owner.id, organization.id, unit.id, {
+      stage: "all",
+      channel: "delivery",
+      query: "",
+      page: 1,
+      limit: 100,
+    });
+    assert.equal(
+      emptyQueue.items.some((item) => item.id === quotedTab.id),
+      false,
+    );
+    const [emptyCloseAudit] = await database.db.execute<{ waived: number }>(sql`
+      select (payload->>'deliveryFeeWaivedCents')::int as waived from pos_tab_events
+      where organization_id = ${organization.id}::uuid and tab_id = ${quotedTab.id}::uuid
+        and type = 'tab.closed'
+    `);
+    assert.equal(emptyCloseAudit?.waived, 900);
+    await assert.rejects(
+      () =>
+        pos.closeTab(owner.id, organization.id, unit.id, tab.id, `delivery-legacy-close-${runId}`, {
+          printRequested: false,
+        }),
+      (error) => errorCode(error) === "DELIVERY_FINANCIAL_SETUP_REQUIRED",
+    );
     const deliveryInput = {
       unitId: unit.id,
       zoneId: zone.id,
@@ -265,6 +393,8 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       address: {
         street: "Rua da Entrega",
         number: "10",
+        complement: "Casa 2",
+        reference: "Portão azul",
         neighborhood: "Centro",
         city: "São Paulo",
         state: "SP",
@@ -294,6 +424,39 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     );
     assert.equal(registeredDelivery.order.customerName, "Cliente delivery");
     assert.equal(registeredDelivery.order.customerPhone, "+5511999990000");
+    const concurrentFee = await Promise.all(
+      [1, 2].map(() =>
+        database.db.transaction((tx) =>
+          applyDeliveryFee(tx, organization.id, unit.id, tab.id, 900),
+        ),
+      ),
+    );
+    assert.ok(
+      concurrentFee.every((current) => current.totalCents === created.totals.totalCents + 900),
+    );
+    await assert.rejects(
+      database.db.transaction((tx) =>
+        applyDeliveryFee(tx, organization.id, randomUUID(), tab.id, 900),
+      ),
+      (error) => errorCode(error) === "DELIVERY_OPERATIONAL_TAB_NOT_FOUND",
+    );
+    await assert.rejects(
+      database.db.transaction((tx) => applyDeliveryFee(tx, organization.id, unit.id, tab.id, 800)),
+      (error) => errorCode(error) === "DELIVERY_FEE_ALREADY_SET",
+    );
+    await productionPrinting.updateBillPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      `delivery-policy-${runId}`,
+      {
+        mode: "notify_cashier",
+        printerId: null,
+        revision: 0,
+        deliveryAutoPrint: true,
+        deliveryPrinterId: printer.id,
+      },
+    );
     await database.db
       .update(deliveryOrders)
       .set({ fulfillment: "pickup" })
@@ -321,7 +484,76 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
     assert.equal(visibleDelivery.customerPhone, "+5511999990000");
     assert.equal(visibleDelivery.address?.street, "Rua da Entrega");
     const printJobIds = sent.printJobIds as string[];
-    assert.equal(printJobIds.length, 2);
+    assert.equal(printJobIds.length, 3);
+    const [deliveryJob] = await database.db
+      .select()
+      .from(posPrintJobs)
+      .where(
+        and(
+          eq(posPrintJobs.organizationId, organization.id),
+          eq(posPrintJobs.unitId, unit.id),
+          eq(posPrintJobs.tabId, tab.id),
+          eq(posPrintJobs.documentType, "delivery_slip"),
+        ),
+      )
+      .limit(1);
+    assert.ok(deliveryJob?.hubCommandId);
+    const payload =
+      deliveryJob.payload as unknown as import("@giromesa/contracts").PrintDocumentPayloadV2;
+    assert.equal(payload.context.tabId, tab.id);
+    assert.equal(payload.context.fulfillmentType, "delivery");
+    assert.equal(payload.delivery?.address.reference, "Portão azul");
+    assert.equal(payload.delivery?.address.complement, "Casa 2");
+    assert.equal(payload.delivery?.customerPhone, "+5511999990000");
+    assert.equal(payload.delivery?.courier, null);
+    assert.equal(payload.totals.deliveryFeeCents, 900);
+    assert.equal(payload.totals.totalCents, visibleDelivery.totalCents);
+    assert.equal(payload.totals.remainingCents, visibleDelivery.totalCents);
+    assert.equal(payload.items.length, 1);
+    assert.equal(payload.establishment.displayName, "KDS Integration");
+    const [savedCustomer] = await database.db
+      .insert(growthCustomers)
+      .values({
+        organizationId: organization.id,
+        name: "Cliente delivery",
+        phone: "+5511999990000",
+        idempotencyKey: `late-customer-${runId}`,
+        requestFingerprint: "integration",
+      })
+      .returning();
+    assert.ok(savedCustomer);
+    const linked = await pos.updateTab(owner.id, organization.id, unit.id, tab.id, {
+      expectedVersion: (await pos.getTab(owner.id, organization.id, unit.id, tab.id)).tab.version,
+      customerId: savedCustomer.id,
+    });
+    assert.equal(linked.tab.customerId, savedCustomer.id);
+    const [linkedDelivery] = await database.db
+      .select()
+      .from(deliveryOrders)
+      .where(eq(deliveryOrders.id, visibleDelivery.id));
+    assert.equal(linkedDelivery?.customerId, savedCustomer.id);
+    assert.deepEqual(linkedDelivery?.address, visibleDelivery.address);
+    await assert.rejects(
+      () =>
+        pos.updateTab(owner.id, organization.id, unit.id, tab.id, {
+          expectedVersion: linked.tab.version,
+          customerId: null,
+        }),
+      (error) => errorCode(error) === "TAB_CUSTOMER_ALREADY_COMMITTED",
+    );
+    await productionPrinting.updateBillPolicy(
+      owner.id,
+      organization.id,
+      unit.id,
+      `delivery-policy-off-${runId}`,
+      {
+        mode: "notify_cashier",
+        printerId: null,
+        revision: 1,
+        deliveryAutoPrint: false,
+        deliveryPrinterId: printer.id,
+      },
+    );
     const [orderSentOutbox] = await database.db
       .select({ payload: outboxEvents.payload })
       .from(outboxEvents)
@@ -380,7 +612,7 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
           eq(hubCommands.type, "print_job.execute"),
         ),
       );
-    assert.equal(executeCommands.length, 2);
+    assert.equal(executeCommands.length, 3);
     const printerOnlySnapshot = await pos.snapshotKds(organization.id, unit.id);
     assert.equal(
       (printerOnlySnapshot.stations as Array<{ id: string }>).some(
@@ -1045,6 +1277,75 @@ it("coordinates KDS priority, terminal profiles and availability against Postgre
       ).length,
       2,
     );
+    // Financial settlement must not mark a delivery fulfilled or hide it after 24 hours.
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "preparing" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    await pos.recordPayment(
+      owner.id,
+      organization.id,
+      unit.id,
+      concurrentTab.id,
+      `delivery-prepaid-${runId}`,
+      {
+        method: "pix",
+        amountCents: 2100,
+      },
+    );
+    await pos.closeTab(
+      owner.id,
+      organization.id,
+      unit.id,
+      concurrentTab.id,
+      `delivery-prepaid-close-${runId}`,
+      { printRequested: false },
+    );
+    await database.db
+      .update(posTabs)
+      .set({
+        closedAt: new Date(Date.now() - 48 * 60 * 60_000),
+        promisedAt: null,
+        readyNotifiedAt: null,
+      })
+      .where(eq(posTabs.id, concurrentTab.id));
+    const queueStage = async (stage: "all" | "delivered" = "all") => {
+      const queue = await pos.listCounterQueue(owner.id, organization.id, unit.id, {
+        stage,
+        channel: "delivery",
+        query: "",
+        page: 1,
+        limit: 100,
+      });
+      assert.equal(queue.pagination.total, queue.counts[stage]);
+      return queue.items.find((item) => item.id === concurrentTab.id)?.queueStage;
+    };
+    assert.equal(await queueStage(), "production");
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "ready" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.equal(await queueStage(), "ready");
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "dispatched" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.equal(await queueStage(), "waiting");
+    await database.db
+      .update(posTabs)
+      .set({ closedAt: new Date() })
+      .where(eq(posTabs.id, concurrentTab.id));
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "completed" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.equal(await queueStage(), undefined);
+    assert.equal(await queueStage("delivered"), "delivered");
+    await database.db
+      .update(deliveryOrders)
+      .set({ status: "canceled" })
+      .where(eq(deliveryOrders.id, adjustedDelivery.id));
+    assert.equal(await queueStage(), undefined);
   } finally {
     await database.onModuleDestroy();
   }

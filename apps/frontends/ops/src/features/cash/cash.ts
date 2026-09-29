@@ -1,4 +1,4 @@
-import type { CashEntry } from "../../management.shared";
+import type { CashData, CashEntry } from "../../management.shared";
 
 const entryLabels: Record<string, string> = {
   pos_payment: "Venda do atendimento",
@@ -27,6 +27,38 @@ export function cashEntryLabel(entryType: string) {
 
 export function paymentMethodLabel(method: string | null) {
   return method ? (methodLabels[method] ?? method) : "Sem método";
+}
+
+export function cashHandoverCandidates(
+  operators: CashData["operators"],
+  responsibleIdentityId: string | null,
+  actorIdentityId?: string,
+) {
+  return operators.filter(
+    (operator) =>
+      operator.identityId !== responsibleIdentityId && operator.identityId !== actorIdentityId,
+  );
+}
+
+export function visibleCashAlerts(
+  data: Pick<CashData, "alerts" | "capabilities" | "approvals" | "pendingTransfers">,
+) {
+  const alerts = data.alerts.filter((alert) => {
+    if (alert.severity === "critical") return true;
+    if (alert.code === "CASH_APPROVAL_PENDING" && data.capabilities.canApproveCashRequests) {
+      return !data.approvals.some(
+        (approval) =>
+          approval.status === "pending" && approval.fromCashShiftId === alert.cashShiftId,
+      );
+    }
+    if (alert.code === "CASH_TRANSFER_PENDING") {
+      return !data.pendingTransfers.some(
+        (transfer) => transfer.toCashShiftId === alert.cashShiftId,
+      );
+    }
+    return true;
+  });
+  return [...new Map(alerts.map((alert) => [JSON.stringify(alert), alert])).values()];
 }
 
 export function summarizeCashEntries(entries: CashEntry[]) {

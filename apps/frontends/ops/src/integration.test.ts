@@ -22,6 +22,29 @@ vi.stubGlobal("crypto", { randomUUID: () => "11111111-1111-4111-8111-11111111111
 beforeEach(() => storage.clear());
 
 describe("integração operacional", () => {
+  it("cadastra o código gerencial na sessão atual e preserva recusas de autorização", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "MANAGER_PIN_DENIED" }), { status: 403 }),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ configured: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(api.pilot.setManagerPin("org-1", "unit-1", "482617")).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(api.pilot.setManagerPin("org-1", "unit-1", "482617")).resolves.toEqual({
+      configured: true,
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toMatch(
+      /\/v1\/organizations\/org-1\/units\/unit-1\/pilot\/manager-pin$/,
+    );
+    const init = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(init.method).toBe("PUT");
+    expect(init.credentials).toBe("include");
+    expect(JSON.parse(String(init.body))).toEqual({ pin: "482617" });
+  });
+
   it("envia metadados e elementos da planta no payload atômico versionado", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ revision: 8 }), {

@@ -183,6 +183,16 @@ public sealed class PrinterConfigurationRegistryTests : IAsyncLifetime
         Assert.Contains("PRINTER_CONFIGURATION_ID_DUPLICATE", issues);
     }
 
+    [Fact]
+    public void AcceptsAllFiveOperationalDocumentTypesIncludingDelivery()
+    {
+        var configuration = Stored("cashier", DateTimeOffset.UtcNow) with
+        {
+            DocumentTypes = ["partial_statement", "payment_statement", "final_receipt", "kds_ticket", "delivery_slip"],
+        };
+        Assert.Empty(PrinterConfigurationRegistry.Validate(configuration));
+    }
+
     public Task InitializeAsync() => Task.CompletedTask;
 
     public Task DisposeAsync()

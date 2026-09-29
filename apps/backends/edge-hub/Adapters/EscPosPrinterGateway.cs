@@ -286,6 +286,7 @@ public static class EscPosDocument
             candidate.WidthDots <= maximumRasterWidthDots
                 ? RenderRaster(candidate)
                 : [];
+        if (graphic.Length > 0) graphic = [0x1b, 0x61, 0x01, .. graphic, 0x1b, 0x61, 0x00];
         var suffix = cut ? FeedAndCut : FeedOnly;
         var result = new byte[
             Initialize.Length + 3 + graphic.Length + body.Length + suffix.Length];
@@ -303,6 +304,7 @@ public static class EscPosDocument
 
     private static byte[] RenderRaster(ThermalRasterGraphic graphic)
     {
+        if (graphic.WidthDots is < 1 or > 576 || graphic.HeightDots is < 1 or > 512) return [];
         var widthBytes = (graphic.WidthDots + 7) / 8;
         if (graphic.Data.Length != widthBytes * graphic.HeightDots) return [];
         const int storeParametersLength = 10;
@@ -321,8 +323,8 @@ public static class EscPosDocument
         command[offset++] = 0x01;
         command[offset++] = 0x01;
         command[offset++] = 0x31;
-        command[offset++] = (byte)(widthBytes & 0xff);
-        command[offset++] = (byte)((widthBytes >> 8) & 0xff);
+        command[offset++] = (byte)(graphic.WidthDots & 0xff);
+        command[offset++] = (byte)((graphic.WidthDots >> 8) & 0xff);
         command[offset++] = (byte)(graphic.HeightDots & 0xff);
         command[offset++] = (byte)((graphic.HeightDots >> 8) & 0xff);
         graphic.Data.CopyTo(command, offset);

@@ -1082,6 +1082,92 @@ test("Responsável marca pedido pronto como servido na próxima ação", async (
   await expectNoHorizontalOverflow(page);
 });
 
+test("modal da mesa preserva a edição do pedido e isola atalhos de modais aninhados", async ({
+  page,
+}) => {
+  await mockProductionApi(page);
+  await page.goto("/");
+  await page.evaluate(() => {
+    window.location.hash = "#/salon";
+  });
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  await page.locator(".real-table").filter({ hasText: "Mesa 03" }).click();
+
+  const dialog = page.getByRole("dialog", { name: "Mesa 03" });
+  const workspace = dialog.locator(".service-workspace");
+  const orderTab = dialog.getByRole("button", { name: "Pedido", exact: true });
+  const accountTab = dialog.getByRole("button", { name: "Conta", exact: true });
+  const printTab = dialog.getByRole("button", { name: "Pré-conta", exact: true });
+  const orderArea = dialog.locator(".service-order-area");
+  const accountArea = dialog.locator(".service-account-area");
+
+  await expect(workspace).toHaveAttribute("data-focus", "order");
+  await expect(orderTab).toHaveAttribute("aria-current", "page");
+  await expect(orderArea).toBeVisible();
+  await expect(accountArea).toBeHidden();
+
+  await dialog.getByRole("button", { name: "Adicionar Café Expresso", exact: true }).click();
+  const cartItem = dialog.locator(".cart-preview__item").filter({ hasText: "Café Expresso" });
+  const cartQuantity = cartItem.locator(".quantity-stepper--compact > strong");
+  await expect(cartItem).toHaveCount(1);
+  await expect(cartQuantity).toHaveText("1");
+
+  await cartItem.getByRole("button", { name: "Observação", exact: true }).click();
+  let productDialog = page.getByRole("dialog", { name: "Café Expresso" });
+  await productDialog.getByRole("button", { name: "Aumentar quantidade" }).click();
+  await productDialog.getByLabel("Observação para a produção").fill("Não deve persistir");
+  await productDialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(productDialog).toBeHidden();
+  await expect(cartItem).toHaveCount(1);
+  await expect(cartQuantity).toHaveText("1");
+  await expect(cartItem).not.toContainText("Não deve persistir");
+
+  await cartItem.getByRole("button", { name: "Observação", exact: true }).click();
+  productDialog = page.getByRole("dialog", { name: "Café Expresso" });
+  await productDialog.getByRole("button", { name: "Aumentar quantidade" }).click();
+  await productDialog.getByLabel("Observação para a produção").fill("Também não persiste");
+  await page.keyboard.press("Escape");
+  await expect(productDialog).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(cartItem).toHaveCount(1);
+  await expect(cartQuantity).toHaveText("1");
+  await expect(cartItem).not.toContainText("Também não persiste");
+
+  await cartItem.getByRole("button", { name: "Observação", exact: true }).click();
+  productDialog = page.getByRole("dialog", { name: "Café Expresso" });
+  await productDialog.getByRole("button", { name: "Aumentar quantidade" }).click();
+  await productDialog.getByLabel("Observação para a produção").fill("Sem açúcar");
+  await productDialog.getByRole("button", { name: /^Salvar 2/ }).click();
+  await expect(productDialog).toBeHidden();
+  await expect(cartItem).toHaveCount(1);
+  await expect(cartQuantity).toHaveText("2");
+  await expect(cartItem).toContainText("Sem açúcar");
+
+  await page.keyboard.press("Alt+2");
+  await expect(workspace).toHaveAttribute("data-focus", "account");
+  await expect(accountTab).toHaveAttribute("aria-current", "page");
+  await expect(orderArea).toBeHidden();
+  await expect(accountArea).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Quanto por pessoa?", exact: true }).click();
+  const splitDialog = page.getByRole("dialog", { name: "Quanto por pessoa?" });
+  await expect(splitDialog).toBeVisible();
+  await page.keyboard.press("Alt+1");
+  await expect(splitDialog).toBeVisible();
+  await expect(workspace).toHaveAttribute("data-focus", "account");
+  await expect(accountTab).toHaveAttribute("aria-current", "page");
+
+  await page.keyboard.press("Escape");
+  await expect(splitDialog).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(workspace).toHaveAttribute("data-focus", "account");
+
+  await page.keyboard.press("Alt+3");
+  await expect(workspace).toHaveAttribute("data-focus", "print");
+  await expect(printTab).toHaveAttribute("aria-current", "page");
+  await expect(dialog.getByRole("region", { name: "Pré-conta e impressão" })).toBeVisible();
+});
+
 test("Atendimento real mantém estado, contexto e layout nos breakpoints críticos", async ({
   page,
 }) => {
@@ -1310,7 +1396,7 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     await expectNoHorizontalOverflow(page);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  const accountTab = dialog.getByRole("button", { name: "Conta e pagamento", exact: true });
+  const accountTab = dialog.getByRole("button", { name: "Conta", exact: true });
   await accountTab.click();
   await expect(dialog.getByText("Comanda em foco", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Impressão", { exact: true })).toBeVisible();
@@ -1324,7 +1410,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(fullPayment).not.toBeDisabled();
   const cashierPaymentForm = dialog.locator("form.cashier-payment-form");
   await expect(cashierPaymentForm).toBeVisible();
-  await expect(cashierPaymentForm.getByLabel("Como receber")).toHaveValue("full");
+  await expect(
+    cashierPaymentForm.getByRole("button", { name: "Quanto por pessoa?", exact: true }),
+  ).toBeVisible();
   const paymentLayout = await cashierPaymentForm.evaluate((form) => {
     const payment = form.getBoundingClientRect();
     const grid = form.parentElement;
@@ -1345,8 +1433,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   expect(
     Math.abs(paymentLayout.gridRight - paymentLayout.right - paymentLayout.paddingRight),
   ).toBeLessThanOrEqual(1);
-  await expect(dialog.getByLabel("Valor a receber")).toHaveValue("287.4");
-  await expect(dialog.getByLabel("Valor recebido")).toHaveValue("287.4");
+  await expect(dialog.getByLabel("Valor recebido", { exact: true })).toHaveValue("287,40");
+  await expect(cashierPaymentForm.locator('input[data-currency="brl"]')).toHaveCount(1);
+  await expect(cashierPaymentForm.getByText("Troco", { exact: true })).toBeVisible();
   const manualMethods = dialog.getByLabel("Forma de pagamento");
   await expect(manualMethods.locator("option")).toHaveText([
     "Dinheiro",
@@ -1357,6 +1446,7 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   ]);
   await manualMethods.selectOption("pix");
   await expect(manualMethods).toHaveValue("pix");
+  await expect(dialog.getByLabel("Valor deste pagamento", { exact: true })).toBeVisible();
   await manualMethods.selectOption("cash");
   await page.setViewportSize({ width: 375, height: 667 });
   await expectNoHorizontalOverflow(page);
@@ -1525,22 +1615,46 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
   await expect(page.getByRole("heading", { level: 1, name: "Balcão e retirada" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Nova comanda rápida" })).toBeVisible();
+  await expect(page.locator(".counter-open-form")).toHaveCount(0);
   await expect(page.getByText("Operação atualizada")).toBeVisible();
   await expect(page.getByRole("button", { name: /Em andamento/ })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
 
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const quickOpenForm = page.locator(".counter-open-form");
-  const formColumns = await page
-    .locator(".counter-open-form")
-    .evaluate((form) => getComputedStyle(form).gridTemplateColumns.trim().split(/\s+/).length);
-  const primaryControls = [
-    quickOpenForm.locator("select"),
-    page.getByLabel("Nome do cliente", { exact: true }),
-  ];
+  for (const width of [375, 1024, 1100, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    if (width > 375 && width < 1440) {
+      await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+      await expect(
+        page.locator(".sidebar").getByRole("link", { name: "Balcão e retirada" }),
+      ).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await page.locator(".sidebar").getByRole("button", { name: "Fechar menu" }).click();
+    }
+    const search = page.getByRole("searchbox", { name: "Buscar atendimento" });
+    await expect(search).toBeVisible();
+    const bounds = await search.boundingBox();
+    expect(bounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(width);
+    await expectNoHorizontalOverflow(page);
+  }
+  const searchWidthRatio = await page
+    .locator(".counter-queue-tools .gm-search-field")
+    .evaluate((search) => {
+      const queue = search.closest(".counter-queue-tools");
+      return queue ? search.getBoundingClientRect().width / queue.getBoundingClientRect().width : 0;
+    });
+  expect(searchWidthRatio).toBeGreaterThan(0.9);
+  await page.getByRole("button", { name: "Novo pedido", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Novo pedido", exact: true })
+    .getByRole("button", { name: "2 · Retirada", exact: true })
+    .click();
+  const formDialog = page.getByRole("dialog", { name: "Novo pedido", exact: true });
+  await expect(formDialog.locator(".counter-open-form")).toBeVisible();
+  await expect(formDialog.getByRole("button", { name: "Cancelar", exact: true })).toBeVisible();
+  const primaryControls = [page.getByLabel("Nome do cliente", { exact: true })];
   const fieldFillRatios = await Promise.all(
     primaryControls.map((control) =>
       control.evaluate((element) => {
@@ -1551,23 +1665,11 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
       }),
     ),
   );
-  const [nameBounds, actionBounds] = await Promise.all([
-    primaryControls[1].boundingBox(),
-    page.getByRole("button", { name: "Abrir e pedir" }).boundingBox(),
-  ]);
-  const searchWidthRatio = await page
-    .locator(".counter-queue-tools .gm-search-field")
-    .evaluate((search) => {
-      const queue = search.closest(".counter-queue-tools");
-      return queue ? search.getBoundingClientRect().width / queue.getBoundingClientRect().width : 0;
-    });
-  expect(formColumns).toBe(3);
   expect(Math.min(...fieldFillRatios)).toBeGreaterThan(0.95);
-  expect(Math.abs((nameBounds?.y ?? 0) - (actionBounds?.y ?? 0))).toBeLessThan(2);
-  expect(searchWidthRatio).toBeGreaterThan(0.9);
   await page.setViewportSize({ width: 375, height: 812 });
 
-  await page.getByText("Prazo e identificação").click();
+  await page.getByText("Dados do pedido", { exact: true }).click();
+  await page.getByText("Agendar pedido · opcional", { exact: true }).click();
   await expect(page.getByLabel("Data")).toHaveAttribute("type", "date");
   await expect(page.getByLabel("Telefone")).toBeVisible();
 
@@ -1585,26 +1687,17 @@ test("Balcão real mantém abertura rápida e fila operacional nos breakpoints c
     { width: 1100, height: 800 },
   ]) {
     await page.setViewportSize(viewport);
-    if (viewport.width > 375) {
-      await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
-      await expect(
-        page.locator(".sidebar").getByRole("link", { name: "Balcão e retirada" }),
-      ).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-      await page.locator(".sidebar").getByRole("button", { name: "Fechar menu" }).click();
-    }
-
+    await expect(formDialog).toBeVisible();
     await expectNoHorizontalOverflow(page);
     for (const control of [
-      quickOpenForm.locator("select"),
       page.getByLabel("Nome do cliente", { exact: true }),
       page.getByLabel("Telefone", { exact: true }),
       page.getByLabel("Data", { exact: true }),
       page.getByLabel("Hora", { exact: true }),
       page.getByLabel("Referência interna", { exact: true }),
       page.getByLabel("Pessoas", { exact: true }),
-      page.getByRole("searchbox", { name: "Buscar atendimento" }),
       page.getByRole("button", { name: "Abrir e pedir" }),
+      formDialog.getByRole("button", { name: "Cancelar", exact: true }),
     ]) {
       const bounds = await control.evaluate((element) => {
         const rect = element.getBoundingClientRect();
@@ -1635,25 +1728,19 @@ test("Recepção real mantém estados vazios compactos e orientados à próxima 
   const arrivalBar = page.locator(".arrival-bar");
   const arrivalSearch = arrivalBar.locator(".gm-search-field");
   const arrivalDate = page.getByLabel("Agenda do dia");
-  const newReservation = arrivalBar.getByRole("button", { name: "Nova reserva" });
+  const newReservation = page.getByRole("button", { name: "Nova reserva", exact: true });
   await expect(arrivalBar).toHaveCSS("display", "grid");
   await expect(page.getByRole("searchbox", { name: "Buscar chegada" })).toBeVisible();
   const desktopSearch = await arrivalSearch.boundingBox();
   const desktopDate = await arrivalDate.boundingBox();
   const desktopAction = await newReservation.boundingBox();
   expect(Math.abs((desktopSearch?.y ?? 0) - (desktopDate?.y ?? 0))).toBeLessThan(3);
-  expect(
-    Math.abs(
-      (desktopDate?.y ?? 0) +
-        (desktopDate?.height ?? 0) -
-        ((desktopAction?.y ?? 0) + (desktopAction?.height ?? 0)),
-    ),
-  ).toBeLessThan(3);
+  expect(desktopAction?.y ?? 0).toBeLessThan(desktopDate?.y ?? 0);
 
   await page.setViewportSize({ width: 768, height: 900 });
   const tabletSearch = await arrivalSearch.boundingBox();
   const tabletDate = await arrivalDate.boundingBox();
-  expect(tabletDate?.y ?? 0).toBeGreaterThan((tabletSearch?.y ?? 0) + (tabletSearch?.height ?? 0));
+  expect(Math.abs((tabletSearch?.y ?? 0) - (tabletDate?.y ?? 0))).toBeLessThan(3);
   await expectNoHorizontalOverflow(page);
 
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -1674,12 +1761,22 @@ test("Recepção real mantém estados vazios compactos e orientados à próxima 
     .filter({ has: page.getByRole("heading", { level: 2, name: "Reservas" }) })
     .getByRole("button", { name: "Criar reserva" });
   await createReservation.click();
-  await expect(page.locator("#reservation-composer")).toHaveAttribute("open", "");
-  await expect(page.locator("#reservation-composer input").first()).toBeFocused();
+  const composer = page.getByRole("dialog", { name: "Nova reserva", exact: true });
+  await expect(composer).toBeVisible();
+  await expect(composer.getByRole("button", { name: "Fechar", exact: true })).toBeFocused();
 
   await page.setViewportSize({ width: 375, height: 812 });
   await expectNoHorizontalOverflow(page);
   await expectWcagAa(page);
+  await composer.getByRole("button", { name: "Cancelar", exact: true }).click();
+  await expect(composer).not.toBeVisible();
+  await expect(createReservation).toBeFocused();
+  await page.getByRole("button", { name: "Histórico", exact: true }).click();
+  const history = page.getByRole("dialog", { name: "Histórico de reservas e fila" });
+  await expect(history).toBeVisible();
+  await history.getByRole("button", { name: "Carregar mais histórico" }).click();
+  await page.keyboard.press("Escape");
+  await expect(history).not.toBeVisible();
 });
 
 test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual", async ({ page }) => {
@@ -1970,9 +2067,10 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
   await paymentDialog.getByRole("button", { name: "Voltar à conta" }).click();
   await expect(page.locator("form.cashier-payment-form")).toBeHidden();
 
-  const printAccount = page.getByRole("button", { name: "Imprimir pré-conta", exact: true });
+  const printAccount = page.getByRole("button", { name: "Pré-conta", exact: true });
   await expect(printAccount).toBeEnabled();
   await printAccount.click();
+  await page.getByRole("button", { name: "Imprimir", exact: true }).click();
   await expect.poll(() => printStatusUpdates).toContain("confirmation_required");
   const confirmPrint = page.getByRole("button", { name: "Confirmar que saiu", exact: true });
   await expect(confirmPrint).toBeVisible();
@@ -1980,7 +2078,7 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
   await expect.poll(() => printStatusUpdates).toContain("printed");
   await expect(page.getByRole("button", { name: "Confirmar saída física" })).toHaveCount(0);
   await expect(page.locator(".print-queue")).toContainText("Pré-conta · Retirada teste");
-  await page.getByText("Dividir valor da pré-conta", { exact: true }).click();
+  await page.getByText("Imprimir vias divididas", { exact: true }).click();
   await expect(
     page.getByText("Valores divididos sobre o saldo. Imprimir não registra pagamento."),
   ).toBeVisible();
@@ -2351,6 +2449,15 @@ test("Recepção senta em mesa compatível e abre a comanda na mesma requisiçã
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
   const reservationRow = page.locator(".data-row").filter({ hasText: "Maria Reserva" }).first();
+  const moreActions = reservationRow.locator(".row-more-actions");
+  await moreActions.locator("summary").click();
+  await expect(moreActions).toHaveAttribute("open", "");
+  await page.getByRole("heading", { name: "Recepção e espera", exact: true }).click();
+  await expect(moreActions).not.toHaveAttribute("open", "");
+  await moreActions.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await expect(moreActions).not.toHaveAttribute("open", "");
+  await expect(moreActions.locator("summary")).toBeFocused();
   await reservationRow.getByRole("button", { name: "Sentar" }).click();
   const modal = page.getByRole("dialog", { name: "Sentar Maria Reserva" });
   await modal.getByLabel("Mesa compatível").selectOption("m01");
@@ -2385,9 +2492,10 @@ test("Cardápio cadastra revenda com limite diário e limpa classificação fisc
     window.location.hash = "#/catalog";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await page.locator("#new-product-details > summary").click();
-  const form = page.locator("#new-product-details form");
-  await form.getByRole("button", { name: "Produto de Revenda (Bebidas / Estoque Direto)" }).click();
+  await page.getByRole("button", { name: "Novo produto", exact: true }).click();
+  const productDialog = page.getByRole("dialog", { name: "Novo produto", exact: true });
+  const form = productDialog.locator("form");
+  await form.getByRole("button", { name: "Revenda", exact: true }).click();
   await form.getByText("Dados fiscais do produto", { exact: true }).click();
   const ncm = form.getByLabel("NCM (Nomenclatura Comum do Mercosul)");
   const cfop = form.getByLabel("CFOP Padrão");
@@ -2446,8 +2554,10 @@ test("Cardápio cadastra revenda com limite diário e limpa classificação fisc
   });
   expect(requests[0].fiscal).toEqual({});
   expect(requests[0]).not.toHaveProperty("stockQuantity");
-  await expect(form.getByLabel("Nome do Produto")).toHaveValue("");
-
+  await expect(productDialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Novo produto", exact: true }).click();
+  await form.getByRole("button", { name: "Revenda", exact: true }).click();
+  await form.getByText("Dados fiscais do produto", { exact: true }).click();
   await form.getByLabel("Nome do Produto").fill("Produto com classificação validada");
   await form.getByLabel("Preço Salão (R$)").fill("10,00");
   await ncm.fill("2201.10.00");
@@ -2456,6 +2566,9 @@ test("Cardápio cadastra revenda com limite diário e limpa classificação fisc
   await form.getByRole("button", { name: "Criar produto", exact: true }).click();
   await expect.poll(() => requests.length).toBe(2);
   expect(requests[1].fiscal).toEqual({ ncm: "22011000", cfop: "5102" });
+  await expect(productDialog).not.toBeVisible();
+  await page.getByRole("button", { name: "Novo produto", exact: true }).click();
+  await form.getByText("Dados fiscais do produto", { exact: true }).click();
   await expect(form.getByLabel("Nome do Produto")).toHaveValue("");
   await expect(ncm).toHaveValue("");
   await expect(cfop).toHaveValue("");
@@ -2477,18 +2590,17 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     window.location.hash = "#/catalog";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { name: "Cardápio operacional" })).toBeVisible();
-  await expect(page.locator(".catalog-management-header")).toHaveCSS("flex-direction", "column");
-  await expect(page.locator(".catalog-management-header__actions")).toHaveCSS(
-    "justify-content",
-    "flex-start",
-  );
-  for (const primaryAction of ["Novo produto", "Conferir como cliente", "Adicionais e opções"]) {
+  await expect(
+    page.getByRole("heading", { name: "Cardápio", level: 1, exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".catalog-management-header h1")).toHaveCount(1);
+  for (const primaryAction of ["Novo produto", "Conferir como cliente"]) {
     await expect(page.getByText(primaryAction, { exact: false }).first()).toBeVisible();
   }
   await expect(page.getByText("Importar CSV", { exact: false }).first()).toBeHidden();
   await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
   for (const secondaryAction of [
+    "Adicionais e opções",
     "Importar CSV",
     "Desempenho dos produtos",
     "Planilha CSV",
@@ -2514,18 +2626,19 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
   await expect(page.getByRole("link", { name: /Identidade visual/ })).toBeEnabled();
   await expect(page.getByRole("link", { name: /Abrir QR das mesas/ })).toBeEnabled();
   await expect(page.locator('.catalog-management-header__import input[type="file"]')).toBeEnabled();
-  await expect(page.getByText("Filtro de Dieta & Segurança:")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Sem Glúten" })).toBeEnabled();
+  await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
+  await page.getByText("Preferências alimentares", { exact: true }).click();
+  await expect(page.getByRole("button", { name: "Sem glúten" })).toBeEnabled();
   const modifierPill = page.getByRole("button", { name: /1 opcionais/ });
   await expect(modifierPill).toHaveCSS("border-radius", "999px");
 
-  await page.locator("#new-product-details > summary").click();
-  await expect(page.getByRole("button", { name: "Produto Preparado / Cozinha" })).toBeEnabled();
+  await page.getByRole("button", { name: "Novo produto", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Preparado", exact: true })).toBeEnabled();
   await expect(page.getByLabel(/^Preço Delivery \(R\$, opcional\)/)).toBeEnabled();
   await expect(page.getByLabel("Custo Unitário / Insumos (R$)")).toBeEnabled();
-  await expect(page.getByLabel("Foto do Prato (Opcional)")).toBeEnabled();
+  await expect(page.getByLabel("Foto (opcional)")).toBeEnabled();
   await expect(page.getByText("Dados fiscais do produto")).toBeVisible();
-  await page.locator("#new-product-details > summary").click();
+  await page.keyboard.press("Escape");
 
   await page.getByRole("button", { name: "Tabela com edição rápida de preços" }).click();
   const quickPrice = page.locator(".catalog-quick-price input").first();
@@ -2541,14 +2654,15 @@ test("Cardápio real mantém a interface completa e as integrações reais", asy
     stationIds: ["station-1"],
   });
 
+  await page.getByRole("group", { name: "Ações do cardápio" }).getByText("Mais ações").click();
   await page.getByRole("button", { name: /Combos e promoções \(0\)/ }).click();
 
   const dialog = page.getByRole("dialog", {
-    name: "Gestão de Combos & Promoções de Horário",
+    name: "Combos e promoções",
   });
   await expect(dialog.getByRole("button", { name: "Promoções & Happy Hour" })).toBeVisible();
-  await dialog.getByLabel("Nome do combo").fill("Combo real");
-  await dialog.getByLabel("Preço promocional do combo").fill("39,90");
+  await dialog.getByLabel("Nome", { exact: true }).fill("Combo real");
+  await dialog.getByLabel("Preço promocional (R$)", { exact: true }).fill("39,90");
   await dialog.getByRole("button", { name: /Prato da casa/ }).click();
   await dialog.getByRole("button", { name: "Salvar Combo" }).click();
 

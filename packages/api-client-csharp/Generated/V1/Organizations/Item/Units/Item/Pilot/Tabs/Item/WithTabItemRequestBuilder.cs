@@ -3,6 +3,7 @@
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.ApprovalRequests;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Claim;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close;
+using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Discount;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Items;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.NotifyReady;
 using GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Orders;
@@ -46,6 +47,11 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.CloseRequestBuilder Close
         {
             get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Close.CloseRequestBuilder(PathParameters, RequestAdapter);
+        }
+        /// <summary>The discount property</summary>
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Discount.DiscountRequestBuilder Discount
+        {
+            get => new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Discount.DiscountRequestBuilder(PathParameters, RequestAdapter);
         }
         /// <summary>The items property</summary>
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.Items.ItemsRequestBuilder Items

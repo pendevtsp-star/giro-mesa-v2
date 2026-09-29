@@ -12,7 +12,7 @@ const initialZone = {
   feeCents: 700,
   minimumOrderCents: 2_000,
   estimatedDeliveryMinutes: 45,
-  geometry: { type: "unit-radius", radiusKm: 5 },
+  geometry: { type: "unit-radius", radiusKm: 5, center: [-46.63, -23.58] },
   active: true,
 };
 
@@ -418,6 +418,77 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(dimensions.document, JSON.stringify(dimensions)).toBe(dimensions.viewport);
 }
 
+test("fila prioriza pedidos e revela cadastros, consulta e histórico sob demanda", async ({
+  page,
+}) => {
+  await openDelivery(page, "manager", emptyCalls(), { couriers: [initialCourier] });
+  await expect(page.getByRole("button", { name: "Cadastrar entregador" })).toHaveCount(0);
+  const updates = page
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Atualizações recentes" }) });
+  await expect(updates).not.toHaveAttribute("open");
+  await page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first().click();
+  const details = page.getByRole("dialog");
+  await expect(details.getByRole("button", { name: "Confirmar", exact: true })).toBeVisible();
+  await expect(details.getByRole("button", { name: "Solicitar notificação" })).toBeHidden();
+  await details.locator("summary").filter({ hasText: "Histórico" }).click();
+  await expect(details.locator(".delivery-history li")).toHaveCount(2);
+  await page.keyboard.press("Escape");
+  await expect(details).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first(),
+  ).toBeFocused();
+
+  await page.getByRole("button", { name: "Entregadores", exact: true }).click();
+  await expect(page.getByText("Carlos Lima", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Cadastrar entregador" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
+  await expect(page.getByRole("button", { name: "Cadastrar entregador" })).toBeFocused();
+
+  await page.getByRole("button", { name: "Zonas", exact: true }).click();
+  await expect(page.getByRole("heading", { name: initialZone.name })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Consultar cobertura", exact: true })).toBeHidden();
+  await page.locator("summary").filter({ hasText: "Consultar cobertura e taxa" }).click();
+  await expect(page.getByLabel("Logradouro")).toHaveValue("");
+  await expect(
+    page.getByRole("button", { name: "Consultar cobertura", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expectNoHorizontalOverflow(page);
+});
+
+test("consulta de zona sem geometria suficiente não afirma que endereço está fora da cobertura", async ({
+  page,
+}) => {
+  const calls = emptyCalls();
+  await openDelivery(page, "manager", calls);
+  await page.route("**/growth/delivery-zones/*/validate-address", (route) =>
+    route.fulfill({ json: { covered: false, validationStatus: "unavailable" } }),
+  );
+  await page.getByRole("button", { name: "Zonas", exact: true }).click();
+  await page.locator("summary").filter({ hasText: "Consultar cobertura e taxa" }).click();
+  await page.getByLabel("CEP", { exact: true }).fill("01001000");
+  await page.getByLabel("Logradouro").fill("Rua de teste");
+  await page.getByLabel("Número", { exact: true }).fill("10");
+  await page.getByLabel("Bairro", { exact: true }).fill("Centro");
+  await page.getByLabel("Cidade", { exact: true }).fill("São Paulo");
+  await page.getByLabel("UF", { exact: true }).fill("SP");
+  await page.getByLabel("Latitude", { exact: true }).fill("-23.58");
+  await page.getByLabel("Longitude", { exact: true }).fill("-46.63");
+  await page.getByRole("button", { name: "Consultar cobertura", exact: true }).click();
+  await expect(
+    page.getByText("Não foi possível confirmar a cobertura", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Endereço não atendido", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Editar", exact: true }).click();
+  await page.getByLabel("Raio declarado (km)").fill("6");
+  await page.getByRole("button", { name: "Salvar zona" }).click();
+  await expect.poll(() => calls.updateZone.length).toBe(1);
+  expect(calls.updateZone[0]).toMatchObject({
+    geometry: { radiusKm: 6, center: [-46.63, -23.58] },
+  });
+});
+
 test("operador visualiza pedidos, abre detalhes e avança uma transição", async ({ page }) => {
   const calls = emptyCalls();
   await openDelivery(page, "delivery", calls);
@@ -441,7 +512,9 @@ test("operador visualiza pedidos, abre detalhes e avança uma transição", asyn
   await expect(details).toContainText("Prometido para");
   await expect(details).toContainText("Histórico");
   await expect(details).toContainText("Recebido");
+  await details.locator("summary").filter({ hasText: "Dados da entrega" }).click();
   await expect(details).toContainText("Última posição");
+  await details.locator("summary").filter({ hasText: "Notificações" }).click();
   await details.getByRole("button", { name: "Solicitar notificação" }).click();
   await expect.poll(() => calls.notifications.length).toBe(1);
   expect(calls.notifications[0]).toMatchObject({
@@ -449,7 +522,9 @@ test("operador visualiza pedidos, abre detalhes e avança uma transição", asyn
     type: "status_update",
     idempotencyKey: expect.any(String),
   });
-  await expect(page.getByRole("status").filter({ hasText: "pendente do provedor" })).toBeVisible();
+  await expect(
+    details.getByRole("status").filter({ hasText: "pendente do provedor" }),
+  ).toBeVisible();
 
   await details.getByRole("button", { name: "Fechar" }).click();
   await page.getByPlaceholder("Protocolo, cliente ou telefone").fill("Maria");
@@ -478,7 +553,7 @@ test("gerente cria, edita e desativa zona de entrega", async ({ page }) => {
   const calls = emptyCalls();
   await openDelivery(page, "manager", calls);
 
-  await expect(page.getByText("Entregadores")).toBeVisible();
+  await page.getByRole("button", { name: "Entregadores", exact: true }).click();
   await expect(page.getByText("Nenhum entregador cadastrado nesta unidade.")).toBeVisible();
   await page.getByRole("button", { name: "Cadastrar entregador" }).click();
   await page.getByLabel("Nome").fill("Carlos Lima");
@@ -602,6 +677,7 @@ test("Delivery renderiza evento realtime e rejeita endereço fora da zona", asyn
 
   const orderButton = page.getByRole("button", { name: "Abrir detalhes do pedido D-100" }).first();
   await expect(page.getByText("Atualizações recentes")).toBeVisible();
+  await page.locator("summary").filter({ hasText: "Atualizações recentes" }).click();
   await expect(page.getByText("Nova posição do entregador")).toBeVisible();
   await orderButton.click();
   await expect(page.getByRole("dialog")).toContainText("Histórico");

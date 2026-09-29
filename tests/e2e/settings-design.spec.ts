@@ -245,8 +245,34 @@ test("configurações salvam, copiam e permanecem acessíveis em dark/375 px", a
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
+    const settingsUrl = page.url();
+    await page.evaluate(() => {
+      document.body.tabIndex = -1;
+      document.body.focus();
+      document.body.removeAttribute("tabindex");
+    });
     await page.keyboard.press("Tab");
-    expect(await page.evaluate(() => document.activeElement?.tagName)).not.toBe("BODY");
+    const skipButton = page.getByRole("button", { name: "Ir para o conteúdo", exact: true });
+    await expect(skipButton).toBeFocused();
+    await expect(skipButton).toBeInViewport();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(settingsUrl);
+    await expect(page.getByRole("main")).toBeFocused();
+    for (const [label, section] of [
+      ["Organização", "organization"],
+      ["Unidade", "unit"],
+      ["Marca e cardápio", "brand"],
+      ["Horários", "hours"],
+      ["Operação especializada", "specialized"],
+    ]) {
+      await page
+        .getByRole("navigation", { name: "Seções das configurações" })
+        .getByRole("button", { name: label, exact: true })
+        .click();
+      await expect(page).toHaveURL(settingsUrl);
+      await expect(page.locator(`#settings-${section}`)).toBeFocused();
+      await expect(page.locator(`#settings-${section} h2`)).toBeInViewport();
+    }
   }
 
   await expect(

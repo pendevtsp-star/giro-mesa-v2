@@ -1011,6 +1011,11 @@ test("private repository publishes keyless Sigstore signatures for every image d
   assert.match(provenance, /"package\.json"/);
   assert.match(readFileSync(trustedEntrypoint, "utf8"), /"package\.json"/);
   assert.equal(workflow.split("deploy/vps/ensure-runtime-env.sh").length - 1, 2);
+  for (const file of ["backup-to-r2.py", "giromesa-backup-r2.service", "giromesa-backup-r2.timer"]) {
+    assert.equal(workflow.split(`deploy/vps/${file}`).length - 1, 2);
+    assert.ok(provenance.includes(`"deploy/vps/${file}"`));
+    assert.ok(readFileSync(trustedEntrypoint, "utf8").includes(`"deploy/vps/${file}"`));
+  }
   assert.match(provenance, /"deploy\/vps\/ensure-runtime-env\.sh"/);
   assert.match(readFileSync(trustedEntrypoint, "utf8"), /"deploy\/vps\/ensure-runtime-env\.sh"/);
   const entrypoint = readFileSync(trustedEntrypoint, "utf8");

@@ -14,6 +14,7 @@
 .finance-preview {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--gm-space-3);
 }
@@ -156,7 +157,8 @@
   display: grid;
   min-width: 0;
   gap: var(--gm-space-1);
-  font-weight: 700;
+  font-size: var(--gm-font-sm);
+  font-weight: 600;
 }
 
 .finance-wide {

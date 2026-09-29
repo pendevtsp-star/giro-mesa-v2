@@ -9,7 +9,7 @@ public sealed record ThermalPrintDocument(string Text, ThermalRasterGraphic? Hea
 
 public static class ThermalReceiptFormatter
 {
-    private const int MaximumTextLength = 240;
+    private const int MaximumTextLength = 1000;
 
     public static string Format(string documentType, JsonElement payload, int width) =>
         FormatDocument(documentType, payload, width).Text;
@@ -20,47 +20,48 @@ public static class ThermalReceiptFormatter
         int width)
     {
         width = Math.Clamp(width, 24, 64);
-        if (documentType == "kds_ticket")
-            return new(FormatKdsTicket(payload, width));
-
         var establishment = Object(payload, "establishment");
-        var establishmentName = FirstText(establishment, "displayName", "tradeName", "name")
-            ?? Text(payload, "establishmentName")
-            ?? "GIROMESA";
-        var lines = new List<string>();
-        AddCenteredWrapped(lines, establishmentName.ToUpperInvariant(), width);
-        AddCenteredWrapped(lines, FirstText(establishment, "legalName"), width);
-        AddPrefixed(lines, "CNPJ: ", FirstText(establishment, "document", "cnpj"), width);
-        AddPrefixed(lines, "END: ", Address(establishment), width);
-        AddPrefixed(lines, "TEL: ", FirstText(establishment, "phone"), width);
-        AddPrefixed(lines, "HORARIO: ", OpeningHours(establishment), width);
+        if (documentType == "kds_ticket")
+            return new(FormatKdsTicket(payload, width), RasterGraphic(establishment));
+
+        var lines = EstablishmentHeader(establishment, payload, width);
+        AddReprint(lines, payload, width);
         lines.Add(Center(DocumentLabel(documentType), width));
         lines.Add(new('-', width));
 
         var tab = Object(payload, "tab");
         var context = Object(payload, "context");
         var totals = Object(payload, "totals");
-        AddWrapped(lines, FirstText(tab, "label") ?? "Comanda", width);
+        var label = FirstText(context, "label") ?? FirstText(tab, "label") ?? "Comanda";
+        AddCenteredWrapped(lines, label, width);
+        if (FirstText(context, "tableLabel") is { } tableLabel && tableLabel != label)
+            AddCenteredWrapped(lines, tableLabel, width);
+        if (PositiveNumber(context, "displayNumber") is { } displayNumber)
+            lines.Add(Center($"PEDIDO {displayNumber}", width));
         AddJoined(
             lines,
             width,
-            FulfillmentLabel(FirstText(tab, "fulfillmentType")),
-            PositiveNumber(tab, "guestCount") is { } guestCount ? $"{guestCount} pessoa(s)" : null);
+            FulfillmentLabel(FirstText(context, "fulfillmentType") ?? FirstText(tab, "fulfillmentType")),
+            (PositiveNumber(context, "guestCount") ?? PositiveNumber(tab, "guestCount")) is { } guestCount
+                ? $"{guestCount} pessoa(s)" : null);
+        AddPrefixed(lines, "STATUS: ", StatusLabel(FirstText(context, "status") ?? FirstText(tab, "status")), width);
         AddPrefixed(lines, "AREA: ", FirstText(context, "areaName"), width);
         AddPrefixed(lines, "PRACA: ", FirstText(context, "squareName"), width);
         AddPrefixed(lines, "ATENDENTE: ", FirstText(context, "waiterDisplayName", "waiterName"), width);
+
+        if (documentType == "delivery_slip") AddDelivery(lines, Object(payload, "delivery"), payload, width);
 
         var openedAt = Date(context, "openedAt") ?? Date(tab, "openedAt");
         var closedAt = Date(context, "closedAt") ?? Date(tab, "closedAt");
         var durationMinutes = PositiveNumber(context, "durationMinutes")
             ?? DurationMinutes(openedAt, closedAt ?? Date(payload, "generatedAt"));
         if (openedAt is not null)
-            lines.Add($"INICIO: {LocalDateTime(openedAt.Value)}");
-        if (durationMinutes is not null)
-            lines.Add($"TEMPO DE CONSUMO: {Duration(durationMinutes.Value)}");
+            AddWrapped(lines, $"INICIO: {LocalDateTime(openedAt.Value, payload)}", width);
+        if (durationMinutes is not null && documentType != "delivery_slip")
+            AddWrapped(lines, $"TEMPO DE CONSUMO: {Duration(durationMinutes.Value)}", width);
         var generatedAt = Date(payload, "generatedAt");
         if (generatedAt is not null)
-            lines.Add($"IMPRESSO: {LocalDateTime(generatedAt.Value)}");
+            AddWrapped(lines, $"IMPRESSO: {LocalDateTime(generatedAt.Value, payload)}", width);
         lines.Add(new string('-', width));
 
         if (documentType != "payment_statement")
@@ -71,7 +72,9 @@ public static class ThermalReceiptFormatter
                 if (Text(item, "status") == "canceled") continue;
                 var quantity = Quantity(item, "quantity");
                 var name = FirstText(item, "productName", "name") ?? "Item";
-                AddColumnsWrapped(lines, $"{quantity}x {name}", Money(Number(item, "netCents")), width);
+                var grossCents = NullableNumber(item, "grossCents")
+                    ?? Number(item, "netCents") + Number(item, "discountCents");
+                AddColumnsWrapped(lines, $"{quantity}x {name}", Money(grossCents), width);
                 var seat = PositiveNumber(item, "seatNumber");
                 if (seat is not null) AddWrapped(lines, $"  Pessoa {seat}", width);
 
@@ -83,10 +86,13 @@ public static class ThermalReceiptFormatter
                         itemId is not null && Text(modifier, "orderItemId") == itemId);
                 foreach (var modifier in modifiers)
                     AddModifier(lines, modifier, width);
+                if (documentType == "delivery_slip")
+                    AddPrefixed(lines, "  OBS: ", Text(item, "notes"), width);
             }
             lines.Add(new string('-', width));
             lines.Add(Columns("Subtotal", Money(Number(totals, "subtotalCents")), width));
-            AddAmount(lines, "Descontos", Number(totals, "discountCents"), width);
+            AddAmount(lines, "Descontos", -Number(totals, "discountCents"), width);
+            AddAmount(lines, "Taxa de entrega", Number(totals, "deliveryFeeCents"), width);
             var optionalService = Boolean(totals, "serviceChargeOptional") ||
                 Boolean(Object(payload, "serviceCharge"), "optional");
             AddAmount(
@@ -95,7 +101,7 @@ public static class ThermalReceiptFormatter
                 Number(totals, "serviceChargeCents"),
                 width);
             AddAmount(lines, "Gorjeta", Number(totals, "tipCents"), width);
-            if (optionalService && Number(totals, "serviceChargeCents") > 0 &&
+            if (documentType == "partial_statement" && optionalService && Number(totals, "serviceChargeCents") > 0 &&
                 NullableNumber(totals, "suggestedTotalCents") is { } suggestedTotal)
                 lines.Add(Columns("TOTAL SUGERIDO", Money(suggestedTotal), width));
             else
@@ -120,11 +126,21 @@ public static class ThermalReceiptFormatter
             {
                 var netAmount = NullableNumber(payment, "netAmountCents")
                     ?? Math.Max(0, Number(payment, "amountCents") - Number(payment, "reversedCents"));
-                lines.Add(Columns(PaymentLabel(Text(payment, "method")), Money(netAmount), width));
-                if (Number(payment, "reversedCents") > 0)
-                    AddAmount(lines, "  Estornado", Number(payment, "reversedCents"), width);
+                var reversed = Math.Max(0, Number(payment, "reversedCents"));
+                var paymentLabel = PaymentLabel(Text(payment, "method")) + (reversed > 0 ? " (liquido)" : "");
+                lines.Add(Columns(paymentLabel, Money(netAmount), width));
+                if (reversed > 0) AddAmount(lines, "  Estornado", reversed, width);
+                if (Text(payment, "method") == "cash" &&
+                    NullableNumber(payment, "receivedCents") is { } received && received > 0 &&
+                    NullableNumber(payment, "changeCents") is { } change && change >= 0 &&
+                    received - change == (decimal)netAmount + reversed)
+                {
+                    if (reversed > 0) AddWrapped(lines, "Recebimento original", width);
+                    AddColumnsWrapped(lines, "Recebido em dinheiro", Money(received), width);
+                    AddColumnsWrapped(lines, "Troco", Money(change), width);
+                }
             }
-            if (payments.Length == 0) lines.Add("Nenhum pagamento registrado");
+            if (payments.Length == 0) AddWrapped(lines, "Nenhum pagamento registrado", width);
         }
         lines.Add(new string('-', width));
         lines.Add(Columns("Pago", Money(Number(totals, "paidCents")), width));
@@ -135,15 +151,32 @@ public static class ThermalReceiptFormatter
         return new(string.Join('\n', lines), RasterGraphic(establishment));
     }
 
+    private static List<string> EstablishmentHeader(JsonElement establishment, JsonElement payload, int width)
+    {
+        var establishmentName = FirstText(establishment, "displayName", "tradeName", "name")
+            ?? Text(payload, "establishmentName")
+            ?? "GIROMESA";
+        var lines = new List<string>();
+        AddCenteredWrapped(lines, establishmentName.ToUpperInvariant(), width);
+        var legalName = FirstText(establishment, "legalName");
+        if (!string.Equals(establishmentName, legalName, StringComparison.OrdinalIgnoreCase))
+            AddCenteredWrapped(lines, legalName, width);
+        AddPrefixed(lines, "CNPJ: ", FirstText(establishment, "document", "cnpj"), width);
+        AddPrefixed(lines, "END: ", Address(establishment), width);
+        AddPrefixed(lines, "TEL: ", FirstText(establishment, "phone"), width);
+        AddPrefixed(lines, "HORARIO: ", OpeningHours(establishment), width);
+        return lines;
+    }
+
     private static string FormatKdsTicket(JsonElement payload, int width)
     {
         var station = Text(payload, "stationName") ?? "PRODUCAO";
         var reference = Text(payload, "reference") ?? "SEM REFERENCIA";
-        var lines = new List<string>
-        {
-            Center(station.ToUpperInvariant(), width),
-            Center($"PEDIDO {reference}", width),
-        };
+        var lines = EstablishmentHeader(Object(payload, "establishment"), payload, width);
+        AddReprint(lines, payload, width);
+        AddCenteredWrapped(lines, station.ToUpperInvariant(), width);
+        AddCenteredWrapped(lines, $"PEDIDO {reference}", width);
+        AddPrefixed(lines, "STATUS: ", StatusLabel(Text(payload, "status")), width);
         if (Boolean(payload, "rush")) lines.Add(Center("*** RUSH ***", width));
         AddJoined(lines, width, Text(payload, "tableLabel"), Text(payload, "tabLabel"), Text(payload, "channel"));
         lines.Add(new string('-', width));
@@ -151,10 +184,7 @@ public static class ThermalReceiptFormatter
         {
             AddWrapped(lines, $"{Quantity(item, "quantity")}x {Text(item, "productName") ?? "Item"}", width);
             foreach (var modifier in Array(item, "modifiers"))
-            {
-                if (modifier.ValueKind == JsonValueKind.String)
-                    AddWrapped(lines, $"  + {modifier.GetString()}", width);
-            }
+                AddModifier(lines, modifier, width, showPrice: false);
             AddPrefixed(lines, "  OBS: ", Text(item, "notes"), width);
             AddPrefixed(lines, "  !! ALERGIA: ", Text(item, "allergyNote"), width);
             var seat = NullableNumber(item, "seatNumber");
@@ -163,14 +193,43 @@ public static class ThermalReceiptFormatter
         }
         lines.Add(new string('-', width));
         var dueAt = Date(payload, "dueAt");
-        if (dueAt is not null) lines.Add($"PREVISAO: {dueAt.Value:HH:mm}");
+        if (dueAt is not null) AddWrapped(lines, $"PREVISAO: {LocalDateTime(dueAt.Value, payload)}", width);
         var generatedAt = Date(payload, "generatedAt");
-        if (generatedAt is not null) lines.Add($"IMPRESSO: {LocalDateTime(generatedAt.Value)}");
+        if (generatedAt is not null) AddWrapped(lines, $"IMPRESSO: {LocalDateTime(generatedAt.Value, payload)}", width);
         AddPrefixed(lines, "ID: ", Text(payload, "id"), width);
         return string.Join('\n', lines);
     }
 
-    private static void AddModifier(List<string> lines, JsonElement modifier, int width)
+    private static void AddReprint(List<string> lines, JsonElement payload, int width)
+    {
+        if (Boolean(Object(payload, "print"), "isReprint"))
+            lines.Add(Center("*** SEGUNDA VIA ***", width));
+    }
+
+    private static void AddDelivery(List<string> lines, JsonElement delivery, JsonElement payload, int width)
+    {
+        lines.Add(new string('-', width));
+        AddPrefixed(lines, "ENTREGA: ", StatusLabel(Text(delivery, "status")), width);
+        AddPrefixed(lines, "CLIENTE: ", Text(delivery, "customerName"), width);
+        AddPrefixed(lines, "TEL: ", Text(delivery, "customerPhone"), width);
+        var address = Object(delivery, "address");
+        AddPrefixed(lines, "RUA: ", Text(address, "street"), width);
+        AddPrefixed(lines, "NUMERO: ", Text(address, "number"), width);
+        AddPrefixed(lines, "COMPLEMENTO: ", Text(address, "complement"), width);
+        AddPrefixed(lines, "BAIRRO: ", Text(address, "neighborhood"), width);
+        AddJoined(lines, width, Text(address, "city"), Text(address, "state"));
+        AddPrefixed(lines, "CEP: ", Text(address, "postalCode"), width);
+        AddPrefixed(lines, "REFERENCIA: ", Text(address, "reference"), width);
+        var courier = Object(delivery, "courier");
+        AddPrefixed(lines, "ENTREGADOR: ", Text(courier, "name"), width);
+        AddPrefixed(lines, "CONTATO: ", Text(courier, "phone"), width);
+        AddPrefixed(lines, "OBS: ", Text(delivery, "notes"), width);
+        if (Date(delivery, "promisedAt") is { } promisedAt)
+            AddWrapped(lines, $"PREVISAO: {LocalDateTime(promisedAt, payload)}", width);
+        lines.Add(new string('-', width));
+    }
+
+    private static void AddModifier(List<string> lines, JsonElement modifier, int width, bool showPrice = true)
     {
         if (modifier.ValueKind == JsonValueKind.String)
         {
@@ -183,7 +242,7 @@ public static class ThermalReceiptFormatter
         var quantity = PositiveNumber(modifier, "quantity") ?? 1;
         var label = quantity > 1 ? $"  + {quantity}x {name}" : $"  + {name}";
         var amount = Number(modifier, "totalDeltaCents");
-        if (amount == 0) AddWrapped(lines, label, width);
+        if (!showPrice || amount == 0) AddWrapped(lines, label, width);
         else AddColumnsWrapped(lines, label, Money(amount), width);
     }
 
@@ -353,7 +412,27 @@ public static class ThermalReceiptFormatter
         "partial_statement" => "PRE-CONTA",
         "payment_statement" => "EXTRATO DE PAGAMENTOS",
         "final_receipt" => "COMPROVANTE FINAL",
+        "delivery_slip" => "VIA DE ENTREGA",
         _ => "DOCUMENTO OPERACIONAL",
+    };
+
+    private static string? StatusLabel(string? status) => status switch
+    {
+        "open" => "ABERTO",
+        "closed" => "ENCERRADO",
+        "draft" => "RASCUNHO",
+        "placed" => "RECEBIDO",
+        "confirmed" => "CONFIRMADO",
+        "pending" or "queued" => "PENDENTE",
+        "accepted" => "ACEITO",
+        "preparing" or "in_progress" => "EM PREPARO",
+        "ready" => "PRONTO",
+        "dispatched" or "out_for_delivery" => "SAIU PARA ENTREGA",
+        "delivered" or "completed" or "served" => "ENTREGUE",
+        "canceled" or "cancelled" => "CANCELADO",
+        "delivery_failed" => "ENTREGA NAO CONCLUIDA",
+        "returned" => "DEVOLVIDO",
+        _ => status?.ToUpperInvariant(),
     };
 
     private static string PaymentLabel(string? method) => method switch
@@ -390,13 +469,22 @@ public static class ThermalReceiptFormatter
     {
         if (source.ValueKind == JsonValueKind.Object &&
             source.TryGetProperty(name, out var value) &&
-            value.TryGetDecimal(out var number))
+            value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var number))
             return number.ToString("0.###", CultureInfo.GetCultureInfo("pt-BR"));
         return "0";
     }
 
-    private static string LocalDateTime(DateTimeOffset value) =>
-        value.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
+    private static string LocalDateTime(DateTimeOffset value, JsonElement payload)
+    {
+        var timezone = Text(Object(payload, "establishment"), "timezone");
+        if (timezone is not null)
+        {
+            try { value = TimeZoneInfo.ConvertTime(value, TimeZoneInfo.FindSystemTimeZoneById(timezone)); }
+            catch (TimeZoneNotFoundException) { }
+            catch (InvalidTimeZoneException) { }
+        }
+        return value.ToString("dd/MM/yyyy HH:mm", CultureInfo.GetCultureInfo("pt-BR"));
+    }
 
     private static string Duration(long minutes)
     {
@@ -481,7 +569,7 @@ public static class ThermalReceiptFormatter
     private static long? NullableNumber(JsonElement source, string name) =>
         source.ValueKind == JsonValueKind.Object &&
         source.TryGetProperty(name, out var value) &&
-        value.TryGetInt64(out var number)
+        value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var number)
             ? number
             : null;
 

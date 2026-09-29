@@ -1,5 +1,7 @@
+import { Icon } from "@giromesa/ui";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { LeadForm } from "../../components/lead-form";
 import {
   commercialAttributionForCatalog,
@@ -33,28 +35,38 @@ export default async function ContactPage({
     ? `Quero homologar uma SmartPOS para o GiroMesa.\nFornecedor: ${provider || "não informado"}\nModelo: ${model || "não informado"}\nAndroid/firmware: ${firmware || "não informado"}`
     : "";
   return (
-    <main id="conteudo" className="inner-page">
+    <main id="conteudo" className="inner-page contact-page">
       <section className="inner-hero container">
         <div className="inner-hero-copy">
           <p className="eyebrow">Conversa direta</p>
           <h1>Conte como sua operação gira hoje.</h1>
           <p>
-            Vendas, parcerias e dúvidas gerais entram por aqui. Para problemas em uma conta
-            existente, use a central de suporte.
+            Vamos conversar sobre o seu negócio. Tire dúvidas sobre o GiroMesa, conheça os planos ou
+            fale com a gente sobre uma parceria.
           </p>
           <div className="contact-cards">
             <article>
+              <span className="contact-card-icon">
+                <Icon name="people" size={22} />
+              </span>
               <h2>Comercial</h2>
               <p>Planos, implantação e avaliação da unidade.</p>
             </article>
             <article>
+              <span className="contact-card-icon">
+                <Icon name="settings" size={22} />
+              </span>
               <h2>Suporte</h2>
-              <p>Clientes identificados recebem contexto e prioridade pelo canal autenticado.</p>
+              <p>Já usa o GiroMesa e precisa de ajuda com a sua conta?</p>
+              <Link href="/suporte">Acessar central de suporte</Link>
             </article>
           </div>
         </div>
-        <aside>
-          <h2>Enviar mensagem</h2>
+        <aside aria-labelledby="contact-form-title">
+          <h2 id="contact-form-title">Fale com a gente</h2>
+          <p className="contact-form-intro">
+            Preencha os campos abaixo e conte o que você precisa.
+          </p>
           {catalogState.catalog ? (
             <LeadForm
               attribution={commercialAttributionForCatalog(

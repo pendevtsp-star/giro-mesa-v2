@@ -73,6 +73,7 @@ async function mockKdsApi(page: Page) {
     blockMutations: [] as Array<{ action: "block" | "unblock"; reason: string }>,
     blockedKitchen: false,
     cancelKitchen: false,
+    rejectCancellation: false,
     cancelMutations: [] as Array<{
       approverMembershipId: string;
       pin: string;
@@ -552,6 +553,10 @@ async function mockKdsApi(page: Page) {
       const body = request.postDataJSON() as {
         approval: { approverMembershipId: string; pin: string; reason: string };
       };
+      if (state.rejectCancellation) {
+        await route.fulfill({ status: 403, json: { message: "PIN não autorizado." } });
+        return;
+      }
       state.cancelMutations.push(body.approval);
       if (ticketId === ids.kitchenTicket) state.cancelKitchen = true;
       state.statuses.set(ticketId, "canceled");
@@ -561,7 +566,10 @@ async function mockKdsApi(page: Page) {
     }
 
     if (method === "POST" && /\/pilot\/kds\/[^/]+\/print-jobs$/.test(path)) {
-      state.printMutations.push(request.postDataJSON() as Record<string, unknown>);
+      state.printMutations.push({
+        ...(request.postDataJSON() as Record<string, unknown>),
+        ticketId: path.split("/").at(-2),
+      });
       await route.fulfill({
         status: 201,
         json: { printJob: { id: "print-job-1", status: "queued" } },
@@ -675,7 +683,7 @@ async function enterKds(page: Page) {
     window.location.hash = "#/kds/station";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Produção" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Produção KDS" })).toBeVisible();
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -701,18 +709,31 @@ test("KDS mantém submenu, rotas e última área operacional", async ({ page }, 
   await expect(page).toHaveURL(/#\/kds\/settings$/);
   await expect(page.getByRole("heading", { level: 1, name: "Configurações do KDS" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Terminal" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Aparência" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Estações e roteamento" })).toHaveCount(
+    0,
+  );
+  const settingsSections = page.getByRole("group", { name: "Áreas de configuração do KDS" });
+  await expect(
+    settingsSections.getByRole("button", { name: "Terminal", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await settingsSections.getByRole("button", { name: "Produtos e estações" }).click();
   await expect(
     page.getByRole("heading", { level: 2, name: "Estações e roteamento" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "Fluxo" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Aparência" })).toBeVisible();
-  await expect(page.getByText("Somente este terminal").first()).toBeVisible();
   await expect(page.getByText("Configuração da unidade").first()).toBeVisible();
+  await settingsSections.getByRole("button", { name: "Impressão e teclas" }).click();
+  await expect(page.getByText("Somente este terminal").first()).toBeVisible();
   await expect(page.getByLabel("Tecla para Ação anterior")).toHaveValue("← Esquerda");
   await expect(page.getByLabel("Tecla para Próxima ação")).toHaveValue("→ Direita");
 
   const settingsGrid = page.locator(".kds-settings__grid");
-  await expect(settingsGrid).toHaveCSS("column-count", "2");
+  await expect(settingsGrid).toHaveCSS("display", "grid");
+  await page.getByLabel("Tecla para Ação anterior").focus();
+  await page.keyboard.press("Tab");
+  await expect(page.getByLabel("Tecla para Próxima ação")).toBeFocused();
+  await expect(page.getByLabel("Tecla para Ação anterior")).toHaveValue("← Esquerda");
   const bumpMappings = page.locator(".kds-bump-map label");
   const firstDesktopMapping = await bumpMappings.nth(0).boundingBox();
   const secondDesktopMapping = await bumpMappings.nth(1).boundingBox();
@@ -726,7 +747,6 @@ test("KDS mantém submenu, rotas e última área operacional", async ({ page }, 
   });
 
   await page.setViewportSize({ width: 375, height: 812 });
-  await expect(settingsGrid).toHaveCSS("column-count", "1");
   const firstMobileMapping = await bumpMappings.nth(0).boundingBox();
   const secondMobileMapping = await bumpMappings.nth(1).boundingBox();
   expect(secondMobileMapping?.y ?? 0).toBeGreaterThan(
@@ -743,6 +763,7 @@ test("KDS centraliza disponibilidade e sincroniza o perfil deste terminal", asyn
   await enterKds(page);
 
   await page.locator(".kds-tabs").getByRole("link", { name: "Configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Produtos e estações", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Central de disponibilidade" })).toBeVisible();
   await page.getByLabel("Pesquisar produto").fill("Risoto");
   await page.getByRole("button", { name: "Alterar" }).click();
@@ -758,6 +779,7 @@ test("KDS centraliza disponibilidade e sincroniza o perfil deste terminal", asyn
   await expect(availabilityDialog.getByLabel("Motivo")).toHaveValue(
     "Ingrediente principal esgotado",
   );
+  await expect(availabilityDialog.getByRole("alert")).toBeVisible();
   apiState.availabilityShouldFail = false;
   await availabilityDialog.getByRole("button", { name: "Confirmar disponibilidade" }).click();
   await expect(availabilityDialog).toHaveCount(0);
@@ -773,6 +795,10 @@ test("KDS centraliza disponibilidade e sincroniza o perfil deste terminal", asyn
   await expect(page.getByText("Esgotado", { exact: true }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Voltar a vender" })).toBeVisible();
 
+  await page
+    .getByRole("group", { name: "Áreas de configuração do KDS" })
+    .getByRole("button", { name: "Terminal", exact: true })
+    .click();
   await page.getByLabel("Nome deste terminal").fill("KDS Bar");
   await page.locator("[data-kds-station]").selectOption({ label: "Bar" });
   await page.getByRole("button", { name: "Sincronizar perfil do terminal" }).click();
@@ -839,7 +865,7 @@ test("KDS real coordena duas praças e só entrega o pedido completo no passe", 
   await page.getByRole("button", { name: "Fixar estação neste terminal" }).click();
   await page.getByRole("link", { name: "Estação — Bar", exact: true }).click();
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1, name: "Produção" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Produção KDS" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Estação — Bar", exact: true })).toBeVisible();
   await expect(page.getByText("Estação fixada", { exact: true })).toBeVisible();
   const startBar = page.getByRole("button", { name: /Iniciar preparo/ }).first();
@@ -922,6 +948,19 @@ test("KDS bloqueia pronto sem ciência, opera bloqueio e imprime o ticket focado
   await expect.poll(() => apiState.printMutations).toHaveLength(1);
 });
 
+test("KDS imprime o ticket focado mesmo após abrir configurações", async ({ page }) => {
+  const apiState = await mockKdsApi(page);
+  await enterKds(page);
+  const barTicket = page.locator(`[data-kds-ticket="${ids.barTicket}"]`);
+  await barTicket.getByRole("button", { name: /Iniciar preparo/ }).focus();
+  await page.locator(".kds-tabs").getByRole("link", { name: "Configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Impressão e teclas", exact: true }).click();
+  await page.getByRole("button", { name: "Imprimir ticket focado", exact: true }).click();
+  await expect.poll(() => apiState.printMutations).toHaveLength(1);
+  await expect(page.locator(".kds-print-status")).toContainText("enviado à fila de impressão");
+  expect(apiState.printMutations[0]).toMatchObject({ ticketId: ids.barTicket });
+});
+
 test("KDS mantém acessibilidade, dark mode e ausência de overflow nos pontos críticos", async ({
   page,
 }) => {
@@ -967,7 +1006,8 @@ test("KDS em tela cheia prioriza tickets e preserva alertas e ações", async ({
     .locator("details")
     .filter({ has: page.getByText("Ritmo da operação", { exact: true }) });
   await expect(rhythm).not.toHaveAttribute("open", "");
-  await expect(page.getByRole("heading", { name: "Produção por item" })).toBeVisible();
+  await expect(page.locator(".kds-production-grid > summary")).toBeVisible();
+  await expect(page.locator(".kds-production-grid")).not.toHaveAttribute("open", "");
   for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.getByRole("button", { name: "Tela cheia", exact: true }).click();
@@ -981,7 +1021,7 @@ test("KDS em tela cheia prioriza tickets e preserva alertas e ações", async ({
     await expect(page.getByRole("region", { name: "Indicadores da produção" })).toBeHidden();
     await expect(page.getByLabel("Produção total", { exact: true })).toBeHidden();
     await expect(rhythm).toBeHidden();
-    await expect(page.getByRole("heading", { name: "Produção por item" })).toBeHidden();
+    await expect(page.locator(".kds-production-grid")).toBeHidden();
     await expect(page.getByText("Atalhos de teclado", { exact: true })).toBeHidden();
     await expect(page.locator("[data-kds-ticket]").first()).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Dados atrasados" })).toBeVisible();
@@ -1026,6 +1066,33 @@ test("KDS mantém cancelamento visível até a cozinha confirmar ciência", asyn
   await expect(alert).toHaveCount(0);
 });
 
+test("KDS fecha ações ao sair e não avança tickets pelo teclado dentro de janelas", async ({
+  page,
+}) => {
+  const apiState = await mockKdsApi(page);
+  await enterKds(page);
+  const menu = page.locator(".kds-terminal-actions");
+  await menu.locator("summary").click();
+  await expect(menu).toHaveAttribute("open", "");
+  await page.getByRole("heading", { name: "Produção KDS", exact: true }).click();
+  await expect(menu).not.toHaveAttribute("open", "");
+  await menu.locator("summary").click();
+  await page.keyboard.press("Escape");
+  await expect(menu).not.toHaveAttribute("open", "");
+  await expect(menu.locator("summary")).toBeFocused();
+
+  await page.getByText("Mais ações do ticket").first().click();
+  await page.getByRole("button", { name: "Cancelar ticket Mesa 12" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancelar ticket — Mesa 12" });
+  await dialog.getByRole("button", { name: "Voltar" }).focus();
+  await page.keyboard.press("p");
+  expect(apiState.printMutations).toHaveLength(0);
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+  expect(apiState.transitions.size).toBe(0);
+  expect(apiState.cancelMutations).toHaveLength(0);
+});
+
 test("KDS exige confirmação e PIN gerencial para cancelar um ticket", async ({ page }) => {
   const apiState = await mockKdsApi(page);
   await enterKds(page);
@@ -1050,4 +1117,24 @@ test("KDS exige confirmação e PIN gerencial para cancelar um ticket", async ({
       },
     ]);
   await expect(page.getByRole("heading", { name: "Pedido cancelado — Mesa 12" })).toBeVisible();
+});
+
+test("KDS preserva o motivo e a janela quando o cancelamento é recusado", async ({ page }) => {
+  const apiState = await mockKdsApi(page);
+  apiState.rejectCancellation = true;
+  await enterKds(page);
+  await page.getByText("Mais ações do ticket").first().click();
+  await page.getByRole("button", { name: "Cancelar ticket Mesa 12" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancelar ticket — Mesa 12" });
+  await dialog.getByLabel("Motivo do cancelamento").fill("Cliente desistiu");
+  await dialog.getByLabel("PIN gerencial").fill("9999");
+  await dialog
+    .getByLabel("Confirmo o cancelamento deste ticket e a interrupção da produção.")
+    .check();
+  await dialog.getByRole("button", { name: "Confirmar cancelamento" }).click();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(dialog.getByLabel("Motivo do cancelamento")).toHaveValue("Cliente desistiu");
+  expect(apiState.cancelMutations).toHaveLength(0);
+  await dialog.getByRole("button", { name: "Voltar" }).click();
+  await expect(dialog).not.toBeVisible();
 });

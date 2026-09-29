@@ -27,6 +27,11 @@ import {
   parseCatalogCsv,
   serializeCatalogCsv,
 } from "./catalog.csv";
+import {
+  type ModifierOptionDraft,
+  modifierPriceToCents,
+  validateModifierDraft,
+} from "./catalog.modifiers";
 import { buildTableQrPrintHtml, escapeCatalogHtml, selectTableQrRows } from "./catalog.print";
 import {
   hasCatalogProductionStation,
@@ -77,9 +82,18 @@ export function CatalogExperience({
   const [allergenName, setAllergenName] = useState("");
   const [allergenCode, _setAllergenCode] = useState("");
   const [modifierName, setModifierName] = useState("");
-  const [modifierMin, setModifierMin] = useState(0);
-  const [modifierMax, setModifierMax] = useState(1);
-  const [modifierOptionsText, setModifierOptionsText] = useState("");
+  const [modifierMin, setModifierMin] = useState("0");
+  const [modifierMax, setModifierMax] = useState("1");
+  const [modifierOptions, setModifierOptions] = useState<ModifierOptionDraft[]>(() => [
+    { id: crypto.randomUUID(), name: "", price: "0,00" },
+  ]);
+  const [modifierSubmitted, setModifierSubmitted] = useState(false);
+  const modifierDraft = validateModifierDraft(
+    modifierName,
+    modifierMin,
+    modifierMax,
+    modifierOptions,
+  );
   const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]);
   const [selectedModifiers, setSelectedModifiers] = useState<string[]>([]);
 
@@ -175,6 +189,8 @@ export function CatalogExperience({
   const [tableQrs, setTableQrs] = useState<Array<CatalogTableQr & { dataUrl: string }>>([]);
 
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [newProductModalOpen, setNewProductModalOpen] = useState(false);
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
   const [bulkCategory, setBulkCategory] = useState<string>("all");
   const [bulkChannel, setBulkChannel] = useState<"salon" | "delivery" | "both">("both");
   const [bulkType, setBulkType] = useState<"percentage" | "fixed">("percentage");
@@ -767,9 +783,7 @@ export function CatalogExperience({
     if (cat?.defaultStationId) {
       setStationIds([cat.defaultStationId]);
     }
-    const details = document.getElementById("new-product-details") as HTMLDetailsElement | null;
-    if (details) details.open = true;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setNewProductModalOpen(true);
   }
 
   function openEditCategory(cat: PilotCatalogCategory) {
@@ -955,9 +969,7 @@ export function CatalogExperience({
     setEstimatedPrepTimeMinutes(product.estimatedPrepTimeMinutes ?? "");
     setSelectedAllergens(product.allergenIds || []);
     setSelectedModifiers(product.modifierGroupIds || []);
-    const details = document.getElementById("new-product-details") as HTMLDetailsElement | null;
-    if (details) details.open = true;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setNewProductModalOpen(true);
   }
 
   async function applyBulkPriceAdjustment() {
@@ -1380,33 +1392,19 @@ export function CatalogExperience({
 
   async function _createModifierGroup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const options = (modifierOptionsText || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line, _i) => {
-        const parts = line.split(",");
-        return {
-          id: crypto.randomUUID(),
-          groupId: "temp",
-          name: (parts[0] || "").trim(),
-          priceDeltaCents: parseInt(parts[1] || "0", 10),
-          active: true,
-        };
-      });
+    if (busy) return;
+    setModifierSubmitted(true);
+    if (!modifierDraft.valid) {
+      const form = event.currentTarget;
+      requestAnimationFrame(() =>
+        form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(),
+      );
+      return;
+    }
 
     setBusy("modifier");
     try {
-      const body = {
-        name: modifierName.trim(),
-        minimumSelections: modifierMin,
-        maximumSelections: modifierMax,
-        options: options.map((option, sortOrder) => ({
-          name: option.name,
-          priceDeltaCents: option.priceDeltaCents,
-          sortOrder,
-        })),
-      };
+      const body = modifierDraft.body;
       await api.pilot.createModifierGroup(
         scope.organizationId,
         scope.unitId,
@@ -1415,7 +1413,10 @@ export function CatalogExperience({
       );
       completeCreateAttempt("modifier");
       setModifierName("");
-      setModifierOptionsText("");
+      setModifierMin("0");
+      setModifierMax("1");
+      setModifierOptions([{ id: crypto.randomUUID(), name: "", price: "0,00" }]);
+      setModifierSubmitted(false);
       setFeedback("Grupo de adicionais criado.");
       onRetry?.();
     } catch (error) {
@@ -1551,6 +1552,7 @@ export function CatalogExperience({
           ? "Produto criado e vinculado ao estoque. Configure as embalagens retornáveis em Editar item."
           : "Produto criado e disponibilizado nesta unidade.",
       );
+      setNewProductModalOpen(false);
       onRetry?.();
     } catch (error) {
       setFeedback(
@@ -1571,7 +1573,7 @@ export function CatalogExperience({
   }
 
   return (
-    <div className="growth-stack">
+    <div className="growth-stack catalog-workspace">
       <CatalogManagementHeader
         availableProductCount={catalog.products.filter((product) => product.available).length}
         brandingHref="#/settings?section=brand"
@@ -1583,12 +1585,8 @@ export function CatalogExperience({
         onImportCsv={handleCsvFileUpload}
         onLanguageChange={setCatalogLanguage}
         onOpenBulkAdjustment={() => setBulkModalOpen(true)}
-        onOpenNewProduct={() => {
-          const panel = document.getElementById("new-product-details");
-          if (panel instanceof HTMLDetailsElement) panel.open = true;
-          panel?.scrollIntoView({ behavior: "smooth", block: "start" });
-          window.requestAnimationFrame(() => panel?.querySelector<HTMLElement>("input")?.focus());
-        }}
+        onOpenNewProduct={() => setNewProductModalOpen(true)}
+        onOpenSetup={() => setSetupModalOpen(true)}
         onOpenCustomerPreview={() => void openCustomerPreview()}
         onOpenLabels={() => void openPrintableLabels()}
         onOpenMatrix={() => void openBcgMatrix()}
@@ -1623,278 +1621,412 @@ export function CatalogExperience({
         preview={csvParsedPreview}
       />
 
-      <div className="quick-actions-grid">
-        <details className="action-panel">
-          <summary>
-            <span>
-              <strong>Nova categoria</strong>
-              <small>Organize a leitura do cardápio.</small>
-            </span>
-            <Icon name="plus" size={18} />
-          </summary>
-          <form className="action-form" onSubmit={(event) => void createCategory(event)}>
-            <Label className="gm-field items-stretch">
-              Nome
-              <Input
-                minLength={2}
-                onChange={(event) => setCategoryName(event.target.value)}
-                required
-                value={categoryName}
-              />
-            </Label>
-            <Button disabled={busy === "category" || categoryName.trim().length < 2} type="submit">
-              {busy === "category" ? "Salvando…" : "Criar categoria"}
-            </Button>
-          </form>
-        </details>
-        <details className="action-panel">
-          <summary>
-            <span>
-              <strong>Nova estação de produção</strong>
-              <small>Defina onde os itens serão produzidos.</small>
-            </span>
-            <Icon name="plus" size={18} />
-          </summary>
-          <form className="action-form" onSubmit={(event) => void createStation(event)}>
-            <Label className="gm-field items-stretch">
-              Nome
-              <Input
-                minLength={2}
-                onChange={(event) => setStationName(event.target.value)}
-                placeholder="Ex.: Cozinha quente"
-                required
-                value={stationName}
-              />
-            </Label>
-            <Button disabled={busy === "station" || stationName.trim().length < 2} type="submit">
-              {busy === "station" ? "Salvando…" : "Criar estação"}
-            </Button>
-          </form>
-        </details>
-      </div>
+      <CatalogFilters
+        categories={catalog.categories}
+        dietFilter={selectedAllergenFilter}
+        onCategoryChange={setSelectedTabCategoryId}
+        onDietFilterChange={setSelectedAllergenFilter}
+        onSearchChange={setSearch}
+        onStatusChange={setFilterStatus}
+        onViewModeChange={setViewMode}
+        products={catalog.products}
+        production={catalog.categories.length > 0 && catalog.stations.length > 0}
+        search={search}
+        selectedCategoryId={selectedTabCategoryId}
+        status={filterStatus}
+        viewMode={viewMode}
+      />
 
-      <details className="action-panel">
-        <summary>
-          <span>
-            <strong>Novo alergênico</strong>
-            <small>Sinalize restrições alimentares (Glúten, Lactose, etc.).</small>
-          </span>
-          <Icon name="plus" size={18} />
-        </summary>
-        <form className="action-form" onSubmit={(event) => void createAllergen(event)}>
-          <Label className="gm-field items-stretch">
-            Nome do Alergênico
-            <Input
-              minLength={2}
-              onChange={(e) => setAllergenName(e.target.value)}
-              required
-              value={allergenName}
-              placeholder="Ex: Contém Glúten, Lactose, Frutos do Mar"
-            />
-          </Label>
-          <Button disabled={busy === "allergen" || allergenName.trim().length < 2} type="submit">
-            {busy === "allergen" ? "Salvando..." : "Criar alergênico"}
-          </Button>
-        </form>
+      <CatalogProductsPanel
+        archiveCategory={archiveCategory}
+        archiveProduct={archiveProduct}
+        busy={busy}
+        catalog={catalog}
+        catalogLanguage={catalogLanguage}
+        collapsedCategories={collapsedCategories}
+        duplicateProduct={duplicateProduct}
+        filterStatus={filterStatus}
+        moveCategory={moveCategory}
+        moveProduct={moveProduct}
+        openEditCategory={openEditCategory}
+        openNewProductForCategory={openNewProductForCategory}
+        production={catalog.categories.length > 0 && catalog.stations.length > 0}
+        quickStockOut={quickStockOut}
+        restoreDailyStock={restoreDailyStock}
+        searchTerm={searchTerm}
+        selectedAllergenFilter={selectedAllergenFilter}
+        selectedTabCategoryId={selectedTabCategoryId}
+        setCustomizerSelections={setCustomizerSelections}
+        setEditingProduct={setEditingProduct}
+        setEditingProductDeliveryPrice={setEditingProductDeliveryPrice}
+        setEditingProductPrice={setEditingProductPrice}
+        setEditingProductReason={setEditingProductReason}
+        setModifierCustomizerProduct={setModifierCustomizerProduct}
+        toggleAvailability={toggleAvailability}
+        toggleCategoryAvailability={toggleCategoryAvailability}
+        toggleCategoryCollapse={toggleCategoryCollapse}
+        updateProductInlineDeliveryPrice={updateProductInlineDeliveryPrice}
+        updateProductInlinePrice={updateProductInlinePrice}
+        viewMode={viewMode}
+      />
 
-        {catalog.allergens.length > 0 && (
-          <div
-            style={{
-              padding: "0.85rem 1.15rem 1.15rem",
-              borderTop: "1px solid var(--gm-border)",
-              background: "var(--gm-surface-sunken, #f8fafc)",
-            }}
-          >
-            <p
-              style={{
-                fontSize: "0.74rem",
-                fontWeight: 700,
-                margin: "0 0 8px 0",
-                color: "var(--gm-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-              }}
-            >
-              Alergênicos Cadastrados ({catalog.allergens.length})
-            </p>
-            <div className="catalog-wrap-6">
-              {catalog.allergens.map((alg) => (
-                <span
-                  key={alg.id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    padding: "4px 8px",
-                    borderRadius: "6px",
-                    background: "var(--gm-surface)",
-                    border: "1px solid rgba(239, 68, 68, 0.3)",
-                    color: "#dc2626",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                  }}
-                >
-                  <Icon name="alert-circle" size={13} />
-                  <span>{alg.name}</span>
-                  <Button
-                    type="button"
-                    disabled={busy === `allergen-${alg.id}`}
-                    onClick={() => void removeAllergen(alg.id)}
-                    title="Remover alergênico"
-                    style={{
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      color: "#dc2626",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "2px",
-                      borderRadius: "4px",
-                      marginLeft: "2px",
-                    }}
-                  >
-                    <Icon name="x" size={12} />
-                  </Button>
+      <Modal
+        className="catalog-setup-panel"
+        closeDisabled={Boolean(busy)}
+        isOpen={setupModalOpen}
+        onClose={() => setSetupModalOpen(false)}
+        size="lg"
+        title="Estrutura e cadastros"
+      >
+        <div className="catalog-setup-panel__content">
+          <div className="quick-actions-grid">
+            <details className="action-panel">
+              <summary>
+                <span>
+                  <strong>Nova categoria</strong>
+                  <small>Organize a leitura do cardápio.</small>
                 </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </details>
-
-      <details className="action-panel">
-        <summary>
-          <span>
-            <strong>Novo adicional (Modificadores)</strong>
-            <small>Crie opções extras (Bacon extra, Ponto da carne, etc.).</small>
-          </span>
-          <Icon name="plus" size={18} />
-        </summary>
-        <form className="action-form" onSubmit={(event) => void _createModifierGroup(event)}>
-          <Label className="gm-field items-stretch">
-            Nome do Grupo
-            <Input
-              minLength={2}
-              onChange={(e) => setModifierName(e.target.value)}
-              required
-              value={modifierName}
-              placeholder="Ex: Ponto da Carne, Adicionais do Hambúrguer"
-            />
-          </Label>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <Label className="gm-field items-stretch catalog-grow">
-              Mínimo
-              <Input
-                type="number"
-                min={0}
-                value={modifierMin}
-                onChange={(e) => setModifierMin(parseInt(e.target.value, 10) || 0)}
-              />
-            </Label>
-            <Label className="gm-field items-stretch catalog-grow">
-              Máximo
-              <Input
-                type="number"
-                min={1}
-                value={modifierMax}
-                onChange={(e) => setModifierMax(parseInt(e.target.value, 10) || 1)}
-              />
-            </Label>
-          </div>
-          <Label className="gm-field items-stretch action-form__wide">
-            Opções (Nome, Preço em centavos - uma por linha)
-            <Textarea
-              rows={3}
-              onChange={(e) => setModifierOptionsText(e.target.value)}
-              value={modifierOptionsText}
-              placeholder="Bacon Extra, 400&#10;Queijo Cheddar, 350&#10;Molho Especial, 0"
-            />
-          </Label>
-          <Button disabled={busy === "modifier" || modifierName.trim().length < 2} type="submit">
-            {busy === "modifier" ? "Salvando..." : "Criar grupo de adicionais"}
-          </Button>
-        </form>
-
-        {catalog.groups.length > 0 && (
-          <div
-            style={{
-              padding: "0.85rem 1.15rem 1.15rem",
-              borderTop: "1px solid var(--gm-border)",
-              background: "var(--gm-surface-sunken, #f8fafc)",
-            }}
-          >
-            <p
-              style={{
-                fontSize: "0.74rem",
-                fontWeight: 700,
-                margin: "0 0 8px 0",
-                color: "var(--gm-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-              }}
-            >
-              Grupos de Adicionais Cadastrados ({catalog.groups.length})
-            </p>
-            <div className="catalog-wrap-6">
-              {catalog.groups.map((grp) => (
-                <span
-                  key={grp.id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    padding: "4px 8px",
-                    borderRadius: "6px",
-                    background: "var(--gm-surface)",
-                    border: "1px solid rgba(16, 185, 129, 0.3)",
-                    color: "#059669",
-                    fontSize: "0.78rem",
-                    fontWeight: 600,
-                    boxShadow: "0 1px 2px rgba(0,0,0,0.03)",
-                  }}
+                <Icon name="plus" size={18} />
+              </summary>
+              <form className="action-form" onSubmit={(event) => void createCategory(event)}>
+                <Label className="gm-field items-stretch">
+                  Nome
+                  <Input
+                    minLength={2}
+                    onChange={(event) => setCategoryName(event.target.value)}
+                    required
+                    value={categoryName}
+                  />
+                </Label>
+                <Button
+                  disabled={busy === "category" || categoryName.trim().length < 2}
+                  type="submit"
                 >
-                  <Icon name="plus" size={13} />
-                  <span>
-                    {grp.name} ({grp.minimumSelections}-{grp.maximumSelections})
-                  </span>
-                  <Button
-                    type="button"
-                    disabled={busy === `modifier-group-${grp.id}`}
-                    onClick={() => void removeModifierGroup(grp.id)}
-                    title="Remover grupo"
-                    style={{
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      color: "#059669",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: "2px",
-                      borderRadius: "4px",
-                      marginLeft: "2px",
-                    }}
-                  >
-                    <Icon name="x" size={12} />
-                  </Button>
+                  {busy === "category" ? "Salvando…" : "Criar categoria"}
+                </Button>
+              </form>
+            </details>
+            <details className="action-panel">
+              <summary>
+                <span>
+                  <strong>Nova estação de produção</strong>
+                  <small>Defina onde os itens serão produzidos.</small>
                 </span>
-              ))}
-            </div>
+                <Icon name="plus" size={18} />
+              </summary>
+              <form className="action-form" onSubmit={(event) => void createStation(event)}>
+                <Label className="gm-field items-stretch">
+                  Nome
+                  <Input
+                    minLength={2}
+                    onChange={(event) => setStationName(event.target.value)}
+                    placeholder="Ex.: Cozinha quente"
+                    required
+                    value={stationName}
+                  />
+                </Label>
+                <Button
+                  disabled={busy === "station" || stationName.trim().length < 2}
+                  type="submit"
+                >
+                  {busy === "station" ? "Salvando…" : "Criar estação"}
+                </Button>
+              </form>
+            </details>
           </div>
-        )}
-      </details>
 
-      <details className="action-panel" id="new-product-details">
-        <summary>
-          <span>
-            <strong>Novo produto</strong>
-            <small>Cadastre preço e destino de produção.</small>
-          </span>
-          <Icon name="plus" size={18} />
-        </summary>
-        <form className="action-form" onSubmit={(event) => void createProduct(event)}>
+          <details className="action-panel">
+            <summary>
+              <span>
+                <strong>Novo alergênico</strong>
+                <small>Sinalize restrições alimentares (Glúten, Lactose, etc.).</small>
+              </span>
+              <Icon name="plus" size={18} />
+            </summary>
+            <form className="action-form" onSubmit={(event) => void createAllergen(event)}>
+              <Label className="gm-field items-stretch">
+                Nome do Alergênico
+                <Input
+                  minLength={2}
+                  onChange={(e) => setAllergenName(e.target.value)}
+                  required
+                  value={allergenName}
+                  placeholder="Ex: Contém Glúten, Lactose, Frutos do Mar"
+                />
+              </Label>
+              <Button
+                disabled={busy === "allergen" || allergenName.trim().length < 2}
+                type="submit"
+              >
+                {busy === "allergen" ? "Salvando..." : "Criar alergênico"}
+              </Button>
+            </form>
+
+            {catalog.allergens.length > 0 && (
+              <div className="catalog-setup-list">
+                <p className="catalog-setup-list__title">
+                  Alergênicos Cadastrados ({catalog.allergens.length})
+                </p>
+                <div className="catalog-wrap-6">
+                  {catalog.allergens.map((alg) => (
+                    <span className="catalog-setup-chip" data-tone="danger" key={alg.id}>
+                      <Icon name="alert-circle" size={13} />
+                      <span>{alg.name}</span>
+                      <Button
+                        className="catalog-setup-chip__remove"
+                        type="button"
+                        disabled={busy === `allergen-${alg.id}`}
+                        onClick={() => void removeAllergen(alg.id)}
+                        title="Remover alergênico"
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </details>
+
+          <details className="action-panel">
+            <summary>
+              <span>
+                <strong>Novo adicional (Modificadores)</strong>
+                <small>Crie opções extras (Bacon extra, Ponto da carne, etc.).</small>
+              </span>
+              <Icon name="plus" size={18} />
+            </summary>
+            <form
+              className="action-form"
+              noValidate
+              onSubmit={(event) => void _createModifierGroup(event)}
+            >
+              <fieldset className="catalog-modifier-fields" disabled={busy === "modifier"}>
+                <Label className="gm-field items-stretch">
+                  Nome do grupo
+                  <Input
+                    maxLength={120}
+                    onChange={(e) => setModifierName(e.target.value)}
+                    required
+                    aria-invalid={modifierSubmitted && Boolean(modifierDraft.nameError)}
+                    aria-describedby={
+                      modifierSubmitted && modifierDraft.nameError
+                        ? "modifier-group-error"
+                        : undefined
+                    }
+                    value={modifierName}
+                    placeholder="Ex: Ponto da Carne, Adicionais do Hambúrguer"
+                  />
+                  {modifierSubmitted && modifierDraft.nameError && (
+                    <small className="catalog-modifier-error" id="modifier-group-error">
+                      {modifierDraft.nameError}
+                    </small>
+                  )}
+                </Label>
+                <div className="gm-form-grid catalog-modifier-limits">
+                  <Label className="gm-field items-stretch catalog-grow">
+                    Escolha mínima
+                    <Input
+                      type="number"
+                      min={0}
+                      max={50}
+                      step={1}
+                      value={modifierMin}
+                      aria-invalid={modifierSubmitted && Boolean(modifierDraft.limitsError)}
+                      aria-describedby="modifier-choices-summary"
+                      onChange={(e) => setModifierMin(e.target.value)}
+                    />
+                  </Label>
+                  <Label className="gm-field items-stretch catalog-grow">
+                    Escolha máxima
+                    <Input
+                      type="number"
+                      min={1}
+                      max={50}
+                      step={1}
+                      value={modifierMax}
+                      aria-invalid={modifierSubmitted && Boolean(modifierDraft.limitsError)}
+                      aria-describedby="modifier-choices-summary"
+                      onChange={(e) => setModifierMax(e.target.value)}
+                    />
+                  </Label>
+                </div>
+                <p
+                  className={
+                    modifierSubmitted && modifierDraft.limitsError
+                      ? "catalog-modifier-error"
+                      : "catalog-muted-copy-084"
+                  }
+                  id="modifier-choices-summary"
+                  aria-live="polite"
+                >
+                  {modifierSubmitted && modifierDraft.limitsError
+                    ? modifierDraft.limitsError
+                    : modifierDraft.summary}
+                </p>
+                {modifierOptions.map((option, index) => {
+                  const errors = modifierDraft.rowErrors[index] ?? { name: "", price: "" };
+                  return (
+                    <div className="catalog-modifier-option" key={option.id}>
+                      <Label className="gm-field items-stretch">
+                        Nome da opção {index + 1}
+                        <Input
+                          maxLength={120}
+                          required
+                          placeholder="Ex.: Bacon extra"
+                          value={option.name}
+                          aria-invalid={modifierSubmitted && Boolean(errors.name)}
+                          aria-describedby={
+                            modifierSubmitted && errors.name
+                              ? `modifier-name-${option.id}`
+                              : undefined
+                          }
+                          onChange={(event) =>
+                            setModifierOptions((rows) =>
+                              rows.map((row) =>
+                                row.id === option.id ? { ...row, name: event.target.value } : row,
+                              ),
+                            )
+                          }
+                        />
+                        {modifierSubmitted && errors.name && (
+                          <small
+                            className="catalog-modifier-error"
+                            id={`modifier-name-${option.id}`}
+                          >
+                            {errors.name}
+                          </small>
+                        )}
+                      </Label>
+                      <Label className="gm-field items-stretch">
+                        Preço extra {index + 1} (R$)
+                        <Input
+                          inputMode="decimal"
+                          required
+                          placeholder="0,00"
+                          value={option.price}
+                          aria-invalid={modifierSubmitted && Boolean(errors.price)}
+                          aria-describedby={`modifier-price-${option.id}`}
+                          onChange={(event) =>
+                            setModifierOptions((rows) =>
+                              rows.map((row) =>
+                                row.id === option.id ? { ...row, price: event.target.value } : row,
+                              ),
+                            )
+                          }
+                          onBlur={() => {
+                            const cents = modifierPriceToCents(option.price);
+                            if (cents !== null)
+                              setModifierOptions((rows) =>
+                                rows.map((row) =>
+                                  row.id === option.id
+                                    ? {
+                                        ...row,
+                                        price: (cents / 100).toLocaleString("pt-BR", {
+                                          minimumFractionDigits: 2,
+                                          maximumFractionDigits: 2,
+                                        }),
+                                      }
+                                    : row,
+                                ),
+                              );
+                          }}
+                        />
+                        <small
+                          className={
+                            modifierSubmitted && errors.price
+                              ? "catalog-modifier-error"
+                              : "catalog-muted-copy-084"
+                          }
+                          id={`modifier-price-${option.id}`}
+                        >
+                          {modifierSubmitted && errors.price
+                            ? errors.price
+                            : modifierPriceToCents(option.price) === 0
+                              ? "Sem acréscimo"
+                              : ""}
+                        </small>
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Remover opção ${index + 1}`}
+                        onClick={() =>
+                          setModifierOptions((rows) => rows.filter((row) => row.id !== option.id))
+                        }
+                        type="button"
+                      >
+                        <Icon name="x" size={16} />
+                      </Button>
+                    </div>
+                  );
+                })}
+                {modifierSubmitted && modifierDraft.optionsError && (
+                  <p className="catalog-modifier-error" role="alert">
+                    {modifierDraft.optionsError}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={modifierOptions.length >= 100}
+                  onClick={() =>
+                    setModifierOptions((rows) => [
+                      ...rows,
+                      { id: crypto.randomUUID(), name: "", price: "0,00" },
+                    ])
+                  }
+                >
+                  <Icon name="plus" size={14} /> Adicionar opção
+                </Button>
+                <Button disabled={busy === "modifier"} type="submit">
+                  {busy === "modifier" ? "Salvando..." : "Criar grupo de adicionais"}
+                </Button>
+              </fieldset>
+            </form>
+
+            {catalog.groups.length > 0 && (
+              <div className="catalog-setup-list">
+                <p className="catalog-setup-list__title">
+                  Grupos de Adicionais Cadastrados ({catalog.groups.length})
+                </p>
+                <div className="catalog-wrap-6">
+                  {catalog.groups.map((grp) => (
+                    <span className="catalog-setup-chip" data-tone="positive" key={grp.id}>
+                      <Icon name="plus" size={13} />
+                      <span>
+                        {grp.name} ({grp.minimumSelections}-{grp.maximumSelections})
+                      </span>
+                      <Button
+                        className="catalog-setup-chip__remove"
+                        type="button"
+                        disabled={busy === `modifier-group-${grp.id}`}
+                        onClick={() => void removeModifierGroup(grp.id)}
+                        title="Remover grupo"
+                      >
+                        <Icon name="x" size={12} />
+                      </Button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </details>
+        </div>
+      </Modal>
+
+      <Modal
+        className="catalog-product-create-modal"
+        closeDisabled={busy === "product"}
+        isOpen={newProductModalOpen}
+        onClose={() => setNewProductModalOpen(false)}
+        size="lg"
+        title="Novo produto"
+      >
+        <form
+          className="action-form catalog-product-create-form"
+          onSubmit={(event) => void createProduct(event)}
+        >
           <div className="action-form__wide catalog-product-type">
             <Button
               className="catalog-product-type__option"
@@ -1906,7 +2038,7 @@ export function CatalogExperience({
               }}
             >
               <Icon name="salon" size={14} />
-              <span>Produto Preparado / Cozinha</span>
+              <span>Preparado</span>
             </Button>
             <Button
               className="catalog-product-type__option"
@@ -1915,7 +2047,7 @@ export function CatalogExperience({
               onClick={() => setProductType("resale")}
             >
               <Icon name="catalog" size={14} />
-              <span>Produto de Revenda (Bebidas / Estoque Direto)</span>
+              <span>Revenda</span>
             </Button>
           </div>
 
@@ -2059,17 +2191,17 @@ export function CatalogExperience({
           </div>
 
           <Label className="gm-field items-stretch action-form__wide">
-            Descrição do Prato / Item
+            Descrição
             <Textarea
               onChange={(event) => setDescription(event.target.value)}
               rows={2}
-              placeholder="Descreva os ingredientes principais, sabor e apresentação do prato..."
+              placeholder="Ingredientes, sabor, apresentação ou informações úteis para a venda"
               value={description}
             />
           </Label>
 
           <Label className="gm-field items-stretch action-form__wide">
-            Foto do Prato (Opcional)
+            Foto (opcional)
             <input
               className="border-input bg-background"
               type="file"
@@ -2120,7 +2252,7 @@ export function CatalogExperience({
             {imageUrl && (
               <img
                 src={imageUrl}
-                alt="Preview"
+                alt="Prévia da foto do produto"
                 style={{
                   marginTop: "8px",
                   maxHeight: "100px",
@@ -2138,9 +2270,7 @@ export function CatalogExperience({
           >
             {productType === "prepared" && (
               <p className="catalog-price-note">
-                A ficha técnica é opcional. Depois de salvar, abra Editar item → Estoque e ficha
-                técnica para vincular insumos e seus locais de baixa. O produto pode ser vendido sem
-                ficha.
+                Ficha técnica opcional. Vincule os insumos na edição do produto.
               </p>
             )}
 
@@ -2534,20 +2664,30 @@ export function CatalogExperience({
             </details>
           </div>
 
-          <Button
-            disabled={
-              busy === "product" ||
-              productName.trim().length < 2 ||
-              catalog.categories.length === 0 ||
-              catalog.stations.length === 0 ||
-              stationIds.length === 0
-            }
-            type="submit"
-          >
-            {busy === "product" ? "Salvando…" : "Criar produto"}
-          </Button>
+          <div className="catalog-modal-actions action-form__wide">
+            <Button
+              disabled={busy === "product"}
+              onClick={() => setNewProductModalOpen(false)}
+              type="button"
+              variant="secondary"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={
+                busy === "product" ||
+                productName.trim().length < 2 ||
+                catalog.categories.length === 0 ||
+                catalog.stations.length === 0 ||
+                stationIds.length === 0
+              }
+              type="submit"
+            >
+              {busy === "product" ? "Salvando…" : "Criar produto"}
+            </Button>
+          </div>
         </form>
-      </details>
+      </Modal>
 
       {feedback && (
         <Toast
@@ -2558,27 +2698,10 @@ export function CatalogExperience({
         />
       )}
 
-      {/* Barra Integrada de Controle e Filtros */}
-      <CatalogFilters
-        categories={catalog.categories}
-        dietFilter={selectedAllergenFilter}
-        onCategoryChange={setSelectedTabCategoryId}
-        onDietFilterChange={setSelectedAllergenFilter}
-        onSearchChange={setSearch}
-        onStatusChange={setFilterStatus}
-        onViewModeChange={setViewMode}
-        products={catalog.products}
-        production
-        search={search}
-        selectedCategoryId={selectedTabCategoryId}
-        status={filterStatus}
-        viewMode={viewMode}
-      />
-
       {bulkModalOpen && (
         <Modal
           isOpen={bulkModalOpen}
-          title="Reajuste de Preços em Lote"
+          title="Reajuste de preços em lote"
           onClose={() => setBulkModalOpen(false)}
         >
           <div className="catalog-stack catalog-stack--16">
@@ -2672,60 +2795,16 @@ export function CatalogExperience({
         </Modal>
       )}
 
-      <CatalogProductsPanel
-        archiveCategory={archiveCategory}
-        archiveProduct={archiveProduct}
-        busy={busy}
-        catalog={catalog}
-        catalogLanguage={catalogLanguage}
-        collapsedCategories={collapsedCategories}
-        duplicateProduct={duplicateProduct}
-        filterStatus={filterStatus}
-        moveCategory={moveCategory}
-        moveProduct={moveProduct}
-        openEditCategory={openEditCategory}
-        openNewProductForCategory={openNewProductForCategory}
-        production
-        quickStockOut={quickStockOut}
-        restoreDailyStock={restoreDailyStock}
-        searchTerm={searchTerm}
-        selectedAllergenFilter={selectedAllergenFilter}
-        selectedTabCategoryId={selectedTabCategoryId}
-        setCustomizerSelections={setCustomizerSelections}
-        setEditingProduct={setEditingProduct}
-        setEditingProductDeliveryPrice={setEditingProductDeliveryPrice}
-        setEditingProductPrice={setEditingProductPrice}
-        setEditingProductReason={setEditingProductReason}
-        setModifierCustomizerProduct={setModifierCustomizerProduct}
-        toggleAvailability={toggleAvailability}
-        toggleCategoryAvailability={toggleCategoryAvailability}
-        toggleCategoryCollapse={toggleCategoryCollapse}
-        updateProductInlineDeliveryPrice={updateProductInlineDeliveryPrice}
-        updateProductInlinePrice={updateProductInlinePrice}
-        viewMode={viewMode}
-      />
-
-      {/* Modal de Configurações de Categoria */}
       {editingCategory && (
         <Modal
           isOpen={editingCategory !== null}
           onClose={() => setEditingCategory(null)}
-          title={`Configurações da Categoria: ${editingCategory.name}`}
+          title={`Editar categoria: ${editingCategory.name}`}
           size="md"
         >
           <form onSubmit={(event) => void updateCategory(event)} className="gm-form-stack">
-            {/* Nome da Categoria */}
-            <Label
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-                fontSize: "0.84rem",
-                fontWeight: 700,
-                color: "var(--gm-ink)",
-              }}
-            >
-              Nome da Categoria *
+            <Label className="gm-field items-stretch">
+              Nome da categoria *
               <Input
                 minLength={2}
                 onChange={(event) =>
@@ -2733,408 +2812,129 @@ export function CatalogExperience({
                 }
                 required
                 value={editingCategory.name}
-                placeholder="Ex: Entradas, Hambúrgueres Artesanais, Sobremesas..."
-                style={{
-                  width: "100%",
-                  height: "42px",
-                  padding: "0 12px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--gm-border)",
-                  background: "var(--gm-surface)",
-                  color: "var(--gm-ink)",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  boxSizing: "border-box",
-                }}
+                placeholder="Ex.: Entradas"
               />
             </Label>
-
-            {
-              <>
-                {/* Subtítulo / Descrição da Categoria */}
-                <Label
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                    fontSize: "0.84rem",
-                    fontWeight: 700,
-                    color: "var(--gm-ink)",
-                  }}
+            <Label className="gm-field items-stretch">
+              Descrição
+              <Textarea
+                rows={2}
+                onChange={(event) =>
+                  setEditingCategory({ ...editingCategory, description: event.target.value })
+                }
+                value={editingCategory.description}
+                placeholder="Informação exibida abaixo da categoria"
+              />
+            </Label>
+            <fieldset className="min-w-0">
+              <legend className="mb-2 text-sm font-medium">Canais de venda</legend>
+              <div className="gm-toolbar">
+                <Button
+                  aria-pressed={editingCategory.salonChannel}
+                  type="button"
+                  variant={editingCategory.salonChannel ? "secondary" : "ghost"}
+                  onClick={() =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      salonChannel: !editingCategory.salonChannel,
+                    })
+                  }
                 >
-                  Subtítulo / Descrição da Categoria
-                  <Textarea
-                    rows={2}
+                  <Icon name={editingCategory.salonChannel ? "check" : "plus"} size={15} />
+                  Salão e balcão
+                </Button>
+                <Button
+                  aria-pressed={editingCategory.qrMesaChannel}
+                  type="button"
+                  variant={editingCategory.qrMesaChannel ? "secondary" : "ghost"}
+                  onClick={() =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      qrMesaChannel: !editingCategory.qrMesaChannel,
+                    })
+                  }
+                >
+                  <Icon name={editingCategory.qrMesaChannel ? "check" : "plus"} size={15} />
+                  QR da mesa
+                </Button>
+                <Button
+                  aria-pressed={editingCategory.deliveryChannel}
+                  type="button"
+                  variant={editingCategory.deliveryChannel ? "secondary" : "ghost"}
+                  onClick={() =>
+                    setEditingCategory({
+                      ...editingCategory,
+                      deliveryChannel: !editingCategory.deliveryChannel,
+                    })
+                  }
+                >
+                  <Icon name={editingCategory.deliveryChannel ? "check" : "plus"} size={15} />
+                  Delivery
+                </Button>
+              </div>
+            </fieldset>
+            <Label className="gm-field items-stretch">
+              Estação padrão para novos produtos
+              <NativeSelect
+                value={editingCategory.defaultStationId}
+                onChange={(event) =>
+                  setEditingCategory({ ...editingCategory, defaultStationId: event.target.value })
+                }
+              >
+                <option value="">Definir em cada produto</option>
+                {catalog.stations.map((station) => (
+                  <option key={station.id} value={station.id}>
+                    {station.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </Label>
+            <Label className="catalog-clickable-row">
+              <input
+                className="accent-primary"
+                type="checkbox"
+                checked={editingCategory.hasSchedule}
+                onChange={(event) =>
+                  setEditingCategory({ ...editingCategory, hasSchedule: event.target.checked })
+                }
+              />
+              Restringir horário de venda
+            </Label>
+            {editingCategory.hasSchedule ? (
+              <div className="catalog-grid-2">
+                <Label className="gm-field items-stretch">
+                  Início
+                  <Input
+                    type="time"
+                    value={editingCategory.startTime}
                     onChange={(event) =>
-                      setEditingCategory({
-                        ...editingCategory,
-                        description: event.target.value,
-                      })
+                      setEditingCategory({ ...editingCategory, startTime: event.target.value })
                     }
-                    value={editingCategory.description}
-                    placeholder="Ex: Ideais para compartilhar • Servidas quentes com molho artesanal da casa..."
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--gm-border)",
-                      background: "var(--gm-surface)",
-                      color: "var(--gm-ink)",
-                      fontSize: "0.85rem",
-                      lineHeight: 1.4,
-                      resize: "vertical",
-                      boxSizing: "border-box",
-                    }}
                   />
-                  <span style={{ fontSize: "0.74rem", color: "var(--gm-muted)", fontWeight: 400 }}>
-                    Texto exibido abaixo do título da categoria no cardápio digital do cliente.
-                  </span>
                 </Label>
-
-                {/* Canais de Venda da Categoria */}
-                <div className="catalog-stack catalog-stack--8">
-                  <div>
-                    <strong
-                      style={{
-                        fontSize: "0.84rem",
-                        color: "var(--gm-ink)",
-                        display: "block",
-                      }}
-                    >
-                      Canais de Exibição & Venda
-                    </strong>
-                    <span style={{ fontSize: "0.74rem", color: "var(--gm-muted)" }}>
-                      Clique nos canais para ativar ou desativar esta categoria
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr 1fr",
-                      gap: "10px",
-                      width: "100%",
-                    }}
-                  >
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        setEditingCategory({
-                          ...editingCategory,
-                          salonChannel: !editingCategory.salonChannel,
-                        })
-                      }
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "12px 8px",
-                        borderRadius: "8px",
-                        border: editingCategory.salonChannel
-                          ? "1.5px solid var(--gm-brand)"
-                          : "1px solid var(--gm-border)",
-                        background: editingCategory.salonChannel
-                          ? "rgba(16, 185, 129, 0.08)"
-                          : "var(--gm-surface-soft)",
-                        color: "var(--gm-ink)",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        width: "100%",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <Icon name="salon" size={20} />
-                      <strong style={{ fontSize: "0.8rem", textAlign: "center" }}>
-                        Salão & Balcão
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: "0.72rem",
-                          color: editingCategory.salonChannel ? "#10b981" : "var(--gm-muted)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {editingCategory.salonChannel ? "✓ Ativo" : "✕ Oculto"}
-                      </span>
-                    </Button>
-
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        setEditingCategory({
-                          ...editingCategory,
-                          qrMesaChannel: !editingCategory.qrMesaChannel,
-                        })
-                      }
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "12px 8px",
-                        borderRadius: "8px",
-                        border: editingCategory.qrMesaChannel
-                          ? "1.5px solid var(--gm-brand)"
-                          : "1px solid var(--gm-border)",
-                        background: editingCategory.qrMesaChannel
-                          ? "rgba(16, 185, 129, 0.08)"
-                          : "var(--gm-surface-soft)",
-                        color: "var(--gm-ink)",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        width: "100%",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <Icon name="counter" size={20} />
-                      <strong style={{ fontSize: "0.8rem", textAlign: "center" }}>
-                        Cardápio QR Mesa
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: "0.72rem",
-                          color: editingCategory.qrMesaChannel ? "#10b981" : "var(--gm-muted)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {editingCategory.qrMesaChannel ? "✓ Ativo" : "✕ Oculto"}
-                      </span>
-                    </Button>
-
-                    <Button
-                      type="button"
-                      onClick={() =>
-                        setEditingCategory({
-                          ...editingCategory,
-                          deliveryChannel: !editingCategory.deliveryChannel,
-                        })
-                      }
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "12px 8px",
-                        borderRadius: "8px",
-                        border: editingCategory.deliveryChannel
-                          ? "1.5px solid var(--gm-brand)"
-                          : "1px solid var(--gm-border)",
-                        background: editingCategory.deliveryChannel
-                          ? "rgba(16, 185, 129, 0.08)"
-                          : "var(--gm-surface-soft)",
-                        color: "var(--gm-ink)",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                        width: "100%",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      <Icon name="delivery" size={20} />
-                      <strong style={{ fontSize: "0.8rem", textAlign: "center" }}>
-                        Delivery Web
-                      </strong>
-                      <span
-                        style={{
-                          fontSize: "0.72rem",
-                          color: editingCategory.deliveryChannel ? "#10b981" : "var(--gm-muted)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {editingCategory.deliveryChannel ? "✓ Ativo" : "✕ Oculto"}
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Estação de produção padrão */}
-                <Label
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                    fontSize: "0.84rem",
-                    fontWeight: 700,
-                    color: "var(--gm-ink)",
-                  }}
-                >
-                  Estação de produção padrão para novos itens
-                  <NativeSelect
-                    value={editingCategory.defaultStationId}
-                    onChange={(e) =>
-                      setEditingCategory({
-                        ...editingCategory,
-                        defaultStationId: e.target.value,
-                      })
+                <Label className="gm-field items-stretch">
+                  Término
+                  <Input
+                    type="time"
+                    value={editingCategory.endTime}
+                    onChange={(event) =>
+                      setEditingCategory({ ...editingCategory, endTime: event.target.value })
                     }
-                    style={{
-                      width: "100%",
-                      height: "40px",
-                      padding: "0 12px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--gm-border)",
-                      background: "var(--gm-surface)",
-                      color: "var(--gm-ink)",
-                      fontSize: "0.86rem",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <option value="">Nenhuma estação fixa (definir individualmente)</option>
-                    {catalog.stations.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {st.name}
-                      </option>
-                    ))}
-                  </NativeSelect>
+                  />
                 </Label>
-
-                {/* Programação por Horário */}
-                <div
-                  style={{
-                    border: "1px solid var(--gm-border)",
-                    borderRadius: "8px",
-                    padding: "12px 14px",
-                    background: "var(--gm-surface-soft)",
-                  }}
-                >
-                  <Label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontSize: "0.84rem",
-                      fontWeight: 700,
-                      color: "var(--gm-ink)",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      className="accent-primary"
-                      type="checkbox"
-                      checked={editingCategory.hasSchedule}
-                      onChange={(e) =>
-                        setEditingCategory({
-                          ...editingCategory,
-                          hasSchedule: e.target.checked,
-                        })
-                      }
-                      style={{ width: "16px", height: "16px", cursor: "pointer" }}
-                    />
-                    <span>Restringir Horário de Venda Desta Categoria</span>
-                  </Label>
-
-                  {editingCategory.hasSchedule ? (
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: "10px",
-                        marginTop: "10px",
-                      }}
-                    >
-                      <Label
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "2px",
-                          fontSize: "0.76rem",
-                          fontWeight: 600,
-                          color: "var(--gm-muted)",
-                        }}
-                      >
-                        Início
-                        <Input
-                          type="time"
-                          value={editingCategory.startTime}
-                          onChange={(e) =>
-                            setEditingCategory({
-                              ...editingCategory,
-                              startTime: e.target.value,
-                            })
-                          }
-                          style={{
-                            width: "100%",
-                            height: "36px",
-                            padding: "0 8px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--gm-border)",
-                            background: "var(--gm-surface)",
-                            color: "var(--gm-ink)",
-                            boxSizing: "border-box",
-                          }}
-                        />
-                      </Label>
-                      <Label
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "2px",
-                          fontSize: "0.76rem",
-                          fontWeight: 600,
-                          color: "var(--gm-muted)",
-                        }}
-                      >
-                        Término
-                        <Input
-                          type="time"
-                          value={editingCategory.endTime}
-                          onChange={(e) =>
-                            setEditingCategory({
-                              ...editingCategory,
-                              endTime: e.target.value,
-                            })
-                          }
-                          style={{
-                            width: "100%",
-                            height: "36px",
-                            padding: "0 8px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--gm-border)",
-                            background: "var(--gm-surface)",
-                            color: "var(--gm-ink)",
-                            boxSizing: "border-box",
-                          }}
-                        />
-                      </Label>
-                    </div>
-                  ) : (
-                    <span
-                      style={{
-                        display: "block",
-                        marginTop: "4px",
-                        fontSize: "0.74rem",
-                        color: "var(--gm-muted)",
-                      }}
-                    >
-                      Disponível durante todo o expediente.
-                    </span>
-                  )}
-                </div>
-              </>
-            }
-
-            {/* Rodapé com Ações */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: "10px",
-                marginTop: "6px",
-                borderTop: "1px solid var(--gm-border)",
-                paddingTop: "14px",
-              }}
-            >
+              </div>
+            ) : (
+              <p className="catalog-muted-copy-084">Disponível durante todo o expediente.</p>
+            )}
+            <div className="catalog-modal-actions">
               <Button variant="ghost" onClick={() => setEditingCategory(null)}>
                 Cancelar
               </Button>
               <Button
                 disabled={busy === "update-category" || editingCategory.name.trim().length < 2}
                 type="submit"
-                variant="primary"
               >
-                {busy === "update-category" ? "Salvando…" : "Salvar Configurações"}
+                {busy === "update-category" ? "Salvando…" : "Salvar categoria"}
               </Button>
             </div>
           </form>
@@ -3146,7 +2946,7 @@ export function CatalogExperience({
         <Modal
           isOpen={reorderModalOpen}
           onClose={() => setReorderModalOpen(false)}
-          title="Reorganizar Ordem das Categorias no Cardápio"
+          title="Reordenar categorias"
           size="md"
         >
           <div className="catalog-stack catalog-stack--14">
@@ -3247,7 +3047,7 @@ export function CatalogExperience({
         editingProductDeliveryPrice={editingProductDeliveryPrice}
         editingProductPrice={editingProductPrice}
         editingProductReason={editingProductReason}
-        production
+        production={catalog.categories.length > 0 && catalog.stations.length > 0}
         scope={scope}
         setEditingProduct={setEditingProduct}
         setEditingProductDeliveryPrice={setEditingProductDeliveryPrice}
@@ -3270,7 +3070,7 @@ export function CatalogExperience({
       {qrPreviewModalOpen && (
         <Modal
           isOpen={qrPreviewModalOpen}
-          title="Prévia do Cardápio do Cliente & Gerador de QR Code de Mesa"
+          title="Prévia do cardápio e QR da mesa"
           onClose={() => setQrPreviewModalOpen(false)}
         >
           <div
@@ -3645,7 +3445,7 @@ export function CatalogExperience({
       {printableLabelsModalOpen && (
         <Modal
           isOpen={printableLabelsModalOpen}
-          title="Gerador de Etiquetas de Vitrine & Displays de Balcão"
+          title="Etiquetas de vitrine e balcão"
           onClose={() => setPrintableLabelsModalOpen(false)}
         >
           <div className="catalog-stack catalog-stack--16">
@@ -3765,7 +3565,7 @@ export function CatalogExperience({
         <Modal
           isOpen={modifiersManagerModalOpen}
           onClose={() => setModifiersManagerModalOpen(false)}
-          title="Grupos de Opcionais & Modificadores do Cardápio"
+          title="Adicionais e opções"
           size="lg"
         >
           <div className="catalog-stack catalog-stack--16">
@@ -3795,14 +3595,7 @@ export function CatalogExperience({
               >
                 + Criar Novo Grupo de Opcionais
               </strong>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1.5fr 1fr 1fr auto",
-                  gap: "10px",
-                  alignItems: "flex-end",
-                }}
-              >
+              <div className="grid min-w-0 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                 <Label className="gm-field catalog-field--compact">
                   Nome do Grupo *
                   <Input
@@ -3856,27 +3649,18 @@ export function CatalogExperience({
                 <Button
                   variant="primary"
                   size="sm"
-                  disabled={newGroupName.trim().length < 2}
+                  disabled={busy === "manager-modifier-group" || newGroupName.trim().length < 2}
                   onClick={() => void createManagerModifierGroup()}
                   style={{ height: "36px", whiteSpace: "nowrap" }}
                 >
                   <Icon name="plus" size={13} />
-                  <span>Adicionar Grupo</span>
+                  <span>{busy === "manager-modifier-group" ? "Salvando…" : "Adicionar grupo"}</span>
                 </Button>
               </div>
             </div>
 
             {/* Lista de Grupos Existentes com suas Opções */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                maxHeight: "400px",
-                overflowY: "auto",
-                paddingRight: "4px",
-              }}
-            >
+            <div className="flex min-w-0 flex-col gap-3">
               {catalog.groups.map((grp) => {
                 const groupOptions = catalog.options.filter((opt) => opt.groupId === grp.id);
                 const isEditing = editingGroupId === grp.id;
@@ -3891,14 +3675,7 @@ export function CatalogExperience({
                       background: "var(--gm-surface)",
                     }}
                   >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "10px",
-                      }}
-                    >
+                    <div className="gm-toolbar mb-3 justify-between">
                       <div>
                         <strong style={{ fontSize: "0.95rem", color: "var(--gm-ink)" }}>
                           {grp.name}
@@ -4004,51 +3781,34 @@ export function CatalogExperience({
 
                     {/* Formulário Rápido para Adicionar Opção ao Grupo */}
                     {isEditing && (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "2fr 1fr auto",
-                          gap: "8px",
-                          marginTop: "10px",
-                          paddingTop: "10px",
-                          borderTop: "1px dashed var(--gm-border)",
-                        }}
-                      >
-                        <Input
-                          placeholder="Nome da Opção (ex: Bacon Extra)"
-                          value={newOptionName}
-                          onChange={(e) => setNewOptionName(e.target.value)}
-                          style={{
-                            height: "34px",
-                            padding: "0 8px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--gm-border)",
-                            background: "var(--gm-surface)",
-                            color: "var(--gm-ink)",
-                            fontSize: "0.82rem",
-                          }}
-                        />
-                        <Input
-                          placeholder="Preço Adicional (ex: 5,00)"
-                          value={newOptionPrice}
-                          onChange={(e) => setNewOptionPrice(e.target.value)}
-                          style={{
-                            height: "34px",
-                            padding: "0 8px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--gm-border)",
-                            background: "var(--gm-surface)",
-                            color: "var(--gm-ink)",
-                            fontSize: "0.82rem",
-                          }}
-                        />
+                      <div className="mt-3 grid min-w-0 items-end gap-2 border-t border-dashed border-border pt-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
+                        <Label className="gm-field items-stretch">
+                          Nome da opção
+                          <Input
+                            placeholder="Ex.: Bacon extra"
+                            value={newOptionName}
+                            onChange={(event) => setNewOptionName(event.target.value)}
+                          />
+                        </Label>
+                        <Label className="gm-field items-stretch">
+                          Adicional (R$)
+                          <Input
+                            inputMode="decimal"
+                            placeholder="Ex.: 5,00"
+                            value={newOptionPrice}
+                            onChange={(event) => setNewOptionPrice(event.target.value)}
+                          />
+                        </Label>
                         <Button
                           variant="secondary"
                           size="sm"
-                          disabled={newOptionName.trim().length === 0}
+                          disabled={
+                            busy === `modifier-option-${grp.id}` ||
+                            newOptionName.trim().length === 0
+                          }
                           onClick={() => void addModifierOption(grp)}
                         >
-                          + Adicionar Opção
+                          {busy === `modifier-option-${grp.id}` ? "Salvando…" : "Adicionar opção"}
                         </Button>
                       </div>
                     )}
@@ -4058,7 +3818,7 @@ export function CatalogExperience({
             </div>
 
             <div className="catalog-actions-end">
-              <Button variant="primary" onClick={() => setModifiersManagerModalOpen(false)}>
+              <Button variant="secondary" onClick={() => setModifiersManagerModalOpen(false)}>
                 Concluir
               </Button>
             </div>
@@ -4071,7 +3831,7 @@ export function CatalogExperience({
         <Modal
           isOpen={modifierCustomizerProduct !== null}
           onClose={() => setModifierCustomizerProduct(null)}
-          title={`Simulador de Pedido: ${modifierCustomizerProduct.name}`}
+          title={`Simular adicionais: ${modifierCustomizerProduct.name}`}
           size="md"
         >
           <div className="catalog-stack catalog-stack--16">
@@ -4147,11 +3907,12 @@ export function CatalogExperience({
                       </span>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                    <div className="catalog-grid-2">
                       {grpOpts.map((opt) => {
                         const isSelected = currentSelected.includes(opt.id);
                         return (
                           <Button
+                            aria-pressed={isSelected}
                             key={opt.id}
                             type="button"
                             onClick={() => {
@@ -4245,20 +4006,12 @@ export function CatalogExperience({
         <Modal
           isOpen={pdfExportModalOpen}
           onClose={() => setPdfExportModalOpen(false)}
-          title="Exportar Cardápio em PDF / Impressão de Mesa"
+          title="Exportar cardápio em PDF"
           size="xl"
         >
-          <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "20px" }}>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
             {/* Painel de Controles e Opções */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "14px",
-                paddingRight: "14px",
-                borderRight: "1px solid var(--gm-border)",
-              }}
-            >
+            <div className="gm-form-stack min-w-0 lg:border-r lg:border-border lg:pr-4">
               <strong style={{ fontSize: "0.88rem", color: "var(--gm-ink)" }}>
                 Opções de Layout
               </strong>
@@ -4356,11 +4109,11 @@ export function CatalogExperience({
 
             {/* Preview da Folha A4 do Cardápio */}
             <div
+              className="min-w-0 break-words p-3 sm:p-7"
               style={{
                 background: "#ffffff",
                 color: "#1e293b",
                 borderRadius: "8px",
-                padding: "28px 32px",
                 boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
                 maxHeight: "560px",
                 overflowY: "auto",
@@ -4451,12 +4204,9 @@ export function CatalogExperience({
                       </div>
 
                       <div
-                        style={{
-                          display: pdfLayoutMode === "bistro" ? "grid" : "flex",
-                          gridTemplateColumns: "1fr 1fr",
-                          flexDirection: "column",
-                          gap: "12px",
-                        }}
+                        className={
+                          pdfLayoutMode === "bistro" ? "catalog-grid-2" : "flex flex-col gap-3"
+                        }
                       >
                         {catProducts.map((prod) => (
                           <div

@@ -585,7 +585,6 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
       <Card className="table-qrs-state" role="status">
         <span className="spinner" aria-hidden="true" />
         <strong>Carregando mesas e versões de QR…</strong>
-        <p>Aguarde a fonte persistida desta unidade.</p>
       </Card>
     );
   }
@@ -682,7 +681,6 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
             <header>
               <div>
                 <h2 id="table-qrs-tables-title">Mesas</h2>
-                <p>Selecione registros reais desta unidade.</p>
               </div>
               <Badge tone={selectedRows.length > 0 ? "info" : "warning"}>
                 {selectedRows.length} selecionadas
@@ -782,9 +780,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                     : "Selecione uma mesa"}
                 </p>
               </div>
-              <Badge tone={dirty ? "warning" : "success"}>
-                {dirty ? "Não salvo" : "Persistido"}
-              </Badge>
+              <Badge tone={dirty ? "warning" : "success"}>{dirty ? "Não salvo" : "Salvo"}</Badge>
             </header>
             <div
               className={`table-qrs-plate table-qrs-plate--${draft.template}`}
@@ -842,7 +838,6 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
           <header>
             <div>
               <h2 id="table-qrs-customize-title">Personalização das placas</h2>
-              <p>Configuração independente, persistida por unidade.</p>
             </div>
             <Button
               disabled={!dirty || Boolean(busy)}
@@ -853,7 +848,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
             </Button>
           </header>
           <div className="gm-form-grid table-qrs-form-grid">
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Nome exibido
               <Input
                 maxLength={120}
@@ -863,7 +858,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 value={draft.displayName}
               />
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Chamada principal
               <Input
                 maxLength={160}
@@ -873,7 +868,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 value={draft.headline}
               />
             </Label>
-            <Label className="gm-form-field table-qrs-field--wide">
+            <Label className="gm-field items-stretch table-qrs-field--wide">
               Instruções
               <Textarea
                 maxLength={500}
@@ -884,7 +879,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 value={draft.instructions}
               />
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               URL da logo
               <Input
                 onChange={(event) => updateSetting("logoUrl", event.target.value || null)}
@@ -893,7 +888,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 value={draft.logoUrl ?? ""}
               />
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Enviar logo
               <Input
                 accept="image/jpeg,image/png,image/webp"
@@ -922,7 +917,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 <small>Nenhuma logo foi enviada nas configurações gerais.</small>
               )}
             </div>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Modelo visual
               <NativeSelect
                 onChange={(event) =>
@@ -937,7 +932,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 ))}
               </NativeSelect>
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Proteção contra foto remota
               <NativeSelect
                 onChange={(event) =>
@@ -962,7 +957,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 <small>Informe este código somente a clientes presentes na unidade.</small>
               </div>
             )}
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Cor principal
               <span className="table-qrs-color-field">
                 <input
@@ -988,7 +983,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 {contrast.passes ? "WCAG AA" : "reprovado; a saída usará cinza escuro"}
               </small>
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Aviso de Wi-Fi
               <Input
                 maxLength={200}
@@ -997,7 +992,7 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 value={draft.wifiNotice ?? ""}
               />
             </Label>
-            <Label className="gm-form-field table-qrs-field--wide">
+            <Label className="gm-field items-stretch table-qrs-field--wide">
               Aviso de taxa de serviço
               <Input
                 maxLength={200}

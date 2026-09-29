@@ -28,3 +28,12 @@ Validação local: não houve commit, push, implantação ou homologação com m
 Históricos anteriores sem snapshot de vínculo/divisão de lotes não são reconstruídos por suposição. Pedidos legados sem o registro de retornáveis mantêm a consulta à configuração vigente no processamento. Nos pedidos novos, alterações posteriores de vínculo, quantidade, depósito ou prazo padrão não alteram a custódia. No offline, essa captura ocorre na reconciliação pela API.
 
 Comportamento operacional e procedimento de conferência: [revenda, estoque e vasilhames](catalog-inventory.md).
+
+## Refinamento da interface — 19/09/2026
+
+Referência visual: Balcão e retirada da aplicação local. Cardápio passou a priorizar busca e produtos, com cadastro em modal, ferramentas auxiliares agrupadas e opções alimentares recolhíveis. Estoque passou a exibir ações, indicadores e instruções conforme a área selecionada. Modais, campos, fundos e textos foram alinhados ao padrão operacional existente, mantendo os contratos e as permissões.
+
+- Vitest de Cardápio e Estoque: 28 testes em 10 arquivos aprovados. Typecheck, build do Ops e Biome dos arquivos alterados aprovados; permanece o aviso de bundle acima de 500 kB.
+- Inspeção pelo navegador na aplicação local em 1440 px e 375 px, temas claro e escuro: lista/grade, preços por canal, navegação das áreas, cadastros, editor, ficha opcional e vasilhames. Modais inspecionados sem overflow horizontal, com rolagem interna, Escape e retorno de foco. O formulário de produto utiliza uma única área de rolagem.
+- As jornadas E2E existentes foram atualizadas para os novos nomes, agrupamentos e modal de cadastro; não foram executadas nesta rodada. A inspeção visual usou a unidade QA local, que não possui estoque cadastrado; não substitui homologação de transferências, contagens e devoluções com dados reais.
+- Nenhum cadastro, saldo ou pedido foi gravado durante a inspeção visual. Trabalho local, sem commit, push ou implantação.

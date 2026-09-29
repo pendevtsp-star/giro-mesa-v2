@@ -377,7 +377,6 @@ export function BillingContent({
         <header className="billing-section__heading">
           <div>
             <h2 id="billing-plans-title">Planos disponíveis</h2>
-            <p>Preços e recursos publicados pelo catálogo comercial.</p>
           </div>
           <label>
             Ciclo
@@ -505,7 +504,6 @@ export function BillingContent({
         <header className="billing-section__heading">
           <div>
             <h2 id="billing-charges-title">Cobranças recentes</h2>
-            <p>Histórico persistido da assinatura da organização.</p>
           </div>
           <Button disabled={busy !== null} onClick={refresh} size="sm" variant="ghost">
             Atualizar

@@ -49,11 +49,15 @@ export function RealMultiunitPage({ scope }: { scope: GrowthScope }) {
     <RemoteGate remote={remote}>
       {(summary) => (
         <div className="growth-stack">
-          <Card className="honest-limit">
-            <Badge tone="info">Consolidado persistido</Badge>
-            <h2>Visão da organização</h2>
-            <p>{summary.disclaimer}</p>
-            <small>Gerado em {dateTime(summary.generatedAt)}</small>
+          <Card>
+            <div className="gm-toolbar justify-between">
+              <h2>Visão da organização</h2>
+              <small className="muted">Atualizado em {dateTime(summary.generatedAt)}</small>
+            </div>
+            <details className="gm-disclosure">
+              <summary>Cobertura dos indicadores</summary>
+              <p className="gm-disclosure__content">{summary.disclaimer}</p>
+            </details>
           </Card>
           {summary.units.length === 0 ? (
             <EmptyState
@@ -76,7 +80,6 @@ export function RealMultiunitPage({ scope }: { scope: GrowthScope }) {
                     <Card className="multiunit-card" key={unit.id}>
                       <header>
                         <div>
-                          <p className="eyebrow">Unidade</p>
                           <h2>{unit.name}</h2>
                         </div>
                         {multiunitAttention(unit) > 0 ? (
@@ -159,7 +162,7 @@ export function RealMultiunitPage({ scope }: { scope: GrowthScope }) {
           <Card>
             <h2>Transferências de estoque</h2>
             {Object.keys(summary.transfersByStatus).length === 0 ? (
-              <p className="muted">Nenhuma transferência persistida.</p>
+              <p className="muted">Nenhuma transferência registrada.</p>
             ) : (
               <div className="badge-row">
                 {Object.entries(summary.transfersByStatus).map(([status, total]) => (

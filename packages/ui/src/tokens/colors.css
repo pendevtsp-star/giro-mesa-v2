@@ -44,6 +44,10 @@
   --gm-surface-soft: hsl(55, 14%, 92%);
   --gm-surface-sunken: hsl(55, 14%, 96%);
   --gm-border: hsl(72, 8%, 85%);
+  /* Cool surfaces for the counter's approved light palette. */
+  --gm-paper-cool: hsl(200, 14%, 96%);
+  --gm-surface-soft-cool: hsl(200, 23%, 97%);
+  --gm-border-cool: hsl(153, 15%, 88%);
   /* Feedback surfaces */
   --gm-warning-soft: hsl(42, 100%, 90%);
   --gm-danger-soft: hsl(0, 75%, 93%);
@@ -58,5 +62,6 @@
   --gm-shell-border: hsl(157, 14%, 24%);
   --gm-shell-text: hsl(150, 18%, 96%);
   --gm-shell-muted: hsl(154, 13%, 72%);
-  --gm-topbar: color-mix(in srgb, var(--gm-paper) 92%, transparent);
+  --gm-topbar-solid: var(--gm-paper-cool);
+  --gm-topbar: color-mix(in srgb, var(--gm-topbar-solid) 80%, transparent);
 }

@@ -445,8 +445,7 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
     <div className="growth-stack reports-page">
       <Card className="reports-filter-card grid">
         <div className="reports-filter-card__copy">
-          <p className="eyebrow">Período de análise</p>
-          <h2>Escolha o intervalo</h2>
+          <h2>Período de análise</h2>
           <p>Consulte até 366 dias de movimentação financeira desta unidade.</p>
         </div>
         <fieldset className="reports-presets">
@@ -549,10 +548,9 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
           </div>
         </form>
         <section aria-label="Resumo dos filtros" className="reports-active-filters">
-          <div className="reports-active-filters__heading">
-            <strong>Consulta preparada</strong>
-            <small aria-live="polite">{filterSummary}</small>
-          </div>
+          <span className="sr-only" aria-live="polite">
+            {filterSummary}
+          </span>
           <div className="reports-active-filters__chips">
             <span className="gm-pill">{reportAnalysisLabel(activeAnalysis)}</span>
             <span className="gm-pill">{periodLabel(draftPeriod)}</span>
@@ -572,7 +570,6 @@ export function RealReportsPage({ scope }: { scope: ManagementScope }) {
         <section aria-label="Filtros salvos" className="reports-saved-filters">
           <div className="reports-saved-filters__heading">
             <strong>Favoritos deste navegador</strong>
-            <small>Neste navegador</small>
           </div>
           <div className="reports-saved-filters__items">
             {savedFilters.length ? (

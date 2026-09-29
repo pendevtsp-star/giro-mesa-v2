@@ -532,6 +532,17 @@ export interface PrintDocumentPayloadV2 {
     closedAt: string | null;
     durationMinutes: number;
   };
+  print?: { isReprint: boolean };
+  delivery?: {
+    orderId: string;
+    status: string;
+    customerName: string | null;
+    customerPhone: string | null;
+    address: DeliveryAddressInput;
+    notes: string | null;
+    promisedAt: string | null;
+    courier: { name: string; reference: string; phone: string | null } | null;
+  };
   totals: {
     subtotalCents: number;
     discountCents: number;
@@ -541,6 +552,7 @@ export interface PrintDocumentPayloadV2 {
     suggestedTotalCents: number;
     serviceTaxNotice: string | null;
     tipCents: number;
+    deliveryFeeCents?: number;
     totalCents: number;
     grossPaidCents: number;
     reversedCents: number;
@@ -560,6 +572,7 @@ export interface PrintDocumentPayloadV2 {
     status: string;
     seatNumber: number | null;
     course: string | null;
+    notes?: string | null;
     modifiers: Array<{
       name: string;
       quantity: number;
@@ -570,7 +583,13 @@ export interface PrintDocumentPayloadV2 {
   payments: Array<{
     id: string;
     method: string;
+    /** Net posted amount after approved reversals, unlike raw payment records. */
     amountCents: number;
+    netAmountCents?: number;
+    reversedCents?: number;
+    /** Original cash exchange; absent for payments recorded before structured capture. */
+    receivedCents?: number | null;
+    changeCents?: number | null;
     financialStatus: "posted";
     createdAt: string;
   }>;
@@ -595,6 +614,7 @@ export const productionPrinterDocumentTypeSchema = z.enum([
   "payment_statement",
   "final_receipt",
   "kds_ticket",
+  "delivery_slip",
 ]);
 export const productionPrinterApplyStatusSchema = z.enum(["pending", "applied", "error"]);
 export const productionPrinterHealthStatusSchema = z.enum([
@@ -617,11 +637,17 @@ export const billPrintingPolicySchema = z
     mode: z.enum(["notify_cashier", "cashier_printer", "local_terminal"]),
     printerId: z.uuid().nullable(),
     revision: z.number().int().min(0),
+    deliveryAutoPrint: z.boolean().optional(),
+    deliveryPrinterId: z.uuid().nullable().optional(),
   })
   .strict()
   .refine((input) => (input.mode === "cashier_printer") === (input.printerId !== null), {
     message: "Selecione a impressora somente para impressão automática no caixa.",
     path: ["printerId"],
+  })
+  .refine((input) => !input.deliveryAutoPrint || Boolean(input.deliveryPrinterId), {
+    message: "Selecione a impressora da via de entrega.",
+    path: ["deliveryPrinterId"],
   });
 export type BillPrintingPolicy = z.infer<typeof billPrintingPolicySchema>;
 export const billPrintingPolicyResponseSchema = z.object({ policy: billPrintingPolicySchema });
@@ -840,6 +866,9 @@ export const manualKdsTicketPrintSchema = z
 
 export interface KdsTicketPrintPayloadV1 {
   schemaVersion: 1;
+  status?: string;
+  establishment?: PrintDocumentPayloadV2["establishment"];
+  print?: { isReprint: boolean };
   generatedAt: string;
   id: string;
   reference: string;
@@ -879,7 +908,7 @@ export type PrintJobExecuteCommandV1 = {
   | {
       stationId?: never;
       stationName?: never;
-      documentType: "partial_statement" | "payment_statement" | "final_receipt";
+      documentType: "partial_statement" | "payment_statement" | "final_receipt" | "delivery_slip";
       payload: PrintDocumentPayloadV2;
     }
 );
@@ -2030,6 +2059,7 @@ export const deliveryAddressSchema = z
     street: z.string().trim().min(2).max(160),
     number: z.string().trim().min(1).max(30),
     complement: z.string().trim().max(120).optional(),
+    reference: z.string().trim().max(160).optional(),
     neighborhood: z.string().trim().min(2).max(120),
     city: z.string().trim().min(2).max(120),
     state: z

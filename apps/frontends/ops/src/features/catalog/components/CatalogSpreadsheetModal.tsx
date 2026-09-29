@@ -32,12 +32,7 @@ export function CatalogSpreadsheetModal({
   onUpload,
 }: CatalogSpreadsheetModalProps) {
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Importar e Exportar Cardápio por Planilha"
-      size="lg"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title="Planilha do cardápio" size="lg">
       <div className="catalog-stack catalog-stack--16">
         <p className="catalog-muted-copy-085">
           Gerencie todo o seu catálogo em lote usando Excel ou Google Sheets. Baixe o modelo pronto

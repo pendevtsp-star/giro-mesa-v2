@@ -101,11 +101,11 @@ export const pageMeta: Partial<Record<RouteId, { title: string; description: str
   },
   salon: {
     title: "Mesas e comandas",
-    description: "Atendimento de mesas, comandas e chamados do salão.",
+    description: "",
   },
   counter: {
     title: "Balcão e retirada",
-    description: "Lançamento rápido para consumo local ou retirada.",
+    description: "",
   },
   catalog: {
     title: "Cardápio operacional",
@@ -191,7 +191,7 @@ export function PageHeading({ title, description }: { title: string; description
     <div className="page-heading">
       <div>
         <h1>{title}</h1>
-        <p>{description}</p>
+        {description && <p>{description}</p>}
       </div>
     </div>
   );
@@ -265,7 +265,7 @@ export function PageContent({
         />
       );
     case "cash":
-      return <RealCashPage scope={managementScope} />;
+      return <RealCashPage scope={managementScope} identityId={session.identityId} />;
     case "inventory":
       return <RealInventoryPage scope={managementScope} identityId={session.identityId} />;
     case "purchases":

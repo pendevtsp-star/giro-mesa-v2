@@ -557,7 +557,7 @@ export function formatBRL(cents: number): string {
   }).format(cents / 100);
 }
 export async function getCommercialCatalog(visitorId?: string): Promise<CommercialCatalogState> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+  const apiUrl = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL)?.replace(/\/$/, "");
   if (!apiUrl) return { catalog: null, source: "unavailable" };
   try {
     const response = await fetch(`${apiUrl}/public/v1/commercial-catalog`, {

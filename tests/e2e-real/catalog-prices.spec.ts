@@ -122,6 +122,41 @@ async function mockCatalogApi(page: Page) {
   return { updates, prices, creations };
 }
 
+test("Cardápio recolhe Mais ações e abre os cadastros pelo topo", async ({ page }) => {
+  await mockCatalogApi(page);
+  await page.goto("/#/catalog");
+  await page.getByRole("button", { name: "Abrir operação" }).click();
+  const menu = page.locator(".catalog-management-header__more");
+  const trigger = menu.locator("summary");
+  const setup = page.getByRole("button", { name: "Estrutura e cadastros", exact: true });
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 900 });
+    await trigger.click();
+    await expect(menu).toHaveAttribute("open", "");
+    await menu.getByRole("button", { name: /PT/, exact: false }).click();
+    await expect(menu).toHaveAttribute("open", "");
+    await page.getByRole("heading", { name: "Cardápio", exact: true }).click();
+    await expect(menu).not.toHaveAttribute("open", "");
+    await trigger.click();
+    await trigger.press("Escape");
+    await expect(menu).not.toHaveAttribute("open", "");
+    await expect(trigger).toBeFocused();
+    await setup.click();
+    const dialog = page.getByRole("dialog", { name: "Estrutura e cadastros", exact: true });
+    await expect(dialog).toBeVisible();
+    await dialog.locator("summary").filter({ hasText: "Nova categoria" }).click();
+    await expect(
+      dialog.getByRole("button", { name: "Criar categoria", exact: true }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+      width,
+    );
+    await page.keyboard.press("Escape");
+    await expect(dialog).not.toBeVisible();
+    await expect(setup).toBeFocused();
+  }
+});
+
 test("Cardápio distingue preços por canal, herança e zero em 375 px e preserva payload e rollback", async ({
   page,
 }, testInfo) => {
@@ -129,7 +164,9 @@ test("Cardápio distingue preços por canal, herança e zero em 375 px e preserv
   const { updates, prices } = await mockCatalogApi(page);
   await page.goto("/#/catalog");
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await expect(page.getByRole("heading", { name: "Cardápio operacional" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Cardápio", level: 1, exact: true }),
+  ).toBeVisible();
 
   for (const width of [1440, 375]) {
     await page.setViewportSize({ width, height: 900 });
@@ -205,9 +242,10 @@ test("Cardápio vincula revenda ao estoque e preserva seleção após falha", as
   await page.setViewportSize({ width: 375, height: 900 });
   await page.goto("/#/catalog");
   await page.getByRole("button", { name: "Abrir operação" }).click();
-  await page.locator("#new-product-details > summary").click();
-  const form = page.locator("#new-product-details form");
-  await form.getByRole("button", { name: "Produto de Revenda (Bebidas / Estoque Direto)" }).click();
+  await page.getByRole("button", { name: "Novo produto", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Novo produto", exact: true });
+  const form = dialog.locator("form");
+  await form.getByRole("button", { name: "Revenda", exact: true }).click();
   await form.getByLabel("Buscar no estoque").fill("CERV");
   const stock = form.getByLabel("Item de estoque");
   await stock.selectOption("inventory-1");
@@ -231,9 +269,10 @@ test("Cardápio vincula revenda ao estoque e preserva seleção após falha", as
     expect(control.left).toBeGreaterThanOrEqual(0);
     expect(control.right).toBeLessThanOrEqual(375);
   }
-  await expect(
-    form.getByRole("button", { name: "Produto de Revenda (Bebidas / Estoque Direto)" }),
-  ).toHaveCSS("white-space", "normal");
+  await expect(form.getByRole("button", { name: "Revenda", exact: true })).toHaveCSS(
+    "white-space",
+    "normal",
+  );
   await form.screenshot({
     path: testInfo.outputPath("new-resale-375-dark.png"),
     style: "header, nav { visibility: hidden !important; }",
@@ -255,7 +294,7 @@ test("Cardápio vincula revenda ao estoque e preserva seleção após falha", as
     priceCents: 1200,
     productType: "resale",
   });
-  await expect(form.getByLabel("Nome do Produto", { exact: true })).toHaveValue("");
+  await expect(dialog).not.toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
 });
 
@@ -272,7 +311,7 @@ test("Editor do Cardápio preserva delivery zero e contém preços em 375 px", a
     .filter({ hasText: "Refrigerante" })
     .getByRole("button", { name: "Editar Produto & Histórico" })
     .click();
-  const dialog = page.getByRole("dialog", { name: "Editar Item: Refrigerante" });
+  const dialog = page.getByRole("dialog", { name: "Editar produto: Refrigerante" });
   const prices = dialog.getByRole("group", { name: "Preços por canal" });
   await expect(prices.getByLabel("Preço Delivery (R$)")).toHaveValue("0,00");
   await prices.scrollIntoViewIfNeeded();

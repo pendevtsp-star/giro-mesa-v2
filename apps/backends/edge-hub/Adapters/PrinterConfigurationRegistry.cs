@@ -84,7 +84,7 @@ public sealed class PrinterConfigurationRegistry(
         "^[a-z0-9](?:[a-z0-9._-]{0,78}[a-z0-9])?$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly HashSet<string> SupportedDocumentTypes = new(
-        ["partial_statement", "payment_statement", "final_receipt", "kds_ticket"],
+        ["partial_statement", "payment_statement", "final_receipt", "kds_ticket", "delivery_slip"],
         StringComparer.Ordinal);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly HubOptions _options = options.Value;

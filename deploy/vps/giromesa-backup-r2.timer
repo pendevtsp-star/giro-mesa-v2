@@ -1,0 +1,11 @@
+[Unit]
+Description=Run GiroMesa R2 backup every three minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/3:00
+AccuracySec=1s
+Persistent=true
+Unit=giromesa-backup-r2.service
+
+[Install]
+WantedBy=timers.target

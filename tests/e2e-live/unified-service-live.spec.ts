@@ -68,7 +68,7 @@ test("separa duas contas na mesma mesa, imprime sem falso positivo e encerra som
   await page.locator(".real-table").filter({ hasText: fixture.tableLabel }).click();
   const dialog = page.getByRole("dialog", { name: fixture.tableLabel });
   await dialog.getByRole("button", { name: /Abrir .*pedir/ }).click();
-  await expect(dialog.getByRole("button", { name: "Conta e pagamento" })).toBeVisible({
+  await expect(dialog.getByRole("button", { name: "Conta", exact: true })).toBeVisible({
     timeout: 15_000,
   });
   await dialog.getByRole("button", { name: "Adicionar Brownie E2E", exact: true }).click();
@@ -76,12 +76,15 @@ test("separa duas contas na mesma mesa, imprime sem falso positivo e encerra som
   await dialog.getByRole("button", { name: "Enviar pedido (2)" }).click();
   await expect(dialog.getByText(/Pedido enviado/)).toBeVisible();
 
-  await dialog.getByRole("button", { name: "Conta e pagamento" }).click();
+  await dialog.getByRole("button", { name: "Conta", exact: true }).click();
+  await dialog.locator(".workspace-tabs__more > summary").click();
   await dialog.getByRole("button", { name: "Separar consumo", exact: true }).click();
-  const split = dialog.getByRole("form", { name: "Separar consumo" });
+  const splitDialog = page.getByRole("dialog", { name: "Separar consumo", exact: true });
+  const split = splitDialog.getByRole("form", { name: "Separar consumo" });
   await split.getByLabel("Quantidade de Brownie E2E a separar").fill("1");
   await split.getByLabel("Nome da nova comanda").fill("Conta B");
   await split.getByRole("button", { name: "Confirmar separação de 1 item(ns)" }).click();
+  await expect(splitDialog).toBeHidden();
 
   await expect
     .poll(async () => {
@@ -115,6 +118,7 @@ test("separa duas contas na mesma mesa, imprime sem falso positivo e encerra som
   const accounts = dialog.getByRole("region", { name: "Comandas deste atendimento" });
   await expect(accounts).toContainText(`${fixture.tableLabel} · 2 comandas`);
   await expect(accounts).toContainText("Conta B");
+  await dialog.getByRole("button", { name: "Pré-conta", exact: true }).click();
   const printQueue = dialog.getByRole("status", { name: "Fila de impressão" });
   await expect(printQueue).toContainText("Pré-conta · Conta B");
   await printQueue.getByRole("button", { name: "Imprimir agora" }).click();
@@ -125,6 +129,7 @@ test("separa duas contas na mesma mesa, imprime sem falso positivo e encerra som
     .filter({ hasText: "Principal" })
     .getByRole("button", { name: /^Principal R\$/ })
     .click();
+  await dialog.getByRole("button", { name: "Pré-conta", exact: true }).click();
   await expect(printQueue).toContainText("Pré-conta · Principal");
   await printQueue.getByRole("button", { name: "Imprimir agora" }).click();
   await expect(dialog.getByText(/cancelar o diálogo não confirma a impressão/)).toBeVisible();
@@ -148,7 +153,8 @@ test("separa duas contas na mesma mesa, imprime sem falso positivo e encerra som
   await expect(dialog.getByRole("button", { name: "Reimprimir última via" })).toHaveCount(0);
 
   const statementIds = statements.map((job) => job.id).sort();
-  await dialog.getByRole("button", { name: "Imprimir pré-conta", exact: true }).click();
+  await dialog.getByRole("button", { name: "Pré-conta", exact: true }).click();
+  await dialog.getByRole("button", { name: "Imprimir", exact: true }).click();
   await expect(
     dialog.getByText("Confira a via anterior na fila antes de imprimir novamente."),
   ).toBeVisible();

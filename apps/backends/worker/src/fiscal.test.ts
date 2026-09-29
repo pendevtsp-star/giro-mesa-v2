@@ -9,6 +9,71 @@ import {
 } from "./fiscal.js";
 
 describe("fiscal NFC-e", () => {
+  const deliverySale: Parameters<typeof buildNfcePayload>[0] = {
+    issuerDocument: "12345678000123",
+    issuedAt: new Date("2026-09-18T12:00:00Z"),
+    buyerPresence: 4,
+    totalCents: 1951,
+    extraCents: 150,
+    deliveryFeeCents: 701,
+    lines: [1, 2].map((number) => ({
+      id: `item-${number}`,
+      productId: `product-${number}`,
+      productName: "Prato",
+      sku: null,
+      quantity: 1,
+      unitPriceCents: 550,
+      grossCents: 550,
+      discountCents: 0,
+      netCents: 550,
+      revisionId: "revision",
+      classification: {
+        ncm: "21069090",
+        cfop: "5102",
+        origin: 0,
+        csosn: "102",
+        cstPis: "49",
+        cstCofins: "49",
+      },
+    })),
+    payments: [{ method: "pix", amountCents: 1951 }],
+  };
+
+  it("keeps the persisted delivery fee distinct from service and matches items plus payment", () => {
+    const result = buildNfcePayload(deliverySale);
+    assert.deepEqual(
+      result.items.map((item) => item.valor_frete),
+      [7.01, 0],
+    );
+    assert.deepEqual(
+      result.items.map((item) => item.valor_outras_despesas),
+      [1.5, 0],
+    );
+    assert.equal(result.presenca_comprador, 4);
+    assert.equal(result.formas_pagamento[0]?.valor_pagamento, 19.51);
+    assert.equal(result.modalidade_frete, 9);
+    assert.throws(
+      () => buildNfcePayload({ ...deliverySale, deliveryFeeCents: 700 }),
+      (error) =>
+        error instanceof FiscalDeliveryError && error.code === "FISCAL_ITEM_TOTAL_MISMATCH",
+    );
+  });
+
+  it("rejects invalid freight and never attaches a delivery fee to dine-in", () => {
+    for (const deliveryFeeCents of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(
+        () => buildNfcePayload({ ...deliverySale, deliveryFeeCents }),
+        (error) =>
+          error instanceof FiscalDeliveryError && error.code === "FISCAL_DELIVERY_FEE_INVALID",
+      );
+    }
+    assert.throws(
+      () => buildNfcePayload({ ...deliverySale, buyerPresence: 1 }),
+      (error) =>
+        error instanceof FiscalDeliveryError && error.code === "FISCAL_DELIVERY_FEE_INVALID",
+    );
+  });
+
   it("derives items and payments from the persisted sale snapshot", () => {
     const payload = buildNfcePayload({
       issuerDocument: "12abc34501de35",

@@ -6596,6 +6596,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/discount": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_discountTab[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/units/{unitId}/pilot/tabs/{tabId}/discount": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations["PilotPosController_discountTab[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/v1/organizations/{organizationId}/units/{unitId}/pilot/items/{itemId}/discount": {
     parameters: {
       query?: never;
@@ -14786,6 +14818,70 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/operational-customers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listOperationalCustomers[0]"];
+    put?: never;
+    post: operations["GrowthController_createOperationalCustomer[0]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/operational-customers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations["GrowthController_listOperationalCustomers[1]"];
+    put?: never;
+    post: operations["GrowthController_createOperationalCustomer[1]"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/v1/organizations/{organizationId}/growth/operational-customers/{customerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateOperationalCustomer[0]"];
+    trace?: never;
+  };
+  "/v1/organizations/{organizationId}/growth/operational-customers/{customerId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations["GrowthController_updateOperationalCustomer[1]"];
     trace?: never;
   };
   "/api/v1/organizations/{organizationId}/growth/customers": {
@@ -24923,6 +25019,7 @@ export interface operations {
             street: string;
             number: string;
             complement?: string;
+            reference?: string;
             neighborhood: string;
             city: string;
             state: string;
@@ -24980,6 +25077,7 @@ export interface operations {
             street: string;
             number: string;
             complement?: string;
+            reference?: string;
             neighborhood: string;
             city: string;
             state: string;
@@ -30824,6 +30922,7 @@ export interface operations {
       content: {
         "application/json": {
           expectedVersion: number;
+          customerId?: string | null;
           label?: string | null;
           /** @enum {string} */
           fulfillmentType?: "dine_in" | "pickup" | "delivery";
@@ -30832,6 +30931,19 @@ export interface operations {
           readyNotificationConsent?: boolean;
           serviceNotes?: string | null;
           deliveryAddress?: string | null;
+          deliveryAddressDetails?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          deliveryZoneId?: string | null;
           promisedAt?: string | null;
           guestCount?: number;
           responsibleIdentityId?: string | null;
@@ -30883,6 +30995,7 @@ export interface operations {
       content: {
         "application/json": {
           expectedVersion: number;
+          customerId?: string | null;
           label?: string | null;
           /** @enum {string} */
           fulfillmentType?: "dine_in" | "pickup" | "delivery";
@@ -30891,6 +31004,19 @@ export interface operations {
           readyNotificationConsent?: boolean;
           serviceNotes?: string | null;
           deliveryAddress?: string | null;
+          deliveryAddressDetails?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          deliveryZoneId?: string | null;
           promisedAt?: string | null;
           guestCount?: number;
           responsibleIdentityId?: string | null;
@@ -31035,6 +31161,19 @@ export interface operations {
           readyNotificationConsent?: boolean;
           serviceNotes?: string;
           deliveryAddress?: string;
+          deliveryAddressDetails?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          deliveryZoneId?: string | null;
           /** Format: date-time */
           promisedAt?: string;
           /** Format: uuid */
@@ -31084,6 +31223,19 @@ export interface operations {
           readyNotificationConsent?: boolean;
           serviceNotes?: string;
           deliveryAddress?: string;
+          deliveryAddressDetails?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          deliveryZoneId?: string | null;
           /** Format: date-time */
           promisedAt?: string;
           /** Format: uuid */
@@ -32642,8 +32794,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -32665,7 +32816,7 @@ export interface operations {
               paymentAttemptId: string;
               /** @enum {string} */
               provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
-            };
+            } | null;
             idempotentReplay?: boolean;
           };
         };
@@ -32704,8 +32855,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -32727,7 +32877,7 @@ export interface operations {
               paymentAttemptId: string;
               /** @enum {string} */
               provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
-            };
+            } | null;
             idempotentReplay?: boolean;
           };
         };
@@ -32753,6 +32903,7 @@ export interface operations {
           /** @enum {string} */
           method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
           amountCents: number;
+          receivedCents?: number;
           reference?: string;
           /** Format: uuid */
           cashRegisterId?: string;
@@ -32789,6 +32940,7 @@ export interface operations {
           /** @enum {string} */
           method: "cash" | "credit_card" | "debit_card" | "pix" | "other";
           amountCents: number;
+          receivedCents?: number;
           reference?: string;
           /** Format: uuid */
           cashRegisterId?: string;
@@ -32827,7 +32979,11 @@ export interface operations {
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
-          documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          documentType:
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "delivery_slip";
           /** Format: uuid */
           serviceCallId?: string;
           /** @default 1 */
@@ -32866,7 +33022,11 @@ export interface operations {
           terminalId?: string;
           printerId?: string;
           /** @enum {string} */
-          documentType: "partial_statement" | "payment_statement" | "final_receipt";
+          documentType:
+            | "partial_statement"
+            | "payment_statement"
+            | "final_receipt"
+            | "delivery_slip";
           /** Format: uuid */
           serviceCallId?: string;
           /** @default 1 */
@@ -33373,9 +33533,9 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
-          itemId: string;
+          itemId?: string;
           /** @enum {string} */
-          action: "discount" | "cancel";
+          action: "discount" | "cancel" | "tab_discount";
           discountCents?: number;
           reason: string;
         };
@@ -33407,9 +33567,9 @@ export interface operations {
       content: {
         "application/json": {
           /** Format: uuid */
-          itemId: string;
+          itemId?: string;
           /** @enum {string} */
-          action: "discount" | "cancel";
+          action: "discount" | "cancel" | "tab_discount";
           discountCents?: number;
           reason: string;
         };
@@ -34481,6 +34641,76 @@ export interface operations {
     };
     responses: {
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_discountTab[0]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          discountCents: number;
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "PilotPosController_discountTab[1]": {
+    parameters: {
+      query?: never;
+      header: {
+        "idempotency-key": string;
+      };
+      path: {
+        organizationId: string;
+        unitId: string;
+        tabId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          discountCents: number;
+          approval: {
+            /** Format: uuid */
+            approverMembershipId: string;
+            pin: string;
+            reason: string;
+          };
+        };
+      };
+    };
+    responses: {
+      201: {
         headers: {
           [name: string]: unknown;
         };
@@ -41716,8 +41946,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -41739,7 +41968,7 @@ export interface operations {
               paymentAttemptId: string;
               /** @enum {string} */
               provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
-            };
+            } | null;
             idempotentReplay?: boolean;
           };
         };
@@ -41768,8 +41997,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -41791,7 +42019,7 @@ export interface operations {
               paymentAttemptId: string;
               /** @enum {string} */
               provider: "rede" | "paygo" | "stone" | "getnet" | "cielo" | "pagbank";
-            };
+            } | null;
             idempotentReplay?: boolean;
           };
         };
@@ -41833,8 +42061,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -41888,8 +42115,7 @@ export interface operations {
               id: string;
               /** Format: uuid */
               paymentId: string;
-              /** Format: uuid */
-              installationId: string;
+              installationId: string | null;
               amountCents: number;
               reason: string;
               /** @enum {string} */
@@ -42245,6 +42471,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -42310,6 +42537,7 @@ export interface operations {
             | "payment_statement"
             | "final_receipt"
             | "kds_ticket"
+            | "delivery_slip"
           )[];
           /** @default null */
           fallbackPrinterId?: string | null;
@@ -42342,6 +42570,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -42405,6 +42634,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -42470,6 +42700,7 @@ export interface operations {
             | "payment_statement"
             | "final_receipt"
             | "kds_ticket"
+            | "delivery_slip"
           )[];
           /** @default null */
           fallbackPrinterId?: string | null;
@@ -42502,6 +42733,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -42553,6 +42785,8 @@ export interface operations {
               mode: "notify_cashier" | "cashier_printer" | "local_terminal";
               printerId: string | null;
               revision: number;
+              deliveryAutoPrint?: boolean;
+              deliveryPrinterId?: string | null;
             };
           };
         };
@@ -42578,6 +42812,8 @@ export interface operations {
           mode: "notify_cashier" | "cashier_printer" | "local_terminal";
           printerId: string | null;
           revision: number;
+          deliveryAutoPrint?: boolean;
+          deliveryPrinterId?: string | null;
         };
       };
     };
@@ -42593,6 +42829,8 @@ export interface operations {
               mode: "notify_cashier" | "cashier_printer" | "local_terminal";
               printerId: string | null;
               revision: number;
+              deliveryAutoPrint?: boolean;
+              deliveryPrinterId?: string | null;
             };
           };
         };
@@ -42622,6 +42860,8 @@ export interface operations {
               mode: "notify_cashier" | "cashier_printer" | "local_terminal";
               printerId: string | null;
               revision: number;
+              deliveryAutoPrint?: boolean;
+              deliveryPrinterId?: string | null;
             };
           };
         };
@@ -42647,6 +42887,8 @@ export interface operations {
           mode: "notify_cashier" | "cashier_printer" | "local_terminal";
           printerId: string | null;
           revision: number;
+          deliveryAutoPrint?: boolean;
+          deliveryPrinterId?: string | null;
         };
       };
     };
@@ -42662,6 +42904,8 @@ export interface operations {
               mode: "notify_cashier" | "cashier_printer" | "local_terminal";
               printerId: string | null;
               revision: number;
+              deliveryAutoPrint?: boolean;
+              deliveryPrinterId?: string | null;
             };
           };
         };
@@ -42840,6 +43084,7 @@ export interface operations {
             | "payment_statement"
             | "final_receipt"
             | "kds_ticket"
+            | "delivery_slip"
           )[];
           /** @default null */
           fallbackPrinterId?: string | null;
@@ -42873,6 +43118,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -42945,6 +43191,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -43005,6 +43252,7 @@ export interface operations {
             | "payment_statement"
             | "final_receipt"
             | "kds_ticket"
+            | "delivery_slip"
           )[];
           /** @default null */
           fallbackPrinterId?: string | null;
@@ -43038,6 +43286,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -43110,6 +43359,7 @@ export interface operations {
                 | "payment_statement"
                 | "final_receipt"
                 | "kds_ticket"
+                | "delivery_slip"
               )[];
               /** @default null */
               fallbackPrinterId: string | null;
@@ -43484,7 +43734,8 @@ export interface operations {
                 | "partial_statement"
                 | "payment_statement"
                 | "final_receipt"
-                | "kds_ticket";
+                | "kds_ticket"
+                | "delivery_slip";
               /** @enum {string} */
               status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
               copies: number;
@@ -43563,7 +43814,8 @@ export interface operations {
                 | "partial_statement"
                 | "payment_statement"
                 | "final_receipt"
-                | "kds_ticket";
+                | "kds_ticket"
+                | "delivery_slip";
               /** @enum {string} */
               status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
               copies: number;
@@ -43641,7 +43893,8 @@ export interface operations {
                 | "partial_statement"
                 | "payment_statement"
                 | "final_receipt"
-                | "kds_ticket";
+                | "kds_ticket"
+                | "delivery_slip";
               /** @enum {string} */
               status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
               copies: number;
@@ -43719,7 +43972,8 @@ export interface operations {
                 | "partial_statement"
                 | "payment_statement"
                 | "final_receipt"
-                | "kds_ticket";
+                | "kds_ticket"
+                | "delivery_slip";
               /** @enum {string} */
               status: "queued" | "printing" | "printed" | "failed" | "confirmation_required";
               copies: number;
@@ -58632,6 +58886,204 @@ export interface operations {
       };
     };
   };
+  "GrowthController_listOperationalCustomers[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_createOperationalCustomer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          name: string;
+          phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_listOperationalCustomers[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_createOperationalCustomer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          name: string;
+          phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+          idempotencyKey: string;
+        };
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateOperationalCustomer[0]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          defaultDeliveryAddress: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  "GrowthController_updateOperationalCustomer[1]": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organizationId: string;
+        customerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          /** Format: uuid */
+          unitId: string;
+          defaultDeliveryAddress: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
+        };
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   "GrowthController_listCustomers[0]": {
     parameters: {
       query?: never;
@@ -58667,6 +59119,18 @@ export interface operations {
           name: string;
           email?: string | null;
           phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
           birthDate?: string | null;
           notes?: string | null;
           /** @default [] */
@@ -58718,6 +59182,18 @@ export interface operations {
           name: string;
           email?: string | null;
           phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
           birthDate?: string | null;
           notes?: string | null;
           /** @default [] */
@@ -58809,6 +59285,18 @@ export interface operations {
           name?: string;
           email?: string | null;
           phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
           birthDate?: string | null;
           notes?: string | null;
           tags?: string[];
@@ -58861,6 +59349,18 @@ export interface operations {
           name?: string;
           email?: string | null;
           phone?: string | null;
+          defaultDeliveryAddress?: {
+            street: string;
+            number: string;
+            complement?: string;
+            reference?: string;
+            neighborhood: string;
+            city: string;
+            state: string;
+            postalCode: string;
+            latitude?: number;
+            longitude?: number;
+          } | null;
           birthDate?: string | null;
           notes?: string | null;
           tags?: string[];
@@ -60734,6 +61234,7 @@ export interface operations {
           street: string;
           number: string;
           complement?: string;
+          reference?: string;
           neighborhood: string;
           city: string;
           state: string;
@@ -60768,6 +61269,7 @@ export interface operations {
           street: string;
           number: string;
           complement?: string;
+          reference?: string;
           neighborhood: string;
           city: string;
           state: string;
@@ -61019,6 +61521,7 @@ export interface operations {
           | "dispatched"
           | "completed"
           | "canceled";
+        orderRef?: string;
       };
       header?: never;
       path: {
@@ -61054,6 +61557,7 @@ export interface operations {
           | "dispatched"
           | "completed"
           | "canceled";
+        orderRef?: string;
       };
       header?: never;
       path: {
@@ -61096,6 +61600,7 @@ export interface operations {
             street: string;
             number: string;
             complement?: string;
+            reference?: string;
             neighborhood: string;
             city: string;
             state: string;
@@ -61142,6 +61647,7 @@ export interface operations {
             street: string;
             number: string;
             complement?: string;
+            reference?: string;
             neighborhood: string;
             city: string;
             state: string;

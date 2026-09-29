@@ -14,6 +14,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
     {
         /// <summary>Stores additional data not described in the OpenAPI description found when deserializing. Can be used for serialization as well.</summary>
         public IDictionary<string, object> AdditionalData { get; set; }
+        /// <summary>The customerId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId? CustomerId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId CustomerId { get; set; }
+#endif
         /// <summary>The customerName property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -37,6 +45,22 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
 #nullable restore
 #else
         public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddress DeliveryAddress { get; set; }
+#endif
+        /// <summary>The deliveryAddressDetails property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails? DeliveryAddressDetails { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails DeliveryAddressDetails { get; set; }
+#endif
+        /// <summary>The deliveryZoneId property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId? DeliveryZoneId { get; set; }
+#nullable restore
+#else
+        public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId DeliveryZoneId { get; set; }
 #endif
         /// <summary>The expectedVersion property</summary>
         public int? ExpectedVersion { get; set; }
@@ -103,9 +127,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "customerId", n => { CustomerId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId.CreateFromDiscriminatorValue); } },
                 { "customerName", n => { CustomerName = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerName>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerName.CreateFromDiscriminatorValue); } },
                 { "customerPhone", n => { CustomerPhone = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerPhone>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerPhone.CreateFromDiscriminatorValue); } },
                 { "deliveryAddress", n => { DeliveryAddress = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddress>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddress.CreateFromDiscriminatorValue); } },
+                { "deliveryAddressDetails", n => { DeliveryAddressDetails = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails.CreateFromDiscriminatorValue); } },
+                { "deliveryZoneId", n => { DeliveryZoneId = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId.CreateFromDiscriminatorValue); } },
                 { "expectedVersion", n => { ExpectedVersion = n.GetIntValue(); } },
                 { "fulfillmentType", n => { FulfillmentType = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_fulfillmentType>(); } },
                 { "guestCount", n => { GuestCount = n.GetIntValue(); } },
@@ -123,9 +150,12 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId>("customerId", CustomerId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerName>("customerName", CustomerName);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerPhone>("customerPhone", CustomerPhone);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddress>("deliveryAddress", DeliveryAddress);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails>("deliveryAddressDetails", DeliveryAddressDetails);
+            writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId>("deliveryZoneId", DeliveryZoneId);
             writer.WriteIntValue("expectedVersion", ExpectedVersion);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_fulfillmentType>("fulfillmentType", FulfillmentType);
             writer.WriteIntValue("guestCount", GuestCount);
@@ -135,6 +165,68 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_responsibleIdentityId>("responsibleIdentityId", ResponsibleIdentityId);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_serviceNotes>("serviceNotes", ServiceNotes);
             writer.WriteAdditionalData(AdditionalData);
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithTabPutRequestBody_customerId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1? WithTabPutRequestBodyCustomerIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1 WithTabPutRequestBodyCustomerIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_customerId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.WithTabPutRequestBodyCustomerIdMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithTabPutRequestBodyCustomerIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithTabPutRequestBodyCustomerIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerIdMember1>(null, WithTabPutRequestBodyCustomerIdMember1);
+                }
+            }
         }
         /// <summary>
         /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_customerNameMember1"/>, <see cref="string"/>
@@ -337,6 +429,125 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item
                 }
                 else {
                     writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressMember1>(null, WithTabPutRequestBodyDeliveryAddressMember1);
+                }
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1"/>, <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember2"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithTabPutRequestBody_deliveryAddressDetails : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1? WithTabPutRequestBodyDeliveryAddressDetailsMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1 WithTabPutRequestBodyDeliveryAddressDetailsMember1 { get; set; }
+#endif
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember2"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember2? WithTabPutRequestBodyDeliveryAddressDetailsMember2 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember2 WithTabPutRequestBodyDeliveryAddressDetailsMember2 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryAddressDetails();
+                result.WithTabPutRequestBodyDeliveryAddressDetailsMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1();
+                result.WithTabPutRequestBodyDeliveryAddressDetailsMember2 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember2();
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithTabPutRequestBodyDeliveryAddressDetailsMember1 != null || WithTabPutRequestBodyDeliveryAddressDetailsMember2 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithTabPutRequestBodyDeliveryAddressDetailsMember1, WithTabPutRequestBodyDeliveryAddressDetailsMember2);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryAddressDetailsMember1>(null, WithTabPutRequestBodyDeliveryAddressDetailsMember1, WithTabPutRequestBodyDeliveryAddressDetailsMember2);
+            }
+        }
+        /// <summary>
+        /// Composed type wrapper for classes <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1"/>, <see cref="Guid"/>
+        /// </summary>
+        [global::System.CodeDom.Compiler.GeneratedCode("Kiota", "1.0.0")]
+        public partial class WithTabPutRequestBody_deliveryZoneId : IComposedTypeWrapper, IParsable
+        {
+            /// <summary>Composed type representation for type <see cref="Guid"/></summary>
+            public Guid? Guid { get; set; }
+            /// <summary>Composed type representation for type <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1"/></summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1? WithTabPutRequestBodyDeliveryZoneIdMember1 { get; set; }
+#nullable restore
+#else
+            public global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1 WithTabPutRequestBodyDeliveryZoneIdMember1 { get; set; }
+#endif
+            /// <summary>
+            /// Creates a new instance of the appropriate class based on discriminator value
+            /// </summary>
+            /// <returns>A <see cref="global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId"/></returns>
+            /// <param name="parseNode">The parse node to use to read the discriminator value and create the object</param>
+            public static global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId CreateFromDiscriminatorValue(IParseNode parseNode)
+            {
+                if(ReferenceEquals(parseNode, null)) throw new ArgumentNullException(nameof(parseNode));
+                var result = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody.WithTabPutRequestBody_deliveryZoneId();
+                if(parseNode.GetGuidValue() is Guid guidValue)
+                {
+                    result.Guid = guidValue;
+                }
+                else {
+                    result.WithTabPutRequestBodyDeliveryZoneIdMember1 = new global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1();
+                }
+                return result;
+            }
+            /// <summary>
+            /// The deserialization information for the current model
+            /// </summary>
+            /// <returns>A IDictionary&lt;string, Action&lt;IParseNode&gt;&gt;</returns>
+            public virtual IDictionary<string, Action<IParseNode>> GetFieldDeserializers()
+            {
+                if(WithTabPutRequestBodyDeliveryZoneIdMember1 != null)
+                {
+                    return ParseNodeHelper.MergeDeserializersForIntersectionWrapper(WithTabPutRequestBodyDeliveryZoneIdMember1);
+                }
+                return new Dictionary<string, Action<IParseNode>>();
+            }
+            /// <summary>
+            /// Serializes information the current object
+            /// </summary>
+            /// <param name="writer">Serialization writer to use to serialize this model</param>
+            public virtual void Serialize(ISerializationWriter writer)
+            {
+                if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+                if(Guid != null)
+                {
+                    writer.WriteGuidValue(null, Guid);
+                }
+                else {
+                    writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tabs.Item.WithTabPutRequestBody_deliveryZoneIdMember1>(null, WithTabPutRequestBodyDeliveryZoneIdMember1);
                 }
             }
         }

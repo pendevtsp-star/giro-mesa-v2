@@ -57,19 +57,14 @@ type NavGroup = (typeof navGroups)[number];
 
 const navItems: { route: RouteId; label: string; icon: IconName; group: NavGroup }[] = [
   { route: "dashboard", label: "Visão geral", icon: "dashboard", group: "Operação" },
+  { route: "reservations", label: "Recepção e espera", icon: "reservations", group: "Operação" },
   { route: "salon", label: "Mesas e comandas", icon: "salon", group: "Operação" },
   { route: "counter", label: "Balcão e retirada", icon: "counter", group: "Operação" },
   { route: "catalog", label: "Cardápio", icon: "catalog", group: "Gestão" },
   { route: "table-qrs", label: "QR das mesas", icon: "grid", group: "Gestão" },
   { route: "kds", label: "Produção KDS", icon: "kds", group: "Operação" },
-  { route: "cash", label: "Contas e caixa", icon: "cash", group: "Operação" },
   { route: "delivery", label: "Entregas", icon: "delivery", group: "Operação" },
-  {
-    route: "reservations",
-    label: "Recepção e espera",
-    icon: "reservations",
-    group: "Operação",
-  },
+  { route: "cash", label: "Contas e caixa", icon: "cash", group: "Operação" },
   { route: "inventory", label: "Estoque", icon: "inventory", group: "Gestão" },
   { route: "purchases", label: "Compras", icon: "purchases", group: "Gestão" },
   { route: "finance", label: "Financeiro", icon: "finance", group: "Financeiro e fiscal" },
@@ -219,7 +214,6 @@ export function OperationalApp({
   const [openNavGroups, setOpenNavGroups] = useState<Set<NavGroup>>(
     () => new Set([navItems.find((item) => item.route === route)?.group ?? navGroups[0]]),
   );
-  const [attendanceOpen, setAttendanceOpen] = useState(true);
   const [attendanceMobileOpen, setAttendanceMobileOpen] = useState(false);
   const [receptionPendingCount, setReceptionPendingCount] = useState<number | null>(null);
   const [accountantPendingCount, setAccountantPendingCount] = useState<number | null>(null);
@@ -400,6 +394,12 @@ export function OperationalApp({
   // Global Keyboard Shortcuts (Ctrl+K, F1-F4, Esc)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.repeat || e.isComposing) return;
+      if (
+        e.key !== "Escape" &&
+        document.querySelector('dialog[open], [role="dialog"][aria-modal="true"]')
+      )
+        return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         toggleSidebar();
@@ -581,7 +581,6 @@ export function OperationalApp({
   }, [session.unitId]);
 
   useEffect(() => {
-    if (isAttendanceRoute(route)) setAttendanceOpen(true);
     if (route === "kds") setKdsNavigationOpen(true);
     const routeGroup = navItems.find((item) => item.route === route)?.group;
     if (routeGroup) setOpenNavGroups(new Set([routeGroup]));
@@ -990,10 +989,17 @@ export function OperationalApp({
   }
 
   return (
-    <div className={`app-shell ${terminalProfile?.compact ? "app-shell--terminal-compact" : ""}`}>
-      <a className="skip-link" href="#main-content">
+    <div
+      className={`app-shell gm-workspace-cool ${terminalProfile?.compact ? "app-shell--terminal-compact" : ""}`}
+    >
+      <Button
+        className="skip-link"
+        onClick={() => {
+          document.getElementById("main-content")?.focus();
+        }}
+      >
         Ir para o conteúdo
-      </a>
+      </Button>
       <aside
         className={`sidebar ${sidebarIsCollapsed ? "sidebar--collapsed" : ""} ${navOpen ? "sidebar--open" : ""}`}
         id="primary-sidebar"
@@ -1020,7 +1026,6 @@ export function OperationalApp({
           )}
           <span>
             <strong>{establishmentContext.unitName ?? "Unidade"}</strong>
-            <small>Sessão operacional</small>
           </span>
         </div>
         {(!compactNavigation || navOpen) && (
@@ -1028,47 +1033,22 @@ export function OperationalApp({
             {navGroups.map((groupName) => {
               const itemsInGroup = visibleNav.filter((i) => i.group === groupName);
               if (itemsInGroup.length === 0) return null;
-              const attendanceItems = attendanceRoutes
-                .map((attendanceRoute) =>
-                  itemsInGroup.find((item) => item.route === attendanceRoute),
-                )
-                .filter((item): item is (typeof navItems)[number] => Boolean(item));
-              const regularItems = itemsInGroup.filter((item) => !isAttendanceRoute(item.route));
               return (
                 <details
                   className="nav-group"
                   key={groupName}
                   onToggle={(event) => {
+                    if (sidebarIsCollapsed) return;
                     const open = event.currentTarget.open;
                     setOpenNavGroups((current) => {
                       if (current.has(groupName) === open) return current;
                       return open ? new Set([groupName]) : new Set();
                     });
                   }}
-                  open={openNavGroups.has(groupName)}
+                  open={sidebarIsCollapsed || openNavGroups.has(groupName)}
                 >
                   <summary className="nav-group__title">{groupName}</summary>
-                  <div className="nav-group__items">
-                    {regularItems
-                      .filter((item) => item.route === "dashboard")
-                      .map(renderNavigationItem)}
-                    {attendanceItems.length > 0 && (
-                      <details
-                        aria-label="Atendimento"
-                        className="nav-section"
-                        onToggle={(event) => setAttendanceOpen(event.currentTarget.open)}
-                        open={attendanceOpen}
-                      >
-                        <summary className="nav-section__title">Atendimento</summary>
-                        <div className="nav-section__items">
-                          {attendanceItems.map(renderNavigationItem)}
-                        </div>
-                      </details>
-                    )}
-                    {regularItems
-                      .filter((item) => item.route !== "dashboard")
-                      .map(renderNavigationItem)}
-                  </div>
+                  <div className="nav-group__items">{itemsInGroup.map(renderNavigationItem)}</div>
                 </details>
               );
             })}
@@ -1093,6 +1073,7 @@ export function OperationalApp({
           </Button>
 
           <Button
+            aria-label="Central de ajuda"
             className="support-link"
             onClick={() => setHelpOpen(true)}
             size="sm"
@@ -1104,7 +1085,6 @@ export function OperationalApp({
             </span>
             {!sidebarIsCollapsed && <span className="support-link__label">Central de ajuda</span>}
           </Button>
-          {!sidebarIsCollapsed && <small>GiroMesa Operação</small>}
         </div>
       </aside>
 
@@ -1559,6 +1539,20 @@ export function OperationalApp({
               { key: "F3", label: "Produção KDS" },
               { key: "F4", label: "Frente de caixa" },
               { key: "Esc", label: "Fechar menus e janelas" },
+              ...(route === "counter"
+                ? [
+                    { key: "Alt + N", label: "Novo atendimento: 1 Local, 2 Retirada, 3 Delivery" },
+                    { key: "Alt + 1", label: "Pedido e busca de produtos" },
+                    { key: "Alt + 2", label: "Conta" },
+                    {
+                      key: "Alt + 3",
+                      label: "Pré-conta; Enter no botão Imprimir executa a impressão",
+                    },
+                    { key: "Alt + R", label: "Focar valor a receber (sem confirmar pagamento)" },
+                    { key: "/", label: "Buscar produto fora dos campos de digitação" },
+                    { key: "Ctrl + Enter", label: "Enviar itens do pedido" },
+                  ]
+                : []),
             ].map((shortcut) => (
               <div className="shortcut-list__item" key={shortcut.key}>
                 <span>{shortcut.label}</span>
@@ -1598,10 +1592,20 @@ export function OperationalApp({
         )}
 
         <main className={`main-content main-content--${safeRoute}`} id="main-content" tabIndex={-1}>
-          <PageHeading
-            title={page?.title ?? "Visão geral"}
-            description={page?.description ?? "Resumo operacional da unidade."}
-          />
+          {![
+            "counter",
+            "catalog",
+            "inventory",
+            "cash",
+            "kds",
+            "kds-settings",
+            "delivery",
+            "reservations",
+            "purchases",
+            "crm",
+          ].includes(safeRoute) && (
+            <PageHeading title={page?.title ?? "Visão geral"} description="" />
+          )}
           {compactNavigation && terminalQuickActions.length > 0 && (
             <nav aria-label="Atalhos deste terminal" className="terminal-quick-actions">
               {terminalQuickActions.map((item) => (

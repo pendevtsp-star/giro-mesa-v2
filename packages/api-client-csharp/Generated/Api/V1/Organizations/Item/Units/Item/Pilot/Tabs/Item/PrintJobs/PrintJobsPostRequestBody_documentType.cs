@@ -20,5 +20,9 @@ namespace GiroMesa.ApiClient.Api.V1.Organizations.Item.Units.Item.Pilot.Tabs.Ite
         #pragma warning disable CS1591
         Final_receipt,
         #pragma warning restore CS1591
+        [EnumMember(Value = "delivery_slip")]
+        #pragma warning disable CS1591
+        Delivery_slip,
+        #pragma warning restore CS1591
     }
 }

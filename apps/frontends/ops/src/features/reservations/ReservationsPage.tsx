@@ -224,9 +224,7 @@ function CustomerLookup({
         <div className="customer-selection" role="status">
           <span>
             <strong className="customer-selection__name">{selectedCustomer.name}</strong>
-            <small>
-              Cadastro vinculado. Nome e telefone abaixo serão salvos como snapshot desta visita.
-            </small>
+            <small>Cliente vinculado a esta visita.</small>
           </span>
           <Button onClick={onUseGuest} size="sm" type="button" variant="ghost">
             Usar convidado avulso
@@ -333,6 +331,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
+  const pageRef = useRef<HTMLDivElement>(null);
   const [agendaDate, setAgendaDate] = useState(localDateValue);
   const [historyLimit, setHistoryLimit] = useState(20);
   const agendaRange = agendaWindow(agendaDate);
@@ -394,9 +393,35 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   const [online, setOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
-  const reservationComposerRef = useRef<HTMLDetailsElement>(null);
-  const waitlistComposerRef = useRef<HTMLDetailsElement>(null);
+  const [composer, setComposer] = useState<"reservation" | "waitlist" | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const seatingSelectRef = useRef<HTMLSelectElement>(null);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      for (const menu of pageRef.current?.querySelectorAll<HTMLDetailsElement>(
+        ".row-more-actions[open]",
+      ) ?? []) {
+        if (event.target instanceof Node && !menu.contains(event.target)) menu.open = false;
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      for (const menu of pageRef.current?.querySelectorAll<HTMLDetailsElement>(
+        ".row-more-actions[open]",
+      ) ?? []) {
+        if (!menu.contains(document.activeElement)) continue;
+        menu.open = false;
+        menu.querySelector<HTMLElement>("summary")?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, []);
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedCustomerQuery(customerQuery.trim()), 250);
     return () => window.clearTimeout(timer);
@@ -441,15 +466,8 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   }, []);
 
   function openComposer(kind: "reservation" | "waitlist") {
-    const composer =
-      kind === "reservation" ? reservationComposerRef.current : waitlistComposerRef.current;
-    const otherComposer =
-      kind === "reservation" ? waitlistComposerRef.current : reservationComposerRef.current;
-    if (!composer) return;
-    otherComposer?.removeAttribute("open");
-    composer.open = true;
-    composer.scrollIntoView({ behavior: "smooth", block: "start" });
-    composer.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+    setFeedback("");
+    setComposer(kind);
   }
 
   async function mutate(id: string, action: () => Promise<unknown>, retry: () => void) {
@@ -497,6 +515,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       setSelectedCustomer(null);
       setCustomerQuery("");
       setReservationNotes("");
+      setComposer(null);
       reservations.retry();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Não foi possível criar a reserva.");
@@ -529,6 +548,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
       setSelectedCustomer(null);
       setCustomerQuery("");
       waitlist.retry();
+      setComposer(null);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Não foi possível atualizar a fila.");
     } finally {
@@ -537,6 +557,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   }
 
   function prepareSeat(target: SeatTarget) {
+    setFeedback("");
     setSelectedTableId("");
     setSeatTarget(target);
   }
@@ -591,8 +612,42 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
   }
 
   return (
-    <div className="growth-stack reservations-page">
-      {feedback && (
+    <div className="growth-stack reservations-page" ref={pageRef}>
+      <header className="reception-header">
+        <div>
+          <h1>Recepção e espera</h1>
+          <p>Reservas do dia e clientes aguardando mesa.</p>
+        </div>
+        <fieldset className="gm-toolbar reception-actions">
+          <legend className="gm-sr-only">Ações da recepção</legend>
+          <Button
+            disabled={!online}
+            onClick={() => openComposer("waitlist")}
+            size="sm"
+            aria-haspopup="dialog"
+          >
+            <Icon name="plus" size={14} /> Cliente sem reserva
+          </Button>
+          <Button
+            disabled={!online}
+            onClick={() => openComposer("reservation")}
+            size="sm"
+            variant="secondary"
+            aria-haspopup="dialog"
+          >
+            Nova reserva
+          </Button>
+          <Button
+            onClick={() => setHistoryOpen(true)}
+            size="sm"
+            variant="secondary"
+            aria-haspopup="dialog"
+          >
+            <Icon name="clock" size={14} /> Histórico
+          </Button>
+        </fieldset>
+      </header>
+      {feedback && !composer && !seatTarget && (
         <p className="form-feedback" role="status">
           {feedback}
         </p>
@@ -603,24 +658,26 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         role="status"
       >
         <span>
-          <Badge
-            tone={
-              !online || reservations.refreshError || waitlist.refreshError ? "warning" : "success"
+          <span
+            className={
+              !online || reservations.refreshError || waitlist.refreshError
+                ? "reception-sync-warning"
+                : "reception-sync-label"
             }
           >
             {!online
               ? "Sem conexão"
               : reservations.refreshError || waitlist.refreshError
                 ? "Dados podem estar atrasados"
-                : "Dados confirmados"}
-          </Badge>
+                : "Atualizado"}
+          </span>
           <small>
             {!online
               ? "Cadastros e mudanças exigem reconexão."
               : (reservations.refreshError ??
                 waitlist.refreshError ??
                 (reservations.lastSuccessfulAt
-                  ? `Última confirmação às ${new Date(reservations.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
+                  ? `às ${new Date(reservations.lastSuccessfulAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
                   : "Aguardando primeira confirmação"))}
           </small>
         </span>
@@ -650,192 +707,216 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         <FormField htmlFor="arrival-date" label="Agenda do dia">
           <Input
             id="arrival-date"
-            onChange={(event) => setAgendaDate(event.target.value)}
+            onChange={(event) => {
+              if (event.target.value) setAgendaDate(event.target.value);
+            }}
             type="date"
             value={agendaDate}
           />
         </FormField>
-        <div className="arrival-bar__actions">
-          <Button onClick={() => openComposer("reservation")} size="sm" variant="secondary">
-            Nova reserva
-          </Button>
-          <Button onClick={() => openComposer("waitlist")} size="sm">
-            Cliente sem reserva
-          </Button>
-        </div>
       </Card>
-      <div className="quick-actions-grid reservations-actions">
-        <details className="action-panel" id="reservation-composer" ref={reservationComposerRef}>
-          <summary>
-            <span>
-              <strong>Nova reserva</strong>
-              <small>Inclua um cliente na agenda da unidade.</small>
-            </span>
-            <Icon name="plus" size={18} />
-          </summary>
-          <form className="action-form" onSubmit={(event) => void createReservation(event)}>
-            <CustomerLookup
-              id="reservation-customer-search"
-              onQueryChange={setCustomerQuery}
-              onSelect={selectCustomer}
-              onUseGuest={useGuestSnapshot}
-              query={customerQuery}
-              retry={customers.retry}
-              selectedCustomer={selectedCustomer}
-              state={customers.state}
+      <Modal
+        className="reception-modal"
+        isOpen={composer === "reservation"}
+        onClose={() => setComposer(null)}
+        closeDisabled={Boolean(busy)}
+        title="Nova reserva"
+        size="md"
+      >
+        {feedback && (
+          <p className="form-feedback" role="status">
+            {feedback}
+          </p>
+        )}
+        <form className="action-form" onSubmit={(event) => void createReservation(event)}>
+          <CustomerLookup
+            id="reservation-customer-search"
+            onQueryChange={setCustomerQuery}
+            onSelect={selectCustomer}
+            onUseGuest={useGuestSnapshot}
+            query={customerQuery}
+            retry={customers.retry}
+            selectedCustomer={selectedCustomer}
+            state={customers.state}
+          />
+          <label>
+            Nome
+            <Input
+              minLength={2}
+              onChange={(event) => setGuestName(event.target.value)}
+              required
+              value={guestName}
             />
-            <label>
-              Nome
-              <Input
-                minLength={2}
-                onChange={(event) => setGuestName(event.target.value)}
-                required
-                value={guestName}
-              />
-            </label>
-            <label>
-              Telefone
-              <Input
-                inputMode="tel"
-                onChange={(event) => setGuestPhone(event.target.value)}
-                pattern="\\+?[0-9 ()-]{10,30}"
-                type="tel"
-                value={guestPhone}
-              />
-            </label>
-            <label>
-              Pessoas
-              <Input
-                min={1}
-                onChange={(event) => setPartySize(Number(event.target.value))}
-                required
-                type="number"
-                value={partySize}
-              />
-            </label>
-            <label>
-              Data e hora
-              <Input
-                min={localDateTimeValue()}
-                onChange={(event) => {
-                  setScheduledAt(event.target.value);
-                  if (event.target.value.length >= 10)
-                    setAgendaDate(event.target.value.slice(0, 10));
-                }}
-                required
-                type="datetime-local"
-                value={scheduledAt}
-              />
-            </label>
-            <label className="action-form__wide">
-              Preferências e observações
-              <Textarea
-                maxLength={500}
-                onChange={(event) => setReservationNotes(event.target.value)}
-                rows={2}
-                value={reservationNotes}
-              />
-            </label>
-            {capacity && (
-              <p
-                className={`action-form__wide capacity-hint ${!capacity.compatible || capacity.remainingSeats < 0 ? "capacity-hint--warning" : ""}`}
-                role="status"
-              >
-                {!capacity.compatible
-                  ? `Atenção: nenhuma mesa ou grupo configurado comporta ${partySize} pessoas.`
-                  : capacity.remainingSeats < 0
-                    ? `Atenção: a agenda excede a capacidade estimada em ${Math.abs(capacity.remainingSeats)} lugar(es).`
-                    : `Capacidade estimada após esta reserva: ${capacity.remainingSeats} lugar(es).`}
-              </p>
-            )}
+          </label>
+          <label>
+            Telefone
+            <Input
+              inputMode="tel"
+              onChange={(event) => setGuestPhone(event.target.value)}
+              pattern="\\+?[0-9 ()-]{10,30}"
+              type="tel"
+              value={guestPhone}
+            />
+          </label>
+          <label>
+            Pessoas
+            <Input
+              min={1}
+              onChange={(event) => setPartySize(Number(event.target.value))}
+              required
+              type="number"
+              value={partySize}
+            />
+          </label>
+          <label>
+            Data e hora
+            <Input
+              min={localDateTimeValue()}
+              onChange={(event) => {
+                setScheduledAt(event.target.value);
+                if (event.target.value.length >= 10) setAgendaDate(event.target.value.slice(0, 10));
+              }}
+              required
+              type="datetime-local"
+              value={scheduledAt}
+            />
+          </label>
+          <label className="action-form__wide">
+            Preferências e observações
+            <Textarea
+              maxLength={500}
+              onChange={(event) => setReservationNotes(event.target.value)}
+              rows={2}
+              value={reservationNotes}
+            />
+          </label>
+          {capacity && (
+            <p
+              className={`action-form__wide capacity-hint ${!capacity.compatible || capacity.remainingSeats < 0 ? "capacity-hint--warning" : ""}`}
+              role="status"
+            >
+              {!capacity.compatible
+                ? `Atenção: nenhuma mesa ou grupo configurado comporta ${partySize} pessoas.`
+                : capacity.remainingSeats < 0
+                  ? `Atenção: a agenda excede a capacidade estimada em ${Math.abs(capacity.remainingSeats)} lugar(es).`
+                  : `Capacidade estimada após esta reserva: ${capacity.remainingSeats} lugar(es).`}
+            </p>
+          )}
+          <div className="reception-modal-actions action-form__wide">
             <Button
-              disabled={busy === "new-reservation" || guestName.trim().length < 2}
+              disabled={Boolean(busy)}
+              onClick={() => setComposer(null)}
+              type="button"
+              variant="secondary"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!online || busy === "new-reservation" || guestName.trim().length < 2}
               type="submit"
             >
               {busy === "new-reservation" ? "Salvando…" : "Criar reserva"}
             </Button>
-          </form>
-        </details>
-        <details className="action-panel" id="waitlist-composer" ref={waitlistComposerRef}>
-          <summary>
-            <span>
-              <strong>Adicionar à espera</strong>
-              <small>Registre chegada e previsão informada.</small>
-            </span>
-            <Icon name="plus" size={18} />
-          </summary>
-          <form className="action-form" onSubmit={(event) => void createWaitlistEntry(event)}>
-            <CustomerLookup
-              id="waitlist-customer-search"
-              onQueryChange={setCustomerQuery}
-              onSelect={selectCustomer}
-              onUseGuest={useGuestSnapshot}
-              query={customerQuery}
-              retry={customers.retry}
-              selectedCustomer={selectedCustomer}
-              state={customers.state}
+          </div>
+        </form>
+      </Modal>
+      <Modal
+        className="reception-modal"
+        isOpen={composer === "waitlist"}
+        onClose={() => setComposer(null)}
+        closeDisabled={Boolean(busy)}
+        title="Cliente sem reserva"
+        size="md"
+      >
+        {feedback && (
+          <p className="form-feedback" role="status">
+            {feedback}
+          </p>
+        )}
+        <form className="action-form" onSubmit={(event) => void createWaitlistEntry(event)}>
+          <CustomerLookup
+            id="waitlist-customer-search"
+            onQueryChange={setCustomerQuery}
+            onSelect={selectCustomer}
+            onUseGuest={useGuestSnapshot}
+            query={customerQuery}
+            retry={customers.retry}
+            selectedCustomer={selectedCustomer}
+            state={customers.state}
+          />
+          <label>
+            Nome
+            <Input
+              minLength={2}
+              onChange={(event) => setGuestName(event.target.value)}
+              required
+              value={guestName}
             />
-            <label>
-              Nome
-              <Input
-                minLength={2}
-                onChange={(event) => setGuestName(event.target.value)}
-                required
-                value={guestName}
-              />
-            </label>
-            <label>
-              Telefone
-              <Input
-                inputMode="tel"
-                onChange={(event) => setGuestPhone(event.target.value)}
-                pattern="\\+?[0-9 ()-]{10,30}"
-                type="tel"
-                value={guestPhone}
-              />
-            </label>
-            <label>
-              Pessoas
-              <Input
-                min={1}
-                onChange={(event) => setPartySize(Number(event.target.value))}
-                required
-                type="number"
-                value={partySize}
-              />
-            </label>
-            <label>
-              Espera informada (min)
-              <Input
-                min={0}
-                onChange={(event) => setWaitMinutes(Number(event.target.value))}
-                type="number"
-                value={waitMinutes}
-              />
-            </label>
-            {waitSuggestion !== null && (
-              <div className="action-form__wide capacity-hint" role="status">
-                <span>
-                  Sugestão pela ocupação atual: <strong>{waitSuggestion} min</strong>
-                </span>
-                {waitMinutes !== waitSuggestion && (
-                  <Button
-                    onClick={() => setWaitMinutes(waitSuggestion)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
-                  >
-                    Usar sugestão
-                  </Button>
-                )}
-              </div>
-            )}
-            <Button disabled={busy === "new-waitlist" || guestName.trim().length < 2} type="submit">
+          </label>
+          <label>
+            Telefone
+            <Input
+              inputMode="tel"
+              onChange={(event) => setGuestPhone(event.target.value)}
+              pattern="\\+?[0-9 ()-]{10,30}"
+              type="tel"
+              value={guestPhone}
+            />
+          </label>
+          <label>
+            Pessoas
+            <Input
+              min={1}
+              onChange={(event) => setPartySize(Number(event.target.value))}
+              required
+              type="number"
+              value={partySize}
+            />
+          </label>
+          <label>
+            Espera informada (min)
+            <Input
+              min={0}
+              onChange={(event) => setWaitMinutes(Number(event.target.value))}
+              type="number"
+              value={waitMinutes}
+            />
+          </label>
+          {waitSuggestion !== null && (
+            <div className="action-form__wide capacity-hint" role="status">
+              <span>
+                Sugestão pela ocupação atual: <strong>{waitSuggestion} min</strong>
+              </span>
+              {waitMinutes !== waitSuggestion && (
+                <Button
+                  onClick={() => setWaitMinutes(waitSuggestion)}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  Usar sugestão
+                </Button>
+              )}
+            </div>
+          )}
+          <div className="reception-modal-actions action-form__wide">
+            <Button
+              disabled={Boolean(busy)}
+              onClick={() => setComposer(null)}
+              type="button"
+              variant="secondary"
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={!online || busy === "new-waitlist" || guestName.trim().length < 2}
+              type="submit"
+            >
               {busy === "new-waitlist" ? "Salvando…" : "Adicionar à fila"}
             </Button>
-          </form>
-        </details>
-      </div>
+          </div>
+        </form>
+      </Modal>
       <div className="ops-grid reservations-board">
         <Card className="reservations-card">
           <div className="section-title">
@@ -855,7 +936,8 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                 <EmptyState
                   action={
                     <Button
-                      aria-controls="reservation-composer"
+                      aria-haspopup="dialog"
+                      disabled={!online}
                       onClick={() => openComposer("reservation")}
                       size="sm"
                       variant="secondary"
@@ -1038,7 +1120,8 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                 <EmptyState
                   action={
                     <Button
-                      aria-controls="waitlist-composer"
+                      aria-haspopup="dialog"
+                      disabled={!online}
                       onClick={() => openComposer("waitlist")}
                       size="sm"
                       variant="secondary"
@@ -1199,8 +1282,13 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
           </RemoteGate>
         </Card>
       </div>
-      <details className="reception-history">
-        <summary>Histórico de reservas e fila</summary>
+      <Modal
+        className="reception-history"
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        title="Histórico de reservas e fila"
+        size="lg"
+      >
         <div className="ops-grid reservations-board">
           <Card>
             <h3>Reservas anteriores</h3>
@@ -1252,8 +1340,10 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
             Carregar mais histórico
           </Button>
         )}
-      </details>
+      </Modal>
       <Modal
+        className="reception-modal"
+        closeDisabled={Boolean(busy)}
         isOpen={seatTarget !== null}
         onClose={() => {
           setSeatTarget(null);
@@ -1262,6 +1352,11 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
         size="sm"
         title={seatTarget ? `Sentar ${seatTarget.guestName}` : "Escolher mesa"}
       >
+        {feedback && (
+          <p className="form-feedback" role="status">
+            {feedback}
+          </p>
+        )}
         {seatTarget && (
           <RemoteGate remote={floor}>
             {(data) => {
@@ -1287,10 +1382,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                     void seatGuest();
                   }}
                 >
-                  <p>
-                    A confirmação ocupará a mesa, abrirá a comanda e atualizará a recepção em uma
-                    única operação.
-                  </p>
+                  <p>Confirme a mesa para abrir a comanda deste atendimento.</p>
                   <label>
                     Mesa ou grupo compatível
                     <NativeSelect
@@ -1309,7 +1401,7 @@ export function RealReservationsPage({ scope }: { scope: GrowthScope }) {
                     </NativeSelect>
                   </label>
                   <Button
-                    disabled={!selectedTableId || busy === `seat-${seatTarget.id}`}
+                    disabled={!online || !selectedTableId || busy === `seat-${seatTarget.id}`}
                     type="submit"
                   >
                     {busy === `seat-${seatTarget.id}` ? "Sentando…" : "Ocupar mesa e abrir comanda"}

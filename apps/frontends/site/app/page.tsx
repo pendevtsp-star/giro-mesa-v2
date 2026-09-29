@@ -5,6 +5,7 @@ import { ExperimentImpression } from "../components/experiment-impression";
 import { FeaturesSection } from "../components/features-section";
 import { Hero } from "../components/hero";
 import { PricingSection } from "../components/pricing-section";
+import { RestaurantBackdrop } from "../components/restaurant-backdrop";
 import { TestimonialsSection } from "../components/testimonials-section";
 import {
   commercialAttributionForCatalog,
@@ -13,6 +14,7 @@ import {
   commercialVisitorId,
   getCommercialCatalog,
 } from "../lib/commercial";
+import { currentProductScreens, landingPreview, previewDescription } from "../lib/landing-preview";
 
 export async function generateMetadata(): Promise<Metadata> {
   const state = await getCommercialCatalog();
@@ -41,7 +43,10 @@ export default async function Home({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const visitorId = commercialVisitorId((await headers()).get("x-giromesa-visitor-id"));
-  const [state, parameters] = await Promise.all([getCommercialCatalog(visitorId), searchParams]);
+  const [state, parameters] = await Promise.all([
+    getCommercialCatalog(landingPreview ? undefined : visitorId),
+    searchParams,
+  ]);
   if (!state.catalog)
     return (
       <main id="conteudo" className="catalog-unavailable">
@@ -65,20 +70,44 @@ export default async function Home({
     visitorId,
   );
   return (
-    <main id="conteudo">
+    <main id="conteudo" className="landing-page">
+      <RestaurantBackdrop />
       <Hero
         attribution={attribution}
-        hero={commercialHeroForCatalog(catalog)}
+        hero={
+          landingPreview
+            ? { ...commercialHeroForCatalog(catalog), description: previewDescription }
+            : commercialHeroForCatalog(catalog)
+        }
         socialProof={catalog.landing.socialProof}
       />
       <FeaturesSection
         benefits={catalog.landing.benefits}
         howItWorks={catalog.landing.howItWorks}
+        slides={
+          landingPreview
+            ? currentProductScreens
+            : catalog.landing.hero.media
+              ? [
+                  {
+                    src: catalog.landing.hero.media.url,
+                    alt: catalog.landing.hero.media.alt,
+                    label: "GiroMesa em ação",
+                    width: catalog.landing.hero.media.width ?? 1280,
+                    height: catalog.landing.hero.media.height ?? 720,
+                  },
+                ]
+              : []
+        }
       />
-      <PricingSection attribution={attribution} plans={catalog.plans} />
+      <PricingSection
+        attribution={attribution}
+        plans={catalog.plans}
+        initialCycle={parameters.ciclo === "annual" ? "annual" : "monthly"}
+      />
       <TestimonialsSection faq={catalog.landing.faq} testimonials={catalog.landing.testimonials} />
       <CtaSection attribution={attribution} content={catalog.landing.finalCta} />
-      {visitorId ? (
+      {visitorId && !landingPreview ? (
         <ExperimentImpression
           catalogVersion={catalog.version}
           experiments={catalog.experiments}

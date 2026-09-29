@@ -20,6 +20,109 @@ describe("contratos operacionais reais", () => {
     expect(usesQuickServiceMode("hybrid")).toBe(false);
   });
 
+  it("conta no resumo de carga apenas comandas abertas de mesas ativas do salao", () => {
+    const floor = parsePilotFloor({
+      tables: [
+        {
+          id: "table-active",
+          roomId: "room",
+          label: "Mesa 1",
+          active: true,
+          status: "occupied",
+          seats: 4,
+        },
+        {
+          id: "table-inactive",
+          roomId: "room",
+          label: "Mesa 2",
+          active: false,
+          status: "occupied",
+          seats: 4,
+        },
+      ],
+      rooms: [],
+      openTabs: [
+        {
+          id: "salon",
+          tableId: "table-active",
+          status: "open",
+          fulfillmentType: "dine_in",
+          responsibleIdentityId: "staff",
+          guestCount: 2,
+          serviceChargeBasisPoints: 0,
+          tipCents: 0,
+          subtotalCents: 2400,
+          discountCents: 0,
+          serviceChargeCents: 0,
+          totalCents: 2400,
+        },
+        {
+          id: "counter",
+          tableId: null,
+          status: "open",
+          fulfillmentType: "pickup",
+          responsibleIdentityId: "staff",
+          guestCount: 1,
+          serviceChargeBasisPoints: 0,
+          tipCents: 0,
+          subtotalCents: 800,
+          discountCents: 0,
+          serviceChargeCents: 0,
+          totalCents: 800,
+        },
+        {
+          id: "delivery",
+          tableId: null,
+          status: "open",
+          fulfillmentType: "delivery",
+          responsibleIdentityId: "staff",
+          guestCount: 3,
+          serviceChargeBasisPoints: 0,
+          tipCents: 0,
+          subtotalCents: 3600,
+          discountCents: 0,
+          serviceChargeCents: 0,
+          totalCents: 3600,
+        },
+        {
+          id: "inactive",
+          tableId: "table-inactive",
+          status: "open",
+          fulfillmentType: "dine_in",
+          responsibleIdentityId: "staff",
+          guestCount: 4,
+          serviceChargeBasisPoints: 0,
+          tipCents: 0,
+          subtotalCents: 4800,
+          discountCents: 0,
+          serviceChargeCents: 0,
+          totalCents: 4800,
+        },
+      ],
+      shiftSections: [
+        {
+          id: "section",
+          shiftId: "shift",
+          name: "Praça",
+          color: "green",
+          serviceMode: "full_service",
+        },
+      ],
+      serviceCalls: [],
+      shiftSectionTables: [
+        { shiftId: "shift", shiftSectionId: "section", tableId: "table-active" },
+      ],
+      shiftSectionStaff: [],
+      shiftTableTransfers: [],
+      staff: [{ identityId: "staff", displayName: "Lia" }],
+    });
+
+    expect(summarizeOperationalLoad(floor)).toMatchObject({
+      sections: [{ guests: 2, totalCents: 2400 }],
+      staff: [{ identityId: "staff", tabs: 1, guests: 2, totalCents: 2400 }],
+    });
+  });
+
   it("explica os perfis de atendimento sem expor nomes técnicos", () => {
     expect(serviceModeLabel("full_service")).toBe("Atendimento à mesa");
     expect(serviceModeLabel("quick_service")).toBe("Atendimento rápido");

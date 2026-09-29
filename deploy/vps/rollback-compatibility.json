@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "requiredAppliedMigration": "0084_inventory_resale_before_catalog",
+  "requiredAppliedMigration": "0088_cash_payment_exchange",
   "transitions": [],
   "fullRestore": {
     "required": true,

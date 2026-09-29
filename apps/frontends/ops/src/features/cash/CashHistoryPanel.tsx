@@ -50,6 +50,7 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a refreshed shift list invalidates the persisted history after review or closure
   useEffect(() => {
     let active = true;
     setBusy("history");
@@ -74,7 +75,7 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
     return () => {
       active = false;
     };
-  }, [filters, scope.organizationId, scope.unitId]);
+  }, [data.shifts, filters, scope.organizationId, scope.unitId]);
 
   function search(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,6 +107,7 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
   async function showDetail(cashShiftId: string) {
     setBusy(`detail:${cashShiftId}`);
     setMessage("");
+    setShowReceipt(false);
     try {
       setDetail(
         parseCashShiftDetail(
@@ -140,7 +142,6 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
     <Card className="cash-history">
       <div className="card-header">
         <div>
-          <p className="eyebrow">Auditoria</p>
           <h2>Histórico de turnos</h2>
         </div>
         <span className="cash-history__exports">
@@ -257,7 +258,11 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
                 </small>
               </span>
               <span className="cash-history__result">
-                <strong>{formatMoney(shift.differenceCents ?? 0)}</strong>
+                <strong>
+                  {shift.status === "open"
+                    ? "Em aberto"
+                    : `Diferença ${formatMoney(shift.differenceCents ?? 0)}`}
+                </strong>
                 <Button
                   disabled={Boolean(busy)}
                   onClick={() => void showDetail(shift.id)}
@@ -291,84 +296,89 @@ export function CashHistoryPanel({ data, scope }: { data: CashData; scope: Manag
         </Button>
       )}
       {detail && (
-        <div className="cash-history__detail">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Detalhe auditável</p>
-              <h3>{detail.shift.cashRegisterName}</h3>
-            </div>
-            <Button onClick={() => setDetail(null)} size="sm" type="button" variant="ghost">
-              Fechar
-            </Button>
-          </div>
-          {detail.tenderCounts.length > 0 && (
-            <div className="cash-methods">
-              {detail.tenderCounts.map((count) => (
-                <span key={count.method}>
-                  <small>{paymentMethodLabel(count.method)}</small>
-                  <strong>{formatMoney(count.observedCents)}</strong>
-                  <small>
-                    Esperado {formatMoney(count.expectedCents)} · diferença{" "}
-                    {formatMoney(count.differenceCents)}
-                  </small>
-                </span>
-              ))}
-            </div>
-          )}
-          {[...detail.entries, ...detail.adjustments].map((entry) => (
-            <div
-              className="cash-entry"
-              key={`${"cashShiftId" in entry ? "entry" : "adjustment"}:${entry.id}`}
-            >
-              <span aria-hidden="true">{entry.direction === "in" ? "↑" : "↓"}</span>
-              <span>
-                <strong>{cashEntryLabel(entry.entryType)}</strong>
-                <small>
-                  {entry.description ?? paymentMethodLabel(entry.paymentMethod)} ·{" "}
-                  {dateLabel(entry.occurredAt)}
-                </small>
-              </span>
-              <strong>{formatMoney(entry.amountCents)}</strong>
-            </div>
-          ))}
-          {detail.responsibilities.map((change) => (
-            <p className="cash-responsibility" key={change.id}>
-              <strong>
-                {change.fromName} → {change.toName}
-              </strong>
-              <small>
-                {change.reason} · {change.transferredByName} · {dateLabel(change.occurredAt)}
-              </small>
-            </p>
-          ))}
-          {detail.shift.status !== "open" && (
-            <Button onClick={() => setShowReceipt(true)} type="button" variant="secondary">
-              Reimprimir comprovante
-            </Button>
-          )}
-        </div>
-      )}
-      {detail && (
         <Modal
-          isOpen={showReceipt}
-          onClose={() => setShowReceipt(false)}
-          size="md"
-          title="Comprovante de fechamento de caixa"
+          className="cash-modal"
+          isOpen
+          onClose={() => {
+            setDetail(null);
+            setShowReceipt(false);
+          }}
+          size={showReceipt ? "md" : "lg"}
+          title={
+            showReceipt ? "Comprovante de fechamento" : `Turno · ${detail.shift.cashRegisterName}`
+          }
         >
-          <CashClosureReceipt
-            shift={detail.shift}
-            breakdown={detail.tenderCounts
-              .filter((item) => item.expectedCents !== null)
-              .map((item) => ({ method: item.method, amountCents: item.expectedCents ?? 0 }))}
-          />
-          <div className="cash-slip-modal-actions">
-            <Button onClick={() => window.print()} type="button">
-              Imprimir comprovante
-            </Button>
-            <Button onClick={() => setShowReceipt(false)} type="button" variant="secondary">
-              Fechar
-            </Button>
-          </div>
+          {!showReceipt ? (
+            <div className="cash-history__detail">
+              <div className="card-header">
+                <p className="cash-card-desc">
+                  {detail.shift.operatorName ?? "Operador"} · {dateLabel(detail.shift.openedAt)}
+                </p>
+              </div>
+              {detail.tenderCounts.length > 0 && (
+                <div className="cash-methods">
+                  {detail.tenderCounts.map((count) => (
+                    <span key={count.method}>
+                      <small>{paymentMethodLabel(count.method)}</small>
+                      <strong>{formatMoney(count.observedCents)}</strong>
+                      <small>
+                        Esperado {formatMoney(count.expectedCents)} · diferença{" "}
+                        {formatMoney(count.differenceCents)}
+                      </small>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {[...detail.entries, ...detail.adjustments].map((entry) => (
+                <div
+                  className="cash-entry"
+                  key={`${"cashShiftId" in entry ? "entry" : "adjustment"}:${entry.id}`}
+                >
+                  <span aria-hidden="true">{entry.direction === "in" ? "↑" : "↓"}</span>
+                  <span>
+                    <strong>{cashEntryLabel(entry.entryType)}</strong>
+                    <small>
+                      {entry.description ?? paymentMethodLabel(entry.paymentMethod)} ·{" "}
+                      {dateLabel(entry.occurredAt)}
+                    </small>
+                  </span>
+                  <strong>{formatMoney(entry.amountCents)}</strong>
+                </div>
+              ))}
+              {detail.responsibilities.map((change) => (
+                <p className="cash-responsibility" key={change.id}>
+                  <strong>
+                    {change.fromName} → {change.toName}
+                  </strong>
+                  <small>
+                    {change.reason} · {change.transferredByName} · {dateLabel(change.occurredAt)}
+                  </small>
+                </p>
+              ))}
+              {detail.shift.status !== "open" && (
+                <Button onClick={() => setShowReceipt(true)} type="button" variant="secondary">
+                  Reimprimir comprovante
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <CashClosureReceipt
+                shift={detail.shift}
+                breakdown={detail.tenderCounts
+                  .filter((item) => item.expectedCents !== null)
+                  .map((item) => ({ method: item.method, amountCents: item.expectedCents ?? 0 }))}
+              />
+              <div className="cash-slip-modal-actions">
+                <Button onClick={() => window.print()} type="button">
+                  Imprimir comprovante
+                </Button>
+                <Button onClick={() => setShowReceipt(false)} type="button" variant="secondary">
+                  Voltar ao turno
+                </Button>
+              </div>
+            </>
+          )}
         </Modal>
       )}
     </Card>

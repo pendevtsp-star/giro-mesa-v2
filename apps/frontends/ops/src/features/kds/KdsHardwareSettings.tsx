@@ -64,8 +64,7 @@ export function KdsHardwareSettings({
           <span className="gm-pill" data-tone="info">
             Somente este terminal
           </span>
-          <h2>Hardware</h2>
-          <p>A impressora vem do perfil persistido do terminal ou do roteamento automático.</p>
+          <h2>Impressão e teclas</h2>
         </div>
         <Badge tone={hardwarePrinting ? "success" : "warning"}>
           {hardwarePrinting ? "Roteamento disponível" : "Saúde não confirmada"}
@@ -77,10 +76,7 @@ export function KdsHardwareSettings({
         <div className="gm-form-field">
           <span>Destino efetivo</span>
           <strong>{printerLabel}</strong>
-          <small>
-            Sem vínculo no terminal, o sistema aplica a política persistida da estação e o tipo do
-            documento.
-          </small>
+          <small>Sem impressora vinculada, segue o roteamento da estação.</small>
           <a className="gm-button gm-button--ghost gm-button--sm" href="#/device">
             Abrir Dispositivos
           </a>
@@ -102,14 +98,12 @@ export function KdsHardwareSettings({
           />
         </label>
         <Button disabled={printBusy} onClick={onTestPrint} size="sm" variant="secondary">
-          Solicitar primeira via do ticket focado
+          Imprimir ticket focado
         </Button>
         <Button disabled={printBusy} onClick={onReprint} size="sm" variant="ghost">
           Reimprimir com motivo…
         </Button>
-        <small>
-          A largura de 58/80 mm, tabela de caracteres e guilhotina são calibradas no Edge.
-        </small>
+        <small>Formato do papel e corte são configurados no conector.</small>
       </fieldset>
 
       <fieldset className="kds-bump-map">
@@ -120,6 +114,7 @@ export function KdsHardwareSettings({
             <Input
               aria-label={`Tecla para ${ACTION_LABEL[action as KdsBumpAction]}`}
               onKeyDown={(event) => {
+                if (event.key === "Tab" || event.key === "Escape") return;
                 event.preventDefault();
                 if (!event.ctrlKey && !event.altKey && !event.metaKey) {
                   assign(action as KdsBumpAction, event.key);

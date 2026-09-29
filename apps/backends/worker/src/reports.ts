@@ -662,15 +662,26 @@ export async function processDueReportSchedules(
             group by categories.id, categories.name order by sum(items.net_cents) desc, categories.name
           `),
           tx.execute<ReportBreakdownRow>(sql`
-            select payments.method::text as key, payments.method::text as label,
-                   count(*)::int as quantity, coalesce(sum(payments.amount_cents), 0)::bigint as revenue_cents
-            from pos_tab_payments as payments
-            inner join pos_tabs as tabs
-              on tabs.organization_id = payments.organization_id and tabs.unit_id = payments.unit_id and tabs.id = payments.tab_id
-            where payments.organization_id = ${schedule.organization_id} and payments.unit_id = ${schedule.unit_id}
-              and tabs.status = 'closed'
-              and timezone(${schedule.timezone}, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
-            group by payments.method order by payments.method
+            select method::text as key, method::text as label,
+                   sum(quantity)::int as quantity, sum(amount_cents)::bigint as revenue_cents
+            from (
+              select payments.method, 1 as quantity, payments.amount_cents
+              from pos_tab_payments as payments
+              inner join pos_tabs as tabs
+                on tabs.organization_id = payments.organization_id and tabs.unit_id = payments.unit_id and tabs.id = payments.tab_id
+              where payments.organization_id = ${schedule.organization_id} and payments.unit_id = ${schedule.unit_id}
+                and tabs.status = 'closed'
+                and timezone(${schedule.timezone}, tabs.closed_at)::date between ${period.from}::date and ${period.to}::date
+              union all
+              select payments.method, 0 as quantity, -reversals.amount_cents
+              from pos_payment_reversals as reversals
+              inner join pos_tab_payments as payments
+                on payments.organization_id = reversals.organization_id and payments.unit_id = reversals.unit_id and payments.id = reversals.payment_id
+              where reversals.organization_id = ${schedule.organization_id} and reversals.unit_id = ${schedule.unit_id}
+                and reversals.status = 'approved'
+                and timezone(${schedule.timezone}, reversals.resolved_at)::date between ${period.from}::date and ${period.to}::date
+            ) as receipts
+            group by method order by method
           `),
           tx.execute<ReportBreakdownRow & { section: ReportFamily }>(sql`
             select 'exceptions'::text as section, 'canceled_items'::text as key,

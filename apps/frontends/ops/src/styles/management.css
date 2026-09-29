@@ -2178,15 +2178,15 @@
     flex-shrink: 0;
     font-size: var(--gm-font-xs);
     min-height: 34px;
-    padding: var(--gm-space-1-5) var(--gm-space-2);
+    padding: var(--gm-space-2);
   }
   .kds-metrics {
-    gap: var(--gm-space-1-5);
+    gap: var(--gm-space-2);
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .kds-metrics > span {
     min-height: 48px;
-    padding: var(--gm-space-1-5) var(--gm-space-3);
+    padding: var(--gm-space-2) var(--gm-space-3);
   }
   .kds-metrics strong {
     font-size: var(--gm-font-lg);

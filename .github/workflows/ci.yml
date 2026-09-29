@@ -38,6 +38,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify scheduled backup retention confinement
+        run: python3 deploy/vps/test_backup_to_r2.py
       - run: pnpm audit --audit-level=high
       - name: Prepare integration databases
         run: |

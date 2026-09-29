@@ -20,10 +20,6 @@
 
   .purchases-command-bar {
     min-width: 0;
-    padding: var(--gm-space-2) var(--gm-space-3);
-    border: 1px solid var(--gm-border);
-    border-radius: 12px;
-    background: var(--gm-surface);
   }
 
   .purchases-command-bar__context,
@@ -34,9 +30,8 @@
     min-width: 0;
   }
 
-  .purchases-command-bar__context strong {
-    font-size: var(--gm-font-md);
-    letter-spacing: -0.01em;
+  .purchases-command-bar__context h1 {
+    margin: 0;
   }
 
   .purchases-command-bar__context span,
@@ -152,6 +147,7 @@
   }
 
   .purchases-toolbar {
+    align-items: end;
     justify-content: flex-start;
     min-width: 0;
     padding: var(--gm-space-2) var(--gm-space-3);
@@ -162,6 +158,7 @@
   .purchases-toolbar__search {
     flex: 1 1 280px;
     min-width: min(100%, 220px);
+    margin: 0;
   }
 
   .purchases-arrival-filter {
@@ -240,10 +237,18 @@
 
   .purchases-total {
     display: flex;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: var(--gm-space-2);
     justify-content: space-between;
     padding: var(--gm-space-3);
     border-radius: 8px;
     background: var(--gm-surface-soft);
+  }
+
+  .purchases-total > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .purchases-lines {

@@ -109,7 +109,7 @@ function NativePairingCard({ onPaired }: { onPaired: () => void }) {
           if (code.length === 8) void redeem(code, apiBaseUrl);
         }}
       >
-        <Label htmlFor="device-pairing-code">
+        <Label className="gm-field items-stretch" htmlFor="device-pairing-code">
           Código temporário
           <Input
             autoComplete="one-time-code"

@@ -57,6 +57,10 @@ describe("database readiness", () => {
             "pos_tabs.linked_service_columns",
             "pos_bill_printing_policies",
             "management_inventory_items.optional_resale_product",
+            "growth_customers.delivery_address",
+            "pos_tabs.delivery_financial_print",
+            "pos_payment_reversals.manual_reversal",
+            "pos_tab_payments.cash_exchange",
           ],
         });
         return true;
@@ -79,6 +83,10 @@ describe("database readiness", () => {
       linkedAccounts: true,
       billPrintingPolicy: "present",
       optionalResaleProduct: true,
+      customerDeliveryAddress: true,
+      deliveryFinancialPrint: true,
+      manualPaymentReversal: true,
+      cashPaymentExchange: true,
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -111,6 +119,10 @@ describe("database readiness", () => {
       linkedAccounts: false,
       billPrintingPolicy: null as string | null,
       optionalResaleProduct: true,
+      customerDeliveryAddress: true,
+      deliveryFinancialPrint: true,
+      manualPaymentReversal: true,
+      cashPaymentExchange: true,
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -145,6 +157,10 @@ describe("database readiness", () => {
       linkedAccounts: true,
       billPrintingPolicy: "present",
       optionalResaleProduct: false,
+      customerDeliveryAddress: true,
+      deliveryFinancialPrint: true,
+      manualPaymentReversal: true,
+      cashPaymentExchange: true,
     };
     const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
     const service = new DatabaseReadinessService(database);
@@ -159,6 +175,51 @@ describe("database readiness", () => {
       },
     );
     readiness.optionalResaleProduct = true;
+    await service.assertReady();
+  });
+
+  it("requires every delivery and payment migration through schema 88", async () => {
+    const readiness = {
+      management: "present",
+      tableQrMetrics: "present",
+      operationalPush: "present",
+      whatsappMessages: "present",
+      crmAutomations: "present",
+      crmQuickReplies: "present",
+      edgeHubPairings: "present",
+      financeAttachments: "present",
+      settlementPayments: true,
+      deliveryFailures: true,
+      linkedAccounts: true,
+      billPrintingPolicy: "present",
+      optionalResaleProduct: true,
+      customerDeliveryAddress: true,
+      deliveryFinancialPrint: true,
+      manualPaymentReversal: true,
+      cashPaymentExchange: true,
+    };
+    const database = { db: { execute: async () => [readiness] } } as unknown as DatabaseService;
+    const service = new DatabaseReadinessService(database);
+    for (const [key, relation] of [
+      ["customerDeliveryAddress", "growth_customers.delivery_address"],
+      ["deliveryFinancialPrint", "pos_tabs.delivery_financial_print"],
+      ["manualPaymentReversal", "pos_payment_reversals.manual_reversal"],
+      ["cashPaymentExchange", "pos_tab_payments.cash_exchange"],
+    ] as const) {
+      readiness[key] = false;
+      await assert.rejects(
+        () => service.assertReady(),
+        (error: unknown) => {
+          assert.ok(error instanceof ServiceUnavailableException);
+          assert.deepEqual(
+            (error.getResponse() as { missingRelations: string[] }).missingRelations,
+            [relation],
+          );
+          return true;
+        },
+      );
+      readiness[key] = true;
+    }
     await service.assertReady();
   });
 });

@@ -13,16 +13,16 @@ export function CtaSection({
   attribution?: CommercialAttribution;
 }) {
   return (
-    <section className="final-cta">
+    <section className="final-cta" aria-labelledby="final-cta-title">
       <div className="container">
-        <h2>{content.title}</h2>
+        <h2 id="final-cta-title">{content.title}</h2>
         <p>{content.description}</p>
         <div>
           <Link
             className="button button-light button-large"
             href={withCommercialAttribution(content.ctaHref, attribution)}
           >
-            {content.ctaLabel} <span aria-hidden="true">→</span>
+            {content.ctaLabel}
           </Link>
         </div>
       </div>

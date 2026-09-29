@@ -92,6 +92,7 @@ export const rolePermissions: Record<SystemRole, readonly string[]> = {
     "operations:tables:reorganize",
     "operations:printing:request",
     "operations:printing:manage",
+    "operations:delivery:operate",
   ],
   receptionist: [
     "reservations:write",

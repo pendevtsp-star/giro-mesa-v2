@@ -17,7 +17,7 @@ import { InternalKeyGuard } from "../billing/internal-key.guard.js";
 import { toOpenApiSchema } from "../common/openapi-zod.js";
 import { DatabaseService } from "../database/database.module.js";
 
-export const RELEASE_SCHEMA_VERSION = 84;
+export const RELEASE_SCHEMA_VERSION = 88;
 export const RELEASE_CAPABILITIES = [
   "table_qr_lifecycle_v1",
   "table_qr_metrics_v1",
@@ -133,6 +133,10 @@ export class DatabaseReadinessService {
           linkedAccounts: boolean;
           billPrintingPolicy: string | null;
           optionalResaleProduct: boolean;
+          customerDeliveryAddress: boolean;
+          deliveryFinancialPrint: boolean;
+          manualPaymentReversal: boolean;
+          cashPaymentExchange: boolean;
         }
       | undefined;
     try {
@@ -150,6 +154,10 @@ export class DatabaseReadinessService {
         linkedAccounts: boolean;
         billPrintingPolicy: string | null;
         optionalResaleProduct: boolean;
+        customerDeliveryAddress: boolean;
+        deliveryFinancialPrint: boolean;
+        manualPaymentReversal: boolean;
+        cashPaymentExchange: boolean;
       }>(
         sql`select
           to_regclass('public.management_time_tracking_settings')::text as management,
@@ -175,7 +183,33 @@ export class DatabaseReadinessService {
           exists(select 1 from pg_constraint
             where conrelid = to_regclass('public.management_inventory_items')
               and conname = 'management_inventory_items_optional_resale_product_check'
-              and convalidated) as "optionalResaleProduct"`,
+              and convalidated) as "optionalResaleProduct",
+          (exists(select 1 from information_schema.columns
+            where table_schema = 'public' and table_name = 'growth_customers'
+              and column_name = 'default_delivery_address')
+            and to_regclass('public.growth_customers_org_idempotency_key_unique') is not null) as "customerDeliveryAddress",
+          ((select count(*) = 3 from information_schema.columns
+            where table_schema = 'public' and table_name = 'pos_tabs'
+              and column_name in ('delivery_fee_cents', 'delivery_address_details', 'delivery_zone_id'))
+            and (select count(*) = 2 from information_schema.columns
+              where table_schema = 'public' and table_name = 'pos_bill_printing_policies'
+                and column_name in ('delivery_auto_print', 'delivery_printer_id'))
+            and exists(select 1 from pg_enum e
+              join pg_type t on t.oid = e.enumtypid join pg_namespace n on n.oid = t.typnamespace
+              where n.nspname = 'public' and t.typname = 'pos_print_document_type'
+                and e.enumlabel = 'delivery_slip')) as "deliveryFinancialPrint",
+          ((select count(*) = 2 from information_schema.columns
+            where table_schema = 'public' and table_name = 'pos_payment_reversals'
+              and column_name in ('payment_attempt_id', 'installation_id') and is_nullable = 'YES')
+            and exists(select 1 from pg_constraint
+              where conrelid = to_regclass('public.pos_payment_reversals')
+                and conname = 'pos_payment_reversals_terminal_pair_check' and convalidated)) as "manualPaymentReversal",
+          ((select count(*) = 2 from information_schema.columns
+            where table_schema = 'public' and table_name = 'pos_tab_payments'
+              and column_name in ('received_cents', 'change_cents'))
+            and exists(select 1 from pg_constraint
+              where conrelid = to_regclass('public.pos_tab_payments')
+                and conname = 'pos_tab_payments_cash_exchange_check' and convalidated)) as "cashPaymentExchange"`,
       );
     } catch (error) {
       this.logger.error(
@@ -203,6 +237,10 @@ export class DatabaseReadinessService {
       !readiness?.optionalResaleProduct
         ? "management_inventory_items.optional_resale_product"
         : null,
+      !readiness?.customerDeliveryAddress ? "growth_customers.delivery_address" : null,
+      !readiness?.deliveryFinancialPrint ? "pos_tabs.delivery_financial_print" : null,
+      !readiness?.manualPaymentReversal ? "pos_payment_reversals.manual_reversal" : null,
+      !readiness?.cashPaymentExchange ? "pos_tab_payments.cash_exchange" : null,
     ].filter((value): value is string => Boolean(value));
     if (missingRelations.length > 0) {
       throw new ServiceUnavailableException({

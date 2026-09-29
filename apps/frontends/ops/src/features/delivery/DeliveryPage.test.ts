@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCourierWhatsAppLink,
   buildDeliveryWhatsAppLink,
+  deliveryColumnSummary,
   deliveryCourierStatusLabel,
   deliveryNotificationTypeLabel,
   deliveryOrderIdFromHash,
@@ -16,7 +17,35 @@ import {
 } from "./DeliveryPage";
 
 describe("integração operacional de mensageria WhatsApp no Delivery", () => {
+  it("resume somente os pedidos da visão e mantém insucessos na etapa em rota", () => {
+    const orders = [
+      { status: "placed" as const, promisedAt: "2020-01-01T00:00:00Z", totalCents: 1000 },
+      { status: "delivery_failed" as const, promisedAt: "2020-01-01T00:00:00Z", totalCents: 2500 },
+      { status: "completed" as const, promisedAt: "2020-01-01T00:00:00Z", totalCents: 5000 },
+    ];
+    const summary = deliveryColumnSummary(orders);
+    expect(summary.find((column) => column.id === "received")).toMatchObject({
+      count: 1,
+      totalCents: 1000,
+      lateCount: 1,
+    });
+    expect(summary.find((column) => column.id === "dispatched")).toMatchObject({
+      count: 1,
+      totalCents: 2500,
+    });
+    expect(summary.reduce((sum, column) => sum + column.count, 0)).toBe(2);
+    expect(
+      deliveryColumnSummary(orders.slice(1)).find((column) => column.id === "received")?.count,
+    ).toBe(0);
+  });
+
   it("traduz estados operacionais e financeiros sem expor enums", () => {
+    expect(deliveryStatusLabel("draft")).toBe("Rascunho");
+    expect(deliveryStatusLabel("sent")).toBe("Enviado");
+    expect(deliveryStatusLabel("served")).toBe("Entregue");
+    expect(deliveryStatusLabel("empty")).toBe("Sem pedidos");
+    expect(deliveryStatusLabel("unknown")).toBe("Em revisão");
+    expect(deliveryStatusLabel("__proto__")).toBe("Em revisão");
     expect(deliveryStatusLabel("delivery_failed")).toBe("Tentativa sem sucesso");
     expect(deliveryStatusLabel("returned")).toBe("Devolvido à loja");
     expect(deliveryCourierStatusLabel("delivering")).toBe("Em entrega");

@@ -471,8 +471,7 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
               <div className="purchases-page">
                 <section aria-label="Ações de compras" className="gm-toolbar purchases-command-bar">
                   <div className="purchases-command-bar__context">
-                    <strong>Fluxo de suprimentos</strong>
-                    <span>Pedidos, recebimentos e faturas da unidade</span>
+                    <h1>Compras</h1>
                   </div>
                   <div className="purchases-header__actions">
                     {canReceive && (
@@ -627,16 +626,18 @@ export function RealPurchasesPage({ scope }: { scope: ManagementScope }) {
                         Atrasados
                       </Button>
                     </fieldset>
-                    <SearchField
-                      aria-label="Buscar pedido ou fornecedor"
-                      className="purchases-toolbar__search"
-                      onChange={(event) => {
-                        setQuery(event.target.value);
-                        setPage(1);
-                      }}
-                      placeholder="Buscar pedido ou fornecedor"
-                      value={query}
-                    />
+                    <label className="gm-form-field purchases-toolbar__search">
+                      <span>Buscar pedido ou fornecedor</span>
+                      <SearchField
+                        aria-label="Buscar pedido ou fornecedor"
+                        onChange={(event) => {
+                          setQuery(event.target.value);
+                          setPage(1);
+                        }}
+                        placeholder="Número do pedido ou fornecedor"
+                        value={query}
+                      />
+                    </label>
                     <label className="gm-form-field purchases-toolbar__status">
                       <span>Status</span>
                       <NativeSelect

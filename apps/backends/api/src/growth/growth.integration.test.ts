@@ -150,6 +150,90 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     const customers = await growth.listCustomers(identityA.id, organizationA.id);
     assert.equal(customers.length, 1);
     assert.equal(customers[0]?.marketingOptIn, true);
+    const defaultDeliveryAddress = {
+      reference: "Portão azul",
+      street: "Rua da Integração",
+      number: "10",
+      neighborhood: "Centro",
+      city: "São Paulo",
+      state: "SP",
+      postalCode: "01001-000",
+    };
+    await growth.updateCustomer(identityA.id, organizationA.id, customer.id, {
+      defaultDeliveryAddress,
+    });
+    assert.deepEqual(
+      (await growth.customerDetail(identityA.id, organizationA.id, customer.id)).customer
+        .defaultDeliveryAddress,
+      defaultDeliveryAddress,
+    );
+    await assert.rejects(
+      () => growth.listCustomers(waiterIdentity.id, organizationA.id),
+      hasCode("INSUFFICIENT_ROLE"),
+    );
+    const operationalCustomerInput = {
+      unitId: unitA.id,
+      name: "Bia Operação",
+      phone: "+55 11 98888-0000",
+      defaultDeliveryAddress,
+      idempotencyKey: `operational-customer-${randomUUID()}`,
+    };
+    const operationalCustomer = await growth.createOperationalCustomer(
+      waiterIdentity.id,
+      organizationA.id,
+      operationalCustomerInput,
+    );
+    assert.equal(operationalCustomer.idempotentReplay, false);
+    assert.equal(operationalCustomer.customer.phone, "+5511988880000");
+    assert.equal(operationalCustomer.customer.defaultDeliveryAddress?.reference, "Portão azul");
+    const replayedOperationalCustomer = await growth.createOperationalCustomer(
+      waiterIdentity.id,
+      organizationA.id,
+      operationalCustomerInput,
+    );
+    assert.equal(replayedOperationalCustomer.idempotentReplay, true);
+    assert.equal(replayedOperationalCustomer.customer.id, operationalCustomer.customer.id);
+    await assert.rejects(
+      () =>
+        growth.createOperationalCustomer(waiterIdentity.id, organizationA.id, {
+          ...operationalCustomerInput,
+          name: "Conteúdo diferente",
+        }),
+      hasCode("IDEMPOTENCY_CONFLICT"),
+    );
+    await assert.rejects(
+      () =>
+        growth.createOperationalCustomer(waiterIdentity.id, organizationA.id, {
+          ...operationalCustomerInput,
+          idempotencyKey: `operational-customer-duplicate-${randomUUID()}`,
+        }),
+      hasCode("CUSTOMER_CONTACT_ALREADY_EXISTS"),
+    );
+    const operationalCustomers = await growth.listOperationalCustomers(
+      waiterIdentity.id,
+      organizationA.id,
+      { unitId: unitA.id, q: "Bia", limit: 20, offset: 0 },
+    );
+    assert.deepEqual(
+      operationalCustomers.items.map((item) => item.id),
+      [operationalCustomer.customer.id],
+    );
+    const clearedOperationalAddress = await growth.updateOperationalCustomer(
+      waiterIdentity.id,
+      organizationA.id,
+      operationalCustomer.customer.id,
+      { unitId: unitA.id, defaultDeliveryAddress: null },
+    );
+    assert.equal(clearedOperationalAddress.customer.defaultDeliveryAddress, null);
+    await assert.rejects(
+      () =>
+        growth.listOperationalCustomers(identityB.id, organizationA.id, {
+          unitId: unitA.id,
+          limit: 20,
+          offset: 0,
+        }),
+      hasCode("UNIT_ACCESS_DENIED"),
+    );
 
     const inboundAt = new Date("2026-09-09T15:00:00.000Z");
     await database.db.insert(whatsappConversations).values([
@@ -485,9 +569,46 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     assert.equal(delivery.order.subtotalCents, 5_000);
     assert.equal(delivery.order.deliveryFeeCents, 900);
     assert.equal(delivery.order.totalCents, 5_900);
+    const [conflictingTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organizationA.id,
+        unitId: unitA.id,
+        openedByIdentityId: identityA.id,
+        fulfillmentType: "delivery",
+        subtotalCents: 5_000,
+        totalCents: 5_000,
+      })
+      .returning();
+    assert.ok(conflictingTab);
+    await assert.rejects(
+      () =>
+        growth.createDeliveryOrder(identityA.id, organizationA.id, {
+          ...deliveryInput,
+          orderRef: conflictingTab.id,
+        }),
+      hasCode("IDEMPOTENCY_CONFLICT"),
+    );
+    const [unchangedTab] = await database.db
+      .select()
+      .from(posTabs)
+      .where(eq(posTabs.id, conflictingTab.id));
+    assert.equal(unchangedTab?.deliveryFeeCents, 0);
+    assert.equal(unchangedTab?.totalCents, 5_000);
+    await database.db.delete(posTabs).where(eq(posTabs.id, conflictingTab.id));
     assert.equal(delivery.order.customerName, "Maria da comanda");
     assert.equal(delivery.order.customerPhone, "+5511988880000");
     assert.equal(delivery.order.addressValidationStatus, "covered");
+    await growth.updateCustomer(identityA.id, organizationA.id, customer.id, {
+      defaultDeliveryAddress: { ...defaultDeliveryAddress, number: "99" },
+    });
+    const [deliverySnapshot] = await growth.listDeliveryOrders(
+      deliveryIdentity.id,
+      organizationA.id,
+      unitA.id,
+      { orderRef: tab.id, limit: 1 },
+    );
+    assert.equal(deliverySnapshot?.address?.number, "10");
     assert.ok(delivery.order.promisedAt);
     assert.ok(delivery.order.promisedAt.getTime() >= deliveryCreatedAt + 59 * 60_000);
     assert.ok(delivery.order.promisedAt.getTime() <= Date.now() + 61 * 60_000);
@@ -738,6 +859,19 @@ it("persists an idempotent tenant-isolated CRM, reservation and delivery flow", 
     );
     assert.equal(scheduledSearch.length, 1);
     assert.equal(scheduledSearch[0]?.id, scheduledPickup.order.id);
+    const byOrderRef = await growth.listDeliveryOrders(
+      deliveryIdentity.id,
+      organizationA.id,
+      unitA.id,
+      {
+        orderRef: scheduledTab.id,
+        limit: 10,
+      },
+    );
+    assert.deepEqual(
+      byOrderRef.map((order) => order.id),
+      [scheduledPickup.order.id],
+    );
     assert.equal(
       (
         await growth.listDeliveryOrders(deliveryIdentity.id, organizationA.id, unitA.id, {

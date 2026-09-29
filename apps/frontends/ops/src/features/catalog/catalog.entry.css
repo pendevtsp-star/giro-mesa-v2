@@ -1,2 +1,8 @@
 @import "./catalog.css" layer(legacy);
 @import "./components/catalog-product-editor.css" layer(legacy);
+
+/* Field alignment must override the Label component's utility classes. */
+.catalog-workspace .gm-modal .gm-field {
+  align-items: stretch;
+  text-align: start;
+}

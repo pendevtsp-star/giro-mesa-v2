@@ -527,7 +527,7 @@ function SettlementsArea({
           isOpen={transition !== null}
           onClose={() => setTransition(null)}
           onConfirm={async (note) => {
-            if (!transition?.settlement.id) return;
+            if (!transition?.settlement.id) return false;
             setBusy(true);
             try {
               await api.management.transitionWaiterSettlement(
@@ -540,8 +540,10 @@ function SettlementsArea({
               setFeedback("Situação do fechamento atualizada.");
               setTransition(null);
               onRefresh();
+              return true;
             } catch (error) {
               setFeedback(errorMessage(error));
+              return false;
             } finally {
               setBusy(false);
             }
@@ -921,7 +923,7 @@ function LossesArea({ data, onRefresh, scope }: AreaProps) {
         isOpen={decision !== null}
         onClose={() => setDecision(null)}
         onConfirm={async (note) => {
-          if (!decision) return;
+          if (!decision) return false;
           setBusy(true);
           try {
             await api.management.decideWaiterOperationalLoss(
@@ -934,8 +936,10 @@ function LossesArea({ data, onRefresh, scope }: AreaProps) {
             setDecision(null);
             setFeedback("Situação da perda atualizada.");
             onRefresh();
+            return true;
           } catch (error) {
             setFeedback(errorMessage(error));
+            return false;
           } finally {
             setBusy(false);
           }
@@ -1483,7 +1487,7 @@ function TransitionModal({
   action: SettlementAction | LossAction | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (note: string) => Promise<void>;
+  onConfirm: (note: string) => Promise<boolean>;
   target: string;
 }) {
   const [note, setNote] = useState("");
@@ -1505,10 +1509,11 @@ function TransitionModal({
         onSubmit={(event) => {
           event.preventDefault();
           setBusy(true);
-          void onConfirm(note.trim()).finally(() => {
-            setBusy(false);
-            setNote("");
-          });
+          void onConfirm(note.trim())
+            .then((completed) => {
+              if (completed) setNote("");
+            })
+            .finally(() => setBusy(false));
         }}
       >
         <FormField htmlFor="transition-note" label="Observação" required>

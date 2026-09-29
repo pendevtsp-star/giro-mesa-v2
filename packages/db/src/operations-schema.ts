@@ -161,6 +161,7 @@ export const posPrintDocumentType = pgEnum("pos_print_document_type", [
   "partial_statement",
   "payment_statement",
   "final_receipt",
+  "delivery_slip",
   "kds_ticket",
 ]);
 export const posPrintJobStatus = pgEnum("pos_print_job_status", [
@@ -435,7 +436,15 @@ export const posProductionPrinters = pgTable(
     supportsRasterGraphics: boolean("supports_raster_graphics").notNull().default(false),
     isDefault: boolean("is_default").notNull().default(false),
     documentTypes: jsonb("document_types")
-      .$type<Array<"partial_statement" | "payment_statement" | "final_receipt" | "kds_ticket">>()
+      .$type<
+        Array<
+          | "partial_statement"
+          | "payment_statement"
+          | "final_receipt"
+          | "kds_ticket"
+          | "delivery_slip"
+        >
+      >()
       .notNull()
       .default(["kds_ticket"]),
     fallbackPrinterId: uuid("fallback_printer_id"),
@@ -519,6 +528,8 @@ export const posBillPrintingPolicies = pgTable(
       .notNull()
       .default("notify_cashier"),
     printerId: uuid("printer_id"),
+    deliveryAutoPrint: boolean("delivery_auto_print").notNull().default(false),
+    deliveryPrinterId: uuid("delivery_printer_id"),
     revision: integer("revision").notNull().default(1),
     ...timestamps,
   },
@@ -542,6 +553,19 @@ export const posBillPrintingPolicies = pgTable(
       sql`(${table.mode} = 'cashier_printer' AND ${table.printerId} IS NOT NULL) OR (${table.mode} IN ('notify_cashier', 'local_terminal') AND ${table.printerId} IS NULL)`,
     ),
     check("pos_bill_printing_policies_revision_check", sql`${table.revision} > 0`),
+    foreignKey({
+      name: "pos_bill_printing_policies_delivery_printer_fk",
+      columns: [table.organizationId, table.unitId, table.deliveryPrinterId],
+      foreignColumns: [
+        posProductionPrinters.organizationId,
+        posProductionPrinters.unitId,
+        posProductionPrinters.id,
+      ],
+    }),
+    check(
+      "pos_bill_printing_policies_delivery_check",
+      sql`NOT ${table.deliveryAutoPrint} OR ${table.deliveryPrinterId} IS NOT NULL`,
+    ),
   ],
 );
 
@@ -1773,6 +1797,19 @@ export const posTabs = pgTable(
     readyNotificationConsent: boolean("ready_notification_consent").notNull().default(false),
     serviceNotes: text("service_notes"),
     deliveryAddress: text("delivery_address"),
+    deliveryAddressDetails: jsonb("delivery_address_details").$type<{
+      street: string;
+      number: string;
+      complement?: string;
+      reference?: string;
+      neighborhood: string;
+      city: string;
+      state: string;
+      postalCode: string;
+      latitude?: number;
+      longitude?: number;
+    }>(),
+    deliveryZoneId: uuid("delivery_zone_id"),
     promisedAt: timestamp("promised_at", { withTimezone: true }),
     readyNotifiedAt: timestamp("ready_notified_at", { withTimezone: true }),
     guestCount: integer("guest_count").notNull().default(1),
@@ -1785,6 +1822,7 @@ export const posTabs = pgTable(
     subtotalCents: integer("subtotal_cents").notNull().default(0),
     discountCents: integer("discount_cents").notNull().default(0),
     serviceChargeCents: integer("service_charge_cents").notNull().default(0),
+    deliveryFeeCents: integer("delivery_fee_cents").notNull().default(0),
     totalCents: integer("total_cents").notNull().default(0),
     closedAt: timestamp("closed_at", { withTimezone: true }),
     ...timestamps,
@@ -1858,7 +1896,7 @@ export const posTabs = pgTable(
     ),
     check(
       "pos_tabs_totals_check",
-      sql`${table.tipCents} >= 0 AND ${table.subtotalCents} >= 0 AND ${table.discountCents} >= 0 AND ${table.serviceChargeCents} >= 0 AND ${table.totalCents} >= 0`,
+      sql`${table.tipCents} >= 0 AND ${table.subtotalCents} >= 0 AND ${table.discountCents} >= 0 AND ${table.serviceChargeCents} >= 0 AND ${table.deliveryFeeCents} >= 0 AND ${table.totalCents} >= 0`,
     ),
   ],
 );
@@ -2150,6 +2188,8 @@ export const posTabPayments = pgTable(
     tabId: uuid("tab_id").notNull(),
     method: posPaymentMethod("method").notNull(),
     amountCents: integer("amount_cents").notNull(),
+    receivedCents: integer("received_cents"),
+    changeCents: integer("change_cents"),
     reference: varchar("reference", { length: 120 }),
     paymentAttemptId: uuid("payment_attempt_id"),
     source: varchar("source", { length: 24 }).notNull().default("manual"),
@@ -2187,6 +2227,12 @@ export const posTabPayments = pgTable(
       ],
     }).onDelete("restrict"),
     check("pos_tab_payments_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "pos_tab_payments_cash_exchange_check",
+      sql`(${table.receivedCents} IS NULL AND ${table.changeCents} IS NULL) OR
+        (${table.method} = 'cash' AND ${table.receivedCents} IS NOT NULL AND ${table.changeCents} IS NOT NULL
+        AND ${table.receivedCents} >= ${table.amountCents} AND ${table.changeCents} = ${table.receivedCents} - ${table.amountCents})`,
+    ),
     check("pos_tab_payments_source_check", sql`${table.source} IN ('manual', 'terminal')`),
   ],
 );
@@ -2198,8 +2244,8 @@ export const posPaymentReversals = pgTable(
     organizationId: uuid("organization_id").notNull(),
     unitId: uuid("unit_id").notNull(),
     paymentId: uuid("payment_id").notNull(),
-    paymentAttemptId: uuid("payment_attempt_id").notNull(),
-    installationId: uuid("installation_id").notNull(),
+    paymentAttemptId: uuid("payment_attempt_id"),
+    installationId: uuid("installation_id"),
     requestedByIdentityId: uuid("requested_by_identity_id")
       .notNull()
       .references(() => identities.id),
@@ -2267,6 +2313,10 @@ export const posPaymentReversals = pgTable(
       ],
     }).onDelete("restrict"),
     check("pos_payment_reversals_amount_check", sql`${table.amountCents} > 0`),
+    check(
+      "pos_payment_reversals_terminal_pair_check",
+      sql`(${table.paymentAttemptId} IS NULL) = (${table.installationId} IS NULL)`,
+    ),
   ],
 );
 

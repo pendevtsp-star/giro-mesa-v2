@@ -139,7 +139,8 @@ public sealed class CloudPrinterCommandProcessorTests : IAsyncLifetime
     [InlineData("partial_statement")]
     [InlineData("payment_statement")]
     [InlineData("final_receipt")]
-    public async Task FinancialCloudDocumentsUseDurableKeysWithoutAProductionStation(string documentType)
+    [InlineData("delivery_slip")]
+    public async Task CustomerCloudDocumentsUseDurableKeysWithoutAProductionStation(string documentType)
     {
         var gateway = new RecordingPrinterGateway();
         var (store, _, processor) = await CreateProcessorAsync(CreateOptions(withStaticPrinter: true), gateway);

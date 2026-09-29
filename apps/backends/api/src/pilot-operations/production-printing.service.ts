@@ -24,8 +24,10 @@ import {
   deviceEnrollments,
   hubCommands,
   hubHeartbeats,
+  organizations,
   outboxEvents,
   posBillPrintingPolicies,
+  posCatalogBranding,
   posDiningTables,
   posIdempotencyReceipts,
   posKdsTerminalProfiles,
@@ -39,6 +41,7 @@ import {
   posProductionStations,
   posTabEvents,
   posTabs,
+  units,
 } from "@giromesa/db";
 import { hasPermission, SYSTEM_ROLES, type SystemRole } from "@giromesa/domain";
 import {
@@ -50,6 +53,8 @@ import {
 } from "@nestjs/common";
 import { and, asc, desc, eq, gt, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { normalizeStoredBranding } from "../organizations/establishment-settings.service.js";
+import { receiptLogoRaster } from "../organizations/receipt-logo.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { replayResult, requestHash } from "./pilot-rules.js";
 
@@ -216,8 +221,20 @@ export class ProductionPrintingService {
       )
       .limit(1);
     return policy
-      ? { mode: policy.mode, printerId: policy.printerId, revision: policy.revision }
-      : { mode: "notify_cashier", printerId: null, revision: 0 };
+      ? {
+          mode: policy.mode,
+          printerId: policy.printerId,
+          revision: policy.revision,
+          deliveryAutoPrint: policy.deliveryAutoPrint,
+          deliveryPrinterId: policy.deliveryPrinterId,
+        }
+      : {
+          mode: "notify_cashier",
+          printerId: null,
+          revision: 0,
+          deliveryAutoPrint: false,
+          deliveryPrinterId: null,
+        };
   }
 
   async readBillPolicy(identityId: string, organizationId: string, unitId: string) {
@@ -254,10 +271,26 @@ export class ProductionPrintingService {
           await this.requireActiveHub(tx, organizationId, unitId, printer.hubId);
           await this.requireFinancialPrintingHub(tx, organizationId, unitId, printer.hubId);
         }
+        const deliveryPrinterId =
+          input.deliveryPrinterId === undefined
+            ? (current.deliveryPrinterId ?? null)
+            : input.deliveryPrinterId;
+        const deliveryAutoPrint = input.deliveryAutoPrint ?? current.deliveryAutoPrint ?? false;
+        if (deliveryAutoPrint && !deliveryPrinterId)
+          throw new ConflictException({ code: "DELIVERY_PRINT_PRINTER_REQUIRED" });
+        if (deliveryPrinterId) {
+          const printer = await this.lockPrinter(tx, organizationId, unitId, deliveryPrinterId);
+          if (!printer.active || !printer.documentTypes.includes("delivery_slip"))
+            throw new ConflictException({ code: "PRODUCTION_PRINTER_NOT_READY" });
+          await this.requireActiveHub(tx, organizationId, unitId, printer.hubId);
+          await this.requireFinancialPrintingHub(tx, organizationId, unitId, printer.hubId);
+        }
         const policy = {
           mode: input.mode,
           printerId: input.printerId,
           revision: current.revision + 1,
+          deliveryAutoPrint,
+          deliveryPrinterId,
         };
         await tx
           .insert(posBillPrintingPolicies)
@@ -655,7 +688,12 @@ export class ProductionPrintingService {
           )
           .limit(1);
         const billPolicy = await this.getBillPolicy(tx, organizationId, unitId);
-        if (policyReference || fallbackReference || billPolicy.printerId === printerId) {
+        if (
+          policyReference ||
+          fallbackReference ||
+          billPolicy.printerId === printerId ||
+          billPolicy.deliveryPrinterId === printerId
+        ) {
           throw new ConflictException({
             code: "PRODUCTION_PRINTER_IN_USE",
             stationId: policyReference?.id,
@@ -1092,7 +1130,10 @@ export class ProductionPrintingService {
           ticketId: source.kdsTicketId,
           station: context.station,
           printer,
-          payload: source.payload as unknown as KdsTicketPrintPayloadV1,
+          payload: {
+            ...source.payload,
+            print: { isReprint: true },
+          } as unknown as KdsTicketPrintPayloadV1,
           copies: input.copies ?? source.copies,
           dispatchKey: `kds-ticket:${source.kdsTicketId}:reprint:${idempotencyKey}`.slice(0, 200),
           reason: input.reason,
@@ -1788,8 +1829,48 @@ export class ProductionPrintingService {
       (context.tab.displayNumber
         ? `Comanda ${context.tab.displayNumber}`
         : context.tab.id.slice(0, 8));
+    const [brand] = await tx
+      .select({
+        legalName: organizations.legalName,
+        tradeName: organizations.tradeName,
+        document: organizations.document,
+        unitName: units.name,
+        timezone: units.timezone,
+        branding: posCatalogBranding.config,
+      })
+      .from(units)
+      .innerJoin(organizations, eq(organizations.id, units.organizationId))
+      .leftJoin(
+        posCatalogBranding,
+        and(
+          eq(posCatalogBranding.organizationId, context.organizationId),
+          eq(posCatalogBranding.unitId, context.unitId),
+        ),
+      )
+      .where(and(eq(units.organizationId, context.organizationId), eq(units.id, context.unitId)))
+      .limit(1);
+    const fallbackName = brand?.tradeName ?? brand?.unitName ?? "Estabelecimento";
+    const presentation = normalizeStoredBranding(brand?.branding, fallbackName).presentation;
     return {
       schemaVersion: 1,
+      status: context.ticket.status,
+      establishment: {
+        displayName: presentation.displayName,
+        legalName: brand?.legalName ?? fallbackName,
+        document: brand?.document ?? null,
+        address: presentation.address,
+        phone: presentation.phone,
+        openingHours: presentation.openingHours,
+        timezone: brand?.timezone ?? "America/Sao_Paulo",
+        logoUrl: presentation.logoUrl,
+        logoRaster:
+          (await receiptLogoRaster(
+            this.database,
+            context.organizationId,
+            context.unitId,
+            presentation.logoUrl,
+          )) ?? undefined,
+      },
       generatedAt: new Date().toISOString(),
       id: context.ticket.id,
       reference: context.tab.displayNumber
@@ -2038,6 +2119,15 @@ export class ProductionPrintingService {
       });
     }
     await this.requireActiveHub(tx, organizationId, unitId, input.hubId);
+    const billPolicy = await this.getBillPolicy(tx, organizationId, unitId);
+    if (
+      (billPolicy.deliveryPrinterId === printerId &&
+        (!input.active || !input.documentTypes.includes("delivery_slip"))) ||
+      (billPolicy.printerId === printerId &&
+        (!input.active || !input.documentTypes.includes("partial_statement")))
+    ) {
+      throw new ConflictException({ code: "PRODUCTION_PRINTER_HAS_ACTIVE_POLICY" });
+    }
     if (input.fallbackPrinterId === printerId) {
       throw new BadRequestException({ code: "PRODUCTION_PRINTER_FALLBACK_SELF_REFERENCE" });
     }

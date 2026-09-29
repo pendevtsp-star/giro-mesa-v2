@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  getPosPaymentAccess,
+  parseManualPaymentReversal,
   parsePaymentAttempt,
   parsePaymentCapabilities,
   paymentAttemptContextError,
@@ -26,6 +28,57 @@ const attempt = {
 };
 
 describe("contratos defensivos do pagamento SmartPOS", () => {
+  it("combina o papel operacional com o modo do terminal sem liberar recebimento manual ao garçom", () => {
+    const expectedAccess = [
+      ["owner", true, true],
+      ["manager", true, true],
+      ["cashier", true, true],
+      ["waiter", false, true],
+      ["finance", false, false],
+      ["delivery", false, false],
+      ["unknown", false, false],
+    ] as const;
+    for (const [profile, manualAllowed, integratedAllowed] of expectedAccess) {
+      for (const mode of ["disabled", "cashier", "homologated_pos"] as const) {
+        expect(getPosPaymentAccess(profile, mode)).toEqual({
+          cashierPaymentEnabled: mode === "cashier" && manualAllowed,
+          integratedPaymentEnabled: mode === "homologated_pos" && integratedAllowed,
+        });
+      }
+    }
+  });
+  it("confirma correção manual apenas para pagamento correspondente aprovado sem ação externa", () => {
+    const reversal = {
+      id: "reversal-1",
+      paymentId: "payment-1",
+      status: "approved",
+      amountCents: 1500,
+    };
+    expect(parseManualPaymentReversal({ reversal, action: null }, "payment-1")).toEqual({
+      reversal,
+      action: null,
+    });
+    for (const status of ["pending", "processing", "declined", "unknown"]) {
+      expect(() =>
+        parseManualPaymentReversal(
+          { reversal: { ...reversal, status }, action: null },
+          "payment-1",
+        ),
+      ).toThrow();
+    }
+    expect(() => parseManualPaymentReversal({ reversal, action: null }, "other-payment")).toThrow();
+    expect(() =>
+      parseManualPaymentReversal({ reversal, action: { type: "reverse" } }, "payment-1"),
+    ).toThrow();
+    for (const amountCents of [0, -1, 1.5, Number.NaN]) {
+      expect(() =>
+        parseManualPaymentReversal(
+          { reversal: { ...reversal, amountCents }, action: null },
+          "payment-1",
+        ),
+      ).toThrow();
+    }
+  });
   it("aceita somente a comanda e a maquininha do deep link", () => {
     expect(paymentAttemptContextError(attempt, "tab-1", "installation-1")).toBeNull();
     expect(paymentAttemptContextError(attempt, "tab-2", "installation-1")).toContain(

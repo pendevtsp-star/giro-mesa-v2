@@ -1,49 +1,48 @@
+import { Icon } from "@giromesa/ui";
+import Link from "next/link";
 import type { CommercialLanding } from "../lib/commercial";
 
 export function TestimonialsSection({
-  testimonials,
   faq,
 }: {
   testimonials: CommercialLanding["testimonials"];
   faq: CommercialLanding["faq"];
 }) {
   return (
-    <>
-      <section className="section trust-section" aria-labelledby="testimonials-title">
-        <div className="container">
-          <div className="section-heading centered">
-            <p className="eyebrow">Experiências publicadas</p>
-            <h2 id="testimonials-title">{testimonials.title}</h2>
+    <section className="section faq-section" id="duvidas" aria-labelledby="faq-title">
+      <div className="container two-column">
+        <div className="faq-intro">
+          <div className="section-heading">
+            <h2 id="faq-title">Dúvidas frequentes</h2>
+            <p>Respostas para ajudar você a escolher o próximo passo da sua operação.</p>
           </div>
-          <div className="testimonial-grid">
-            {testimonials.items.map((item) => (
-              <figure className="testimonial-card" key={`${item.name}-${item.quote}`}>
-                <blockquote>“{item.quote}”</blockquote>
-                <figcaption>
-                  <strong>{item.name}</strong>
-                  <span>{item.role}</span>
-                </figcaption>
-              </figure>
-            ))}
+          <div className="faq-contact">
+            <span className="faq-contact-icon">
+              <Icon name="people" size={24} />
+            </span>
+            <h3>Ainda ficou alguma dúvida?</h3>
+            <p>Converse com a nossa equipe sobre o GiroMesa e as necessidades do seu negócio.</p>
+            <Link className="button button-primary" href="/contato">
+              Falar com a equipe
+            </Link>
           </div>
         </div>
-      </section>
-      <section className="section faq-section">
-        <div className="container narrow">
-          <div className="section-heading centered">
-            <p className="eyebrow">Perguntas frequentes</p>
-            <h2>{faq.title}</h2>
-          </div>
-          <div className="faq-list">
-            {faq.items.map((item) => (
-              <details key={item.question}>
-                <summary>{item.question}</summary>
+        <div className="faq-list">
+          {faq.items.map((item, index) => (
+            <details key={item.question} name="landing-faq" open={index === 0}>
+              <summary>
+                <span>{item.question}</span>
+                <span className="faq-chevron">
+                  <Icon name="chevron-down" size={18} />
+                </span>
+              </summary>
+              <div className="faq-answer">
                 <p>{item.answer}</p>
-              </details>
-            ))}
-          </div>
+              </div>
+            </details>
+          ))}
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

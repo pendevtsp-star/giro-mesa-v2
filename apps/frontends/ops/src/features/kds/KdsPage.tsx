@@ -80,6 +80,7 @@ import {
   saveKdsStationLabel,
 } from "./kds.navigation";
 import { createKdsInitialPrintRequest, kdsReprintIdempotencyKey } from "./kds.printing";
+import "./kds.css";
 
 type KdsViewMode = "station" | "pass";
 type KdsTone = "neutral" | "info" | "warning" | "success" | "danger";
@@ -467,7 +468,7 @@ function TicketCard({
                   </div>
                   <div className="real-kds-item__meta">
                     {item.seatNumber && <span>Pessoa {item.seatNumber}</span>}
-                    <span>{courseLabel(item.course)}</span>
+                    {item.course !== "anytime" && <span>{courseLabel(item.course)}</span>}
                     {item.readyQuantity > 0 && item.readyQuantity < item.quantity && (
                       <span>
                         {item.readyQuantity}/{item.quantity} prontos
@@ -807,6 +808,7 @@ export function RealKdsPage({
     printerPreferences(`${storagePrefix}:print-copies`, `${storagePrefix}:printer`),
   );
   const [printBusy, setPrintBusy] = useState(false);
+  const [printMessage, setPrintMessage] = useState<string | null>(null);
   const [printJobsByTicket, setPrintJobsByTicket] = useState<Record<string, ProductionPrintJob>>(
     {},
   );
@@ -851,6 +853,7 @@ export function RealKdsPage({
   const [cancelPin, setCancelPin] = useState("");
   const [cancelConfirmed, setCancelConfirmed] = useState(false);
   const [cancelFormError, setCancelFormError] = useState<string | null>(null);
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
   const [realtimeFreshness, setRealtimeFreshness] = useState<RealtimeFreshness | null>(null);
   const [readyNotices, setReadyNotices] = useState<ReadyNotice[]>([]);
@@ -859,6 +862,8 @@ export function RealKdsPage({
   const [itemOperationReason, setItemOperationReason] = useState("");
   const [itemOperationStationId, setItemOperationStationId] = useState("");
   const [itemOperationError, setItemOperationError] = useState<string | null>(null);
+  const [itemOperationSubmitting, setItemOperationSubmitting] = useState(false);
+  const [itemOperationActionKey, setItemOperationActionKey] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<KdsAnalytics | null>(null);
   const [analyticsWindowHours, setAnalyticsWindowHours] = useState(24);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
@@ -868,6 +873,7 @@ export function RealKdsPage({
     typeof window === "undefined" ? null : kdsTicketIdFromHash(window.location.hash),
   );
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const terminalActionsRef = useRef<HTMLDetailsElement>(null);
   const printInFlightRef = useRef(new Set<string>());
   const confirmationsRef = useRef(new Map<string, PendingConfirmation>());
   const inFlightRef = useRef(new Set<string>());
@@ -877,6 +883,27 @@ export function RealKdsPage({
   const previousChangesRef = useRef<Set<string> | null>(null);
   const terminalProfileLoadedRef = useRef<string | null>(null);
   const availabilityLoadRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      const menu = terminalActionsRef.current;
+      if (menu?.open && event.target instanceof Node && !menu.contains(event.target)) {
+        menu.open = false;
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      const menu = terminalActionsRef.current;
+      if (event.key !== "Escape" || !menu?.open || !menu.contains(document.activeElement)) return;
+      menu.open = false;
+      menu.querySelector<HTMLElement>("summary")?.focus();
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeWithEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeWithEscape);
+    };
+  }, []);
 
   useEffect(() => {
     const timer = globalThis.setInterval(() => setNow(Date.now()), 30_000);
@@ -1011,35 +1038,21 @@ export function RealKdsPage({
     saveKdsStationLabel(scope.unitId, station?.name ?? "Todas as estações");
   }, [remote.state, scope.unitId, stationId]);
 
-  useEffect(() => {
-    const workspace = workspaceRef.current;
-    if (!workspace) return;
-    const onFocusIn = (event: FocusEvent) => {
-      const element = event.target instanceof HTMLElement ? event.target : null;
-      const ticket = element?.closest<HTMLElement>("[data-kds-ticket]");
-      if (ticket?.dataset.kdsTicket) setFocusedPrintTicketId(ticket.dataset.kdsTicket);
-    };
-    workspace.addEventListener("focusin", onFocusIn);
-    return () => workspace.removeEventListener("focusin", onFocusIn);
-  }, []);
-
   const printTicket = useCallback(
     async (requestedTicketId?: string) => {
       const workspace = workspaceRef.current;
       if (!workspace || remote.state.status !== "ready") return;
-      const ticketId = requestedTicketId ?? focusedPrintTicketId;
-      const candidates = [...workspace.querySelectorAll<HTMLElement>("[data-kds-ticket]")];
-      const target =
-        candidates.find((candidate) => candidate.dataset.kdsTicket === ticketId) ?? candidates[0];
-      if (!target) {
-        setLiveMessage("Nenhum ticket disponível para impressão.");
+      const ticketId =
+        requestedTicketId ??
+        focusedPrintTicketId ??
+        workspace.querySelector<HTMLElement>("[data-kds-ticket]")?.dataset.kdsTicket;
+      if (!ticketId) {
+        setPrintMessage("Selecione um ticket na Estação de preparo para imprimir.");
         return;
       }
-      const ticket = remote.state.data.tickets.find(
-        (candidate) => candidate.id === target.dataset.kdsTicket,
-      );
+      const ticket = remote.state.data.tickets.find((candidate) => candidate.id === ticketId);
       if (!ticket) {
-        setLiveMessage("O ticket focado não está mais na fila.");
+        setPrintMessage("Selecione um ticket na Estação de preparo para imprimir.");
         return;
       }
       const operationKey = `initial:${ticket.id}`;
@@ -1060,13 +1073,13 @@ export function RealKdsPage({
         );
         setPrintJobsByTicket((current) => ({ ...current, [ticket.id]: created.printJob }));
         const reference = ticket.reference ?? ticket.id.slice(0, 6).toUpperCase();
-        setLiveMessage(
+        setPrintMessage(
           created.idempotentReplay
             ? `A primeira via do ticket ${reference} já havia sido solicitada. Para uma nova saída física, use Reimprimir com motivo.`
             : `Ticket ${reference} enviado à fila de impressão.`,
         );
       } catch (error) {
-        setLiveMessage(
+        setPrintMessage(
           error instanceof Error
             ? `Não foi possível solicitar a impressão: ${error.message}`
             : "Não foi possível solicitar a impressão.",
@@ -1089,7 +1102,7 @@ export function RealKdsPage({
         workspace?.querySelector<HTMLElement>("[data-kds-ticket]")?.dataset.kdsTicket;
       const ticket = remote.state.data.tickets.find((candidate) => candidate.id === ticketId);
       if (!ticket) {
-        setLiveMessage("Nenhum ticket disponível para reimpressão.");
+        setPrintMessage("Selecione um ticket na Estação de preparo para reimprimir.");
         return;
       }
       setPrintBusy(true);
@@ -1103,7 +1116,7 @@ export function RealKdsPage({
           sourceJob = jobs.find((job) => job.status === "printed" && job.reprintOfJobId === null);
         }
         if (sourceJob?.status !== "printed") {
-          setLiveMessage(
+          setPrintMessage(
             "A primeira via ainda não tem confirmação de impressão; resolva a fila antes de reimprimir.",
           );
           return;
@@ -1117,7 +1130,7 @@ export function RealKdsPage({
           idempotencyKey: kdsReprintIdempotencyKey(ticket.id, crypto.randomUUID()),
         });
       } catch (error) {
-        setLiveMessage(
+        setPrintMessage(
           error instanceof Error
             ? `Não foi possível localizar a impressão original: ${error.message}`
             : "Não foi possível localizar a impressão original.",
@@ -1154,7 +1167,7 @@ export function RealKdsPage({
           ...current,
           [reprintRequest.ticketId]: created.printJob,
         }));
-        setLiveMessage(`Reimpressão do ticket ${reprintRequest.reference} enviada à fila.`);
+        setPrintMessage(`Reimpressão do ticket ${reprintRequest.reference} enviada à fila.`);
         setReprintRequest(null);
         setReprintReason("");
       } catch (error) {
@@ -1324,9 +1337,23 @@ export function RealKdsPage({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.ctrlKey || event.altKey || event.metaKey || isEditableTarget(event.target)) return;
+      if (
+        event.ctrlKey ||
+        event.altKey ||
+        event.metaKey ||
+        isEditableTarget(event.target) ||
+        document.querySelector("dialog[open]")
+      )
+        return;
       const key = event.key.toLowerCase();
       const bumpAction = kdsBumpActionForKey(bumpMap, event.key);
+      if (
+        bumpAction === "bump" &&
+        event.target instanceof HTMLElement &&
+        event.target.closest("button, a, summary") &&
+        !event.target.closest("[data-kds-bump]")
+      )
+        return;
       if (bumpAction === "previous" || bumpAction === "next") {
         const buttons = [
           ...document.querySelectorAll<HTMLButtonElement>("[data-kds-bump]:not(:disabled)"),
@@ -1595,18 +1622,34 @@ export function RealKdsPage({
         : "",
     );
     setItemOperationError(null);
+    setItemOperationActionKey(null);
   }
 
   function closeItemOperation() {
+    if (itemOperationSubmitting) return;
+    resetItemOperation();
+  }
+
+  function resetItemOperation() {
     setItemOperation(null);
     setItemOperationReason("");
     setItemOperationStationId("");
     setItemOperationError(null);
+    setItemOperationActionKey(null);
+  }
+
+  async function runItemOperation(input: KdsActionInput) {
+    setItemOperationError(null);
+    setItemOperationActionKey(input.key);
+    setItemOperationSubmitting(true);
+    const accepted = await runAction(input);
+    setItemOperationSubmitting(false);
+    if (accepted) resetItemOperation();
   }
 
   function submitItemOperation(event: FormEvent<HTMLFormElement>, data: KdsData) {
     event.preventDefault();
-    if (!itemOperation) return;
+    if (!itemOperation || itemOperationSubmitting) return;
     const reason = itemOperationReason.trim();
     if (reason.length < 3) {
       setItemOperationError("Informe um motivo com pelo menos 3 caracteres.");
@@ -1627,7 +1670,7 @@ export function RealKdsPage({
         setItemOperationError("Escolha uma estação diferente da atual.");
         return;
       }
-      void runAction({
+      void runItemOperation({
         action: KDS_PILOT_ACTIONS.rerouteItem,
         key: `ticket:${ticket.id}:item:${item.id}:reroute:${targetStationId}`,
         label: `Mudança de estação de ${item.productName}`,
@@ -1647,11 +1690,10 @@ export function RealKdsPage({
         confirmed: (nextData) =>
           isKdsRerouteConfirmed(nextData, ticket.id, item.id, targetStationId),
       });
-      closeItemOperation();
       return;
     }
     const block = itemOperation.kind === "block";
-    void runAction({
+    void runItemOperation({
       action: block ? KDS_PILOT_ACTIONS.blockItem : KDS_PILOT_ACTIONS.unblockItem,
       key: `ticket:${ticket.id}:item:${item.id}:${block ? "block" : "unblock"}`,
       label: `${item.productName} ${block ? "bloqueado" : "desbloqueado"}`,
@@ -1686,7 +1728,6 @@ export function RealKdsPage({
         return assignment !== null && Boolean(assignment.blocked?.active) === block;
       },
     });
-    closeItemOperation();
   }
 
   function refireItem(ticket: KdsTicket, item: KdsItem) {
@@ -2052,10 +2093,20 @@ export function RealKdsPage({
     setCancelPin("");
     setCancelConfirmed(false);
     setCancelFormError(null);
+    setErrors((current) => {
+      const next = { ...current };
+      delete next[`ticket:${ticket.id}:cancel`];
+      return next;
+    });
     setCancelTicketId(ticket.id);
   }
 
   function closeTicketCancellation() {
+    if (cancelSubmitting) return;
+    resetTicketCancellation();
+  }
+
+  function resetTicketCancellation() {
     setCancelTicketId(null);
     setCancelReason("");
     setCancelPin("");
@@ -2063,11 +2114,11 @@ export function RealKdsPage({
     setCancelFormError(null);
   }
 
-  function submitTicketCancellation(event: FormEvent<HTMLFormElement>) {
+  async function submitTicketCancellation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const ticketId = cancelTicketId;
     const reason = cancelReason.trim();
-    if (!ticketId) return;
+    if (!ticketId || cancelSubmitting) return;
     if (reason.length < 3) {
       setCancelFormError("Informe um motivo com pelo menos 3 caracteres.");
       return;
@@ -2085,7 +2136,9 @@ export function RealKdsPage({
       pin: cancelPin,
       reason,
     };
-    void runAction({
+    setCancelFormError(null);
+    setCancelSubmitting(true);
+    const accepted = await runAction({
       action: KDS_PILOT_ACTIONS.cancelTicket,
       key: `ticket:${ticketId}:cancel`,
       label: "Cancelamento do ticket",
@@ -2108,7 +2161,8 @@ export function RealKdsPage({
         );
       },
     });
-    closeTicketCancellation();
+    setCancelSubmitting(false);
+    if (accepted) resetTicketCancellation();
   }
 
   function acknowledgeCancellation(alert: KdsCancellationAlert) {
@@ -2255,11 +2309,31 @@ export function RealKdsPage({
         return (
           <div
             className={`kds-workspace kds-workspace--density-${density} ${fullscreen ? "kds-workspace--fullscreen" : ""}`}
+            onFocusCapture={(event) => {
+              const ticket = event.target.closest<HTMLElement>("[data-kds-ticket]");
+              if (ticket?.dataset.kdsTicket) setFocusedPrintTicketId(ticket.dataset.kdsTicket);
+            }}
             ref={workspaceRef}
           >
             <p aria-atomic="true" aria-live="polite" className="kds-sr-live">
               {liveMessage}
             </p>
+
+            <header className="kds-page-heading">
+              <h1>
+                {area === "settings"
+                  ? "Configurações do KDS"
+                  : operationalViewMode === "pass"
+                    ? "Passe / expedição"
+                    : "Produção KDS"}
+              </h1>
+            </header>
+
+            {printMessage && (
+              <p className="gm-observability-row kds-print-status" role="status">
+                {printMessage}
+              </p>
+            )}
 
             <nav aria-label="Navegação da produção KDS" className="kds-tabs">
               <a
@@ -2384,19 +2458,15 @@ export function RealKdsPage({
               <>
                 <div className="kds-command-bar">
                   <div className="kds-operational-context">
-                    <Badge tone="neutral">Produção KDS</Badge>
                     {operationalViewMode === "station" && (
                       <div className="kds-station-context">
                         <strong>{stationName}</strong>
-                        <Badge tone={stationLocked ? "info" : "warning"}>
-                          {stationLocked ? "Estação fixada" : "Estação não fixada"}
-                        </Badge>
+                        {stationLocked && <Badge tone="info">Estação fixada</Badge>}
                       </div>
                     )}
                     {operationalViewMode === "pass" && (
                       <div className="kds-pass-context">
-                        <strong>Passe / expedição</strong>
-                        <small>Todos os pedidos e estações</small>
+                        <strong>Todos os pedidos e estações</strong>
                       </div>
                     )}
                   </div>
@@ -2422,7 +2492,7 @@ export function RealKdsPage({
                     >
                       {manualRefreshing ? "Atualizando…" : "Atualizar produção"}
                     </Button>
-                    <details className="kds-terminal-actions">
+                    <details className="kds-terminal-actions" ref={terminalActionsRef}>
                       <summary>Ações do terminal</summary>
                       <div>
                         <Button
@@ -2493,7 +2563,7 @@ export function RealKdsPage({
                       {realtimeStatus === "live"
                         ? "tempo real"
                         : realtimeStatus === "polling"
-                          ? "polling de contingência"
+                          ? "atualização periódica"
                           : "conectando"}
                       {realtimeFreshness?.lastConfirmedAt
                         ? ` · confirmação ${formatTime(realtimeFreshness.lastConfirmedAt)}`
@@ -2890,6 +2960,7 @@ export function RealKdsPage({
                   fullscreen={fullscreen}
                   installationId={terminalInstallationId}
                   mode={operationalViewMode}
+                  stationId={operationalStationId}
                   refresh={remote.refresh}
                   scope={scope}
                 />
@@ -2911,6 +2982,7 @@ export function RealKdsPage({
             )}
 
             <Modal
+              closeDisabled={itemOperationSubmitting}
               isOpen={itemOperation !== null}
               onClose={closeItemOperation}
               size="sm"
@@ -2936,6 +3008,7 @@ export function RealKdsPage({
                   <label>
                     Tipo de bloqueio
                     <NativeSelect
+                      disabled={itemOperationSubmitting}
                       onChange={(event) => setItemOperationCode(event.target.value as KdsBlockCode)}
                       required
                       value={itemOperationCode}
@@ -2952,6 +3025,7 @@ export function RealKdsPage({
                   <label>
                     Estação de destino
                     <NativeSelect
+                      disabled={itemOperationSubmitting}
                       onChange={(event) => setItemOperationStationId(event.target.value)}
                       required
                       value={itemOperationStationId}
@@ -2970,6 +3044,7 @@ export function RealKdsPage({
                 <label>
                   Motivo
                   <Textarea
+                    disabled={itemOperationSubmitting}
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setItemOperationReason(event.target.value)}
@@ -2978,40 +3053,51 @@ export function RealKdsPage({
                     value={itemOperationReason}
                   />
                 </label>
-                {itemOperationError && (
+                {(itemOperationError ||
+                  (itemOperationActionKey && errors[itemOperationActionKey])) && (
                   <p className="kds-action-error" role="alert">
-                    {itemOperationError}
+                    {itemOperationError ||
+                      (itemOperationActionKey && errors[itemOperationActionKey])}
                   </p>
                 )}
                 {cloudUnavailable &&
                   (itemOperation?.kind === "reroute" || !data.capabilities.offlineBlock) && (
                     <p className="kds-inline-alert" role="status">
-                      Esta ação exige conexão com o servidor e não será simulada localmente.
+                      Conecte o terminal para concluir esta ação.
                     </p>
                   )}
                 <div className="kds-item-operation-form__actions">
-                  <Button onClick={closeItemOperation} type="button" variant="ghost">
+                  <Button
+                    disabled={itemOperationSubmitting}
+                    onClick={closeItemOperation}
+                    type="button"
+                    variant="secondary"
+                  >
                     Voltar
                   </Button>
                   <Button
                     disabled={
-                      cloudUnavailable &&
-                      (itemOperation?.kind === "reroute" || !data.capabilities.offlineBlock)
+                      itemOperationSubmitting ||
+                      (cloudUnavailable &&
+                        (itemOperation?.kind === "reroute" || !data.capabilities.offlineBlock))
                     }
                     type="submit"
                     variant={itemOperation?.kind === "block" ? "danger" : "primary"}
                   >
-                    {itemOperation?.kind === "block"
-                      ? "Confirmar bloqueio"
-                      : itemOperation?.kind === "unblock"
-                        ? "Confirmar desbloqueio"
-                        : "Confirmar nova estação"}
+                    {itemOperationSubmitting
+                      ? "Confirmando…"
+                      : itemOperation?.kind === "block"
+                        ? "Confirmar bloqueio"
+                        : itemOperation?.kind === "unblock"
+                          ? "Confirmar desbloqueio"
+                          : "Confirmar nova estação"}
                   </Button>
                 </div>
               </form>
             </Modal>
 
             <Modal
+              closeDisabled={cancelSubmitting}
               isOpen={cancelTicketId !== null}
               onClose={closeTicketCancellation}
               size="sm"
@@ -3025,6 +3111,7 @@ export function RealKdsPage({
                 <label>
                   Motivo do cancelamento
                   <Textarea
+                    disabled={cancelSubmitting}
                     maxLength={500}
                     minLength={3}
                     onChange={(event) => setCancelReason(event.target.value)}
@@ -3037,6 +3124,7 @@ export function RealKdsPage({
                   PIN gerencial
                   <Input
                     autoComplete="one-time-code"
+                    disabled={cancelSubmitting}
                     inputMode="numeric"
                     maxLength={8}
                     minLength={4}
@@ -3050,29 +3138,36 @@ export function RealKdsPage({
                 <label className="kds-cancel-confirmation">
                   <input
                     checked={cancelConfirmed}
+                    disabled={cancelSubmitting}
                     onChange={(event) => setCancelConfirmed(event.target.checked)}
                     required
                     type="checkbox"
                   />
                   <span>Confirmo o cancelamento deste ticket e a interrupção da produção.</span>
                 </label>
-                {cancelFormError && (
+                {(cancelFormError || errors[`ticket:${cancelTicketId}:cancel`]) && (
                   <p className="kds-action-error" role="alert">
-                    {cancelFormError}
+                    {cancelFormError || errors[`ticket:${cancelTicketId}:cancel`]}
                   </p>
                 )}
                 <div className="kds-cancel-form__actions">
-                  <Button onClick={closeTicketCancellation} type="button" variant="ghost">
+                  <Button
+                    disabled={cancelSubmitting}
+                    onClick={closeTicketCancellation}
+                    type="button"
+                    variant="secondary"
+                  >
                     Voltar
                   </Button>
-                  <Button type="submit" variant="danger">
-                    Confirmar cancelamento
+                  <Button disabled={cancelSubmitting} type="submit" variant="danger">
+                    {cancelSubmitting ? "Confirmando…" : "Confirmar cancelamento"}
                   </Button>
                 </div>
               </form>
             </Modal>
 
             <Modal
+              closeDisabled={printBusy}
               isOpen={reprintRequest !== null}
               onClose={() => {
                 if (printBusy) return;
@@ -3084,10 +3179,7 @@ export function RealKdsPage({
               title={`Reimprimir ticket ${reprintRequest?.reference ?? ""}`}
             >
               <form className="kds-item-operation-form" onSubmit={submitTicketReprint}>
-                <p>
-                  A primeira via nunca é disparada novamente por duplo clique. Informe o motivo
-                  desta nova saída física; a reimpressão ficará vinculada ao trabalho original.
-                </p>
+                <p>Informe o motivo. A nova via ficará registrada no histórico de impressão.</p>
                 <label>
                   Motivo da reimpressão
                   <Textarea
@@ -3114,7 +3206,7 @@ export function RealKdsPage({
                       setReprintError(null);
                     }}
                     type="button"
-                    variant="ghost"
+                    variant="secondary"
                   >
                     Voltar
                   </Button>
@@ -3130,7 +3222,7 @@ export function RealKdsPage({
               <p>
                 Setas ← ↑ → ↓ movem o foco entre as ações principais (bump bar). Enter ou Espaço
                 executa a ação focada. R atualiza, M alterna o som, F alterna a tela cheia e P
-                imprime somente o ticket focado. Atalhos não atuam durante digitação.
+                imprime somente o ticket focado. Atalhos ficam pausados em formulários e janelas.
               </p>
             </details>
             {errors.global && (

@@ -73,7 +73,7 @@ public sealed class CloudPrinterCommandProcessor(
             (input.DocumentType != "kds_ticket" && input.StationId is not null) ||
             input.StationName?.Length > 120 ||
             input.PrinterId?.Length > 80 ||
-            input.DocumentType is not ("kds_ticket" or "partial_statement" or "payment_statement" or "final_receipt") ||
+            input.DocumentType is not ("kds_ticket" or "partial_statement" or "payment_statement" or "final_receipt" or "delivery_slip") ||
             string.IsNullOrWhiteSpace(input.PrinterId) ||
             input.Copies is < 1 or > 5 ||
             input.Payload.ValueKind != JsonValueKind.Object)

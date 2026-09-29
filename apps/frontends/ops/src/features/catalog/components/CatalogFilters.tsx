@@ -23,11 +23,11 @@ type CatalogFiltersProps = {
 };
 
 const DIET_FILTERS = [
-  { id: "all", label: "Todos os Itens" },
-  { id: "gluten_free", label: "Sem Glúten" },
-  { id: "lactose_free", label: "Sem Lactose" },
-  { id: "vegan", label: "Vegano / Vegetariano" },
-  { id: "seafood_free", label: "Sem Frutos do Mar" },
+  { id: "all", label: "Todos os itens" },
+  { id: "gluten_free", label: "Sem glúten" },
+  { id: "lactose_free", label: "Sem lactose" },
+  { id: "vegan", label: "Vegano / vegetariano" },
+  { id: "seafood_free", label: "Sem frutos do mar" },
 ];
 
 const VIEW_MODES: Array<{
@@ -103,40 +103,45 @@ export function CatalogFilters({
             }
             value={status}
           >
-            <option value="active">Apenas Ativos</option>
-            <option value="inactive">Apenas Inativos</option>
-            <option value="all">Todos os Status</option>
+            <option value="active">Apenas ativos</option>
+            <option value="inactive">Apenas inativos</option>
+            <option value="all">Todos os status</option>
           </NativeSelect>
 
           <SearchField
             className="catalog-filters__search"
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Buscar produtos..."
+            placeholder="Buscar produtos"
             value={search}
           />
         </div>
       </div>
 
-      <div className="catalog-diet-filters">
-        <span className="catalog-diet-filters__label">Filtro de Dieta & Segurança:</span>
-        {DIET_FILTERS.map((diet) => {
-          const active = dietFilter === diet.id;
-          return (
-            <Button
-              aria-pressed={active}
-              className="catalog-diet-filters__chip"
-              data-active={active}
-              key={diet.id}
-              onClick={() => onDietFilterChange(diet.id)}
-              type="button"
-              variant="ghost"
-            >
-              {active && <Icon name="check" size={11} />}
-              <span>{diet.label}</span>
-            </Button>
-          );
-        })}
-      </div>
+      <details className="catalog-diet-filter-disclosure">
+        <summary>
+          <span>Preferências alimentares</span>
+          {dietFilter !== "all" && <small>1 filtro ativo</small>}
+        </summary>
+        <div className="catalog-diet-filters">
+          {DIET_FILTERS.map((diet) => {
+            const active = dietFilter === diet.id;
+            return (
+              <Button
+                aria-pressed={active}
+                className="catalog-diet-filters__chip"
+                data-active={active}
+                key={diet.id}
+                onClick={() => onDietFilterChange(diet.id)}
+                type="button"
+                variant="ghost"
+              >
+                {active && <Icon name="check" size={11} />}
+                <span>{diet.label}</span>
+              </Button>
+            );
+          })}
+        </div>
+      </details>
     </section>
   );
 }

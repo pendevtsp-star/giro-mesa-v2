@@ -12,7 +12,7 @@ import {
   StatusDot,
 } from "@giromesa/ui";
 import { type FormEvent, useEffect, useState } from "react";
-import { api } from "../../api";
+import { ApiClientError, api } from "../../api";
 import {
   currencyToCents,
   dateLabel,
@@ -28,7 +28,12 @@ import { formatMoney } from "../../rules";
 import { CashAdministrationPanels } from "./CashAdministrationPanels";
 import { CashClosureReceipt } from "./CashClosureReceipt";
 import { CashHistoryPanel } from "./CashHistoryPanel";
-import { cashEntryLabel, paymentMethodLabel, summarizeCashEntries } from "./cash";
+import {
+  cashEntryLabel,
+  paymentMethodLabel,
+  summarizeCashEntries,
+  visibleCashAlerts,
+} from "./cash";
 import "./cash.css";
 
 type BusyAction = "open" | "movement" | "close" | "review" | "register" | "transfer" | null;
@@ -71,13 +76,20 @@ function useOnline() {
   return online;
 }
 
-export function RealCashPage({ scope }: { scope: ManagementScope }) {
+export function RealCashPage({
+  scope,
+  identityId,
+}: {
+  scope: ManagementScope;
+  identityId?: string;
+}) {
   const remote = useRemote(scope, api.management.cashShifts, parseCash);
   const online = useOnline();
   const [opening, setOpening] = useState("");
   const [selectedRegisterId, setSelectedRegisterId] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [showRegisterForm, setShowRegisterForm] = useState(false);
+  const [showRegisters, setShowRegisters] = useState(false);
   const [editingRegisterId, setEditingRegisterId] = useState("");
   const [editingRegisterName, setEditingRegisterName] = useState("");
   const [transferToShiftId, setTransferToShiftId] = useState("");
@@ -95,6 +107,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
   const [confirmClose, setConfirmClose] = useState(false);
   const [lastClosure, setLastClosure] = useState<ReturnType<typeof parseCashClosure> | null>(null);
   const [reviewNote, setReviewNote] = useState("");
+  const [restrictedReviews, setRestrictedReviews] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<CashWorkspaceView>("shift");
   const [activeActionPanel, setActiveActionPanel] = useState<
     "close" | "movement" | "transfer" | null
@@ -109,6 +122,8 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
 
   function selectRegister(cashRegisterId: string) {
     setSelectedRegisterId(cashRegisterId);
+    setLastClosure(null);
+    setShowReceiptModal(false);
     setMovementAmount("");
     setMovementReason("");
     setTransferToShiftId("");
@@ -402,7 +417,17 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
       setFeedback("Divergência revisada e auditada.");
       remote.retry();
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Não foi possível revisar o caixa.");
+      if (
+        error instanceof ApiClientError &&
+        error.code === "CASH_SHIFT_REVIEW_DUAL_CONTROL_REQUIRED"
+      ) {
+        setRestrictedReviews((current) => [...current, `${identityId ?? ""}:${shiftId}`]);
+        setActionError("");
+      } else {
+        setActionError(
+          error instanceof Error ? error.message : "Não foi possível revisar o caixa.",
+        );
+      }
     } finally {
       setBusy(null);
     }
@@ -425,6 +450,11 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
         const reviewCandidate = closed.find(
           (shift) => shift.status === "closed" && shift.differenceSeverity !== "none",
         );
+        const reviewRequiresAnotherManager = Boolean(
+          reviewCandidate &&
+            ((identityId && reviewCandidate.currentResponsibleIdentityId === identityId) ||
+              restrictedReviews.includes(`${identityId ?? ""}:${reviewCandidate.id}`)),
+        );
         const entries = open ? data.entries.filter((entry) => entry.cashShiftId === open.id) : [];
         const summary = summarizeCashEntries(entries);
         const closeMethods = [
@@ -439,6 +469,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
           (sum, tab) => sum + tab.remainingCents,
           0,
         );
+        const alerts = visibleCashAlerts(data);
 
         const filteredEntries = entries.filter((entry) => {
           if (ledgerFilter === "in") return entry.direction === "in";
@@ -448,28 +479,75 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
 
         return (
           <div className="cash-page growth-stack">
+            <header className="cash-page-header gm-toolbar">
+              <div>
+                <h1>Contas e caixa</h1>
+                <p>
+                  {openShifts.length === 1
+                    ? "1 caixa aberto"
+                    : `${openShifts.length} caixas abertos`}
+                  {openShifts.length > 1 && data.capabilities.canViewExpected && (
+                    <> · Total da unidade {formatMoney(consolidatedExpected)}</>
+                  )}
+                </p>
+              </div>
+              <div className="cash-page-header__actions">
+                {data.registers.length > 0 && (
+                  <label className="cash-register-picker">
+                    Gaveta
+                    <NativeSelect
+                      aria-label="Gaveta em uso"
+                      disabled={busy !== null}
+                      onChange={(event) => selectRegister(event.target.value)}
+                      value={selectedRegister?.id ?? ""}
+                    >
+                      {data.registers.map((register) => (
+                        <option key={register.id} value={register.id}>
+                          {register.name} ·{" "}
+                          {register.openShiftId
+                            ? "Aberto"
+                            : register.active
+                              ? "Fechado"
+                              : "Inativo"}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </label>
+                )}
+                {data.capabilities.canManageRegisters && (
+                  <Button
+                    onClick={() => {
+                      setActionError("");
+                      setShowRegisters(true);
+                    }}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    <Icon name="settings" size={14} />
+                    Gavetas
+                  </Button>
+                )}
+              </div>
+            </header>
             {!online && (
               <p className="cash-notice cash-notice--warning" role="alert">
-                Você está offline. A consulta continua visível, mas abertura, lançamentos e
-                fechamento estão bloqueados.
+                Sem conexão. Reconecte para abrir, movimentar ou fechar o caixa.
               </p>
             )}
 
             {/* ALERTAS OPERACIONAIS EM DESTAQUE NO TOPO */}
-            {activeView === "shift" && data.alerts.length > 0 && (
+            {activeView === "shift" && alerts.length > 0 && (
               <div className="cash-top-alerts">
-                {data.alerts.map((alert) => (
+                {alerts.map((alert) => (
                   <Callout
-                    key={`${alert.code}:${alert.cashShiftId ?? alert.installationId ?? "unit"}`}
+                    key={JSON.stringify(alert)}
                     tone={alert.severity === "critical" ? "danger" : "warning"}
                   >
                     <div className="cash-top-alert-content">
                       <Icon name="alert-circle" />
                       <div>
                         <strong>
-                          {alert.severity === "critical"
-                            ? "Alerta Crítico de Caixa"
-                            : "Atenção Operacional"}
+                          {alert.severity === "critical" ? "Alerta de caixa" : "Atenção"}
                         </strong>
                         <p>{alert.message}</p>
                       </div>
@@ -479,7 +557,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
               </div>
             )}
 
-            {actionError && (
+            {actionError && !activeActionPanel && !showRegisters && (
               <p className="auth-message auth-message--error" role="alert">
                 {actionError}
               </p>
@@ -491,117 +569,133 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             )}
 
             {/* SELETOR DE GAVETAS FÍSICAS */}
-            <Card className="cash-registers">
-              <div className="card-header">
-                <div>
-                  <p className="eyebrow">Gavetas físicas</p>
-                  <h2>Caixas da unidade</h2>
-                </div>
-                <div className="cash-register-header__actions">
-                  <Badge tone={openShifts.length > 0 ? "success" : "neutral"}>
-                    {openShifts.length === 1 ? "1 aberto" : `${openShifts.length} abertos`}
-                  </Badge>
-                  {data.capabilities.canManageRegisters && (
-                    <Button
-                      disabled={busy !== null || !online}
-                      onClick={() => {
-                        setShowRegisterForm((visible) => !visible);
-                        setEditingRegisterId("");
-                        setEditingRegisterName("");
-                      }}
-                      size="sm"
-                      type="button"
-                      variant="secondary"
-                    >
-                      {showRegisterForm ? "Cancelar" : "Adicionar gaveta"}
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {showRegisterForm && data.capabilities.canManageRegisters && (
-                <form className="cash-register-create" onSubmit={createRegister}>
-                  <label>
-                    Nome da gaveta
-                    <Input
-                      maxLength={120}
-                      onChange={(event) => setRegisterName(event.target.value)}
-                      placeholder="Ex.: Bar"
-                      value={registerName}
-                    />
-                  </label>
-                  <Button disabled={busy !== null || !online} type="submit">
-                    {busy === "register" ? "Salvando…" : "Salvar gaveta"}
-                  </Button>
-                </form>
-              )}
-
-              {data.registers.length > 0 ? (
-                <div className="cash-register-grid">
-                  {data.registers.map((cashRegister) => {
-                    const shift = openShifts.find(
-                      (candidate) => candidate.cashRegisterId === cashRegister.id,
-                    );
-                    const selected = selectedRegister?.id === cashRegister.id;
-                    return (
-                      <article
-                        className="cash-register-card"
-                        data-selected={selected}
-                        key={cashRegister.id}
+            <Modal
+              className="cash-modal"
+              closeDisabled={busy !== null}
+              isOpen={showRegisters}
+              onClose={() => setShowRegisters(false)}
+              size="lg"
+              title="Gavetas da unidade"
+            >
+              <div className="cash-registers">
+                <div className="card-header">
+                  <div className="cash-register-header__actions">
+                    <Badge tone={openShifts.length > 0 ? "success" : "neutral"}>
+                      {openShifts.length === 1 ? "1 aberto" : `${openShifts.length} abertos`}
+                    </Badge>
+                    {data.capabilities.canManageRegisters && (
+                      <Button
+                        disabled={busy !== null || !online}
+                        onClick={() => {
+                          setShowRegisterForm((visible) => !visible);
+                          setEditingRegisterId("");
+                          setEditingRegisterName("");
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="secondary"
                       >
-                        <Button
-                          aria-label={`Selecionar ${cashRegister.name}, ${
-                            shift ? "aberto" : cashRegister.active ? "fechado" : "inativo"
-                          }`}
-                          aria-pressed={selected}
-                          className="cash-register-card__select"
-                          onClick={() => selectRegister(cashRegister.id)}
-                          type="button"
-                          variant="ghost"
+                        {showRegisterForm ? "Cancelar" : "Adicionar gaveta"}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                {actionError && (
+                  <p className="auth-message auth-message--error" role="alert">
+                    {actionError}
+                  </p>
+                )}
+                {feedback && (
+                  <p className="form-feedback" role="status">
+                    {feedback}
+                  </p>
+                )}
+
+                {showRegisterForm && data.capabilities.canManageRegisters && (
+                  <form className="cash-register-create" onSubmit={createRegister}>
+                    <label>
+                      Nome da gaveta
+                      <Input
+                        maxLength={120}
+                        onChange={(event) => setRegisterName(event.target.value)}
+                        placeholder="Ex.: Bar"
+                        value={registerName}
+                      />
+                    </label>
+                    <Button disabled={busy !== null || !online} type="submit">
+                      {busy === "register" ? "Salvando…" : "Salvar gaveta"}
+                    </Button>
+                  </form>
+                )}
+
+                {data.registers.length > 0 ? (
+                  <div className="cash-register-grid">
+                    {data.registers.map((cashRegister) => {
+                      const shift = openShifts.find(
+                        (candidate) => candidate.cashRegisterId === cashRegister.id,
+                      );
+                      const selected = selectedRegister?.id === cashRegister.id;
+                      return (
+                        <article
+                          className="cash-register-card"
+                          data-selected={selected}
+                          key={cashRegister.id}
                         >
-                          <span className="cash-register-card__title">
-                            <span className="cash-register-card__status-line">
-                              <StatusDot
-                                pulse={Boolean(shift)}
+                          <Button
+                            aria-label={`Selecionar ${cashRegister.name}, ${
+                              shift ? "aberto" : cashRegister.active ? "fechado" : "inativo"
+                            }`}
+                            aria-pressed={selected}
+                            className="cash-register-card__select"
+                            disabled={busy !== null}
+                            onClick={() => {
+                              selectRegister(cashRegister.id);
+                              setShowRegisters(false);
+                            }}
+                            type="button"
+                            variant="ghost"
+                          >
+                            <span className="cash-register-card__title">
+                              <span className="cash-register-card__status-line">
+                                <StatusDot
+                                  pulse={Boolean(shift)}
+                                  tone={
+                                    shift ? "success" : cashRegister.active ? "neutral" : "warning"
+                                  }
+                                />
+                                <strong>{cashRegister.name}</strong>
+                              </span>
+                              <Badge
                                 tone={
                                   shift ? "success" : cashRegister.active ? "neutral" : "warning"
                                 }
-                              />
-                              <strong>{cashRegister.name}</strong>
+                              >
+                                {shift ? "Aberto" : cashRegister.active ? "Fechado" : "Inativo"}
+                              </Badge>
                             </span>
-                            <Badge
-                              tone={shift ? "success" : cashRegister.active ? "neutral" : "warning"}
-                            >
-                              {shift ? "Aberto" : cashRegister.active ? "Fechado" : "Inativo"}
-                            </Badge>
-                          </span>
-                          <small className="cash-register-card__operator">
-                            {shift
-                              ? `Responsável: ${
-                                  shift.responsibleName ?? shift.operatorName ?? "não informado"
-                                }`
-                              : cashRegister.active
-                                ? "Disponível para abertura"
-                                : "Fora de uso"}
-                          </small>
-                          {shift?.openedAt && (
-                            <small className="cash-register-card__time">
-                              Desde {dateLabel(shift.openedAt)}
+                            <small className="cash-register-card__operator">
+                              {shift
+                                ? `Responsável: ${
+                                    shift.responsibleName ?? shift.operatorName ?? "não informado"
+                                  }`
+                                : cashRegister.active
+                                  ? "Disponível para abertura"
+                                  : "Fora de uso"}
                             </small>
-                          )}
-                          {selected && (
-                            <span className="cash-register-card__selected-pill">
-                              Gaveta em foco
-                            </span>
-                          )}
-                        </Button>
-                        {data.capabilities.canManageRegisters && (
-                          <details className="cash-register-menu">
-                            <summary aria-label={`Ações da gaveta ${cashRegister.name}`}>⋯</summary>
-                            <div className="cash-register-menu__content">
+                            {shift?.openedAt && (
+                              <small className="cash-register-card__time">
+                                Desde {dateLabel(shift.openedAt)}
+                              </small>
+                            )}
+                          </Button>
+                          {data.capabilities.canManageRegisters && (
+                            <fieldset
+                              className="cash-register-menu__content"
+                              aria-label={`Ações da gaveta ${cashRegister.name}`}
+                            >
                               <Button
-                                onClick={(event) => {
-                                  event.currentTarget.closest("details")?.removeAttribute("open");
+                                disabled={busy !== null || !online}
+                                onClick={() => {
                                   setShowRegisterForm(false);
                                   setEditingRegisterId(cashRegister.id);
                                   setEditingRegisterName(cashRegister.name);
@@ -613,7 +707,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                                 Renomear
                               </Button>
                               <Button
-                                disabled={busy !== null || Boolean(shift)}
+                                disabled={busy !== null || !online || Boolean(shift)}
                                 onClick={() =>
                                   void toggleRegister(cashRegister.id, !cashRegister.active)
                                 }
@@ -624,49 +718,49 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                                 {cashRegister.active ? "Desativar" : "Ativar"}
                               </Button>
                               {shift && <small>Feche o caixa para desativar.</small>}
-                            </div>
-                          </details>
-                        )}
-                        {editingRegisterId === cashRegister.id && (
-                          <form className="cash-register-rename" onSubmit={renameRegister}>
-                            <label>
-                              Novo nome
-                              <Input
-                                maxLength={120}
-                                onChange={(event) => setEditingRegisterName(event.target.value)}
-                                value={editingRegisterName}
-                              />
-                            </label>
-                            <div className="cash-register-rename__actions">
-                              <Button disabled={busy !== null || !online} size="sm" type="submit">
-                                {busy === "register" ? "Salvando…" : "Salvar nome"}
-                              </Button>
-                              <Button
-                                onClick={() => {
-                                  setEditingRegisterId("");
-                                  setEditingRegisterName("");
-                                }}
-                                size="sm"
-                                type="button"
-                                variant="ghost"
-                              >
-                                Cancelar
-                              </Button>
-                            </div>
-                          </form>
-                        )}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <EmptyState
-                  description="Cadastre a primeira gaveta física desta unidade."
-                  icon="$"
-                  title="Nenhuma gaveta cadastrada"
-                />
-              )}
-            </Card>
+                            </fieldset>
+                          )}
+                          {editingRegisterId === cashRegister.id && (
+                            <form className="cash-register-rename" onSubmit={renameRegister}>
+                              <label>
+                                Novo nome
+                                <Input
+                                  maxLength={120}
+                                  onChange={(event) => setEditingRegisterName(event.target.value)}
+                                  value={editingRegisterName}
+                                />
+                              </label>
+                              <div className="cash-register-rename__actions">
+                                <Button disabled={busy !== null || !online} size="sm" type="submit">
+                                  {busy === "register" ? "Salvando…" : "Salvar nome"}
+                                </Button>
+                                <Button
+                                  onClick={() => {
+                                    setEditingRegisterId("");
+                                    setEditingRegisterName("");
+                                  }}
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </form>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <EmptyState
+                    description="Cadastre a primeira gaveta física desta unidade."
+                    icon="$"
+                    title="Nenhuma gaveta cadastrada"
+                  />
+                )}
+              </div>
+            </Modal>
 
             <nav className="cash-workspace-tabs" aria-label="Áreas do caixa">
               {(
@@ -684,7 +778,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                     data.capabilities.canManageTerminals,
                 )
                 .map(([view, label]) => (
-                  <button
+                  <Button
                     aria-current={activeView === view ? "page" : undefined}
                     className="cash-workspace-tabs__item"
                     data-active={activeView === view}
@@ -695,26 +789,16 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                       setConfirmClose(false);
                     }}
                     type="button"
+                    variant="ghost"
+                    size="sm"
                   >
                     {label}
                     {view === "history" && reviewCandidate && data.capabilities.canReview && (
                       <Badge tone="warning">Revisar</Badge>
                     )}
-                  </button>
+                  </Button>
                 ))}
             </nav>
-
-            {activeView === "shift" && openShifts.length > 1 && (
-              <Card className="metric-card cash-consolidated-card">
-                <p>Consolidado da unidade ({openShifts.length} gavetas abertas)</p>
-                <strong>
-                  {data.capabilities.canViewExpected
-                    ? formatMoney(consolidatedExpected)
-                    : `${openShifts.length} gavetas em operação`}
-                </strong>
-                <small>Transferências internas entre gavetas não alteram este total.</small>
-              </Card>
-            )}
 
             {activeView === "shift" && lastClosure && (
               <Card aria-live="polite" className="cash-result">
@@ -803,19 +887,17 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   <div className="cash-operation-header__actions">
                     {data.capabilities.canClose && (
                       <Button
-                        className={`cash-btn-close-highlight ${
-                          activeActionPanel === "close" ? "cash-btn-close-highlight--active" : ""
-                        }`}
                         onClick={() => {
+                          setActionError("");
                           setActiveActionPanel((curr) => (curr === "close" ? null : "close"));
                           setConfirmClose(false);
                         }}
-                        size="md"
+                        size="sm"
                         type="button"
-                        variant="danger"
+                        variant="secondary"
                       >
                         <Icon name="check" />
-                        {activeActionPanel === "close" ? "Ocultar fechamento" : "Fechar caixa"}
+                        Fechar caixa
                       </Button>
                     )}
                     {data.capabilities.canMove && (
@@ -827,6 +909,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                               : ""
                           }
                           onClick={() => {
+                            setActionError("");
                             setMovementType("withdrawal");
                             setActiveActionPanel((curr) =>
                               curr === "movement" && movementType === "withdrawal"
@@ -834,7 +917,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                                 : "movement",
                             );
                           }}
-                          size="md"
+                          size="sm"
                           type="button"
                           variant="secondary"
                         >
@@ -848,12 +931,13 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                               : ""
                           }
                           onClick={() => {
+                            setActionError("");
                             setMovementType("supply");
                             setActiveActionPanel((curr) =>
                               curr === "movement" && movementType === "supply" ? null : "movement",
                             );
                           }}
-                          size="md"
+                          size="sm"
                           type="button"
                           variant="secondary"
                         >
@@ -866,9 +950,10 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                       <Button
                         className={activeActionPanel === "transfer" ? "cash-btn-quick--active" : ""}
                         onClick={() => {
+                          setActionError("");
                           setActiveActionPanel((curr) => (curr === "transfer" ? null : "transfer"));
                         }}
-                        size="md"
+                        size="sm"
                         type="button"
                         variant="secondary"
                       >
@@ -912,25 +997,24 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                         <div className="cash-pending-banner__header">
                           <Icon name="alert-circle" />
                           <strong>
-                            Atenção antes de fechar: {data.pendingTabs.length} comanda(s) com saldo
-                            pendente
+                            {data.pendingTabs.length}{" "}
+                            {data.pendingTabs.length === 1
+                              ? "comanda a receber"
+                              : "comandas a receber"}{" "}
+                            · {formatMoney(totalPendingTabsCents)}
                           </strong>
                         </div>
-                        <p>
-                          Total de {formatMoney(totalPendingTabsCents)} ainda não recebido no salão.
-                          Se fechar agora, esses recebimentos não farão parte deste turno.
-                        </p>
+                        <p>Recebimentos após o fechamento entram no próximo turno.</p>
                       </div>
                       <div className="cash-pending-banner__actions">
                         <Button
+                          aria-expanded={pendingTabsExpanded}
                           onClick={() => setPendingTabsExpanded((prev) => !prev)}
                           size="sm"
                           type="button"
                           variant="secondary"
                         >
-                          {pendingTabsExpanded
-                            ? "Ocultar comandas"
-                            : `Ver ${data.pendingTabs.length} comanda(s)`}
+                          {pendingTabsExpanded ? "Ocultar comandas" : "Ver comandas"}
                         </Button>
                         <a
                           className="button button--secondary cash-pending-action"
@@ -969,278 +1053,278 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 )}
 
                 {/* PAINEL PROEMINENTE DE FECHAMENTO DE CAIXA COM CALCULADORA DE CÉDULAS */}
-                {data.capabilities.canClose && activeActionPanel === "close" && (
-                  <Card className="cash-action-card cash-closure-card" id="cash-closure-panel">
-                    <div className="card-header">
-                      <div>
-                        <p className="eyebrow">
-                          {data.capabilities.canViewExpected
-                            ? "Conferência assistida do turno"
-                            : "Conferência cega do turno"}
-                        </p>
-                        <h2>Fechar turno</h2>
-                        <p className="cash-card-desc">
-                          Informe a contagem física. Ao confirmar, o sistema registra o fechamento e
-                          apresenta eventuais diferenças.
-                        </p>
-                      </div>
-                    </div>
+                <Modal
+                  className="cash-modal"
+                  closeDisabled={busy !== null}
+                  isOpen={activeActionPanel !== null}
+                  onClose={() => {
+                    setActiveActionPanel(null);
+                    setConfirmClose(false);
+                  }}
+                  size={activeActionPanel === "close" ? "lg" : "md"}
+                  title={
+                    activeActionPanel === "close"
+                      ? "Fechar caixa"
+                      : activeActionPanel === "transfer"
+                        ? "Transferir entre gavetas"
+                        : movementType === "supply"
+                          ? "Suprimento"
+                          : "Sangria"
+                  }
+                >
+                  {actionError && (
+                    <p className="auth-message auth-message--error" role="alert">
+                      {actionError}
+                    </p>
+                  )}
+                  {data.capabilities.canClose && activeActionPanel === "close" && (
+                    <div id="cash-closure-panel">
+                      <p className="cash-card-desc">
+                        {data.capabilities.canViewExpected
+                          ? "Confira o dinheiro e os recebimentos antes de encerrar."
+                          : "Contagem cega: o esperado aparece após o fechamento."}
+                      </p>
 
-                    <form
-                      className="cash-closure-form"
-                      onSubmit={(event) => void closeShift(event, open.id, closeMethods)}
-                    >
-                      <div className="cash-closure-step">
-                        <div className="cash-closure-step__header">
-                          <span className="cash-step-number">1</span>
-                          <div>
-                            <strong>Dinheiro em espécie contado na gaveta</strong>
-                            <small>
-                              Cédulas e moedas físicas contadas na gaveta física neste momento.
-                            </small>
-                          </div>
-                          <Button
-                            className="cash-btn-toggle-calculator"
-                            onClick={() => setShowDenominationCalculator((prev) => !prev)}
-                            size="sm"
-                            type="button"
-                            variant="secondary"
-                          >
-                            <Icon name="cash" />
-                            {showDenominationCalculator
-                              ? "Digitar valor direto"
-                              : "Contador de cédulas e moedas"}
-                          </Button>
-                        </div>
-
-                        {showDenominationCalculator ? (
-                          <div className="cash-denomination-calculator">
-                            <div className="cash-denomination-calculator__header">
-                              <span>
-                                <strong>Calculadora física de cédulas e moedas:</strong> Digite as
-                                quantidades encontradas na gaveta.
-                              </span>
-                              <Button
-                                onClick={clearDenominations}
-                                size="sm"
-                                type="button"
-                                variant="ghost"
-                              >
-                                Zerar contagem
-                              </Button>
-                            </div>
-                            <div className="cash-denomination-grid">
-                              {BRL_DENOMINATIONS.map((d) => (
-                                <label className="cash-denomination-item" key={d.cents}>
-                                  <span className="cash-denomination-item__label">
-                                    <span
-                                      className={`cash-denom-type ${d.type === "bill" ? "bill" : "coin"}`}
-                                    >
-                                      {d.type === "bill" ? "Cédula" : "Moeda"}
-                                    </span>
-                                    <strong>{d.label}</strong>
-                                  </span>
-                                  <Input
-                                    inputMode="numeric"
-                                    min="0"
-                                    onChange={(event) =>
-                                      updateDenomination(d.cents, event.target.value)
-                                    }
-                                    placeholder="0"
-                                    type="number"
-                                    value={
-                                      denominationCounts[d.cents]
-                                        ? String(denominationCounts[d.cents])
-                                        : ""
-                                    }
-                                  />
-                                  <small className="cash-denomination-subtotal">
-                                    = {formatMoney((denominationCounts[d.cents] ?? 0) * d.cents)}
-                                  </small>
-                                </label>
-                              ))}
-                            </div>
-                            <div className="cash-denomination-total-bar">
-                              <span>Total apurado pelas cédulas e moedas:</span>
-                              <strong>{counted ? `R$ ${counted}` : "R$ 0,00"}</strong>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="cash-counted-field">
-                            <label>
-                              Dinheiro contado
-                              <Input
-                                className="cash-input-lg"
-                                data-currency="brl"
-                                inputMode="decimal"
-                                onChange={(event) => {
-                                  setCounted(formatCurrencyInput(event.target.value));
-                                  setConfirmClose(false);
-                                }}
-                                placeholder="0,00"
-                                required
-                                value={counted}
-                              />
-                            </label>
-                          </div>
-                        )}
-                      </div>
-
-                      {closeMethods.filter((method) => method !== "cash").length > 0 && (
+                      <form
+                        className="cash-closure-form"
+                        onSubmit={(event) => void closeShift(event, open.id, closeMethods)}
+                      >
                         <div className="cash-closure-step">
                           <div className="cash-closure-step__header">
-                            <span className="cash-step-number">2</span>
+                            <span className="cash-step-number">1</span>
                             <div>
-                              <strong>Conferência de outras formas de pagamento</strong>
-                              <small>
-                                Total conferido no relatório de fechamento das maquininhas (POS) ou
-                                extrato Pix.
-                              </small>
+                              <strong>Dinheiro na gaveta</strong>
                             </div>
+                            <Button
+                              aria-expanded={showDenominationCalculator}
+                              className="cash-btn-toggle-calculator"
+                              onClick={() => setShowDenominationCalculator((prev) => !prev)}
+                              size="sm"
+                              type="button"
+                              variant="secondary"
+                            >
+                              <Icon name="cash" />
+                              {showDenominationCalculator
+                                ? "Digitar valor direto"
+                                : "Contar cédulas e moedas"}
+                            </Button>
                           </div>
-                          <div className="cash-tender-grid">
-                            {closeMethods
-                              .filter((method) => method !== "cash")
-                              .map((method) => (
-                                <label key={method}>
-                                  {paymentMethodLabel(method)} (R$)
-                                  <Input
-                                    inputMode="decimal"
-                                    onChange={(event) => {
-                                      setTenderCounts((current) => ({
-                                        ...current,
-                                        [method]: formatCurrencyInput(event.target.value),
-                                      }));
-                                      setConfirmClose(false);
-                                    }}
-                                    placeholder="0,00"
-                                    required
-                                    value={tenderCounts[method] ?? ""}
-                                  />
-                                </label>
-                              ))}
-                          </div>
-                        </div>
-                      )}
 
-                      <div className="cash-closure-step">
-                        <div className="cash-closure-step__header">
-                          <span className="cash-step-number">
-                            {closeMethods.filter((m) => m !== "cash").length > 0 ? "3" : "2"}
-                          </span>
-                          <div>
-                            <strong>Observações do turno (opcional)</strong>
-                            <small>
-                              Anotações sobre sobras, faltas ou ocorrências operacionais para
-                              auditoria gerencial.
-                            </small>
-                          </div>
-                        </div>
-                        <label className="cash-closure-reason-label">
-                          Observação do fechamento
-                          <Input
-                            onChange={(event) => setCloseReason(event.target.value)}
-                            placeholder="Ex.: Troco inicial conferido, sangria entregue ao gerente."
-                            value={closeReason}
-                          />
-                        </label>
-                      </div>
-
-                      {confirmClose && (
-                        <div className="cash-confirm-box" role="alert">
-                          <div className="cash-confirm-box__header">
-                            <Icon name="alert-circle" />
-                            <div>
-                              <strong>Confira os valores antes de encerrar o turno:</strong>
-                              <p>
-                                Ao confirmar, o turno será encerrado e as diferenças ficarão
-                                registradas.
-                              </p>
-                            </div>
-                          </div>
-                          <div className="cash-confirm-box__summary">
-                            {closeMethods.map((method) => (
-                              <div className="cash-confirm-item" key={method}>
-                                <span className="cash-confirm-item__label">
-                                  {paymentMethodLabel(method)}:
-                                </span>
-                                <span className="cash-confirm-item__val">
-                                  {formatMoney(
-                                    method === "cash"
-                                      ? currencyToCents(counted)
-                                      : currencyToCents(tenderCounts[method] ?? ""),
-                                  )}
-                                </span>
+                          {showDenominationCalculator ? (
+                            <div className="cash-denomination-calculator">
+                              <div className="cash-denomination-calculator__header">
+                                <span>Informe a quantidade de cada cédula ou moeda.</span>
+                                <Button
+                                  onClick={clearDenominations}
+                                  size="sm"
+                                  type="button"
+                                  variant="ghost"
+                                >
+                                  Zerar contagem
+                                </Button>
                               </div>
-                            ))}
+                              <div className="cash-denomination-grid">
+                                {BRL_DENOMINATIONS.map((d) => (
+                                  <label className="cash-denomination-item" key={d.cents}>
+                                    <span className="cash-denomination-item__label">
+                                      <span
+                                        className={`cash-denom-type ${d.type === "bill" ? "bill" : "coin"}`}
+                                      >
+                                        {d.type === "bill" ? "Cédula" : "Moeda"}
+                                      </span>
+                                      <strong>{d.label}</strong>
+                                    </span>
+                                    <Input
+                                      inputMode="numeric"
+                                      min="0"
+                                      onChange={(event) =>
+                                        updateDenomination(d.cents, event.target.value)
+                                      }
+                                      placeholder="0"
+                                      type="number"
+                                      value={
+                                        denominationCounts[d.cents]
+                                          ? String(denominationCounts[d.cents])
+                                          : ""
+                                      }
+                                    />
+                                    <small className="cash-denomination-subtotal">
+                                      = {formatMoney((denominationCounts[d.cents] ?? 0) * d.cents)}
+                                    </small>
+                                  </label>
+                                ))}
+                              </div>
+                              <div className="cash-denomination-total-bar">
+                                <span>Total contado</span>
+                                <strong>{counted ? `R$ ${counted}` : "R$ 0,00"}</strong>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="cash-counted-field">
+                              <label>
+                                Dinheiro contado
+                                <Input
+                                  className="cash-input-lg"
+                                  data-currency="brl"
+                                  inputMode="decimal"
+                                  onChange={(event) => {
+                                    setCounted(formatCurrencyInput(event.target.value));
+                                    setConfirmClose(false);
+                                  }}
+                                  placeholder="0,00"
+                                  required
+                                  value={counted}
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+
+                        {closeMethods.filter((method) => method !== "cash").length > 0 && (
+                          <div className="cash-closure-step">
+                            <div className="cash-closure-step__header">
+                              <span className="cash-step-number">2</span>
+                              <div>
+                                <strong>Outras formas de pagamento</strong>
+                                <small>Confira no relatório da maquininha ou no extrato Pix.</small>
+                              </div>
+                            </div>
+                            <div className="cash-tender-grid">
+                              {closeMethods
+                                .filter((method) => method !== "cash")
+                                .map((method) => (
+                                  <label key={method}>
+                                    {paymentMethodLabel(method)} (R$)
+                                    <Input
+                                      inputMode="decimal"
+                                      onChange={(event) => {
+                                        setTenderCounts((current) => ({
+                                          ...current,
+                                          [method]: formatCurrencyInput(event.target.value),
+                                        }));
+                                        setConfirmClose(false);
+                                      }}
+                                      placeholder="0,00"
+                                      required
+                                      value={tenderCounts[method] ?? ""}
+                                    />
+                                  </label>
+                                ))}
+                            </div>
                           </div>
-                          <div className="cash-confirm-box__actions">
+                        )}
+
+                        <div className="cash-closure-step">
+                          <div className="cash-closure-step__header">
+                            <span className="cash-step-number">
+                              {closeMethods.filter((m) => m !== "cash").length > 0 ? "3" : "2"}
+                            </span>
+                            <div>
+                              <strong>Observação (opcional)</strong>
+                            </div>
+                          </div>
+                          <label className="cash-closure-reason-label">
+                            Observação do fechamento
+                            <Input
+                              onChange={(event) => setCloseReason(event.target.value)}
+                              placeholder="Ex.: Troco inicial conferido, sangria entregue ao gerente."
+                              value={closeReason}
+                            />
+                          </label>
+                        </div>
+
+                        {confirmClose && (
+                          <div className="cash-confirm-box" role="alert">
+                            <div className="cash-confirm-box__header">
+                              <Icon name="alert-circle" />
+                              <div>
+                                <strong>Confirmar os valores contados?</strong>
+                                <p>
+                                  Ao confirmar, o turno será encerrado e as diferenças ficarão
+                                  registradas.
+                                </p>
+                              </div>
+                            </div>
+                            <div className="cash-confirm-box__summary">
+                              {closeMethods.map((method) => (
+                                <div className="cash-confirm-item" key={method}>
+                                  <span className="cash-confirm-item__label">
+                                    {paymentMethodLabel(method)}:
+                                  </span>
+                                  <span className="cash-confirm-item__val">
+                                    {formatMoney(
+                                      method === "cash"
+                                        ? currencyToCents(counted)
+                                        : currencyToCents(tenderCounts[method] ?? ""),
+                                    )}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="cash-confirm-box__actions">
+                              <Button
+                                disabled={busy !== null || !online}
+                                size="md"
+                                type="submit"
+                                variant="danger"
+                              >
+                                {busy === "close" ? "Encerrando turno…" : "Confirmar fechamento"}
+                              </Button>
+                              <Button
+                                disabled={busy !== null}
+                                onClick={() => setConfirmClose(false)}
+                                size="md"
+                                type="button"
+                                variant="secondary"
+                              >
+                                Corrigir valores
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {!confirmClose && (
+                          <div className="cash-closure-actions">
                             <Button
                               disabled={busy !== null || !online}
                               size="md"
                               type="submit"
-                              variant="danger"
+                              variant="primary"
                             >
-                              {busy === "close" ? "Encerrando turno…" : "Confirmar fechamento"}
+                              Revisar contagem
                             </Button>
                             <Button
-                              onClick={() => setConfirmClose(false)}
+                              onClick={() => {
+                                setActiveActionPanel(null);
+                                setConfirmClose(false);
+                              }}
                               size="md"
                               type="button"
                               variant="secondary"
                             >
-                              Corrigir Valores
+                              Cancelar
                             </Button>
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </form>
+                    </div>
+                  )}
 
-                      {!confirmClose && (
-                        <div className="cash-closure-actions">
-                          <Button
-                            disabled={busy !== null || !online}
-                            size="md"
-                            type="submit"
-                            variant="danger"
-                          >
-                            Revisar Contagem e Fechar Caixa
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setActiveActionPanel(null);
-                              setConfirmClose(false);
-                            }}
-                            size="md"
-                            type="button"
-                            variant="ghost"
-                          >
-                            Recolher
-                          </Button>
-                        </div>
-                      )}
-                    </form>
-                  </Card>
-                )}
-
-                {/* PAINEL DE MOVIMENTAÇÃO FÍSICA (SANGRIA / SUPRIMENTO) */}
-                {data.capabilities.canMove && activeActionPanel === "movement" && (
-                  <Card className="cash-action-card cash-movement-card">
-                    <div className="card-header">
-                      <div>
-                        <p className="eyebrow">Movimentação Física</p>
-                        <h2>
-                          {movementType === "supply"
-                            ? "Suprimento de Caixa (Entrada)"
-                            : "Sangria de Caixa (Retirada)"}
-                        </h2>
-                        <p className="cash-card-desc">
-                          {movementType === "supply"
-                            ? "Aporte de dinheiro físico na gaveta para troco ou reforço operacional."
-                            : "Retirada de dinheiro físico da gaveta para cofre, depósito ou pagamentos de despesas."}
-                        </p>
-                      </div>
-                      <div className="cash-movement-type-toggle">
+                  {/* PAINEL DE MOVIMENTAÇÃO FÍSICA (SANGRIA / SUPRIMENTO) */}
+                  {data.capabilities.canMove && activeActionPanel === "movement" && (
+                    <div>
+                      <p className="cash-card-desc">
+                        {movementType === "supply"
+                          ? "Entrada de dinheiro na gaveta."
+                          : "Retirada de dinheiro da gaveta."}
+                      </p>
+                      <fieldset
+                        className="cash-movement-type-toggle"
+                        aria-label="Tipo de movimento"
+                      >
                         <Button
+                          aria-pressed={movementType === "withdrawal"}
+                          disabled={busy !== null}
                           onClick={() => setMovementType("withdrawal")}
                           size="sm"
                           type="button"
@@ -1249,6 +1333,8 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                           Sangria (Saída)
                         </Button>
                         <Button
+                          aria-pressed={movementType === "supply"}
+                          disabled={busy !== null}
                           onClick={() => setMovementType("supply")}
                           size="sm"
                           type="button"
@@ -1256,136 +1342,130 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                         >
                           Suprimento (Entrada)
                         </Button>
-                      </div>
-                    </div>
-                    <form
-                      className="action-form cash-action-form-grid"
-                      onSubmit={(event) => void addMovement(event, open.id)}
-                    >
-                      <label>
-                        Valor (R$)
-                        <Input
-                          data-currency="brl"
-                          inputMode="decimal"
-                          onChange={(event) =>
-                            setMovementAmount(formatCurrencyInput(event.target.value))
-                          }
-                          placeholder="0,00"
-                          required
-                          value={movementAmount}
-                        />
-                      </label>
-                      <label className="action-form__wide">
-                        Motivo auditável
-                        <Input
-                          minLength={3}
-                          onChange={(event) => setMovementReason(event.target.value)}
-                          placeholder={
-                            movementType === "supply"
-                              ? "Ex.: Reforço de troco para o turno da noite"
-                              : "Ex.: Sangria para o cofre do restaurante"
-                          }
-                          required
-                          value={movementReason}
-                        />
-                      </label>
-                      <div className="cash-form-buttons action-form__wide">
-                        <Button disabled={busy !== null || !online} size="md" type="submit">
-                          {busy === "movement"
-                            ? "Registrando…"
-                            : movementType === "supply"
-                              ? "Registrar Suprimento"
-                              : "Registrar Sangria"}
-                        </Button>
-                        <Button
-                          onClick={() => setActiveActionPanel(null)}
-                          size="md"
-                          type="button"
-                          variant="ghost"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    </form>
-                  </Card>
-                )}
-
-                {/* PAINEL DE TRANSFERÊNCIA ENTRE GAVETAS */}
-                {data.capabilities.canTransfer &&
-                  openShifts.length > 1 &&
-                  activeActionPanel === "transfer" && (
-                    <Card className="cash-action-card cash-transfer-card">
-                      <div className="card-header">
-                        <div>
-                          <p className="eyebrow">Transferência Interna</p>
-                          <h2>Transferir Dinheiro entre Gavetas</h2>
-                          <p className="cash-card-desc">
-                            A saída desta gaveta e a entrada na gaveta de destino são registradas
-                            juntas com auditoria.
-                          </p>
-                        </div>
-                        <Badge tone="neutral">Transferência</Badge>
-                      </div>
+                      </fieldset>
                       <form
                         className="action-form cash-action-form-grid"
-                        onSubmit={(event) => void transferCash(event, open.id)}
+                        onSubmit={(event) => void addMovement(event, open.id)}
                       >
                         <label>
-                          Gaveta de destino
-                          <NativeSelect
-                            onChange={(event) => setTransferToShiftId(event.target.value)}
-                            required
-                            value={transferToShiftId}
-                          >
-                            <option value="">Selecione a gaveta</option>
-                            {openShifts
-                              .filter((shift) => shift.id !== open.id)
-                              .map((shift) => (
-                                <option key={shift.id} value={shift.id}>
-                                  {shift.cashRegisterName}
-                                </option>
-                              ))}
-                          </NativeSelect>
-                        </label>
-                        <label>
-                          Valor a transferir (R$)
+                          Valor (R$)
                           <Input
                             data-currency="brl"
                             inputMode="decimal"
                             onChange={(event) =>
-                              setTransferAmount(formatCurrencyInput(event.target.value))
+                              setMovementAmount(formatCurrencyInput(event.target.value))
                             }
                             placeholder="0,00"
                             required
-                            value={transferAmount}
+                            value={movementAmount}
                           />
                         </label>
                         <label className="action-form__wide">
                           Motivo
                           <Input
                             minLength={3}
-                            onChange={(event) => setTransferReason(event.target.value)}
-                            placeholder="Ex.: Repasse de troco para o bar"
+                            onChange={(event) => setMovementReason(event.target.value)}
+                            placeholder={
+                              movementType === "supply"
+                                ? "Ex.: Reforço de troco para o turno da noite"
+                                : "Ex.: Sangria para o cofre do restaurante"
+                            }
                             required
-                            value={transferReason}
+                            value={movementReason}
                           />
                         </label>
                         <div className="cash-form-buttons action-form__wide">
                           <Button disabled={busy !== null || !online} size="md" type="submit">
-                            {busy === "transfer" ? "Transferindo…" : "Transferir Valor"}
+                            {busy === "movement"
+                              ? "Registrando…"
+                              : movementType === "supply"
+                                ? "Registrar suprimento"
+                                : "Registrar sangria"}
                           </Button>
                           <Button
+                            disabled={busy !== null}
                             onClick={() => setActiveActionPanel(null)}
                             size="md"
                             type="button"
-                            variant="ghost"
+                            variant="secondary"
                           >
                             Cancelar
                           </Button>
                         </div>
                       </form>
-                    </Card>
+                    </div>
                   )}
+
+                  {/* PAINEL DE TRANSFERÊNCIA ENTRE GAVETAS */}
+                  {data.capabilities.canTransfer &&
+                    openShifts.length > 1 &&
+                    activeActionPanel === "transfer" && (
+                      <div>
+                        <p className="cash-card-desc">
+                          O responsável pelo destino precisa aceitar o valor.
+                        </p>
+                        <form
+                          className="action-form cash-action-form-grid"
+                          onSubmit={(event) => void transferCash(event, open.id)}
+                        >
+                          <label>
+                            Gaveta de destino
+                            <NativeSelect
+                              onChange={(event) => setTransferToShiftId(event.target.value)}
+                              required
+                              value={transferToShiftId}
+                            >
+                              <option value="">Selecione a gaveta</option>
+                              {openShifts
+                                .filter((shift) => shift.id !== open.id)
+                                .map((shift) => (
+                                  <option key={shift.id} value={shift.id}>
+                                    {shift.cashRegisterName}
+                                  </option>
+                                ))}
+                            </NativeSelect>
+                          </label>
+                          <label>
+                            Valor a transferir (R$)
+                            <Input
+                              data-currency="brl"
+                              inputMode="decimal"
+                              onChange={(event) =>
+                                setTransferAmount(formatCurrencyInput(event.target.value))
+                              }
+                              placeholder="0,00"
+                              required
+                              value={transferAmount}
+                            />
+                          </label>
+                          <label className="action-form__wide">
+                            Motivo
+                            <Input
+                              minLength={3}
+                              onChange={(event) => setTransferReason(event.target.value)}
+                              placeholder="Ex.: Repasse de troco para o bar"
+                              required
+                              value={transferReason}
+                            />
+                          </label>
+                          <div className="cash-form-buttons action-form__wide">
+                            <Button disabled={busy !== null || !online} size="md" type="submit">
+                              {busy === "transfer" ? "Transferindo…" : "Solicitar transferência"}
+                            </Button>
+                            <Button
+                              disabled={busy !== null}
+                              onClick={() => setActiveActionPanel(null)}
+                              size="md"
+                              type="button"
+                              variant="secondary"
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+                </Modal>
 
                 {/* EXTRATO DO CAIXA COM FILTROS */}
                 <Card className="cash-ledger" hidden={activeView !== "ledger"}>
@@ -1395,36 +1475,38 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                       <h2>Extrato do caixa</h2>
                     </div>
                     <div className="cash-ledger__header-actions">
-                      <div className="cash-ledger__filter-tabs" role="tablist">
-                        <button
-                          aria-selected={ledgerFilter === "all"}
-                          className={`cash-tab-btn ${ledgerFilter === "all" ? "cash-tab-btn--active" : ""}`}
+                      <fieldset
+                        className="cash-ledger__filter-tabs"
+                        aria-label="Filtrar lançamentos"
+                      >
+                        <Button
+                          aria-pressed={ledgerFilter === "all"}
                           onClick={() => setLedgerFilter("all")}
-                          role="tab"
+                          size="sm"
+                          variant={ledgerFilter === "all" ? "secondary" : "ghost"}
                           type="button"
                         >
                           Todos ({entries.length})
-                        </button>
-                        <button
-                          aria-selected={ledgerFilter === "in"}
-                          className={`cash-tab-btn ${ledgerFilter === "in" ? "cash-tab-btn--active" : ""}`}
+                        </Button>
+                        <Button
+                          aria-pressed={ledgerFilter === "in"}
                           onClick={() => setLedgerFilter("in")}
-                          role="tab"
+                          size="sm"
+                          variant={ledgerFilter === "in" ? "secondary" : "ghost"}
                           type="button"
                         >
                           Entradas (+{entries.filter((e) => e.direction === "in").length})
-                        </button>
-                        <button
-                          aria-selected={ledgerFilter === "out"}
-                          className={`cash-tab-btn ${ledgerFilter === "out" ? "cash-tab-btn--active" : ""}`}
+                        </Button>
+                        <Button
+                          aria-pressed={ledgerFilter === "out"}
                           onClick={() => setLedgerFilter("out")}
-                          role="tab"
+                          size="sm"
+                          variant={ledgerFilter === "out" ? "secondary" : "ghost"}
                           type="button"
                         >
                           Saídas (-{entries.filter((e) => e.direction === "out").length})
-                        </button>
-                      </div>
-                      <Badge tone="neutral">{entries.length} lançamento(s)</Badge>
+                        </Button>
+                      </fieldset>
                     </div>
                   </div>
 
@@ -1487,7 +1569,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 <EmptyState
                   description={
                     data.capabilities.canManageRegisters
-                      ? 'Use "Adicionar gaveta" acima para cadastrar a primeira gaveta. Depois, selecione-a para abrir o turno.'
+                      ? 'Abra "Gavetas" no topo e adicione a primeira gaveta.'
                       : "Peça ao responsável pela unidade para cadastrar uma gaveta. Depois, selecione-a para consultar o turno."
                   }
                   icon="$"
@@ -1501,50 +1583,45 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   <div className="cash-hero-card__badge-row">
                     <StatusDot tone="neutral" />
                     <span className="cash-hero-card__status">
-                      {selectedRegister?.active ? "Gaveta Fechada" : "Gaveta inativa"}
+                      {selectedRegister?.active ? "Gaveta fechada" : "Gaveta inativa"}
                     </span>
-                    {selectedRegister?.active && data.capabilities.canOpen && (
-                      <Badge tone="neutral">Disponível para Abertura</Badge>
-                    )}
                   </div>
                   <h2 className="cash-hero-card__title">
                     {selectedRegister
-                      ? `Abertura de Caixa — ${selectedRegister.name}`
+                      ? `Abrir caixa — ${selectedRegister.name}`
                       : "Nenhuma gaveta selecionada"}
                   </h2>
                   <p className="cash-hero-card__desc">
-                    Defina o fundo de troco inicial em dinheiro para liberar esta gaveta física para
-                    vendas e recebimentos.
+                    Informe o dinheiro disponível para troco no início do turno.
                   </p>
                 </div>
 
                 {data.capabilities.canOpen && selectedRegister?.active ? (
                   <div className="cash-hero-card__body">
                     <div className="cash-quick-chips-section">
-                      <span className="cash-quick-chips-title">
-                        Sugestões de fundo de troco inicial:
-                      </span>
+                      <span className="cash-quick-chips-title">Fundo de troco</span>
                       <div className="cash-quick-chips">
                         {QUICK_OPENING_AMOUNTS.map((chip) => (
-                          <button
-                            className={`cash-quick-chip ${
-                              opening === chip.value ? "cash-quick-chip--active" : ""
-                            }`}
+                          <Button
+                            aria-pressed={opening === chip.value}
                             key={chip.value}
                             onClick={() => setOpening(chip.value)}
                             type="button"
+                            size="sm"
+                            variant={opening === chip.value ? "primary" : "secondary"}
                           >
                             {chip.label}
-                          </button>
+                          </Button>
                         ))}
                         {opening && !QUICK_OPENING_AMOUNTS.some((c) => c.value === opening) && (
-                          <button
-                            className="cash-quick-chip cash-quick-chip--clear"
+                          <Button
                             onClick={() => setOpening("")}
                             type="button"
+                            size="sm"
+                            variant="ghost"
                           >
                             Limpar
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -1578,13 +1655,6 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                         {busy === "open" ? "Abrindo turno…" : "Abrir turno"}
                       </Button>
                     </form>
-                    <div className="cash-opening-note">
-                      <small>
-                        Auditoria de ponto de venda ativa. O valor inicial será associado ao seu
-                        operador e a política de conferência do seu perfil será aplicada no
-                        fechamento.
-                      </small>
-                    </div>
                   </div>
                 ) : selectedRegister && !data.capabilities.canOpen ? (
                   <p className="cash-hero-card__permission-msg">
@@ -1613,7 +1683,8 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                 isOpen={showReceiptModal}
                 onClose={() => setShowReceiptModal(false)}
                 size="md"
-                title="Comprovante de Fechamento de Caixa"
+                className="cash-modal"
+                title="Comprovante de fechamento"
               >
                 <CashClosureReceipt
                   shift={{
@@ -1673,23 +1744,33 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
                   </span>
                   <Badge tone="warning">Pendente</Badge>
                 </summary>
-                <form
-                  className="action-form"
-                  onSubmit={(event) => void reviewShift(event, reviewCandidate.id)}
+                <p
+                  className="cash-inline-empty"
+                  role={reviewRequiresAnotherManager ? "status" : undefined}
                 >
-                  <label className="action-form__wide">
-                    Justificativa da revisão
-                    <Input
-                      minLength={3}
-                      onChange={(event) => setReviewNote(event.target.value)}
-                      required
-                      value={reviewNote}
-                    />
-                  </label>
-                  <Button disabled={busy !== null || !online} type="submit">
-                    {busy === "review" ? "Revisando…" : "Concluir revisão"}
-                  </Button>
-                </form>
+                  {reviewRequiresAnotherManager
+                    ? "Outro gestor deve revisar este turno, pois você participou da operação."
+                    : "A revisão deve ser feita por um gestor que não abriu, assumiu ou fechou este turno."}
+                </p>
+                {!reviewRequiresAnotherManager && (
+                  <form
+                    className="action-form"
+                    onSubmit={(event) => void reviewShift(event, reviewCandidate.id)}
+                  >
+                    <label className="action-form__wide">
+                      Justificativa da revisão
+                      <Input
+                        minLength={3}
+                        onChange={(event) => setReviewNote(event.target.value)}
+                        required
+                        value={reviewNote}
+                      />
+                    </label>
+                    <Button disabled={busy !== null || !online} type="submit">
+                      {busy === "review" ? "Revisando…" : "Concluir revisão"}
+                    </Button>
+                  </form>
+                )}
               </details>
             )}
 
@@ -1725,6 +1806,7 @@ export function RealCashPage({ scope }: { scope: ManagementScope }) {
             {(activeView === "shift" || activeView === "settings") && (
               <CashAdministrationPanels
                 data={data}
+                identityId={identityId}
                 key={`${open?.id ?? selectedRegister?.id ?? "no-register"}:${activeView}`}
                 onChanged={remote.retry}
                 online={online}

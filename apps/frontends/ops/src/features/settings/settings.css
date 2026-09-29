@@ -19,20 +19,9 @@
   scrollbar-width: thin;
 }
 
-.settings-section-nav a {
-  border-radius: var(--gm-radius-sm);
-  color: var(--gm-muted);
+.settings-section-nav .gm-button {
   flex: 0 0 auto;
-  font-size: var(--gm-font-sm);
-  font-weight: 700;
   min-height: 40px;
-  padding: var(--gm-space-2) var(--gm-space-3);
-  text-decoration: none;
-}
-
-.settings-section-nav a:is(:hover, :focus-visible) {
-  background: var(--gm-surface-soft);
-  color: var(--gm-ink);
 }
 
 .setup-checklist {

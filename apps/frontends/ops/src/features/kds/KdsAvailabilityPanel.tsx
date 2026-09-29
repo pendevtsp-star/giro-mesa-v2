@@ -126,7 +126,7 @@ export function KdsAvailabilityPanel({
   }
 
   function closeEditor() {
-    if (busy) return;
+    if (busy || submitting) return;
     setSelectedProductId(null);
     setConfirmed(false);
   }
@@ -168,10 +168,7 @@ export function KdsAvailabilityPanel({
         <div>
           <span className="gm-pill">Operação da unidade</span>
           <h2>Central de disponibilidade</h2>
-          <p>
-            Esgote, limite ou libere produtos em todos os canais desta unidade. “86” aparece apenas
-            como código auxiliar de cozinha.
-          </p>
+          <p>Controle a venda em todos os canais da unidade.</p>
         </div>
         <Badge tone={unavailableProducts.length > 0 ? "danger" : "success"}>
           {unavailableProducts.length > 0
@@ -225,7 +222,7 @@ export function KdsAvailabilityPanel({
 
       {visibleProducts.length === 0 ? (
         <EmptyState
-          description="A lista será atualizada quando o servidor publicar produtos ou houver demanda no KDS."
+          description="Confira a busca ou os produtos cadastrados no Cardápio."
           icon="◇"
           title="Nenhum produto encontrado"
         />
@@ -265,11 +262,12 @@ export function KdsAvailabilityPanel({
       )}
       {cloudUnavailable && (
         <p className="kds-inline-alert" role="status">
-          Alterar disponibilidade exige conexão; nenhum estado será simulado localmente.
+          Conecte o terminal para alterar a disponibilidade.
         </p>
       )}
 
       <Modal
+        closeDisabled={busy || submitting}
         isOpen={selectedProduct !== null}
         onClose={closeEditor}
         size="sm"
@@ -408,8 +406,19 @@ export function KdsAvailabilityPanel({
               </span>
             </label>
 
+            {errors[`product:${selectedProduct.productId}:availability`] && (
+              <p className="kds-action-error" role="alert">
+                {errors[`product:${selectedProduct.productId}:availability`]}
+              </p>
+            )}
+
             <div className="kds-item-operation-form__actions">
-              <Button onClick={closeEditor} type="button" variant="ghost">
+              <Button
+                disabled={busy || submitting}
+                onClick={closeEditor}
+                type="button"
+                variant="secondary"
+              >
                 Voltar
               </Button>
               <Button

@@ -73,7 +73,11 @@ describe("scheduled reports", () => {
           products: [{ key: "p1", label: "Prato", quantity: 2, revenue_cents: 10_500 }],
           categories: [],
           channels: [{ key: "dine_in", label: "dine_in", quantity: 2, revenue_cents: 10_500 }],
-          paymentMethods: [],
+          paymentMethods: [
+            { key: "cash", label: "cash", quantity: 2, revenue_cents: 7000 },
+            { key: "pix", label: "pix", quantity: 1, revenue_cents: 0 },
+            { key: "credit_card", label: "credit_card", quantity: 0, revenue_cents: -500 },
+          ],
         },
       },
     );
@@ -82,6 +86,9 @@ describe("scheduled reports", () => {
     assert.match(csv, /fluxo_caixa;;saídas;Saídas realizadas;;;;;;;3000;complete/);
     assert.match(csv, /dre;;cmv;CMV;;;;;;;4000;complete/);
     assert.match(csv, /detalhamento_products;;p1;Prato;2;;;;;10500;;/);
+    assert.match(csv, /detalhamento_paymentMethods;;cash;cash;2;;;;;7000;;/);
+    assert.match(csv, /detalhamento_paymentMethods;;pix;pix;1;;;;;0;;/);
+    assert.match(csv, /detalhamento_paymentMethods;;credit_card;credit_card;0;;;;;'-500;;/);
     assert.equal(reportContentSha256(csv), reportContentSha256(csv));
     assert.match(reportContentSha256(csv), /^[a-f0-9]{64}$/);
   });

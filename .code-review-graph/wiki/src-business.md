@@ -63,7 +63,7 @@ Directory-based community: packages/domain
 | ActivationChecklist | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 17-17 |
 | missingActivationItems | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 19-21 |
 
-*... and 30 more members.*
+*... and 14 more members.*
 
 ## Execution Flows
 
@@ -73,12 +73,13 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `equal` (65 edge(s))
+- `equal` (33 edge(s))
 - `from` (10 edge(s))
-- `some` (7 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts::hasPermission` (10 edge(s))
 - `update` (6 edge(s))
 - `throws` (5 edge(s))
 - `repeat` (5 edge(s))
+- `some` (5 edge(s))
 - `toString` (5 edge(s))
 - `deepEqual` (4 edge(s))
 - `digest` (4 edge(s))
@@ -87,22 +88,21 @@ No execution flows pass through this community.
 - `min` (4 edge(s))
 - `max` (4 edge(s))
 - `toISOString` (3 edge(s))
-- `trim` (3 edge(s))
 
 ### Incoming
 
-- `equal` (65 edge(s))
+- `equal` (33 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts` (13 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts::hasPermission` (10 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts` (9 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/billing.ts` (7 edge(s))
 - `throws` (5 edge(s))
 - `repeat` (5 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts` (5 edge(s))
 - `deepEqual` (4 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.test.ts` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/secret-envelope.ts` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/whatsapp.ts` (4 edge(s))
 - `every` (3 edge(s))
 - `ok` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/commercial.ts` (2 edge(s))
+- `from` (2 edge(s))

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PosPrintJob } from "../../api";
-import type { PosItem, PosTab } from "../../operations.shared";
+import type { PosItem, PosTab, TabPayment } from "../../operations.shared";
 import { statementMatchesCurrentAccount } from "./account-printing";
 import { splitConsumptionPreview } from "./SplitConsumptionPanel";
 
@@ -29,6 +29,88 @@ const statement = {
 } as unknown as PosPrintJob;
 
 describe("pré-conta atual e separação de consumo", () => {
+  const payment: Pick<TabPayment, "id" | "method" | "netAmountCents" | "reversedCents"> = {
+    id: "payment-1",
+    method: "cash",
+    netAmountCents: 2000,
+    reversedCents: 800,
+  };
+  const paidStatement = {
+    ...statement,
+    payload: {
+      ...statement.payload,
+      totals: { ...statement.payload.totals, paidCents: 2000 },
+      payments: [
+        {
+          ...payment,
+          amountCents: 2000,
+          financialStatus: "posted",
+          createdAt: "2026-09-19T12:00:00Z",
+        },
+      ],
+    },
+  } as PosPrintJob;
+
+  it("compara líquido e estorno sem descontar o estorno duas vezes", () => {
+    expect(statementMatchesCurrentAccount(paidStatement, tab, [brownie], 2000, [payment])).toBe(
+      true,
+    );
+    const legacy = {
+      ...paidStatement,
+      payload: {
+        ...paidStatement.payload,
+        payments: paidStatement.payload.payments.map(({ netAmountCents: _, ...line }) => line),
+      },
+    };
+    expect(statementMatchesCurrentAccount(legacy, tab, [brownie], 2000, [payment])).toBe(true);
+    const withoutReversals = { ...payment, reversedCents: 0 };
+    const oldStatement = {
+      ...paidStatement,
+      payload: {
+        ...paidStatement.payload,
+        payments: [
+          {
+            id: payment.id,
+            method: payment.method,
+            amountCents: 2000,
+            financialStatus: "posted" as const,
+            createdAt: "2026-09-19T12:00:00Z",
+          },
+        ],
+      },
+    };
+    expect(
+      statementMatchesCurrentAccount(oldStatement, tab, [brownie], 2000, [withoutReversals]),
+    ).toBe(true);
+    expect(statementMatchesCurrentAccount(oldStatement, tab, [brownie], 2000, [payment])).toBe(
+      false,
+    );
+  });
+
+  it.each([
+    { id: "novo-pagamento" },
+    { method: "pix" as const },
+    { netAmountCents: 1800 },
+    { reversedCents: 1000 },
+  ])("invalida pré-conta com mesmo total pago e pagamento alterado: %j", (changes) => {
+    expect(
+      statementMatchesCurrentAccount(paidStatement, tab, [brownie], 2000, [
+        { ...payment, ...changes },
+      ]),
+    ).toBe(false);
+  });
+
+  it("invalida estorno integral seguido de novo pagamento com mesmo saldo", () => {
+    const payments = [
+      { ...payment, netAmountCents: 0, reversedCents: 2800 },
+      { ...payment, id: "payment-2", netAmountCents: 2000, reversedCents: 0 },
+    ];
+    expect(statementMatchesCurrentAccount(paidStatement, tab, [brownie], 2000, payments)).toBe(
+      false,
+    );
+    expect(statementMatchesCurrentAccount(paidStatement, tab, [brownie], 2000, [])).toBe(false);
+  });
+
   it("reconhece somente o snapshot da conta atual, com quantidades, valores e pagamentos atuais", () => {
     expect(statementMatchesCurrentAccount(statement, tab, [brownie], 0)).toBe(true);
     expect(
@@ -44,6 +126,9 @@ describe("pré-conta atual e separação de consumo", () => {
       statementMatchesCurrentAccount(statement, tab, [{ ...brownie, netCents: 2700 }], 0),
     ).toBe(false);
     expect(statementMatchesCurrentAccount(statement, tab, [brownie], 1000)).toBe(false);
+    expect(
+      statementMatchesCurrentAccount(statement, { ...tab, deliveryFeeCents: 700 }, [brownie], 0),
+    ).toBe(false);
     expect(statementMatchesCurrentAccount(statement, { ...tab, label: "Ana" }, [brownie], 0)).toBe(
       false,
     );

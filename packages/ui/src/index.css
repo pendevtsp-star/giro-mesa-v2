@@ -43,6 +43,17 @@
 
 @layer theme, base, legacy, components, utilities;
 
+/* Field wrappers opt into stacked labels; ordinary labels remain inline. */
+@layer utilities {
+  label[data-slot="label"]:is(.gm-field, .gm-form-field) {
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+    line-height: var(--gm-leading-normal);
+    min-width: 0;
+  }
+}
+
 @custom-variant dark (&:is([data-theme="dark"] *));
 
 @theme inline {

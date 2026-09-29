@@ -36,6 +36,7 @@ import {
   WEEKDAYS,
 } from "./settings";
 import "./settings.css";
+import { ManagerPinSetupModal } from "../counter/ManagerPinSetupModal";
 import { SetupChecklist } from "./SetupChecklist";
 
 type SettingsPageProps = {
@@ -47,6 +48,12 @@ type SettingsPageProps = {
 };
 
 type Feedback = { tone: "danger" | "success"; message: string } | null;
+
+function focusSettingsSection(section: string) {
+  const target = document.getElementById(`settings-${section}`);
+  target?.scrollIntoView({ block: "start" });
+  target?.focus({ preventScroll: true });
+}
 
 function useFilePreview(file: File | null, fallback: string | null | undefined) {
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : fallback), [fallback, file]);
@@ -186,7 +193,7 @@ function HoursRuleEditor({
           {rule.periods.map((period, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: controlled rows have no persisted identifier
             <div className="settings-period" key={index}>
-              <Label>
+              <Label className="gm-field items-stretch">
                 Abre
                 <Input
                   aria-label={`Abertura do período ${index + 1} de ${label}`}
@@ -203,7 +210,7 @@ function HoursRuleEditor({
                   value={period.start}
                 />
               </Label>
-              <Label>
+              <Label className="gm-field items-stretch">
                 Fecha
                 <Input
                   aria-label={`Fechamento do período ${index + 1} de ${label}`}
@@ -278,6 +285,7 @@ export function SettingsPage({
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [selectedTargets, setSelectedTargets] = useState<string[]>([]);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
+  const [managerPinModalOpen, setManagerPinModalOpen] = useState(false);
   const [restoreTarget, setRestoreTarget] = useState<EstablishmentSettingsHistoryEntry | null>(
     null,
   );
@@ -291,6 +299,7 @@ export function SettingsPage({
   const [now, setNow] = useState(() => new Date());
   const persistedSettings = useRef<EstablishmentSettings | null>(null);
   const isOwner = profileId === "owner";
+  const canManageManagerPin = isOwner || profileId === "manager";
 
   useEffect(() => {
     void reloadToken;
@@ -372,9 +381,7 @@ export function SettingsPage({
     if (!settings || typeof window === "undefined") return;
     const section = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("section");
     if (!section) return;
-    window.requestAnimationFrame(() =>
-      document.getElementById(`settings-${section}`)?.scrollIntoView(),
-    );
+    window.requestAnimationFrame(() => focusSettingsSection(section));
   }, [settings]);
 
   const openState = useMemo(() => {
@@ -781,15 +788,62 @@ export function SettingsPage({
         onRefresh={() => setSummaryRevision((value) => value + 1)}
       />
 
+      {canManageManagerPin && (
+        <section id="settings-manager-pin" aria-labelledby="settings-manager-pin-title">
+          <Card className="settings-card">
+            <div className="gm-toolbar justify-between">
+              <div className="min-w-0">
+                <h2 id="settings-manager-pin-title">Código gerencial</h2>
+                <p className="m-0 text-sm text-muted-foreground">
+                  Código pessoal para autorizar ajustes e reabrir atendimentos.
+                </p>
+              </div>
+              <Button
+                aria-haspopup="dialog"
+                onClick={() => setManagerPinModalOpen(true)}
+                size="sm"
+                variant="secondary"
+              >
+                Cadastrar/alterar código
+              </Button>
+            </div>
+          </Card>
+          {managerPinModalOpen && (
+            <ManagerPinSetupModal
+              onClose={() => setManagerPinModalOpen(false)}
+              onSaved={() => setFeedback({ tone: "success", message: "Código gerencial salvo." })}
+              scope={{ organizationId, unitId }}
+            />
+          )}
+        </section>
+      )}
+
       <nav aria-label="Seções das configurações" className="settings-section-nav">
-        <a href="#settings-organization">Organização</a>
-        <a href="#settings-unit">Unidade</a>
-        <a href="#settings-brand">Marca e cardápio</a>
-        <a href="#settings-hours">Horários</a>
-        <a href="#settings-specialized">Operação especializada</a>
+        {(
+          [
+            ["organization", "Organização"],
+            ["unit", "Unidade"],
+            ["brand", "Marca e cardápio"],
+            ["hours", "Horários"],
+            ["specialized", "Operação especializada"],
+          ] as const
+        ).map(([section, label]) => (
+          <Button
+            key={section}
+            onClick={() => focusSettingsSection(section)}
+            size="sm"
+            variant="ghost"
+          >
+            {label}
+          </Button>
+        ))}
       </nav>
 
-      <section id="settings-organization" aria-labelledby="settings-organization-title">
+      <section
+        id="settings-organization"
+        aria-labelledby="settings-organization-title"
+        tabIndex={-1}
+      >
         <Card className="settings-card">
           <header>
             <div>
@@ -799,7 +853,7 @@ export function SettingsPage({
             {dirtySections.includes("organization") && <Badge tone="warning">Não salvo</Badge>}
           </header>
           <div className="gm-form-grid settings-grid">
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Nome fantasia
               <Input
                 aria-invalid={Boolean(fieldErrors["organization.tradeName"])}
@@ -819,11 +873,11 @@ export function SettingsPage({
                 </small>
               )}
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Razão social
               <Input disabled readOnly value={settings.organization.legalName} />
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               CNPJ
               <Input disabled readOnly value={settings.organization.document} />
             </Label>
@@ -847,7 +901,7 @@ export function SettingsPage({
         </Card>
       </section>
 
-      <section id="settings-unit" aria-labelledby="settings-unit-title">
+      <section id="settings-unit" aria-labelledby="settings-unit-title" tabIndex={-1}>
         <Card className="settings-card">
           <header>
             <div>
@@ -857,7 +911,7 @@ export function SettingsPage({
             {dirtySections.includes("unit") && <Badge tone="warning">Não salvo</Badge>}
           </header>
           <div className="gm-form-grid settings-grid">
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Nome interno da unidade
               <Input
                 aria-invalid={Boolean(fieldErrors.name)}
@@ -878,7 +932,7 @@ export function SettingsPage({
                 </small>
               )}
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Fuso horário
               <NativeSelect
                 aria-invalid={Boolean(fieldErrors.timezone)}
@@ -903,7 +957,7 @@ export function SettingsPage({
                 </small>
               )}
             </Label>
-            <Label className="gm-form-field settings-field--wide">
+            <Label className="gm-field items-stretch settings-field--wide">
               Endereço
               <Input
                 aria-invalid={Boolean(fieldErrors["presentation.address"])}
@@ -923,7 +977,7 @@ export function SettingsPage({
                 </small>
               )}
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Telefone / WhatsApp
               <Input
                 aria-invalid={Boolean(fieldErrors["presentation.phone"])}
@@ -950,7 +1004,7 @@ export function SettingsPage({
                 </small>
               )}
             </Label>
-            <Label className="gm-form-field">
+            <Label className="gm-field items-stretch">
               Instagram
               <Input
                 aria-invalid={Boolean(fieldErrors["presentation.instagram"])}
@@ -984,7 +1038,7 @@ export function SettingsPage({
           <details className="settings-address-details">
             <summary>Endereço estruturado para mapas e impressão</summary>
             <div className="gm-form-grid settings-grid">
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 CEP
                 <Input
                   inputMode="numeric"
@@ -996,7 +1050,7 @@ export function SettingsPage({
                   value={formatPostalCode(settings.presentation.addressDetails?.postalCode ?? "")}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Logradouro
                 <Input
                   maxLength={180}
@@ -1004,7 +1058,7 @@ export function SettingsPage({
                   value={settings.presentation.addressDetails?.street ?? ""}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Número
                 <Input
                   maxLength={30}
@@ -1012,7 +1066,7 @@ export function SettingsPage({
                   value={settings.presentation.addressDetails?.number ?? ""}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Complemento
                 <Input
                   maxLength={120}
@@ -1020,7 +1074,7 @@ export function SettingsPage({
                   value={settings.presentation.addressDetails?.complement ?? ""}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Bairro
                 <Input
                   maxLength={120}
@@ -1028,7 +1082,7 @@ export function SettingsPage({
                   value={settings.presentation.addressDetails?.district ?? ""}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Cidade
                 <Input
                   maxLength={120}
@@ -1036,7 +1090,7 @@ export function SettingsPage({
                   value={settings.presentation.addressDetails?.city ?? ""}
                 />
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 UF
                 <Input
                   maxLength={2}
@@ -1074,7 +1128,7 @@ export function SettingsPage({
         </Card>
       </section>
 
-      <section id="settings-brand" aria-labelledby="settings-brand-title">
+      <section id="settings-brand" aria-labelledby="settings-brand-title" tabIndex={-1}>
         <Card className="settings-card">
           <header>
             <div>
@@ -1088,7 +1142,7 @@ export function SettingsPage({
           </header>
           <div className="settings-brand-layout">
             <div className="gm-form-stack">
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Nome exibido
                 <Input
                   aria-invalid={Boolean(fieldErrors["presentation.displayName"])}
@@ -1109,7 +1163,7 @@ export function SettingsPage({
                   </small>
                 )}
               </Label>
-              <Label className="gm-form-field">
+              <Label className="gm-field items-stretch">
                 Slogan
                 <Input
                   maxLength={300}
@@ -1152,7 +1206,7 @@ export function SettingsPage({
                   />
                 </Label>
               </div>
-              <Label className="settings-upload">
+              <Label className="gm-field items-stretch settings-upload">
                 Logo (JPG, PNG ou WEBP até 2 MB)
                 <input accept="image/jpeg,image/png,image/webp" onChange={chooseLogo} type="file" />
               </Label>
@@ -1175,7 +1229,7 @@ export function SettingsPage({
                   Remover logo
                 </Button>
               )}
-              <Label className="settings-upload">
+              <Label className="gm-field items-stretch settings-upload">
                 {settings.presentation.coverImageUrl || coverFile
                   ? "Trocar foto de capa do cardápio"
                   : "Foto de capa do cardápio"}{" "}
@@ -1272,7 +1326,7 @@ export function SettingsPage({
         </Card>
       </section>
 
-      <section id="settings-hours" aria-labelledby="settings-hours-title">
+      <section id="settings-hours" aria-labelledby="settings-hours-title" tabIndex={-1}>
         <Card className="settings-card">
           <header>
             <div>
@@ -1504,10 +1558,9 @@ export function SettingsPage({
         </Card>
       )}
 
-      <section id="settings-specialized" aria-labelledby="settings-specialized-title">
+      <section id="settings-specialized" aria-labelledby="settings-specialized-title" tabIndex={-1}>
         <div className="settings-section-heading">
           <h2 id="settings-specialized-title">Configurações especializadas</h2>
-          <p>Cada área mantém suas regras e permissões próprias.</p>
         </div>
         <div className="settings-shortcuts">
           {SPECIALIZED_SETTINGS.filter(
