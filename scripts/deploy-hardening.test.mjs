@@ -932,9 +932,9 @@ test("pre-migration backup binds the migration actually applied in the source da
   for (const transition of recovery.transitions) {
     assert.equal(transition.appliedAfter, recovery.targetMigration);
     assert.equal(transition.recoveryMigration, "0088_cash_payment_exchange");
-    assert.equal(transition.recoveryArtifact, "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876");
+    assert.equal(transition.recoveryArtifact, "git:a199c01b0d7fb3d02d0561891c14191273f5bf24");
     assert.equal(transition.testedUpgrade, true);
-    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/36634779764$/);
+    assert.match(transition.evidence.workflowRun, /\/actions\/runs\/37672847334$/);
     assert.equal(transition.evidence.testReportDigest, transition.evidence.sha256);
   }
 });

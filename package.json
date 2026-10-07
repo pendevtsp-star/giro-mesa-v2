@@ -39,20 +39,20 @@
   },
   "productionBaseline": {
     "level": "software-ready",
-    "artifact": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876",
+    "artifact": "git:a199c01b0d7fb3d02d0561891c14191273f5bf24",
     "migration": {
       "id": "0088_cash_payment_exchange",
       "status": "verified",
-      "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
+      "evidence": "git:a199c01b0d7fb3d02d0561891c14191273f5bf24"
     },
     "gateResults": {
       "automated": {
         "status": "passed",
-        "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
+        "evidence": "git:a199c01b0d7fb3d02d0561891c14191273f5bf24"
       },
       "security": {
         "status": "passed",
-        "evidence": "git:8db1be7c17f9c6cdd672e13e0bdac5974f24b876"
+        "evidence": "git:a199c01b0d7fb3d02d0561891c14191273f5bf24"
       }
     }
   },
