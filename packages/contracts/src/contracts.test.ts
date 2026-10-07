@@ -32,6 +32,7 @@ import {
   registerRequestSchema,
   registerSchema,
   tableQrLifecycleSchema,
+  tableQrPresenceSchema,
   testTableQrUrlSchema,
   timezoneSchema,
   trialApplicationRequestSchema,
@@ -201,6 +202,10 @@ describe("public contracts", () => {
 
   it("keeps table QR settings, print lifecycle and pre-tab sessions strict", () => {
     const tableId = crypto.randomUUID();
+    const presence = { mode: "daily_code", code: "123456" };
+    assert.deepEqual(tableQrLifecycleSchema.shape.presence.parse(presence), presence);
+    assert.equal(tableQrPresenceSchema.safeParse(presence).success, false);
+    assert.equal(tableQrPresenceSchema.safeParse({ ...presence, activeTables: [] }).success, true);
     assert.equal(
       publicTableSessionRequestSchema.safeParse({ presenceCode: "123456" }).success,
       true,

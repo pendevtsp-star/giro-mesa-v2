@@ -6,7 +6,7 @@ import {
   growthIntegrations,
   posTabCustomerLinks,
 } from "@giromesa/db";
-import { doseClubManagedCredential } from "@giromesa/domain";
+import { doseClubManagedCredential, trustedDoseClubBaseUrl } from "@giromesa/domain";
 import {
   ConflictException,
   Injectable,
@@ -111,9 +111,19 @@ export class DoseClubIntegrationService {
   }
 
   private client(connection: ActiveConnection) {
+    let baseUrl: string;
+    try {
+      baseUrl = trustedDoseClubBaseUrl(
+        connection.credentialReference,
+        connection.config.apiBaseUrl,
+        process.env.DOSECLUB_API_BASE_URL,
+      );
+    } catch {
+      throw new ServiceUnavailableException({ code: "DOSECLUB_CONFIG_INVALID" });
+    }
     const integrationKey = connection.credentialReference.startsWith("managed:v1:")
       ? this.managedCredential(connection)
-      : process.env[connection.credentialReference]?.trim();
+      : process.env.DOSECLUB_INTEGRATION_KEY?.trim();
     if (!integrationKey) {
       throw new ServiceUnavailableException({
         code: "DOSECLUB_CREDENTIALS_NOT_CONFIGURED",
@@ -121,7 +131,7 @@ export class DoseClubIntegrationService {
       });
     }
     return new DoseClubHttpClient({
-      baseUrl: connection.config.apiBaseUrl,
+      baseUrl,
       clientId: connection.config.clientId,
       integrationKey,
     });

@@ -14,6 +14,7 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Headers,
   HttpCode,
   HttpStatus,
@@ -233,6 +234,7 @@ export class PilotPosController {
   }
 
   @Get("tables/qr/presence")
+  @Header("Cache-Control", "no-store")
   @ApiOkResponse({ schema: toOpenApiSchema(tableQrPresenceSchema) })
   tableQrPresence(
     @Req() request: AuthenticatedRequest,

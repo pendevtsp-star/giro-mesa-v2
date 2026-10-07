@@ -48,6 +48,12 @@
   justify-content: flex-end;
 }
 
+.operational-attention-presence {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .operational-attention-partial,
 .operational-attention-error {
   padding: var(--gm-space-2) var(--gm-space-3);

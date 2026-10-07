@@ -40,13 +40,13 @@ No Dose Club:
 
 1. mantenha o tenant em `trial` ou `active`, com `inventoryMode=giromesa` e entitlement ativo `integration.shared_inventory`;
 2. crie uma `IntegrationAccount` ativa para o provider `giromesa`, com `clientId`, `secretRef` e, se aplicável, `branchId`;
-3. disponibilize o segredo indicado por `secretRef` no ambiente da API;
+3. disponibilize o segredo indicado por `secretRef` como `DOSECLUB_INTEGRATION_KEY` no ambiente da API e do worker;
 4. crie os mappings `customer`, `branch` e `product`. Os IDs externos são, respectivamente, os UUIDs de cliente, unidade e produto do GiroMesa.
 
 No GiroMesa:
 
 1. defina `DOSECLUB_PROVIDER_ENABLED=true` na API e no worker;
-2. disponibilize o mesmo segredo em uma variável de ambiente, por exemplo `DOSECLUB_INTEGRATION_KEY`;
+2. configure `DOSECLUB_API_BASE_URL` com a origem confiável do provedor e disponibilize o mesmo segredo somente em `DOSECLUB_INTEGRATION_KEY` na API e no worker;
 3. como `owner`, configure `POST /api/v1/organizations/:organizationId/growth/integrations/doseclub` com:
 
 ```json
@@ -62,7 +62,7 @@ No GiroMesa:
 
 4. ative por unidade com `POST /api/v1/organizations/:organizationId/units/:unitId/integrations/doseclub/activate`.
 
-A ativação somente grava estado `active` depois de um `GET /v1/integrations/giromesa/health` autenticado com `x-giromesa-client-id` e `x-giromesa-integration-key`. Em produção, a URL do Dose Club deve usar HTTPS. Uma configuração específica da unidade prevalece sobre a configuração da organização.
+A ativação somente grava estado `active` depois de um `GET /v1/integrations/giromesa/health` autenticado com `x-giromesa-client-id` e `x-giromesa-integration-key`. A URL do corpo deve ter a mesma origem de `DOSECLUB_API_BASE_URL`; a API persiste a URL do servidor, e a API e o worker recusam conexões antigas com outra origem ou referência de credencial diferente de `DOSECLUB_INTEGRATION_KEY` (exceto referências gerenciadas). Em produção, a URL deve usar HTTPS. Reconfigure conexões manuais antigas que não satisfazem essa política antes de ativá-las. Uma configuração específica da unidade prevalece sobre a configuração da organização.
 
 ## Fluxo real de consumo
 

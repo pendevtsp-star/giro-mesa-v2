@@ -1854,6 +1854,13 @@ export const tableQrPresenceSchema = z
       .string()
       .regex(/^\d{6}$/)
       .nullable(),
+    activeTables: z.array(
+      z.object({
+        tableId: z.string().uuid(),
+        label: z.string().min(1).max(60),
+        code: z.string().regex(/^\d{6}$/),
+      }),
+    ),
   })
   .strict();
 
@@ -1970,7 +1977,7 @@ export const tableQrLifecycleSchema = z
         logoThumbnailUrl: httpUrlSchema.nullable(),
       })
       .strict(),
-    presence: tableQrPresenceSchema,
+    presence: tableQrPresenceSchema.omit({ activeTables: true }),
     batches: z.array(tableQrPrintBatchSchema),
     rotations: z.array(
       z

@@ -40,6 +40,7 @@ import {
   createTableSessionToken,
   TABLE_SESSION_TTL_SECONDS,
   type TableSessionClaims,
+  tableOccupancyCode,
   verifyTableSessionToken,
 } from "./table-session-token.js";
 
@@ -61,9 +62,13 @@ export class PublicTableService {
     slug: string,
     tableToken: string | undefined,
     input: PublicTableSessionRequest,
+    sessionToken?: string,
   ) {
-    const menu = await this.activeMenu(slug);
-    const table = await this.resolveQrTable(menu, slug, tableToken);
+    const previousSession =
+      !tableToken && sessionToken ? await this.requireSession(slug, sessionToken, true) : null;
+    const menu = previousSession?.menu ?? (await this.activeMenu(slug));
+    const table = previousSession?.table ?? (await this.resolveQrTable(menu, slug, tableToken));
+    const tab = previousSession?.tab ?? (await this.activeTabForTable(menu, table.id));
     const [settings] = await this.database.db
       .select({ presenceProtection: posTableQrSettings.presenceProtection })
       .from(posTableQrSettings)
@@ -74,17 +79,22 @@ export class PublicTableService {
         ),
       )
       .limit(1);
-    if (settings?.presenceProtection === "daily_code") {
-      const expected = tablePresenceCode(
-        tableAccessSecret(),
-        menu.organizationId,
-        menu.unitId,
-        menu.timezone,
-      );
+    if (tab || settings?.presenceProtection === "daily_code") {
+      const expected = tab
+        ? tableOccupancyCode(
+            tableAccessSecret(),
+            menu.organizationId,
+            menu.unitId,
+            table.id,
+            tab.id,
+          )
+        : tablePresenceCode(tableAccessSecret(), menu.organizationId, menu.unitId, menu.timezone);
       if (!verifyTablePresenceCode(expected, input.presenceCode)) {
         throw new ForbiddenException({
           code: "PUBLIC_TABLE_PRESENCE_CODE_REQUIRED",
-          message: "Informe o código de presença disponível no estabelecimento.",
+          message: tab
+            ? "Solicite à equipe o código da comanda atual."
+            : "Informe o código de presença disponível no estabelecimento.",
           tableLabel: table.label,
         });
       }
@@ -111,7 +121,6 @@ export class PublicTableService {
           updatedAt: scannedAt,
         },
       });
-    const tab = await this.activeTabForTable(menu, table.id);
     const expiresAt = new Date(Date.now() + TABLE_SESSION_TTL_SECONDS * 1_000);
     const token = createTableSessionToken(
       {
@@ -138,7 +147,7 @@ export class PublicTableService {
   }
 
   async status(slug: string, sessionToken: string | undefined) {
-    const { claims, menu, table, tab } = await this.requireSession(slug, sessionToken);
+    const { claims, table, tab } = await this.requireSession(slug, sessionToken);
     const expiresAt = new Date(claims.exp * 1_000);
     const response = {
       status: tab ? ("active" as const) : ("awaiting_tab" as const),
@@ -146,24 +155,7 @@ export class PublicTableService {
       tableLabel: table.label,
       expiresAt: expiresAt.toISOString(),
     };
-    if (claims.tabId || !tab) return { response };
-
-    return {
-      token: createTableSessionToken(
-        {
-          slug,
-          organizationId: menu.organizationId,
-          unitId: menu.unitId,
-          tableId: table.id,
-          tabId: tab.id,
-          tokenVersion: table.tokenVersion,
-          exp: claims.exp,
-        },
-        tableAccessSecret(),
-      ),
-      cookieOptions: sessionCookieOptions(expiresAt),
-      response,
-    };
+    return { response };
   }
 
   async command(
@@ -173,11 +165,16 @@ export class PublicTableService {
     sessionToken: string | undefined,
     body: PublicMenuCommandInput,
   ) {
-    const session = sessionToken ? await this.requireSession(slug, sessionToken) : null;
+    const session = sessionToken
+      ? await this.requireSession(slug, sessionToken, body.type === "call_waiter")
+      : null;
     if (body.type === "request_check" && !session) this.invalidSession();
     const menu = session?.menu ?? (await this.activeMenu(slug));
     const table = session?.table ?? (await this.resolveQrTable(menu, slug, tableToken));
-    const tab = session?.tab ?? (await this.activeTabForTable(menu, table.id));
+    const tab =
+      body.type === "call_waiter" && !session?.claims.tabId
+        ? null
+        : (session?.tab ?? (await this.activeTabForTable(menu, table.id)));
     if (body.type === "request_check" && !tab) {
       throw new ConflictException({
         code: "PUBLIC_TABLE_TAB_NOT_OPEN",
@@ -342,7 +339,7 @@ export class PublicTableService {
     };
   }
 
-  private async requireSession(slug: string, token: string | undefined) {
+  private async requireSession(slug: string, token: string | undefined, allowUnbound = false) {
     let claims: TableSessionClaims | null = null;
     try {
       claims = token ? verifyTableSessionToken(token, slug, tableAccessSecret()) : null;
@@ -357,6 +354,13 @@ export class PublicTableService {
     const table = await this.resolveSessionTable(menu, claims);
     const tab = await this.activeTabForTable(menu, table.id);
     if (claims.tabId && (!tab || tab.id !== claims.tabId)) this.invalidSession();
+    if (tab && !claims.tabId && !allowUnbound) {
+      throw new ForbiddenException({
+        code: "PUBLIC_TABLE_PRESENCE_CODE_REQUIRED",
+        message: "Solicite à equipe o código da comanda atual.",
+        tableLabel: table.label,
+      });
+    }
     return { claims, menu, table, tab };
   }
 

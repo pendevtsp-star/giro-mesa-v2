@@ -1602,8 +1602,10 @@
 .salon-floor__toolbar {
   align-items: center;
   display: flex;
+  flex-wrap: wrap;
   gap: 0.65rem;
   justify-content: space-between;
+  min-width: 0;
 }
 .salon-view-toggle {
   align-items: center;
@@ -3463,8 +3465,9 @@
 
 .main-content--salon .real-table-grid--map {
   gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(170px, 100%), 1fr));
   margin-top: 0;
+  min-width: 0;
 }
 
 @media (max-width: 640px) {
@@ -6724,8 +6727,8 @@
 }
 
 .salon-floor__toolbar > .segmented:first-child .gm-button[aria-pressed="true"] small {
-  background: var(--gm-brand);
-  border-color: var(--gm-brand);
+  background: var(--gm-action);
+  border-color: var(--gm-action);
   color: var(--gm-on-action);
 }
 
@@ -6734,6 +6737,8 @@
   border: 1px solid var(--gm-border);
   border-radius: 10px;
   flex: 0 0 auto;
+  max-width: 100%;
+  min-width: 0;
   padding: 0.2rem;
 }
 

@@ -10,6 +10,7 @@ import {
   posCatalogBranding,
   posDiningRooms,
   posDiningTables,
+  posTabs,
   publicMenus,
   roleBindings,
   units,
@@ -18,8 +19,9 @@ import { eq, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { PublicTableService } from "../public-menu/public-table.service.js";
+import { tableOccupancyCode } from "../public-menu/table-session-token.js";
 import { PilotCatalogService } from "./pilot-catalog.service.js";
-import type { PilotPosService } from "./pilot-pos.service.js";
+import { PilotPosService } from "./pilot-pos.service.js";
 
 it("persists and audits the table QR settings and print lifecycle in PostgreSQL", async (context) => {
   const databaseUrl = process.env.PILOT_DATABASE_URL;
@@ -28,7 +30,8 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     return;
   }
   process.env.DATABASE_URL = databaseUrl;
-  process.env.QR_TABLE_TOKEN_SECRET = "integration-table-qr-secret".padEnd(32, "x");
+  const qrSecret = "integration-table-qr-secret".padEnd(32, "x");
+  process.env.QR_TABLE_TOKEN_SECRET = qrSecret;
   process.env.CUSTOMER_APP_URL = "https://menu.example.test";
   const database = new DatabaseService();
   let createdOrganizationId: string | undefined;
@@ -105,7 +108,21 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     assert.match(fallback.wifiNotice ?? "", /Casa QR/);
 
     assert.equal(fallback.presenceProtection, "session_only");
-    const publicTable = new PublicTableService(database, {} as PilotPosService);
+    const assistanceTabIds: Array<string | undefined> = [];
+    const publicTable = new PublicTableService(database, {
+      createPublicServiceCall: async (
+        _organizationId: string,
+        _unitId: string,
+        _tableId: string,
+        tabId: string | undefined,
+      ) => {
+        assistanceTabIds.push(tabId);
+        return {
+          call: { id: randomUUID(), kind: "assistance", status: "pending" },
+          duplicate: false,
+        };
+      },
+    } as unknown as PilotPosService);
     const sessionOnlyBatch = await catalog.createTableQrPrintBatch(
       identity.id,
       organization.id,
@@ -118,6 +135,89 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     assert.ok(sessionOnlyToken);
     const openedWithoutPresenceCode = await publicTable.openSession(slug, sessionOnlyToken, {});
     assert.equal(openedWithoutPresenceCode.response.tableLabel, "Mesa 01");
+    assert.equal(openedWithoutPresenceCode.response.status, "awaiting_tab");
+    await publicTable.command(
+      slug,
+      "qr-assistance-before-tab",
+      undefined,
+      openedWithoutPresenceCode.token,
+      { type: "call_waiter", payload: {} },
+    );
+    assert.equal(assistanceTabIds.at(-1), undefined);
+    const [firstTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        tableId: table.id,
+        openedByIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(firstTab);
+    const staffPresence = await new PilotPosService(
+      database,
+      new ScopeService(database),
+    ).tableQrPresence(identity.id, organization.id, unit.id);
+    assert.equal(staffPresence.activeTables[0]?.tableId, table.id);
+    await assert.rejects(() => publicTable.status(slug, openedWithoutPresenceCode.token));
+    await assert.rejects(() => publicTable.consumption(slug, openedWithoutPresenceCode.token));
+    await publicTable.command(
+      slug,
+      "qr-assistance-during-tab",
+      undefined,
+      openedWithoutPresenceCode.token,
+      { type: "call_waiter", payload: {} },
+    );
+    assert.equal(assistanceTabIds.at(-1), undefined);
+    await assert.rejects(() =>
+      publicTable.command(
+        slug,
+        "qr-check-without-presence",
+        undefined,
+        openedWithoutPresenceCode.token,
+        { type: "request_check", payload: {} },
+      ),
+    );
+    await assert.rejects(() =>
+      publicTable.createOrder(slug, openedWithoutPresenceCode.token, "old-qr-order", { items: [] }),
+    );
+    await assert.rejects(() => publicTable.openSession(slug, sessionOnlyToken, {}));
+    const firstCode = tableOccupancyCode(qrSecret, organization.id, unit.id, table.id, firstTab.id);
+    const firstOccupancy = await publicTable.openSession(
+      slug,
+      undefined,
+      { presenceCode: firstCode },
+      openedWithoutPresenceCode.token,
+    );
+    assert.equal(staffPresence.activeTables[0]?.code, firstCode);
+    assert.equal(firstOccupancy.response.status, "active");
+    await database.db
+      .update(posTabs)
+      .set({ status: "closed", closedAt: new Date() })
+      .where(eq(posTabs.id, firstTab.id));
+    const [nextTab] = await database.db
+      .insert(posTabs)
+      .values({
+        organizationId: organization.id,
+        unitId: unit.id,
+        tableId: table.id,
+        openedByIdentityId: identity.id,
+      })
+      .returning();
+    assert.ok(nextTab);
+    await assert.rejects(() => publicTable.status(slug, firstOccupancy.token));
+    await assert.rejects(() =>
+      publicTable.openSession(slug, sessionOnlyToken, { presenceCode: firstCode }),
+    );
+    const nextCode = tableOccupancyCode(qrSecret, organization.id, unit.id, table.id, nextTab.id);
+    const nextOccupancy = await publicTable.openSession(slug, sessionOnlyToken, {
+      presenceCode: nextCode,
+    });
+    assert.equal(nextOccupancy.response.status, "active");
+    await database.db
+      .update(posTabs)
+      .set({ status: "closed", closedAt: new Date() })
+      .where(eq(posTabs.id, nextTab.id));
 
     const settingsInput = {
       expectedRevision: 0,
@@ -220,7 +320,7 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     });
     assert.equal(opened.response.tableLabel, "Mesa 01");
     const withMetrics = await catalog.tableQrLifecycle(identity.id, organization.id, unit.id);
-    assert.equal(withMetrics.tables[0]?.scanCount, 2);
+    assert.equal(withMetrics.tables[0]?.scanCount, 4);
     assert.ok(withMetrics.tables[0]?.lastScannedAt);
   } finally {
     if (createdOrganizationId) {

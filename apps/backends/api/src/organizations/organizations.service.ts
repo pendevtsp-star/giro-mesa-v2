@@ -37,12 +37,14 @@ import { encryptionKey, encryptSecret, trialWindow } from "@giromesa/domain";
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { canGrantPersonAccessRole } from "../management/management.rules.js";
 import { smartPosInstallationLockKey } from "../pilot-operations/pilot-smartpos.service.js";
 import { edgeHubInstallerConfig, publicEdgeHubInstaller } from "./edge-hub-installer-config.js";
 import { projectBrandingSummary } from "./establishment-settings.service.js";
@@ -51,6 +53,45 @@ import { ScopeService } from "./scope.service.js";
 
 const hashToken = (value: string) => createHash("sha256").update(value).digest("hex");
 const PAIRING_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+function assertInvitationGrant(
+  bindings: readonly Pick<typeof roleBindings.$inferSelect, "role" | "unitId">[],
+  invitation: Pick<InviteMembershipInput, "role" | "unitId">,
+) {
+  const owner = bindings.some(
+    (binding) =>
+      binding.role === "owner" && (binding.unitId === null || binding.unitId === invitation.unitId),
+  );
+  const manager = bindings.some(
+    (binding) =>
+      binding.role === "manager" &&
+      invitation.unitId !== null &&
+      (binding.unitId === null || binding.unitId === invitation.unitId),
+  );
+  if (
+    (invitation.unitId === null &&
+      !bindings.some((binding) => binding.role === "owner" && binding.unitId === null)) ||
+    (!owner && !manager)
+  ) {
+    throw new ForbiddenException({
+      code: "INVITATION_SCOPE_DENIED",
+      message: "Você não pode convidar para este escopo.",
+    });
+  }
+  if (invitation.role === "owner") {
+    if (!owner) {
+      throw new ForbiddenException({
+        code: "OWNER_INVITE_REQUIRES_OWNER",
+        message: "Somente proprietários podem convidar outro proprietário.",
+      });
+    }
+  } else if (!owner && !canGrantPersonAccessRole("manager", invitation.role)) {
+    throw new ForbiddenException({
+      code: "INVITATION_ROLE_DENIED",
+      message: "Você não pode conceder este perfil de acesso.",
+    });
+  }
+}
 
 function pairingCode() {
   return [...randomBytes(8)].map((byte) => PAIRING_ALPHABET[byte & 31]).join("");
@@ -682,11 +723,7 @@ export class OrganizationsService {
       "owner",
       "manager",
     ]);
-    if (input.role === "owner" && !inviterRoles.some((row) => row.role === "owner"))
-      throw new BadRequestException({
-        code: "OWNER_INVITE_REQUIRES_OWNER",
-        message: "Somente proprietários podem convidar outro proprietário.",
-      });
+    assertInvitationGrant(inviterRoles, input);
     if (input.unitId) await this.scope.requireUnitAccess(identityId, organizationId, input.unitId);
     const token = randomBytes(32).toString("base64url");
     const encryption = encryptionKey(process.env.OUTBOX_ENCRYPTION_KEY, "OUTBOX_ENCRYPTION_KEY");
@@ -762,6 +799,34 @@ export class OrganizationsService {
           message: "Entre com a conta do e-mail que recebeu o convite.",
         });
       }
+      if (invitation.unitId) {
+        const [unit] = await tx
+          .select({ id: units.id })
+          .from(units)
+          .where(
+            and(
+              eq(units.id, invitation.unitId),
+              eq(units.organizationId, invitation.organizationId),
+              eq(units.active, true),
+            ),
+          )
+          .limit(1);
+        if (!unit) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
+      }
+      const inviterBindings = await tx
+        .select({ role: roleBindings.role, unitId: roleBindings.unitId })
+        .from(memberships)
+        .innerJoin(roleBindings, eq(roleBindings.membershipId, memberships.id))
+        .where(
+          and(
+            eq(memberships.identityId, invitation.invitedByIdentityId),
+            eq(memberships.organizationId, invitation.organizationId),
+            eq(memberships.status, "active"),
+            inArray(roleBindings.role, ["owner", "manager"]),
+          ),
+        )
+        .for("share");
+      assertInvitationGrant(inviterBindings, invitation);
       let [personAccess] = await tx
         .select()
         .from(managementPersonAccess)
@@ -874,6 +939,9 @@ export class OrganizationsService {
               .sort(),
           ]
         : [invitation.role];
+      for (const role of roles) {
+        assertInvitationGrant(inviterBindings, { role, unitId: invitation.unitId });
+      }
       if (personAccess) {
         const [orphanBinding] = await tx
           .select({ id: roleBindings.id })

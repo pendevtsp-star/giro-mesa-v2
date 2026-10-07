@@ -4,8 +4,8 @@
 
 Directory-based community: apps/native
 
-- **Size**: 3416 nodes
-- **Cohesion**: 0.4532
+- **Size**: 3632 nodes
+- **Cohesion**: 0.4603
 - **Dominant Language**: javascript
 
 ## Members
@@ -63,56 +63,56 @@ Directory-based community: apps/native
 | PairingPayload | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 551-551 |
 | HubCommandResponse | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs | 552-552 |
 
-*... and 536 more members.*
+*... and 3582 more members.*
 
 ## Execution Flows
 
-- **e** (criticality: 0.75, depth: 11)
-- **Nr** (criticality: 0.75, depth: 15)
-- **e** (criticality: 0.75, depth: 12)
-- **t** (criticality: 0.75, depth: 15)
 - **e** (criticality: 0.75, depth: 10)
+- **pt** (criticality: 0.75, depth: 11)
 - **e** (criticality: 0.75, depth: 15)
-- **RotatePaymentCredentialAsync** (criticality: 0.73, depth: 2)
-- **SendSignedAsync** (criticality: 0.70, depth: 3)
-- **RedeemPaymentPairingAsync** (criticality: 0.69, depth: 4)
-- **Je** (criticality: 0.68, depth: 13)
-- *... and 53 more flows.*
+- **S** (criticality: 0.75, depth: 15)
+- **s** (criticality: 0.75, depth: 15)
+- **ae** (criticality: 0.75, depth: 15)
+- **e** (criticality: 0.75, depth: 14)
+- **e** (criticality: 0.75, depth: 12)
+- **t** (criticality: 0.75, depth: 12)
+- **we** (criticality: 0.75, depth: 12)
+- *... and 80 more flows.*
 
 ## Dependencies
 
 ### Outgoing
 
-- `FromResult` (37 edge(s))
-- `push` (36 edge(s))
-- `IsNullOrWhiteSpace` (31 edge(s))
-- `Append` (24 edge(s))
-- `ToString` (23 edge(s))
-- `Equals` (22 edge(s))
-- `call` (19 edge(s))
-- `Error` (16 edge(s))
-- `slice` (14 edge(s))
-- `forEach` (13 edge(s))
-- `indexOf` (13 edge(s))
-- `Add` (12 edge(s))
-- `isArray` (12 edge(s))
-- `map` (12 edge(s))
-- `GetAsync` (11 edge(s))
+- `map` (489 edge(s))
+- `trim` (276 edge(s))
+- `Error` (239 edge(s))
+- `filter` (239 edge(s))
+- `push` (176 edge(s))
+- `find` (164 edge(s))
+- `includes` (147 edge(s))
+- `preventDefault` (141 edge(s))
+- `slice` (136 edge(s))
+- `isArray` (122 edge(s))
+- `replace` (107 edge(s))
+- `Number` (107 edge(s))
+- `some` (104 edge(s))
+- `join` (103 edge(s))
+- `retry` (93 edge(s))
 
 ### Incoming
 
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-w2WzQHlP.js` (1405 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/jspdf-es-min-BmRfrLaW.js` (610 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-C3qj6_Ta.js` (474 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/html2canvas-DCcDvdvP.js` (212 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/purify-es-ChwZkWde.js` (69 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/browser-Cpc4qo6y.js` (46 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/Program.cs` (46 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceApiClient.cs` (18 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/NativeBridge.cs` (15 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPayments.cs` (12 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosResultOutbox.cs` (9 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-es-5j_NbZbH.js` (8 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/checks/SmartPos.SelfCheck/AndroidStubs.cs` (8 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosDeviceSecurity.cs` (7 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/SmartPosPaymentContracts.cs` (7 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/rolldown-runtime-hePW80VL.js` (5 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/jspdf-es-min-DFkXcjsK.js` (5 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/index-C2PQs79y.js` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/SalonPage--t1Hx0g8.js` (134 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CatalogPage-DRsS2RjO.js` (126 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/ReportsPage-Ipmeo4od.js` (116 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CounterWorkspace-BWsgxnJ1.js` (115 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/FiscalPages-B-rZIZMU.js` (110 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/KdsPage-QoY2tSru.js` (110 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/InventoryPage-D8cmUJ4K.js` (88 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/DeviceSetupPage-DmY-bFXv.js` (87 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/platform-DsUefNrH.js` (84 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/PeoplePage-DZs56LAY.js` (82 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/apps/native/ops-shell/Resources/Raw/wwwroot/assets/CrmPage-CECFsyum.js` (74 edge(s))

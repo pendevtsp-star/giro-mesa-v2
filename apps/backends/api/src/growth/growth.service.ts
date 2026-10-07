@@ -58,6 +58,7 @@ import {
   writeWhatsAppArtifact,
 } from "@giromesa/db";
 import {
+  DOSECLUB_MANUAL_CREDENTIAL_REFERENCE,
   encryptionKey,
   encryptSecret,
   evolutionCredentialReference,
@@ -66,6 +67,7 @@ import {
   type OperationalCapability,
   SYSTEM_ROLES,
   type SystemRole,
+  trustedDoseClubBaseUrl,
 } from "@giromesa/domain";
 import {
   BadRequestException,
@@ -97,6 +99,7 @@ import {
   sum,
 } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
+import { normalizeDoseClubIntegrationBaseUrl } from "../doseclub-integration/doseclub-client.js";
 import { ScopeService } from "../organizations/scope.service.js";
 import { applyDeliveryFee } from "../pilot-operations/delivery-financial.js";
 import { EvolutionGoClient, EvolutionGoError } from "./evolution-go.js";
@@ -344,6 +347,21 @@ export class GrowthService {
     }
   }
 
+  private async requireGlobalCrmManager(identityId: string, organizationId: string) {
+    const bindings = await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    if (
+      !bindings.some(
+        (binding) =>
+          binding.unitId === null && (binding.role === "owner" || binding.role === "manager"),
+      )
+    ) {
+      throw new ForbiddenException({
+        code: "CRM_GLOBAL_ROLE_REQUIRED",
+        message: "O CRM da organização exige acesso gerencial global.",
+      });
+    }
+  }
+
   private async audit(
     tx: GrowthTransaction,
     input: {
@@ -421,7 +439,7 @@ export class GrowthService {
   }
 
   async listCustomers(identityId: string, organizationId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     return this.database.db
       .select()
@@ -437,7 +455,7 @@ export class GrowthService {
     organizationId: string,
     query: CustomerListQueryInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     if (query.unitId) await this.scope.requireUnitAccess(identityId, organizationId, query.unitId);
     const search = query.q?.split("·", 1)[0]?.trim();
@@ -646,7 +664,7 @@ export class GrowthService {
     customerId: string,
     query: CustomerHistoryQueryInput = { limit: 30 },
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     await this.customer(organizationId, customerId);
     const cursor = query.cursorAt
@@ -718,7 +736,7 @@ export class GrowthService {
   }
 
   async customerDetail(identityId: string, organizationId: string, customerId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     const customer = await this.customer(organizationId, customerId);
     const now = new Date();
@@ -1053,7 +1071,7 @@ export class GrowthService {
   }
 
   async createCustomer(identityId: string, organizationId: string, input: CustomerInput) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     if (input.defaultUnitId)
       await this.scope.requireUnitAccess(identityId, organizationId, input.defaultUnitId);
@@ -1103,7 +1121,7 @@ export class GrowthService {
     customerId: string,
     input: CustomerUpdateInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     const customer = await this.customer(organizationId, customerId);
     if (customer.archivedAt)
@@ -1169,7 +1187,7 @@ export class GrowthService {
     customerId: string,
     input: CustomerArchiveInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     await this.customer(organizationId, customerId);
     const [openTab] = await this.database.db
@@ -1234,7 +1252,7 @@ export class GrowthService {
     targetCustomerId: string,
     input: CustomerMergeInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     if (targetCustomerId === input.sourceCustomerId)
       throw new BadRequestException({ code: "CUSTOMER_MERGE_SAME_RECORD" });
@@ -1407,7 +1425,7 @@ export class GrowthService {
     customerId: string,
     input: ConsentInput,
   ) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     return this.database.db.transaction(async (tx) => {
       const [customer] = await tx
@@ -1477,7 +1495,7 @@ export class GrowthService {
   }
 
   async issueOptOutToken(identityId: string, organizationId: string, customerId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "basic_crm");
     await this.customer(organizationId, customerId);
     const token = randomBytes(32).toString("base64url");
@@ -1626,7 +1644,7 @@ export class GrowthService {
   }
 
   async loyaltyBalance(identityId: string, organizationId: string, customerId: string) {
-    await this.scope.requireOrganizationRole(identityId, organizationId, MANAGERS);
+    await this.requireGlobalCrmManager(identityId, organizationId);
     await this.requireEntitlement(organizationId, "loyalty");
     await this.customer(organizationId, customerId);
     const [row] = await this.database.db
@@ -5454,6 +5472,24 @@ export class GrowthService {
         code: "DOSECLUB_DISABLED",
         message: "Integração DoseClub permanece desabilitada até a configuração do provedor.",
       });
+    if (input.credentialReference !== DOSECLUB_MANUAL_CREDENTIAL_REFERENCE) {
+      throw new BadRequestException({ code: "DOSECLUB_CREDENTIAL_REFERENCE_INVALID" });
+    }
+    let trustedBaseUrl: string;
+    try {
+      trustedBaseUrl = trustedDoseClubBaseUrl(
+        input.credentialReference,
+        input.config.apiBaseUrl,
+        process.env.DOSECLUB_API_BASE_URL,
+      );
+      normalizeDoseClubIntegrationBaseUrl(trustedBaseUrl);
+    } catch {
+      throw new BadRequestException({ code: "DOSECLUB_API_ORIGIN_INVALID" });
+    }
+    if (!process.env.DOSECLUB_INTEGRATION_KEY?.trim()) {
+      throw new ServiceUnavailableException({ code: "DOSECLUB_CREDENTIALS_NOT_CONFIGURED" });
+    }
+    const config = { ...input.config, apiBaseUrl: trustedBaseUrl };
     return this.database.db.transaction(async (tx) => {
       const conditions = [
         eq(growthIntegrations.organizationId, organizationId),
@@ -5473,7 +5509,7 @@ export class GrowthService {
             .set({
               status: "pending",
               credentialReference: input.credentialReference,
-              config: input.config,
+              config,
               updatedAt: new Date(),
             })
             .where(
@@ -5491,7 +5527,7 @@ export class GrowthService {
               provider: "doseclub",
               status: "pending",
               credentialReference: input.credentialReference,
-              config: input.config,
+              config,
             })
             .returning();
       if (!integration) throw new Error("DOSECLUB_CONFIG_INSERT_FAILED");

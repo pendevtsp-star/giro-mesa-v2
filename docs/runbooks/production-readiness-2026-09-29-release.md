@@ -24,6 +24,8 @@ A migration 0085 cria índice único em `growth_customers(organization_id,idempo
 
 Para ativar, provisionar fora do Git `/srv/apps/giromesa-v2/shared/backup-offsite.env`, root `0600`, com `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_ACCESS_KEY_ID` e `R2_SECRET_ACCESS_KEY` corretos. Exigir uma geração completa da unidade, incluindo upload e `head-object` de todos os arquivos, antes de habilitar o timer. Configurar e verificar retenção externa de pelo menos 30 dias e alerta para manifesto remoto com idade superior a cinco minutos, falha do serviço e espaço em disco. Completar ensaio de restauração do banco, objetos e configuração cifrada; backup existente ou upload bem-sucedido isoladamente não provam RTO de 30 minutos.
 
+Atualização em 30/09/2026: conta confirmada no painel Cloudflare, ID público `ec2edef30ff30ecba26cfc6d71c02a91`. Criado o bucket exclusivo `giromesa-backups`, classe Standard, acesso público desabilitado. O bucket operacional `giromesa-doseclub-pilot` permanece separado. O teste somente de leitura com as chaves legadas e o endpoint correto falhou (HTTP 400); nenhuma chave foi exposta ou substituída. O formulário do token de conta `giromesa-vps-backups` foi preparado com leitura/gravação de objetos restrita a `giromesa-backups`, aguardando confirmação de criação. `backup-offsite.env` e o timer continuam ausentes; upload, retenção, alerta e restauração remotos ainda não estão comprovados.
+
 Após a promoção da nova release e revisão dos arquivos, os comandos de instalação são:
 
 ```bash
@@ -40,6 +42,16 @@ systemctl list-timers giromesa-backup-r2.timer --all
 O serviço usa o mesmo lock exclusivo da promoção. Em futuras releases, parar o timer e aguardar o serviço terminar antes de chamar o entrypoint confiável; reativar após a verificação da nova versão. O novo script executado como root deve integrar a lista de arquivos assinados dos manifestos de alvo/recuperação e o validador do entrypoint antes da instalação.
 
 ## Gates para a nova release
+
+### Atualização operacional em 07/10/2026
+
+- Criado o token de conta `giromesa-vps-backups`, com leitura/gravação de objetos somente no bucket privado `giromesa-backups`. Credenciais fora do Git em `shared/backup-offsite.env`, root `0600`; nenhum segredo foi incluído neste documento.
+- Primeiro backup remoto completo: `20261007T181725Z-2c765fc3a2643bb100511cf9987e85bf`, da release `50acfece4f586d8dc416893a3f25ecbac9c4df00`, schema 88. Os cinco objetos foram enviados e conferidos por tamanho e SHA-256.
+- Timer `giromesa-backup-r2.timer` habilitado a cada três minutos. Execuções automáticas às 18:21, 18:24, 18:27 e 18:30 UTC concluíram com sucesso. Esta observação inicial não substitui monitoramento contínuo do RPO.
+- Regra R2 `giromesa-backups-30-dias` habilitada para `giromesa-v2/backups/`: impede sobrescrita e exclusão por 30 dias. Nenhuma expiração destrutiva foi configurada.
+- Ensaio a partir do R2: download, assinatura HMAC e hashes dos cinco objetos verificados; banco restaurado em container descartável sem rede/portas/mounts de produção; objetos e configuração cifrada restaurados, cifra e binding da configuração conferidos. Smoke fiscal, migration 0088 e invariantes dos pagamentos passaram. Download e restauração levaram 25,78 segundos; restauração em si, 13 segundos. O container descartável foi removido. Evidência na VPS: `restore-drills/r2-20261007T181725Z-2c765fc3a2643bb100511cf9987e85bf-attempt2/verified-r2-restore.json`.
+- O primeiro ensaio detectou uma expectativa incorreta de contagem de migrations no smoke do operador; ela foi substituída pela versão exata do journal, preservando a tentativa anterior. Não houve alteração do backup ou do banco de produção.
+- O ensaio valida recuperação dos dados, objetos e configuração; não mede troca de infraestrutura/DNS nem retomada completa da API/worker. Cópia de recuperação das chaves fora da VPS e canal de alertas ainda precisam de confirmação operacional.
 
 1. Publicar um commit candidato do schema 88 na `main`, ainda bloqueado para promoção; executar `validate-recovery.yml` em PostgreSQL 16/17 para esse SHA e conferir JSON/hash, upgrade legado, API, worker e outbox. Não reutilizar a prova do schema 84.
 2. Publicar o commit de autorização com baseline `software-ready`, matriz de recuperação e testes vinculados à evidência real do candidato. Exigir CI, Security e todos os jobs de `Publish pilot images`, incluindo imagens, assinaturas e manifestos de alvo e recuperação.

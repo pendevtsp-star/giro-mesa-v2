@@ -268,7 +268,7 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       feeCents: 700,
       minimumOrderCents: 4_000,
       estimatedDeliveryMinutes: 30,
-      geometry: { type: "Polygon", coordinates: [] },
+      geometry: { type: "circle", center: [-46.65, -23.56], radiusKm: 5 },
       active: true,
     });
     await database.db.insert(posCatalogPromotions).values({
@@ -473,6 +473,8 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
         city: "São Paulo",
         state: "SP",
         postalCode: "01001-000",
+        latitude: -23.56,
+        longitude: -46.65,
       },
     };
     await assert.rejects(
@@ -491,6 +493,7 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
     assert.equal(delivery.deliveryFeeCents, 900);
     assert.equal(delivery.subtotalCents, 6_000);
     assert.equal(delivery.totalCents, 6_900);
+    assert.equal(delivery.addressValidationStatus, "unchecked");
     assert.equal((await stock())?.soldToday, 4);
     await assert.rejects(
       () =>
@@ -515,6 +518,7 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
     assert.ok(persistedOrder);
     assert.equal(persistedOrder.customerName, "Ana Cliente");
     assert.equal(persistedOrder.paymentStatus, "awaiting_payment");
+    assert.equal(persistedOrder.addressValidationStatus, "unchecked");
     assert.ok(persistedOrder.promisedAt);
     assert.ok(persistedOrder.promisedAt.getTime() >= deliveryPlacedAt + 29 * 60_000);
     assert.ok(persistedOrder.promisedAt.getTime() <= Date.now() + 31 * 60_000);
@@ -526,6 +530,8 @@ it("creates real public pickup/delivery orders with tenant isolation, replay and
       city: "São Paulo",
       state: "SP",
       postalCode: "01001000",
+      latitude: -23.56,
+      longitude: -46.65,
     });
     const [deliveryPosOrder] = await database.db
       .select({ id: posOrders.id, status: posOrders.status })

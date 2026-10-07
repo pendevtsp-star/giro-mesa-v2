@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { describe, it } from "node:test";
 import {
   DoseClubProvisioningError,
@@ -7,6 +8,7 @@ import {
   hasEffectiveDoseClubAccess,
   includesDoseClubEntitlement,
   isActiveDoseClubTrial,
+  requestJson,
 } from "./doseclub-provisioning.js";
 
 describe("Dose Club subscription entitlement", () => {
@@ -70,6 +72,43 @@ describe("Dose Club trial eligibility", () => {
 });
 
 describe("Dose Club managed provisioning boundaries", () => {
+  it("rejects provisioning redirects before forwarding credentials", async () => {
+    let redirectStatus = 307;
+    let redirectedRequests = 0;
+    const server = createServer((request, response) => {
+      if (request.url === "/redirected") {
+        redirectedRequests += 1;
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end("{}");
+        return;
+      }
+      response.writeHead(redirectStatus, { location: "/redirected" });
+      response.end();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    try {
+      for (const status of [307, 308]) {
+        redirectStatus = status;
+        await assert.rejects(
+          requestJson(`http://127.0.0.1:${address.port}/provision`, {
+            method: "POST",
+            headers: { "x-giromesa-provisioning-key": "test-secret" },
+            body: JSON.stringify({ integrationKey: "test-token" }),
+          }),
+          (error: unknown) =>
+            error instanceof DoseClubProvisioningError &&
+            error.code === "DOSECLUB_PROVISIONING_UNAVAILABLE",
+        );
+      }
+      assert.equal(redirectedRequests, 0);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it("bloqueia conexão manual global ou de unidade antes de provisionar", () => {
     const unitIds = ["unit-a", "unit-b"];
     assert.equal(

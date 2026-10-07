@@ -4,6 +4,19 @@ import { tableAccessSecret } from "./table-access-token.js";
 export const TABLE_SESSION_COOKIE_NAME = "giromesa_table_session";
 export const TABLE_SESSION_TTL_SECONDS = 4 * 60 * 60;
 
+export function tableOccupancyCode(
+  secret: string,
+  organizationId: string,
+  unitId: string,
+  tableId: string,
+  tabId: string,
+) {
+  const digest = createHmac("sha256", secret)
+    .update(`giromesa:table-occupancy:v1:${organizationId}:${unitId}:${tableId}:${tabId}`)
+    .digest();
+  return (digest.readUInt32BE(0) % 1_000_000).toString().padStart(6, "0");
+}
+
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

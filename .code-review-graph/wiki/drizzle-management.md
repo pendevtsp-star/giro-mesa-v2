@@ -4,8 +4,8 @@
 
 Directory-based community: packages/db
 
-- **Size**: 322 nodes
-- **Cohesion**: 0.0812
+- **Size**: 332 nodes
+- **Cohesion**: 0.0853
 - **Dominant Language**: sql
 
 ## Members
@@ -63,7 +63,7 @@ Directory-based community: packages/db
 | growth_webhook_endpoints | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0004_complete-product.sql | 316-326 |
 | growth_webhook_publications | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0004_complete-product.sql | 328-337 |
 
-*... and 239 more members.*
+*... and 282 more members.*
 
 ## Execution Flows
 
@@ -73,36 +73,36 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `map` (21 edge(s))
+- `ok` (277 edge(s))
+- `match` (88 edge(s))
+- `map` (24 edge(s))
+- `readFile` (21 edge(s))
 - `join` (16 edge(s))
 - `push` (15 edge(s))
 - `from` (14 edge(s))
-- `match` (14 edge(s))
+- `deepEqual` (12 edge(s))
 - `test` (12 edge(s))
 - `resolve` (12 edge(s))
 - `writeUInt32LE` (12 edge(s))
 - `writeUInt16LE` (11 edge(s))
+- `equal` (9 edge(s))
 - `split` (8 edge(s))
 - `toString` (8 edge(s))
-- `startsWith` (7 edge(s))
-- `String` (7 edge(s))
-- `max` (7 edge(s))
-- `trim` (6 edge(s))
 
 ### Incoming
 
+- `ok` (277 edge(s))
+- `match` (87 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0004_complete-product.sql` (72 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/src/report-artifacts.ts` (27 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0000_flowery_doctor_faustus.sql` (26 edge(s))
+- `readFile` (19 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0043_tricky_diamondback.sql` (18 edge(s))
-- `match` (13 edge(s))
+- `deepEqual` (12 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/src/operations-schema.ts` (12 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0038_tired_captain_flint.sql` (9 edge(s))
 - `from` (9 edge(s))
+- `equal` (9 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0013_furry_ultimatum.sql` (7 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0047_narrow_slyde.sql` (7 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0044_bored_the_phantom.sql` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0062_plain_tigra.sql` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0072_commercial_site_control.sql` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/src/fiscal-artifacts.ts` (6 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0027_delivery_operations.sql` (5 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/db/drizzle/0052_cash_controls.sql` (5 edge(s))

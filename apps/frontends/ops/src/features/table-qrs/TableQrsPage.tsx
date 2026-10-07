@@ -947,14 +947,19 @@ export function TableQrsPage({ scope }: { scope: ManagementScope }) {
                 <option value="daily_code">Exigir código diário de presença</option>
               </NativeSelect>
               <small>
-                O código diário não fica gravado no QR e reduz o uso de fotos fora do local.
+                Para consultar consumo ou pedir, informe ao cliente o código da comanda ativa
+                disponível em Atenções da operação.
+                {draft.presenceProtection === "daily_code" &&
+                  " O código diário protege mesas sem comanda."}
               </small>
             </Label>
             {draft.presenceProtection === "daily_code" && (
               <div className="gm-form-field table-qrs-presence-code" role="status">
                 <span>Código de presença de hoje</span>
                 <strong>{lifecycle.presence.code ?? "Salve para gerar"}</strong>
-                <small>Informe este código somente a clientes presentes na unidade.</small>
+                <small>
+                  Use apenas antes de abrir a comanda; depois informe o código da mesa ativa.
+                </small>
               </div>
             )}
             <Label className="gm-field items-stretch">

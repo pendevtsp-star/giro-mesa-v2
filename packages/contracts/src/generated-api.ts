@@ -25233,8 +25233,8 @@ export interface operations {
   "PublicMenuController_tableSession[0]": {
     parameters: {
       query?: never;
-      header: {
-        "X-GiroMesa-Table-Token": string;
+      header?: {
+        "X-GiroMesa-Table-Token"?: string;
       };
       path: {
         slug: string;
@@ -25297,8 +25297,8 @@ export interface operations {
   "PublicMenuController_tableSession[1]": {
     parameters: {
       query?: never;
-      header: {
-        "X-GiroMesa-Table-Token": string;
+      header?: {
+        "X-GiroMesa-Table-Token"?: string;
       };
       path: {
         slug: string;
@@ -28849,6 +28849,12 @@ export interface operations {
             /** @enum {string} */
             mode: "session_only" | "daily_code";
             code: string | null;
+            activeTables: {
+              /** Format: uuid */
+              tableId: string;
+              label: string;
+              code: string;
+            }[];
           };
         };
       };
@@ -28875,6 +28881,12 @@ export interface operations {
             /** @enum {string} */
             mode: "session_only" | "daily_code";
             code: string | null;
+            activeTables: {
+              /** Format: uuid */
+              tableId: string;
+              label: string;
+              code: string;
+            }[];
           };
         };
       };

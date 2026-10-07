@@ -5,7 +5,7 @@
 Directory-based community: packages/ui
 
 - **Size**: 72 nodes
-- **Cohesion**: 0.3221
+- **Cohesion**: 0.3213
 - **Dominant Language**: tsx
 
 ## Members
@@ -41,7 +41,14 @@ Directory-based community: packages/ui
 | Drawer | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Drawer/Drawer.tsx | 5-48 |
 | EmptyState | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/EmptyState/EmptyState.tsx | 3-24 |
 | FormField | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/FormField/FormField.tsx | 3-30 |
+| IconName | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx | 3-43 |
+| Icon | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx | 292-315 |
+| InputProps | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx | 4-4 |
+| formatBrazilianCurrencyInput | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx | 6-13 |
+| Input | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx | 15-37 |
 | Label | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Label/Label.tsx | 4-13 |
+| Modal | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx | 8-95 |
+| requestClose | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx | 32-37 |
 | NativeSelect | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/NativeSelect/NativeSelect.tsx | 4-15 |
 | Pagination | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Pagination/Pagination.tsx | 4-13 |
 | PaginationContent | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Pagination/Pagination.tsx | 14-22 |
@@ -55,15 +62,8 @@ Directory-based community: packages/ui
 | Skeleton | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Skeleton/Skeleton.tsx | 1-18 |
 | StatCard | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/StatCard/StatCard.tsx | 4-46 |
 | StatusDot | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/StatusDot/StatusDot.tsx | 1-22 |
-| SwitchProps | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx | 4-7 |
-| Switch | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx | 9-44 |
-| Table | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 4-12 |
-| TableHeader | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 13-21 |
-| TableBody | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 22-30 |
-| TableFooter | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 31-39 |
-| TableRow | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Table/Table.tsx | 40-48 |
 
-*... and 18 more members.*
+*... and 22 more members.*
 
 ## Execution Flows
 
@@ -76,18 +76,18 @@ No execution flows pass through this community.
 - `ComponentProps` (29 edge(s))
 - `toContain` (25 edge(s))
 - `expect` (25 edge(s))
-- `ReactNode` (16 edge(s))
+- `ReactNode` (18 edge(s))
 - `HTMLAttributes` (9 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx::Icon` (5 edge(s))
-- `useEffect` (3 edge(s))
-- `stopPropagation` (2 edge(s))
+- `useEffect` (4 edge(s))
+- `stopPropagation` (3 edge(s))
+- `onClose` (2 edge(s))
 - `onChange` (2 edge(s))
+- `useRef` (2 edge(s))
+- `useId` (2 edge(s))
+- `close` (2 edge(s))
 - `VariantProps` (1 edge(s))
 - `alertVariants` (1 edge(s))
 - `badgeVariants` (1 edge(s))
-- `TableHTMLAttributes` (1 edge(s))
-- `onClose` (1 edge(s))
-- `ChangeEvent` (1 edge(s))
 
 ### Incoming
 
@@ -97,12 +97,12 @@ No execution flows pass through this community.
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Breadcrumb/Breadcrumb.tsx` (6 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Card/Card.tsx` (6 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Accordion/Accordion.tsx` (4 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx::Modal` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Pagination/Pagination.tsx` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Alert/Alert.tsx` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Icon/Icon.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Input/Input.tsx` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Button/Button.tsx` (2 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Modal/Modal.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Separator/Separator.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Switch/Switch.tsx` (2 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/components/Toast/Toast.tsx` (2 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/ui/src/layouts/KanbanBoard/KanbanBoard.tsx` (2 edge(s))

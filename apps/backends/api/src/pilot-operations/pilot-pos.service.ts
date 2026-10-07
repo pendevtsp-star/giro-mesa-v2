@@ -145,6 +145,7 @@ import { ScopeService } from "../organizations/scope.service.js";
 import { bestPromotion, localCalendar } from "../public-menu/public-order-rules.js";
 import { requireConfirmedPublicTotal } from "../public-menu/public-order-total.js";
 import { tableAccessSecret } from "../public-menu/table-access-token.js";
+import { tableOccupancyCode } from "../public-menu/table-session-token.js";
 import { reserveOrderInventory } from "./order-inventory.js";
 import {
   allocatePrintSplitAmounts,
@@ -1947,7 +1948,7 @@ export class PilotPosService {
 
   async tableQrPresence(identityId: string, organizationId: string, unitId: string) {
     await this.requireAccess(identityId, organizationId, unitId);
-    const [settings, unit] = await Promise.all([
+    const [settings, unit, directTabs, groupedTabs] = await Promise.all([
       this.database.db
         .select({ presenceProtection: posTableQrSettings.presenceProtection })
         .from(posTableQrSettings)
@@ -1963,15 +1964,93 @@ export class PilotPosService {
         .from(units)
         .where(and(eq(units.organizationId, organizationId), eq(units.id, unitId)))
         .limit(1),
+      this.database.db
+        .select({ tableId: posDiningTables.id, label: posDiningTables.label, tabId: posTabs.id })
+        .from(posTabs)
+        .innerJoin(
+          posDiningTables,
+          and(
+            eq(posDiningTables.organizationId, posTabs.organizationId),
+            eq(posDiningTables.unitId, posTabs.unitId),
+            eq(posDiningTables.id, posTabs.tableId),
+            eq(posDiningTables.active, true),
+          ),
+        )
+        .where(
+          and(
+            eq(posTabs.organizationId, organizationId),
+            eq(posTabs.unitId, unitId),
+            eq(posTabs.status, "open"),
+          ),
+        ),
+      this.database.db
+        .select({
+          tableId: posDiningTables.id,
+          label: posDiningTables.label,
+          tabId: posTabs.id,
+        })
+        .from(posDiningTableGroupMembers)
+        .innerJoin(
+          posDiningTableGroups,
+          and(
+            eq(posDiningTableGroups.organizationId, posDiningTableGroupMembers.organizationId),
+            eq(posDiningTableGroups.unitId, posDiningTableGroupMembers.unitId),
+            eq(posDiningTableGroups.id, posDiningTableGroupMembers.groupId),
+            eq(posDiningTableGroups.mode, "single_tab"),
+            isNull(posDiningTableGroups.dissolvedAt),
+          ),
+        )
+        .innerJoin(
+          posTabs,
+          and(
+            eq(posTabs.organizationId, posDiningTableGroups.organizationId),
+            eq(posTabs.unitId, posDiningTableGroups.unitId),
+            eq(posTabs.id, posDiningTableGroups.primaryTabId),
+            eq(posTabs.status, "open"),
+          ),
+        )
+        .innerJoin(
+          posDiningTables,
+          and(
+            eq(posDiningTables.organizationId, posDiningTableGroupMembers.organizationId),
+            eq(posDiningTables.unitId, posDiningTableGroupMembers.unitId),
+            eq(posDiningTables.id, posDiningTableGroupMembers.tableId),
+            eq(posDiningTables.active, true),
+          ),
+        )
+        .where(
+          and(
+            eq(posDiningTableGroupMembers.organizationId, organizationId),
+            eq(posDiningTableGroupMembers.unitId, unitId),
+          ),
+        ),
     ]);
     if (!unit[0]) throw new NotFoundException({ code: "UNIT_NOT_FOUND" });
     const mode = settings[0]?.presenceProtection === "daily_code" ? "daily_code" : "session_only";
+    const activeTables = new Map<string, (typeof directTabs)[number]>();
+    for (const row of directTabs) activeTables.set(row.tableId, row);
+    for (const row of groupedTabs) {
+      if (!activeTables.has(row.tableId)) activeTables.set(row.tableId, row);
+    }
     return {
       mode,
       code:
         mode === "daily_code"
           ? tablePresenceCode(tableAccessSecret(), organizationId, unitId, unit[0].timezone)
           : null,
+      activeTables: [...activeTables.values()]
+        .map((row) => ({
+          tableId: row.tableId,
+          label: row.label,
+          code: tableOccupancyCode(
+            tableAccessSecret(),
+            organizationId,
+            unitId,
+            row.tableId,
+            row.tabId,
+          ),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label, "pt-BR")),
     };
   }
 

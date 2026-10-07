@@ -98,6 +98,7 @@ const floor = {
 };
 
 const catalog = {
+  capabilities: { canManage: true },
   categories: [{ id: "cat-1", name: "Principais", active: true }],
   stations: [{ id: "station-1", name: "Cozinha", active: true }],
   allergens: [],
@@ -366,6 +367,7 @@ async function mockProductionApi(
                   new: 0,
                   production: 0,
                   ready: 0,
+                  readyForHandoff: 0,
                   waiting: 0,
                   delivered: 0,
                   late: 0,
@@ -500,18 +502,59 @@ test("notificações mantêm texto e ações dentro do painel", async ({ page },
   await expect(dialog).toHaveCount(0);
 });
 
-test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => {
-  await mockProductionApi(page);
+test("Barras segmentadas do salão usam seleção em pill sem overflow com 12 mesas", async ({
+  page,
+}, testInfo) => {
+  const crowdedFloor = {
+    ...floor,
+    tables: Array.from({ length: 12 }, (_, index) => ({
+      ...floor.tables[0],
+      id: `m${String(index + 1).padStart(2, "0")}`,
+      label: `Mesa ${String(index + 1).padStart(2, "0")}`,
+      status: index === 10 ? "occupied" : "available",
+    })),
+    openTabs: [],
+    activeShift: {
+      id: "shift-12-tables",
+      label: "Jantar",
+      serviceMode: "full_service",
+      startsAt: "2026-09-30T18:00:00.000Z",
+    },
+    serviceCalls: [
+      {
+        ...floor.serviceCalls[0],
+        id: "call-bill-12",
+        tableId: "m12",
+        tabId: "tab-12",
+        kind: "bill",
+      },
+    ],
+  };
+  await mockProductionApi(page, undefined, undefined, crowdedFloor);
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
   await page.evaluate(() => {
     window.location.hash = "#/salon";
   });
   await page.getByRole("button", { name: "Abrir operação" }).click();
 
-  const statusFilter = page.getByRole("button", { name: /Todas 2/ });
+  const statusFilter = page.getByRole("button", { name: /Todas 12/ });
   const viewToggle = page.getByRole("button", { name: "Painel", exact: true });
-  const inactiveStatusFilter = page.getByRole("button", { name: /Livres 1/ });
+  const inactiveStatusFilter = page.getByRole("button", { name: /Livres 10/ });
   const inactiveViewToggle = page.getByRole("button", { name: "Lista", exact: true });
+  await expect(page.getByRole("button", { name: /Ocupadas 1/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Chamando 0/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Pediu conta 1/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Reservadas 0/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Limpeza 0/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Operar", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Editar espaço", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Organizar turno", exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("salon-overflow-1280.png"),
+    fullPage: true,
+  });
   await expect(statusFilter).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("border-radius", "999px");
   await expect(viewToggle).toHaveCSS("box-shadow", "none");
@@ -522,6 +565,11 @@ test("Barras segmentadas do salão usam seleção em pill", async ({ page }) => 
   await page.setViewportSize({ width: 375, height: 812 });
   await page.locator("html").evaluate((element) => element.setAttribute("data-theme", "dark"));
   await inactiveStatusFilter.hover();
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath("salon-overflow-dark-375.png"),
+    fullPage: true,
+  });
   await expectWcagAa(page);
 });
 
@@ -589,7 +637,7 @@ test("comanda repõe rodada, assiste ruptura e libera etapa real da cozinha", as
   await page.goto("/");
   await page.evaluate(() => {
     localStorage.setItem(
-      "gm:attendance:last-order:unit-1:identity-1",
+      "gm:attendance:last-order:unit-1:identity-1:tab-3",
       JSON.stringify([
         {
           id: "last-coffee",
@@ -622,7 +670,7 @@ test("comanda repõe rodada, assiste ruptura e libera etapa real da cozinha", as
   expect(courseCalls[0]).toEqual({ course: "main", state: "fired" });
   await expect(dialog.getByText("Principal liberada para preparo.")).toBeVisible();
 
-  await dialog.getByRole("button", { name: "Conta" }).click();
+  await dialog.getByRole("button", { name: "Conta", exact: true }).click();
   await expect(dialog.getByText("1 item(ns) lançado(s) ficaram indisponíveis")).toBeVisible();
   await dialog.getByRole("button", { name: "Resolver Prato da casa" }).click();
   const ruptureModal = page.getByRole("dialog", { name: "Resolver falta de Prato da casa" });
@@ -652,7 +700,7 @@ test("Notificações do sistema desaparecem automaticamente", async ({ page }) =
   await page.locator(".real-table").filter({ hasText: "Mesa 01" }).click();
   const dialog = page.getByRole("dialog", { name: "Mesa 01" });
   await dialog.getByLabel("Identificação do cliente ou reserva (opcional)").fill("Cliente Teste");
-  await dialog.getByRole("button", { name: "Abrir atendimento e pedir" }).click();
+  await dialog.getByRole("button", { name: "Abrir e pedir", exact: true }).click();
 
   const toast = page.locator(".gm-toast").filter({ hasText: "Atendimento aberto" });
   await expect(toast).toBeVisible();
@@ -787,7 +835,7 @@ test("Configuração de praças guia revisão, equipe e abertura sem duplicar o 
     .getByRole("dialog", { name: "Configurar atendimento" })
     .getByRole("button", { name: "Fechar" })
     .click();
-  await page.getByRole("button", { name: /Prontidão \d\/4/ }).click();
+  await page.getByRole("button", { name: "Configurar", exact: true }).click();
 
   const dialog = page.getByRole("dialog", { name: "Configurar atendimento" });
   await dialog.getByRole("button", { name: "Turno e praças" }).click();
@@ -1015,7 +1063,7 @@ test("Salão respeita a operação permitida para cada papel", async ({ browser 
     const dialog = page.getByRole("dialog", { name: "Mesa 03" });
     if (actor.expectation === "protected") {
       await expect(
-        dialog.getByRole("heading", { name: "Atendimento de outra praça" }),
+        dialog.getByRole("heading", { name: "Atendimento de outro responsável" }),
       ).toBeVisible();
       await expect(dialog).toContainText("não estão no seu escopo");
     } else {
@@ -1101,6 +1149,10 @@ test("modal da mesa preserva a edição do pedido e isola atalhos de modais anin
   const orderArea = dialog.locator(".service-order-area");
   const accountArea = dialog.locator(".service-account-area");
 
+  await expect(workspace).toHaveAttribute("data-focus", "account");
+  await expect(accountTab).toHaveAttribute("aria-current", "page");
+  await expect(accountArea).toBeVisible();
+  await orderTab.click();
   await expect(workspace).toHaveAttribute("data-focus", "order");
   await expect(orderTab).toHaveAttribute("aria-current", "page");
   await expect(orderArea).toBeVisible();
@@ -1207,7 +1259,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await page.getByRole("button", { name: "Abrir operação" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Mesas e comandas" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Central da operação" })).toBeVisible();
-  await expect(page.getByText("Operação geral", { exact: true })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Controle do turno", exact: true })).toContainText(
+    "Nenhum turno aberto",
+  );
   const readinessButton = page.getByRole("button", { name: /Prontidão \d\/4/ });
   await expect(readinessButton).toBeVisible();
   await readinessButton.click();
@@ -1293,7 +1347,7 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
           getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean).length,
       ),
     )
-    .toBe(3);
+    .toBe(2);
   await page.setViewportSize({ width: 375, height: 812 });
   await expectNoHorizontalOverflow(page);
   await expect
@@ -1398,8 +1452,8 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await page.setViewportSize({ width: 1440, height: 900 });
   const accountTab = dialog.getByRole("button", { name: "Conta", exact: true });
   await accountTab.click();
-  await expect(dialog.getByText("Comanda em foco", { exact: true })).toBeVisible();
-  await expect(dialog.getByText("Impressão", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("region", { name: "Conta de Mesa 03", exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Pré-conta", exact: true })).toBeEnabled();
   await expect(dialog.getByText("Online", { exact: true })).toHaveCount(0);
   await expect(dialog.getByText(/no rascunho/)).toHaveCount(0);
   await expect(accountTab).toHaveAttribute("aria-current", "page");
@@ -1433,7 +1487,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   expect(
     Math.abs(paymentLayout.gridRight - paymentLayout.right - paymentLayout.paddingRight),
   ).toBeLessThanOrEqual(1);
-  await expect(dialog.getByLabel("Valor recebido", { exact: true })).toHaveValue("287,40");
+  await expect(dialog.getByRole("textbox", { name: "Valor recebido", exact: true })).toHaveValue(
+    "287,40",
+  );
   await expect(cashierPaymentForm.locator('input[data-currency="brl"]')).toHaveCount(1);
   await expect(cashierPaymentForm.getByText("Troco", { exact: true })).toBeVisible();
   const manualMethods = dialog.getByLabel("Forma de pagamento");
@@ -1446,7 +1502,9 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   ]);
   await manualMethods.selectOption("pix");
   await expect(manualMethods).toHaveValue("pix");
-  await expect(dialog.getByLabel("Valor deste pagamento", { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByRole("textbox", { name: "Valor deste pagamento", exact: true }),
+  ).toBeVisible();
   await manualMethods.selectOption("cash");
   await page.setViewportSize({ width: 375, height: 667 });
   await expectNoHorizontalOverflow(page);
@@ -1493,10 +1551,13 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(dialog.locator("details.account-items-disclosure")).toHaveAttribute("open", "");
   const firstAccountLine = dialog.locator(".account-line-group").first();
-  await firstAccountLine.getByRole("button", { name: /Ações para/ }).click();
+  const itemActions = firstAccountLine.getByRole("button", { name: /Ações para/ });
+  await itemActions.click();
   await expect(firstAccountLine.locator(".approval-form--inline")).toContainText("Ajustar item");
-  await firstAccountLine.getByRole("button", { name: "Fechar" }).click();
-  await dialog.getByRole("button", { name: "Lançar pedido", exact: true }).click();
+  await itemActions.click();
+  await expect(itemActions).toHaveAttribute("aria-expanded", "false");
+  await expect(firstAccountLine.locator(".approval-form--inline")).toBeHidden();
+  await dialog.getByRole("button", { name: "Pedido", exact: true }).click();
   await dialog.locator(".real-product-picker").evaluate((picker) => {
     const cards = [...picker.children];
     for (let index = 0; index < 4; index += 1) {
@@ -1531,20 +1592,21 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
   await expect(dialog.locator(".cart-preview__submit")).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: "Receber no caixa" })).toHaveCount(0);
   await moreMenu.locator("summary").click();
-  await moreMenu.getByRole("button", { name: /^Detalhes Cliente/ }).click();
-  await expect(dialog.locator(".counter-metadata-form")).toBeVisible();
+  await moreMenu.getByRole("button", { name: "Editar atendimento", exact: true }).click();
+  const editDialog = page.getByRole("dialog", { name: "Editar atendimento", exact: true });
+  await expect(editDialog.locator(".attendance-edit-form")).toBeVisible();
   await expectWcagAa(page);
 
   for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await expectNoHorizontalOverflow(page);
-    const metadataColumns = await dialog
-      .locator(".counter-metadata-form")
-      .evaluate((element) =>
-        getComputedStyle(element).gridTemplateColumns.split(" ").filter(Boolean),
-      );
-    expect(metadataColumns).toHaveLength(viewport.width <= 760 ? 1 : 12);
-    const bounds = await dialog.locator(".gm-modal").evaluate((element) => {
+    const metadataColumns = await editDialog
+      .locator(".attendance-edit-form")
+      .evaluate((element) => getComputedStyle(element).gridTemplateColumns);
+    expect(metadataColumns).toBe(
+      viewport.width <= 640 ? "minmax(0px, 1fr)" : "repeat(12, minmax(0px, 1fr))",
+    );
+    const bounds = await editDialog.locator(".gm-modal").evaluate((element) => {
       const rect = element.getBoundingClientRect();
       return {
         bottom: rect.bottom,
@@ -1560,12 +1622,16 @@ test("Atendimento real mantém estado, contexto e layout nos breakpoints crític
     expect(bounds.top).toBeGreaterThanOrEqual(0);
     expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
     expect(
-      await dialog
-        .locator(".counter-metadata-form")
+      await editDialog
+        .locator(".attendance-edit-form")
         .evaluate((element) => element.scrollWidth <= element.clientWidth),
     ).toBe(true);
   }
 
+  await page.keyboard.press("Escape");
+  await expect(editDialog).toBeHidden();
+  await expect(dialog).toBeVisible();
+  await expect(moreMenu.locator("summary")).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
   await expect(requestedBill).toBeFocused();
@@ -1969,7 +2035,16 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
     await route.fulfill({
       json: {
         items: [{ ...pickupTab, queueStage: "new" }],
-        counts: { all: 1, new: 1, production: 0, ready: 0, waiting: 0, delivered: 0, late: 0 },
+        counts: {
+          all: 1,
+          new: 1,
+          production: 0,
+          ready: 0,
+          readyForHandoff: 0,
+          waiting: 0,
+          delivered: 0,
+          late: 0,
+        },
         pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
       },
     });
@@ -1994,9 +2069,12 @@ test("Balcão cobra no SmartPOS, imprime pré-conta e oculta o registro manual",
       ]),
     );
   });
+  await expect(page.getByText("Operação atualizada")).toBeVisible();
   await page.getByRole("button", { name: /Retirada teste/ }).click();
 
-  await expect(page.getByText("Operação atualizada")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Comanda Retirada teste" })).toContainText(
+    "Servidor conectado",
+  );
   await expect(page.getByText("Sincronizando")).toHaveCount(0);
   const cartToggle = page.getByRole("button", { name: /Comanda/ });
   await expect(cartToggle).toHaveAttribute("aria-expanded", "false");
@@ -2460,7 +2538,7 @@ test("Recepção senta em mesa compatível e abre a comanda na mesma requisiçã
   await expect(moreActions.locator("summary")).toBeFocused();
   await reservationRow.getByRole("button", { name: "Sentar" }).click();
   const modal = page.getByRole("dialog", { name: "Sentar Maria Reserva" });
-  await modal.getByLabel("Mesa compatível").selectOption("m01");
+  await modal.getByLabel("Mesa ou grupo compatível").selectOption("m01");
   await modal.getByRole("button", { name: "Ocupar mesa e abrir comanda" }).click();
 
   await expect(page.getByText("Mesa ocupada e comanda aberta para Maria Reserva.")).toBeVisible();

@@ -346,10 +346,14 @@ function configuration() {
   };
 }
 
-async function requestJson(url: string, init: RequestInit): Promise<unknown> {
+export async function requestJson(url: string, init: RequestInit): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
+    response = await fetch(url, {
+      ...init,
+      redirect: "error",
+      signal: AbortSignal.timeout(10_000),
+    });
   } catch {
     throw new DoseClubProvisioningError("DOSECLUB_PROVISIONING_UNAVAILABLE", true);
   }

@@ -4222,9 +4222,11 @@ export const api = {
     floor: (organizationId: string, unitId: string) =>
       request<unknown>(pilotPath(organizationId, unitId, "floor")),
     tableQrPresence: (organizationId: string, unitId: string) =>
-      request<{ mode: "session_only" | "daily_code"; code: string | null }>(
-        pilotPath(organizationId, unitId, "tables/qr/presence"),
-      ),
+      request<{
+        mode: "session_only" | "daily_code";
+        code: string | null;
+        activeTables: Array<{ tableId: string; label: string; code: string }>;
+      }>(pilotPath(organizationId, unitId, "tables/qr/presence")),
     operationalPushConfig: (organizationId: string, unitId: string, installationId: string) =>
       request<OperationalPushConfig>(
         pilotPath(

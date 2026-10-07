@@ -97,6 +97,8 @@ jobs:
           retention-days: 7
       - name: Verify customer order tracking
         run: pnpm exec playwright test --config=tests/customer-tracking.config.ts
+      - name: Verify cookie-only table presence recovery
+        run: pnpm exec playwright test --config=tests/customer-presence.config.ts
       - name: Verify production baseline manifest
         run: pnpm production:baseline
 

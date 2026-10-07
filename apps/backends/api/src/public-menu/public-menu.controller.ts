@@ -92,15 +92,21 @@ export class PublicMenuController {
   }
 
   @Post(":slug/table-session")
-  @ApiHeader({ name: "X-GiroMesa-Table-Token", required: true })
+  @ApiHeader({ name: "X-GiroMesa-Table-Token", required: false })
   @ApiOkResponse({ schema: toOpenApiSchema(publicTableSessionResponseSchema) })
   async tableSession(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
     @Headers("x-giromesa-table-token") tableToken: string | undefined,
+    @Req() request: FastifyRequest,
     @Body(new ZodPipe(publicTableSessionRequestSchema)) body: PublicTableSessionRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
   ) {
-    const result = await this.publicTableService.openSession(slug, tableToken, body);
+    const result = await this.publicTableService.openSession(
+      slug,
+      tableToken,
+      body,
+      request.cookies[TABLE_SESSION_COOKIE_NAME],
+    );
     reply.setCookie(TABLE_SESSION_COOKIE_NAME, result.token, result.cookieOptions);
     return result.response;
   }
@@ -110,15 +116,11 @@ export class PublicMenuController {
   async tableSessionStatus(
     @Param("slug", new ZodPipe(publicMenuSlugSchema)) slug: string,
     @Req() request: FastifyRequest,
-    @Res({ passthrough: true }) reply: FastifyReply,
   ) {
     const result = await this.publicTableService.status(
       slug,
       request.cookies[TABLE_SESSION_COOKIE_NAME],
     );
-    if (result.token && result.cookieOptions) {
-      reply.setCookie(TABLE_SESSION_COOKIE_NAME, result.token, result.cookieOptions);
-    }
     return result.response;
   }
 

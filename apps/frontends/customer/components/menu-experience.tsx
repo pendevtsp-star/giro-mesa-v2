@@ -79,18 +79,19 @@ async function fetchTableSession(
   tableToken?: string,
   presenceCode?: string,
 ) {
+  const submitting = Boolean(tableToken || presenceCode);
   const response = await fetch(
     `${apiUrl}/public/v1/menus/${encodeURIComponent(menuSlug)}/table-session`,
     {
-      method: tableToken ? "POST" : "GET",
+      method: submitting ? "POST" : "GET",
       cache: "no-store",
       credentials: "include",
-      ...(tableToken
+      ...(submitting
         ? {
             body: JSON.stringify(presenceCode ? { presenceCode } : {}),
             headers: {
               "content-type": "application/json",
-              "X-GiroMesa-Table-Token": tableToken,
+              ...(tableToken ? { "X-GiroMesa-Table-Token": tableToken } : {}),
             },
           }
         : {}),
@@ -288,7 +289,7 @@ export function MenuExperience({
         if (!active) return;
         if (!response.ok || !value) {
           const presence = readPresenceChallenge(payload);
-          if (scannedToken && presence) {
+          if (presence) {
             setSession({ status: "presence_required", ...presence });
             return;
           }
@@ -317,13 +318,13 @@ export function MenuExperience({
   async function confirmPresence() {
     const apiUrl = apiBase();
     const scannedToken = tableToken.current;
-    if (!apiUrl || !scannedToken || !/^\d{6}$/.test(presenceCode)) return;
+    if (!apiUrl || !/^\d{6}$/.test(presenceCode)) return;
     setPresencePending(true);
     try {
       const { response, payload, value } = await fetchTableSession(
         apiUrl,
         menuSlug,
-        scannedToken,
+        scannedToken ?? undefined,
         presenceCode,
       );
       if (!response.ok || !value) {
@@ -371,9 +372,14 @@ export function MenuExperience({
       timer = undefined;
       if (!active || document.hidden) return;
       try {
-        const { response, value } = await fetchTableSession(resolvedApiUrl, menuSlug);
+        const { response, payload, value } = await fetchTableSession(resolvedApiUrl, menuSlug);
         if (!active) return;
         if (!response.ok || !value) {
+          const challenge = readPresenceChallenge(payload);
+          if (challenge) {
+            setSession({ status: "presence_required", ...challenge });
+            return;
+          }
           if (classifyPublicFailure(response.status) === "session") {
             setSession({ status: "expired" });
             return;

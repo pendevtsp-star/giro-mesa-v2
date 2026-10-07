@@ -146,6 +146,7 @@ describe("Dose Club HTTP client", () => {
     );
     for (const call of calls) {
       const headers = new Headers(call.init?.headers);
+      assert.equal(call.init?.redirect, "error");
       assert.equal(headers.get("x-giromesa-client-id"), "giromesa-client");
       assert.equal(headers.get("x-giromesa-integration-key"), "integration-secret");
       assert.equal(headers.get("idempotency-key"), null);

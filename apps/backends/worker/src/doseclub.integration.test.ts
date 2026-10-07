@@ -33,10 +33,11 @@ test("commits a dose only after physical stock and reverses cancellation idempot
 
   const previousDatabaseUrl = process.env.DATABASE_URL;
   const previousEnabled = process.env.DOSECLUB_PROVIDER_ENABLED;
-  const previousSecret = process.env.DOSECLUB_TEST_INTEGRATION_KEY;
+  const previousSecret = process.env.DOSECLUB_INTEGRATION_KEY;
+  const previousBaseUrl = process.env.DOSECLUB_API_BASE_URL;
   process.env.DATABASE_URL = databaseUrl;
   process.env.DOSECLUB_PROVIDER_ENABLED = "true";
-  process.env.DOSECLUB_TEST_INTEGRATION_KEY = "integration-secret";
+  process.env.DOSECLUB_INTEGRATION_KEY = "integration-secret";
 
   const database = createDatabase(databaseUrl);
   let worker: OutboxWorker | undefined;
@@ -81,6 +82,7 @@ test("commits a dose only after physical stock and reverses cancellation idempot
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
   assert.ok(address && typeof address === "object");
+  process.env.DOSECLUB_API_BASE_URL = `http://127.0.0.1:${address.port}`;
 
   try {
     const [organization] = await database.db
@@ -215,7 +217,7 @@ test("commits a dose only after physical stock and reverses cancellation idempot
         unitId: unit.id,
         provider: "doseclub",
         status: "active",
-        credentialReference: "DOSECLUB_TEST_INTEGRATION_KEY",
+        credentialReference: "DOSECLUB_INTEGRATION_KEY",
         config: {
           apiBaseUrl: `http://127.0.0.1:${address.port}`,
           clientId: "giromesa-worker-test",
@@ -336,7 +338,9 @@ test("commits a dose only after physical stock and reverses cancellation idempot
     else process.env.DATABASE_URL = previousDatabaseUrl;
     if (previousEnabled === undefined) delete process.env.DOSECLUB_PROVIDER_ENABLED;
     else process.env.DOSECLUB_PROVIDER_ENABLED = previousEnabled;
-    if (previousSecret === undefined) delete process.env.DOSECLUB_TEST_INTEGRATION_KEY;
-    else process.env.DOSECLUB_TEST_INTEGRATION_KEY = previousSecret;
+    if (previousSecret === undefined) delete process.env.DOSECLUB_INTEGRATION_KEY;
+    else process.env.DOSECLUB_INTEGRATION_KEY = previousSecret;
+    if (previousBaseUrl === undefined) delete process.env.DOSECLUB_API_BASE_URL;
+    else process.env.DOSECLUB_API_BASE_URL = previousBaseUrl;
   }
 });

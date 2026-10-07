@@ -1,5 +1,5 @@
 import { auditEvents, type Database, doseClubRedemptions, growthIntegrations } from "@giromesa/db";
-import { doseClubManagedCredential } from "@giromesa/domain";
+import { doseClubManagedCredential, trustedDoseClubBaseUrl } from "@giromesa/domain";
 import { and, eq, inArray } from "drizzle-orm";
 
 const INTEGRATION_PATH = "/v1/integrations/giromesa";
@@ -65,10 +65,20 @@ function connectionConfig(row: typeof growthIntegrations.$inferSelect) {
     throw new DoseClubDeliveryError("DOSECLUB_CONNECTION_INACTIVE", false);
   }
   const config = row.config;
-  const apiBaseUrl = typeof config.apiBaseUrl === "string" ? config.apiBaseUrl.trim() : "";
+  const storedBaseUrl = typeof config.apiBaseUrl === "string" ? config.apiBaseUrl.trim() : "";
   const clientId = typeof config.clientId === "string" ? config.clientId.trim() : "";
   const credentialReference = row.credentialReference?.trim() ?? "";
-  let secret = credentialReference ? process.env[credentialReference]?.trim() : "";
+  let apiBaseUrl: string;
+  try {
+    apiBaseUrl = trustedDoseClubBaseUrl(
+      credentialReference,
+      storedBaseUrl,
+      process.env.DOSECLUB_API_BASE_URL,
+    );
+  } catch {
+    throw new DoseClubDeliveryError("DOSECLUB_CONFIG_INVALID", false);
+  }
+  let secret = process.env.DOSECLUB_INTEGRATION_KEY?.trim() ?? "";
   if (credentialReference.startsWith("managed:v1:")) {
     try {
       const managed = doseClubManagedCredential(
@@ -133,6 +143,7 @@ async function requestOperation(
   let response: Response;
   try {
     response = await fetch(`${connection.baseUrl}${input.path}`, {
+      redirect: "error",
       headers: {
         ...(input.body ? { "content-type": "application/json" } : {}),
         ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),

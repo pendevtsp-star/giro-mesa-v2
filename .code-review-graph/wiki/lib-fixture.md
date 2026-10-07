@@ -5,7 +5,7 @@
 Directory-based community: load/lib
 
 - **Size**: 27 nodes
-- **Cohesion**: 0.1066
+- **Cohesion**: 0.0871
 - **Dominant Language**: javascript
 
 ## Members
@@ -42,42 +42,42 @@ Directory-based community: load/lib
 
 ## Execution Flows
 
-- **publicQrScenario** (criticality: 0.69, depth: 2)
+No execution flows pass through this community.
 
 ## Dependencies
 
 ### Outgoing
 
 - `test` (9 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:selects fixture tenants deterministically without adding tenant IDs to metric tags@L171` (7 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:loads cookies only from named environment entries and never exposes them as metadata@L120` (6 edge(s))
 - `isArray` (6 edge(s))
 - `has` (5 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:models the approved target, two-times spike and soak without running them@L57` (5 edge(s))
 - `map` (5 edge(s))
 - `toLowerCase` (5 edge(s))
 - `isInteger` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:requires the full 500-table, 50-terminal and 2000-QR target fixture per unit@L84` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/local-smoke.test.mjs::it:turns SIGINT and SIGTERM into fail-closed interruption and terminates active children@L64` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:resolves fixtures inside the load directory and rejects path traversal@L194` (3 edge(s))
 - `includes` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/journeys.test.mjs::it:keeps secrets outside journey descriptors@L118` (3 edge(s))
 - `push` (3 edge(s))
-- `add` (3 edge(s))
-- `trim` (2 edge(s))
-- `every` (2 edge(s))
-- `exec` (2 edge(s))
-- `get` (2 edge(s))
-- `set` (2 edge(s))
-- `clear` (2 edge(s))
 
 ### Incoming
 
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs` (26 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/lib/config.js` (13 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/journeys.test.mjs` (10 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/lib/local-smoke-runtime.js` (8 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/local-smoke.test.mjs` (8 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:selects fixture tenants deterministically without adding tenant IDs to metric tags@L171` (7 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:loads cookies only from named environment entries and never exposes them as metadata@L120` (6 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:models the approved target, two-times spike and soak without running them@L57` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-multitenant.js::multitenantScenario` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/local-smoke.mjs` (5 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-public-qr.js` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-operational.js::operationalScenario` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:requires the full 500-table, 50-terminal and 2000-QR target fixture per unit@L84` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/lib/journeys.js` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/local-smoke.test.mjs::it:turns SIGINT and SIGTERM into fail-closed interruption and terminates active children@L64` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-multitenant.js` (3 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-operational.js` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-public-qr.js::publicQrScenario` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/local-smoke.mjs::command` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/lib/k6-runtime.js` (2 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/load/k6-config.test.mjs::it:resolves fixtures inside the load directory and rejects path traversal@L194` (3 edge(s))

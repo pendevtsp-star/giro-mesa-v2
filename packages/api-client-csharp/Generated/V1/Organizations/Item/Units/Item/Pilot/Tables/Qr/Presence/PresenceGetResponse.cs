@@ -12,6 +12,14 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Pr
     public partial class PresenceGetResponse : IParsable
     #pragma warning restore CS1591
     {
+        /// <summary>The activeTables property</summary>
+#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
+#nullable enable
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_activeTables>? ActiveTables { get; set; }
+#nullable restore
+#else
+        public List<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_activeTables> ActiveTables { get; set; }
+#endif
         /// <summary>The code property</summary>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
@@ -40,6 +48,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Pr
         {
             return new Dictionary<string, Action<IParseNode>>
             {
+                { "activeTables", n => { ActiveTables = n.GetCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_activeTables>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_activeTables.CreateFromDiscriminatorValue)?.AsList(); } },
                 { "code", n => { Code = n.GetObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse.PresenceGetResponse_code>(global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse.PresenceGetResponse_code.CreateFromDiscriminatorValue); } },
                 { "mode", n => { Mode = n.GetEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_mode>(); } },
             };
@@ -51,6 +60,7 @@ namespace GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Pr
         public virtual void Serialize(ISerializationWriter writer)
         {
             if(ReferenceEquals(writer, null)) throw new ArgumentNullException(nameof(writer));
+            writer.WriteCollectionOfObjectValues<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_activeTables>("activeTables", ActiveTables);
             writer.WriteObjectValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse.PresenceGetResponse_code>("code", Code);
             writer.WriteEnumValue<global::GiroMesa.ApiClient.V1.Organizations.Item.Units.Item.Pilot.Tables.Qr.Presence.PresenceGetResponse_mode>("mode", Mode);
         }

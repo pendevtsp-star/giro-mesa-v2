@@ -1210,7 +1210,7 @@
   gap: 6px;
   margin-top: 6px;
 }
-.sidebar__toggle-btn:hover {
+.sidebar .sidebar__toggle-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--gm-shell-text) 12%, transparent);
   color: var(--gm-shell-text);
 }

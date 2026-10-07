@@ -34,7 +34,6 @@ import {
 } from "@nestjs/common";
 import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { DatabaseService } from "../database/database.module.js";
-import { deliveryCoverageStatus } from "../growth/growth.rules.js";
 import { reserveOrderInventory } from "../pilot-operations/order-inventory.js";
 import {
   isWithinAvailability,
@@ -393,7 +392,7 @@ export class PublicOrderService {
       let zoneId: string | null = null;
       let deliveryFeeCents = 0;
       let promisedAt: Date | null = null;
-      let addressValidationStatus: "covered" | "unchecked" | "unavailable" = "unchecked";
+      const addressValidationStatus = "unchecked" as const;
       if (input.fulfillment === "delivery") {
         const [zone] = await tx
           .select({
@@ -401,7 +400,6 @@ export class PublicOrderService {
             feeCents: deliveryZones.feeCents,
             minimumOrderCents: deliveryZones.minimumOrderCents,
             estimatedDeliveryMinutes: deliveryZones.estimatedDeliveryMinutes,
-            geometry: deliveryZones.geometry,
           })
           .from(deliveryZones)
           .where(
@@ -428,13 +426,6 @@ export class PublicOrderService {
         zoneId = zone.id;
         deliveryFeeCents = zone.feeCents;
         promisedAt = new Date(now.getTime() + zone.estimatedDeliveryMinutes * 60_000);
-        const coverage = deliveryCoverageStatus(zone.geometry, input.address);
-        if (coverage === "outside")
-          throw new BadRequestException({
-            code: "PUBLIC_DELIVERY_ADDRESS_OUTSIDE_ZONE",
-            message: "Endereço fora da zona de entrega.",
-          });
-        addressValidationStatus = coverage;
       }
       const totalCents = subtotalCents + deliveryFeeCents;
       if (!Number.isSafeInteger(totalCents)) {

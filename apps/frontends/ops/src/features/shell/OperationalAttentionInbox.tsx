@@ -301,6 +301,7 @@ export function OperationalAttentionInbox({
   const [presence, setPresence] = useState<{
     mode: "session_only" | "daily_code";
     code: string | null;
+    activeTables: Array<{ tableId: string; label: string; code: string }>;
   } | null>(null);
   const pwa = usePwaSnapshot();
   const previousItemIds = useRef<Set<string> | null>(null);
@@ -568,6 +569,18 @@ export function OperationalAttentionInbox({
                 )}
                 {presence?.mode === "daily_code" && presence.code && (
                   <Badge tone="info">Código QR de hoje: {presence.code}</Badge>
+                )}
+                {presence && presence.activeTables.length > 0 && (
+                  <details className="operational-attention-presence">
+                    <summary>Códigos das comandas ativas ({presence.activeTables.length})</summary>
+                    <ul>
+                      {presence.activeTables.map((table) => (
+                        <li key={table.tableId}>
+                          {table.label}: <strong>{table.code}</strong>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 )}
                 {pushConfig?.configured && pushConfig.active && (
                   <Badge tone="success">Notificações externas ativas</Badge>

@@ -4,8 +4,8 @@
 
 Directory-based community: packages/domain
 
-- **Size**: 80 nodes
-- **Cohesion**: 0.4177
+- **Size**: 83 nodes
+- **Cohesion**: 0.4175
 - **Dominant Language**: typescript
 
 ## Members
@@ -27,12 +27,15 @@ Directory-based community: packages/domain
 | it:restricts expired tenants but preserves a bounded shift closure@L84 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/domain.test.ts | 84-94 |
 | it:requires every activation gate@L96 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/domain.test.ts | 96-107 |
 | it:keeps owner universal and staff scoped@L109 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/domain.test.ts | 109-120 |
-| describe:includesDoseClubEntitlement@L5 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 5-12 |
-| it:aceita somente o entitlement explícito ou aliases legados@L6 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 6-11 |
-| describe:doseClubManagedCredential@L14 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 14-24 |
-| it:derives a stable tenant credential without persisting the token@L15 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 15-23 |
-| includesDoseClubEntitlement | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts | 5-10 |
-| doseClubManagedCredential | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts | 12-22 |
+| describe:includesDoseClubEntitlement@L9 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 9-16 |
+| it:aceita somente o entitlement explícito ou aliases legados@L10 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 10-15 |
+| describe:doseClubManagedCredential@L18 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 18-28 |
+| it:derives a stable tenant credential without persisting the token@L19 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 19-27 |
+| describe:trustedDoseClubBaseUrl@L30 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 30-41 |
+| it:allows only the dedicated manual credential or a managed reference at the configured origin@L31 | Test | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts | 31-40 |
+| trustedDoseClubBaseUrl | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts | 7-29 |
+| includesDoseClubEntitlement | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts | 31-36 |
+| doseClubManagedCredential | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts | 38-48 |
 | BusinessHoursPeriod | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts | 1-5 |
 | BusinessHoursRule | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts | 7-10 |
 | BusinessHours | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts | 12-15 |
@@ -59,11 +62,8 @@ Directory-based community: packages/domain
 | polygonContainsPolygon | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts | 59-82 |
 | orientation | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts | 64-65 |
 | convexPolygonsOverlap | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts | 84-101 |
-| floorPlacementConflicts | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts | 103-119 |
-| ActivationChecklist | Class | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 17-17 |
-| missingActivationItems | Function | C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts | 19-21 |
 
-*... and 14 more members.*
+*... and 33 more members.*
 
 ## Execution Flows
 
@@ -73,13 +73,13 @@ No execution flows pass through this community.
 
 ### Outgoing
 
-- `equal` (33 edge(s))
+- `equal` (69 edge(s))
 - `from` (10 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts::hasPermission` (10 edge(s))
+- `throws` (9 edge(s))
+- `some` (7 edge(s))
+- `repeat` (6 edge(s))
+- `trim` (6 edge(s))
 - `update` (6 edge(s))
-- `throws` (5 edge(s))
-- `repeat` (5 edge(s))
-- `some` (5 edge(s))
 - `toString` (5 edge(s))
 - `deepEqual` (4 edge(s))
 - `digest` (4 edge(s))
@@ -91,18 +91,18 @@ No execution flows pass through this community.
 
 ### Incoming
 
-- `equal` (33 edge(s))
+- `equal` (69 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/establishment-hours.ts` (13 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts::hasPermission` (10 edge(s))
+- `throws` (9 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/floor-geometry.ts` (9 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/billing.ts` (7 edge(s))
-- `throws` (5 edge(s))
-- `repeat` (5 edge(s))
+- `repeat` (6 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.ts` (5 edge(s))
 - `deepEqual` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/permissions.test.ts` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/secret-envelope.ts` (4 edge(s))
 - `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/whatsapp.ts` (4 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.test.ts` (3 edge(s))
+- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/doseclub.ts` (3 edge(s))
 - `every` (3 edge(s))
 - `ok` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/onboarding.ts` (3 edge(s))
-- `C:/Users/maxue/projetos_programação/giro_mesa_v2/packages/domain/src/commercial.ts` (2 edge(s))
-- `from` (2 edge(s))

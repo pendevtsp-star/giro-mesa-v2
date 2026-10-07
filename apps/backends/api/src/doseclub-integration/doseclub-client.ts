@@ -227,6 +227,7 @@ export class DoseClubHttpClient implements DoseClubIntegrationClient {
     try {
       const response = await this.fetcher(`${this.integrationBaseUrl}${path}`, {
         ...init,
+        redirect: "error",
         signal: controller.signal,
         headers: {
           accept: "application/json",

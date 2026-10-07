@@ -161,6 +161,30 @@ it("keeps CRM campaign scope, retry safety, loyalty and complete history persist
       phone: "+5511999991002",
       tags: [],
     });
+    for (const action of [
+      () => growth.listCustomers(manager.id, organization.id),
+      () => growth.listCustomerPage(manager.id, organization.id, { limit: 10, offset: 0 }),
+      () => growth.customerDetail(manager.id, organization.id, customerB.id),
+      () => growth.updateCustomer(manager.id, organization.id, customerB.id, { name: "Alterado" }),
+      () =>
+        growth.createCustomer(manager.id, organization.id, {
+          name: "Cliente indevido",
+          defaultUnitId: unitB.id,
+          tags: [],
+        }),
+    ])
+      await assert.rejects(action, hasCode("CRM_GLOBAL_ROLE_REQUIRED"));
+    assert.equal((await growth.listCustomers(organizationManager.id, organization.id)).length, 2);
+    assert.deepEqual(
+      (
+        await growth.listOperationalCustomers(manager.id, organization.id, {
+          unitId: unitA.id,
+          limit: 10,
+          offset: 0,
+        })
+      ).items.map((row) => row.id),
+      [customerA.id],
+    );
     for (const customer of [customerA, customerB])
       await growth.recordConsent(owner.id, organization.id, customer.id, {
         decision: "granted",
