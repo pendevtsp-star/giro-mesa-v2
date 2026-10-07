@@ -323,23 +323,27 @@ it("persists and audits the table QR settings and print lifecycle in PostgreSQL"
     assert.equal(withMetrics.tables[0]?.scanCount, 4);
     assert.ok(withMetrics.tables[0]?.lastScannedAt);
   } finally {
-    if (createdOrganizationId) {
-      await database.db
-        .delete(auditEvents)
-        .where(eq(auditEvents.organizationId, createdOrganizationId));
-      await database.db
-        .delete(outboxEvents)
-        .where(sql`${outboxEvents.payload}->>'organizationId' = ${createdOrganizationId}`);
-      await database.db.delete(organizations).where(eq(organizations.id, createdOrganizationId));
-      const remaining = await database.db
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, createdOrganizationId));
-      assert.equal(remaining.length, 0, "the integration organization must be removed");
+    try {
+      if (createdOrganizationId) {
+        await database.db
+          .delete(auditEvents)
+          .where(eq(auditEvents.organizationId, createdOrganizationId));
+        await database.db
+          .delete(outboxEvents)
+          .where(sql`${outboxEvents.payload}->>'organizationId' = ${createdOrganizationId}`);
+        await database.db.delete(posTabs).where(eq(posTabs.organizationId, createdOrganizationId));
+        await database.db.delete(organizations).where(eq(organizations.id, createdOrganizationId));
+        const remaining = await database.db
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, createdOrganizationId));
+        assert.equal(remaining.length, 0, "the integration organization must be removed");
+      }
+      if (createdIdentityId) {
+        await database.db.delete(identities).where(eq(identities.id, createdIdentityId));
+      }
+    } finally {
+      await database.onModuleDestroy();
     }
-    if (createdIdentityId) {
-      await database.db.delete(identities).where(eq(identities.id, createdIdentityId));
-    }
-    await database.onModuleDestroy();
   }
 });
